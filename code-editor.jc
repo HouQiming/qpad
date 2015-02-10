@@ -1,0 +1,718 @@
+import System.Math.*
+import System.Algorithm.*
+import System.Console.*
+import Gui2D.detail.*
+import Javascript.*
+import TextBox.*
+
+//todo: bracket seeking, indentation handler, line / column handler
+
+/*
+or-ing tokens
+	<
+	<script
+*/
+REAL_TYPE_MOV=0;
+REAL_TYPE_XOR=1;
+REAL_TYPE_ADD=2;
+DEFAULT_WRAP_WIDTH_IN_CHARS=2048LL
+
+struct TBracketType
+	int type
+	int[] tok0,tok1
+
+//0+=0 for non-inc
+struct TBDFATransition
+	i32 m_and
+	i32 m_xor
+	i16 m_delta
+	u16 m_next_state
+
+struct TColorRule
+	string color_name
+	//int bid
+	//int extend_0,extend_1
+	int bmask
+	int extend_before
+		
+class CLanguageDescription
+	//int[] m_enabled_from_inside
+	int[] m_all_key_states
+	int[] m_id_from_key_state
+	u8[] m_char_map
+	u16[] m_bigchar_dfa
+	int m_total_state_size
+	int m_context_size
+	int m_n_char_types
+	int m_n_key_states
+	u8[] m_token_lengths
+	int m_n_tokens
+	//the initial state is always 0
+	/////////
+	//TBracketType[] m_bracket_types
+	TBDFATransition[] m_bracket_dfa
+	TColorRule[] m_coloring_rules
+
+class CLayouter_programmer
+	FLAG_HAS_TAB=1
+	FLAG_HAS_ENTER=2
+	/////////
+	m_wrap_width_in_fp=0LL
+	m_tab_width_in_fp=0LL
+	m_tab_width=4
+	m_wrap_width=0.f
+	m_font=TFont()
+	m_bgcolor_selection=0xff800000
+	m_color_overlay=0xff000000
+	//////////////
+	JSObject m_style
+	CLanguageDescription m_lang
+	int[] m_cached_colors
+	//todo: easy color change...
+	/////////////////
+	charWidth=inline(ch){
+		return float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))
+	}
+	charHeight=inline(){
+		return float2fixed(g_renderer.GetCharacterHeight(m_font))
+	}
+	/////////////////
+	//this thing isn't line-only
+	name=function(){return "renderer"}
+	stateSize=function(){return 4}
+	/////////////////
+	//final format: pre-tab width, has-tabbed-ness, tab-enter width, has-enter-ness, post-enter width
+	//do not use a render-central design
+	AddString=function(i64[] a,i64[] unused,string s_context,string s,iptr ofs){
+		w_pre_tab=0LL
+		w_tab_enter=0LL
+		w_post_enter=0LL
+		flags=0
+		foreach ch,I in Utf8Chars(s)
+			if I>=ofs:break
+			if ch=='\t':
+				if !(flags&FLAG_HAS_ENTER):
+					if !(flags&FLAG_HAS_TAB):
+						flags|=FLAG_HAS_TAB
+					else
+						w_tab_enter=(w_tab_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+				else
+					w_post_enter=(w_post_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+			else if ch=='\n':
+				if !(flags&FLAG_HAS_ENTER):
+					flags|=FLAG_HAS_ENTER
+				else
+					w_post_enter=(w_post_enter/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+			else if ch!='\r':
+				dx=charWidth(ch)
+				if !(flags&FLAG_HAS_ENTER):
+					if !(flags&FLAG_HAS_TAB):
+						w_pre_tab+=dx
+					else 
+						w_tab_enter+=dx
+				else
+					w_post_enter+=dx
+		a[0]=w_pre_tab
+		a[1]=w_tab_enter
+		a[2]=w_post_enter
+		a[3]=i64(flags)
+	}
+	Add=function(i64[] a,i64[] b){
+		a_w_pre_tab=a[0]
+		a_w_tab_enter=a[1]
+		a_w_post_enter=a[2]
+		a_flags=int(a[3])
+		b_w_pre_tab=b[0]
+		b_w_tab_enter=b[1]
+		b_w_post_enter=b[2]
+		b_flags=int(b[3])
+		if a_flags&FLAG_HAS_ENTER:
+			//a_w_post_enter
+			a_w_post_enter+=b_w_pre_tab
+			if b_flags&FLAG_HAS_TAB:
+				a_w_post_enter=(a_w_post_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+			a_w_post_enter+=b_w_tab_enter
+			if b_flags&FLAG_HAS_ENTER:
+				a_w_post_enter=(a_w_post_enter/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+			a_w_post_enter+=b_w_post_enter
+		else if a_flags&FLAG_HAS_TAB:
+			a_w_tab_enter+=b_w_pre_tab
+			if b_flags&FLAG_HAS_TAB:
+				a_w_tab_enter=(a_w_tab_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+			a_w_post_enter+=b_w_tab_enter
+			if b_flags&FLAG_HAS_ENTER:
+				a_flags|=FLAG_HAS_ENTER
+				a_w_post_enter=b_w_post_enter
+		else
+			a_w_pre_tab+=b_w_pre_tab
+			a_flags=b_flags
+			a_w_tab_enter=b_w_tab_enter
+			a_w_post_enter=b_w_post_enter
+		a[0]=a_w_pre_tab
+		a[1]=a_w_tab_enter
+		a[2]=a_w_post_enter
+		a[3]=i64(a_flags)
+	}
+	GetFlatX=inline(i64[] a){
+		w_pre_tab=a[0]
+		w_tab_enter=a[1]
+		w_post_enter=a[2]
+		flags=int(a[3])
+		x=w_pre_tab
+		if flags&FLAG_HAS_TAB:
+			x=(x/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+		x+=w_tab_enter
+		if flags&FLAG_HAS_ENTER:
+			x=(x/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+		x+=w_post_enter
+		return x
+	}
+	XYToX=inline(i64 x,i64 y){
+		hc=charHeight()
+		return max(min(x,m_wrap_width_in_fp-1LL),0LL)+(y/hc)*m_wrap_width_in_fp
+	}
+	/////////////////
+	//compare known-positive doubles as ints
+	Compare=function(i64[] a,i64[] b){
+		return __C_compare(GetFlatX(a),XYToX(b[0],b[1]))
+	}
+	SeekInBlock=function(i64[] a,i64[] unused,string s,i64[] b){
+		x_goal=XYToX(b[0],b[1])
+		x=GetFlatX(a)
+		foreach ch,I in Utf8Chars(s)
+			if x>=x_goal:return I
+			if ch=='\t':
+				x=(x/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+			else if ch=='\n':
+				x=(x/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+			else if ch!='\r':
+				dx=charWidth(ch)
+				x+=dx
+		return s.n
+	}
+	/////////////////
+	long2 m_caret_overlay
+	JSObject m_overlay_obj
+	i64 m_caret_offset
+	SetTextStyle=function(JSObject obj){
+		m_lang=obj["language"].as(CLanguageDescription)
+		m_font=obj["font"].as(TFont)
+		m_font.h/=g_renderer.m_pixels_per_unit
+		m_tab_width=obj["tab_width"].or(8)
+		m_wrap_width=obj["wrap_width"].or(0.f)
+		m_tab_width_in_fp=i64(m_tab_width)*charWidth(int(' '))
+		if !(m_wrap_width>0.f):
+			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
+		else
+			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
+		////////////
+		m_cached_colors=new int[m_lang.m_coloring_rules.n+1]
+		m_cached_colors[0]=obj["color"].or(0xff000000)
+		foreach crule,I in m_lang.m_coloring_rules
+			m_cached_colors[I+1]=obj[crule.color_name].or(0xff000000)
+		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
+		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
+	}
+	SetCaretOverlay=function(i64 x,i64 y,JSObject obj){
+		m_overlay_obj=obj
+		w_overlayd=0.
+		if obj:
+			s=obj["text"].as(string)
+			if s:
+				w_overlayd=GetStringWidth(m_font,s)
+		w_overlay=double2fixed(w_overlayd)
+		m_caret_overlay=long2(XYToX(x,y),w_overlay)
+		m_caret_offset=0LL
+		return w_overlay
+	}
+	GetCaretOffset=function(){
+		return m_caret_offset
+	}
+	RenderText=function(i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+		//todo: keywords
+		fnt_scaled=m_font
+		fnt_scaled.h*=scaling
+		//smart emboldening for SRGB
+		//coulddo: per-color emboldening
+		if g_renderer.m_srgb_supported:
+			color_default=m_cached_colors[0]
+			fnt_scaled.embolden+=int((1.f-float(19589*(color_default&0xff)+38470*((color_default>>8)&0xff)+7477*((color_default>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
+		hc=charHeight()
+		x=GetFlatX(a)
+		if x>m_caret_overlay.x:
+			x+=m_caret_overlay.y
+		tab_width=m_tab_width_in_fp
+		wrap_width=m_wrap_width_in_fp
+		inline projectXY(i64 x0)
+			auto y=x0/wrap_width
+			auto x=x0-y*wrap_width
+			y*=hc
+			return float2(fixed2float(x-scroll_x)*scaling+screen_x,fixed2float(y-scroll_y)*scaling+screen_y)
+		for ch,I in Utf8Chars(s)
+			if x==m_caret_overlay.x&&m_overlay_obj:
+				s_overlay=m_overlay_obj["text"].as(string)
+				prj_x=projectXY(x)
+				if s_overlay:
+					overlay_sel0=m_overlay_obj["start"].or(0L)
+					overlay_sel1=overlay_sel0+m_overlay_obj["length"].or(0L)
+					if m_overlay_obj["type"].as(string)=="IME":
+						cmap=new iptr[]
+						foreach chj,J in Utf8Chars(s_overlay)
+							cmap.push(J)
+						cmap.push(s_overlay.n)
+						overlay_sel0=min(overlay_sel0,cmap.n-1)
+						overlay_sel1=min(overlay_sel1,cmap.n-1)
+						if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
+							x_sel0=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel0]-1])
+							x_sel1=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel1]-1])
+							m_caret_offset=double2fixed(x_sel1)
+							if x_sel0>x_sel1:
+								(x_sel0,x_sel1)=(x_sel1,x_sel0)
+							//selection - pre-draw the highlight
+							if x_sel0<x_sel1:
+								g_renderer.DrawBitmap(0, prj_x.x+float(x_sel0),prj_x.y,float((x_sel1-x_sel0)*scaling),fixed2float(hc), m_bgcolor_selection)
+						else
+							x_sel0=0.
+							x_sel1=0.
+					xo=x
+					foreach chj,J in Utf8Chars(s_overlay)
+						dx_j=charWidth(chj)
+						prj_xo=projectXY(xo)
+						g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+						xo+=dx_j
+				else
+					assert(0)
+				if m_overlay_obj["type"].as(string)=="IME":
+					//draw the underline
+					y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
+					g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.y)*scaling,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
+				x+=m_caret_overlay.y
+			if ch=='\n':
+				x=(x/wrap_width+1LL)*wrap_width
+			else if ch=='\r':
+				//nothing
+				continue
+			else if ch==' ':
+				x+=charWidth(ch)
+			else if ch=='\t':
+				x=(x/tab_width+1LL)*tab_width
+			else
+				dx_i=charWidth(ch)
+				prj_x=projectXY(x)
+				g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids?int(color_ids[I]):0], ch)
+				x+=dx_i
+	}
+	GetCharacterHeightAt=function(i64[] a,i64[] pp,string s,iptr ofs){
+		return charHeight()
+	}
+	GetDefaultFont=function(){
+		return m_font
+	}
+	GetXYFromState=function(i64[] a){
+		x0=GetFlatX(a)
+		y=x0/m_wrap_width_in_fp
+		x=x0-y*m_wrap_width_in_fp
+		y*=charHeight()
+		return long2(x,y)
+	}
+	//////////////////////////////
+	__JS_prototype=function(JSObject proto){}
+
+class CColorer_programmer
+	CLanguageDescription m_lang
+	name=function(){return "colorer"}
+	stateSize=function(){return m_lang.m_total_state_size}
+	contextSize=function(){return m_lang.m_context_size}
+	SetTextStyle=function(JSObject obj){
+		m_lang=obj["language"].as(CLanguageDescription)
+	}
+	//state format: ~and_mask|xor_mask, global bracket delta
+	inline EnumTokens(string s_context,string s)
+		//do the dfa and get all tokens
+		return {'forEach':inline(fbody_outer){
+			auto ld=m_lang
+			auto sz_context=ld.m_context_size
+			auto n_char_types=ld.m_n_char_types
+			auto char_map=ld.m_char_map
+			auto dfa=ld.m_bigchar_dfa
+			auto token_lengths=ld.m_token_lengths
+			container={'forEach':inline(fbody){
+				for i=0:sz_context-1
+					fbody(s_context[s_context.n-sz_context+i],~i)
+				foreach ch,I in s
+					fbody(ch,int(I))
+			}}
+			st=0
+			foreach ch,I in container
+				if st<0:
+					if I>=0:
+						//Writeln('token: ',~st,' at ',I)
+						fbody_outer(~st,I,token_lengths[~st])
+					st=0
+				chi=int(char_map[int(u8(ch))])
+				st=int(i16(dfa[st*n_char_types+chi]))
+		}}
+	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
+		//here it's just the states
+		ld=m_lang
+		key_mask=(1<<ld.m_n_key_states)-1
+		//do the dfa and get all tokens
+		tokens=new u8[]
+		foreach tok,I in EnumTokens(s_context,s)
+			//I is the finishing position
+			if I>ofs:break
+			tokens.push(u8(tok))
+		bdfa=ld.m_bracket_dfa
+		for sti=0:ld.m_n_key_states-1
+			pa=3*sti
+			and_mask=~int(a[pa+0]>>32)
+			xor_mask=int(a[pa+0])
+			inc_value=0
+			min_value=0
+			st=ld.m_id_from_key_state[((ld.m_all_key_states[sti]&and_mask)^xor_mask)&key_mask]*ld.m_n_tokens
+			foreach tok,I in tokens
+				tran=bdfa[st+int(tok)]
+				and_mask&=tran.m_and
+				xor_mask&=tran.m_and
+				xor_mask^=tran.m_xor
+				st=int(tran.m_next_state)
+				inc_value+=int(tran.m_delta)
+				//if !sti:Write(inc_value)
+				if min_value>inc_value:
+					min_value=inc_value
+			//if !sti:Writeln(' ',inc_value,' ',ofs)
+			a[pa+0]=((i64(~and_mask)<<32)|i64(u32(xor_mask)))
+			a[pa+1]+=i64(inc_value)
+			a[pa+2]=min(a[pa+2],i64(min_value))
+	}
+	Add=function(i64[] a,i64[] b){
+		ld=m_lang
+		m_all_key_states=ld.m_all_key_states
+		m_id_from_key_state=ld.m_id_from_key_state
+		key_mask=(1<<ld.m_n_key_states)-1
+		for sti=0:ld.m_n_key_states-1
+			pa=3*sti
+			and_maska=~int(a[pa+0]>>32)
+			xor_maska=int(a[pa+0])
+			//we need a state lookup to cover the happened key transitions
+			pb=3*m_id_from_key_state[((m_all_key_states[sti]&and_maska)^xor_maska)&key_mask]
+			and_maskb=~int(b[pb+0]>>32)
+			xor_maskb=int(b[pb+0])
+			and_mask=(and_maska&and_maskb)
+			xor_mask=((xor_maska&and_maskb)^xor_maskb)
+			a[pa+0]=((i64(~and_mask)<<32)|i64(u32(xor_mask)))
+			a[pa+2]=min(a[pa+2],a[pa+1]+b[pb+2])
+			a[pa+1]+=b[pb+1]
+	}
+	//For coloring states, we need a colorer
+	//latex \: use word-based highlighting
+	ComputeCharColorID=function(i64[] a,string s_context,string s){
+		ld=m_lang
+		crules=ld.m_coloring_rules
+		bdfa=ld.m_bracket_dfa
+		//////////////
+		key_mask=(1<<ld.m_n_key_states)-1
+		and_maska=~int(a[0]>>32)
+		xor_maska=int(a[0])
+		bst=ld.m_id_from_key_state[xor_maska&key_mask]*ld.m_n_tokens
+		mask=xor_maska
+		mask0=0
+		struct TColoringEvent
+			int ofs
+			i8 rule_id
+			i8 direction
+		coloring_events=new TColoringEvent[]
+		foreach tok,I,lg_token in EnumTokens(s_context,s)
+			//ignore nest-only brackets
+			tran=bdfa[bst+tok]
+			//Writeln(I,' ',bst/ld.m_n_tokens,' ',tok,' ',tran,' ',mask)
+			bst=int(tran.m_next_state)
+			mask&=tran.m_and
+			mask^=tran.m_xor
+			if mask!=mask0:
+				//test color rules sequentially - they are only tested at color *changes*
+				for i=crules.n-1:-1:0
+					mask_i=crules[i].bmask
+					if (mask^mask0)&mask_i:
+						evt=TColoringEvent(){rule_id:i8(i)}
+						if mask&mask_i:
+							//we're entering, backtrack
+							evt.ofs=I-iptr(lg_token)
+							evt.direction=i8(1)
+						else
+							evt.ofs=I
+							evt.direction=i8(0)
+						coloring_events.push(evt)
+				mask0=mask
+		coloring_events.Sortby(inline(evt){return evt.ofs})
+		crule_activation=new i8[crules.n]
+		ret=new u8[s.n]
+		ofs_last=0L
+		active_color=0
+		foreach evt in coloring_events
+			crule_activation[evt.rule_id]=int(evt.direction)
+			if ofs_last<evt.ofs:
+				for j=ofs_last:evt.ofs-1
+					ret[j]=active_color
+				ofs_last=evt.ofs
+			active_color=0
+			for ci=crule_activation.n-1:-1:0
+				if crule_activation[ci]:
+					active_color=ci+1
+					break
+		for j=ofs_last:ret.n-1
+			ret[j]=active_color
+		//Writeln(coloring_events)
+		//Writeln(ret)
+		return ret
+	}
+	/////////////////////////////
+	//bracket seeking
+	SEEK_MODE_BRACKET=0LL
+	SEEK_MODE_STATE=1LL
+	hasValidResult=function(i64[] a,i64[] da, i64[] b){
+		if b[0]==SEEK_MODE_BRACKET:
+			return a[1]+da[2]<=b[1]
+		else
+			assert(0)
+			return 0
+	}
+	QueryPerCharValidity=function(i64[] a,i64[] pp,string s_context,string s, i64[] b){
+		if b[0]==SEEK_MODE_BRACKET:
+			ld=m_lang
+			key_mask=(1<<ld.m_n_key_states)-1
+			bdfa=ld.m_bracket_dfa
+			cur_delta=(a[1]-b[1])
+			and_mask=~int(a[0]>>32)
+			xor_mask=int(a[0])
+			st=ld.m_id_from_key_state[((ld.m_all_key_states[0]&and_mask)^xor_mask)&key_mask]*ld.m_n_tokens
+			ret=new i8[s.n+1]
+			ofs_last=0L
+			is_valid=i8(cur_delta<=0LL)
+			foreach tok,I in EnumTokens(s_context,s)
+				for i=ofs_last:I-1
+					ret[i]=is_valid
+				ofs_last=I
+				tran=bdfa[st+int(tok)]
+				and_mask&=tran.m_and
+				xor_mask&=tran.m_and
+				xor_mask^=tran.m_xor
+				st=int(tran.m_next_state)
+				cur_delta+=i64(tran.m_delta)
+				is_valid=i8(cur_delta<=0LL)
+			for i=ofs_last:ret.n-1
+				ret[i]=is_valid
+			return ret
+		else
+			assert(0)
+			return i8[].NULL
+	}
+	////////////////////
+	//for JS operations
+	__JS_prototype=function(JSObject proto){}
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["CreateLanguageDefinition"]=function(JSContext JS){
+		//create from a LanguageDefinition object
+		obj=JS.Param(0).as(JSObject)
+		if !obj:return JS.ReturnError("undefined language definition object")
+		ret=new CLanguageDescription
+		//bigchar part
+		m_big_chars=obj["m_big_chars"].as(JSObject)
+		if !m_big_chars:return JS.ReturnError("undefined token list")
+		native_bigchars=new string[]
+		token_lengths=new u8[]
+		char_map=new u8[256]
+		context_size=0L
+		for i=0:m_big_chars.length()-1
+			s_bigchar_i=m_big_chars[i].or("")
+			if !s_bigchar_i.n:return JS.ReturnError("tokens cannot be empty")
+			native_bigchars.push(s_bigchar_i)
+			token_lengths.push(int(s_bigchar_i.n))
+			foreach ch in s_bigchar_i
+				char_map[int(u8(ch))]=1
+			context_size=max(context_size,s_bigchar_i.n)
+		ret.m_context_size=int(context_size)
+		////////////////////////////
+		//we need bigchars to be a prefix code, but no checking yet
+		//it's just AhoCorasick... but the builtin implementation is not for this
+		//here we can affored precomputation, but runtime cost should be minimized: no funny business with next
+		//and we can do it 8-bit - don't need awareness to handle UTF8
+		assert(native_bigchars.n<128)
+		n_char_types=1
+		for i=0:255
+			if char_map[i]:
+				char_map[i]=n_char_types
+				n_char_types++
+		assert(n_char_types<=256)
+		fc_lists=new int[][n_char_types]
+		for i=0:fc_lists.n-1
+			fc_lists[i]=new int[]
+		foreach spattern,I in native_bigchars
+			ch0=int(u8(spattern[0]))
+			if spattern.n==1:
+				state=~int(I)
+			else
+				state=int(I)|(1<<16)
+			fc_lists[int(char_map[ch0])].push(state)
+		//multi-state DFA -> single-state DFA
+		state_map=new int[int[]]
+		ops_map=new int[u16[]]
+		state_addrs=[0]
+		Q=[new int[]]
+		dfa=new u16[n_char_types]
+		dfa_ops=new u16[]
+		reached=new i8[native_bigchars.n]
+		for(i=0L;i<Q.n;i++)
+			cur_states=Q[i]
+			my_addr=i*n_char_types
+			tran=new int[][n_char_types]
+			for j=0:tran.n-1
+				tran[j]=new(fc_lists[j])
+			//fc_lists
+			foreach stpacked in cur_states
+				pid=(stpacked&0xffff)
+				pos=(stpacked>>16)
+				s_pid=native_bigchars[pid]
+				ch_std=int(char_map[int(u8(s_pid[pos]))])
+				pos++
+				if pos>=s_pid.n:
+					//add action
+					tran[ch_std].push(~pid)
+				else
+					tran[ch_std].push(pid+(pos<<16))
+			//Write(cur_states,' ')
+			for j=0:tran.n-1
+				new_states=tran[j]
+				new_states.Sort()
+				new_states.Unique()
+				actions=u16[].NULL
+				if new_states.n&&new_states[0]<0:
+					//actions - higher pid should take higher priority and get sorted first
+					new_stid=new_states[0]
+					reached[~new_states[0]]=1
+				else
+					new_stid=state_map[new_states]
+					if !new_stid:
+						if new_states.n:
+							new_stid=int(Q.n)
+							Q.push(new_states)
+							dfa.resize(dfa.n+n_char_types)
+							assert(dfa.n==n_char_types*Q.n)
+							state_map[new_states]=new_stid
+				dfa[my_addr+j]=u16(new_stid)
+		ret.m_char_map=char_map
+		ret.m_n_char_types=n_char_types
+		ret.m_bigchar_dfa=dfa
+		for i=0:reached.n-1
+			if !reached[i]:
+				Writeln("warning: big char '@1' can never get triggered".Replace(["@1",native_bigchars[i]]))
+		/////////////
+		//the list of brackets
+		m_bracket_types=obj["m_bracket_types"].as(JSObject)
+		if !m_bracket_types:return JS.ReturnError("undefined bracket types")
+		n_key_brackets=0
+		brackets=new TBracketType[]
+		auto parseTokenSet(JSObject obj,string s_name)
+			auto obj_set=obj[s_name].as(JSObject)
+			auto n=obj_set.length()
+			auto ret_set=new int[n]
+			for j=0:n-1
+				ret_set[j]=obj_set[j].or(0)
+			return ret_set
+		for i=0:m_bracket_types.length()-1
+			obj_i=m_bracket_types[i].as(JSObject)
+			if !obj_i:return JS.ReturnError("undefined bracket type")
+			type=obj_i["type"].or(REAL_TYPE_MOV)
+			is_key=obj_i["is_key"].or(0)
+			if is_key:
+				assert(n_key_brackets==i)
+				n_key_brackets=i+1
+			tok0=parseTokenSet(obj_i,"tok0")
+			tok1=parseTokenSet(obj_i,"tok1")
+			brackets.push(TBracketType(){type:type,tok0:tok0,tok1:tok1})
+		assert(n_key_brackets<=12)
+		/////////////
+		//the state masking rules
+		m_enabled_from_inside=new int[1<<n_key_brackets]
+		m_id_from_key_state=new int[1<<n_key_brackets]
+		m_all_key_states=new int[]
+		m_entry_states=obj["m_entry_states"].as(JSObject)
+		if !m_entry_states:return JS.ReturnError("undefined entry states")
+		for i=0:m_entry_states.length()-1
+			obj_i=m_entry_states[i].as(JSObject)
+			if !obj_i:return JS.ReturnError("undefined entry state")
+			inside_mask=obj_i["inside"].or(0)
+			m_enabled_from_inside[inside_mask]=obj_i["enabled"].or(0)
+			m_id_from_key_state[inside_mask]=i+1
+			m_all_key_states.push(inside_mask)
+		for i=0:m_id_from_key_state.n-1
+			m_id_from_key_state[i]--
+		ret.m_all_key_states=m_all_key_states
+		/////////////
+		//the bracket DFA
+		n_key_states=m_all_key_states.n
+		n_tokens=native_bigchars.n
+		bdfa=new TBDFATransition[n_key_states*n_tokens]
+		assert(bdfa.n<32768)
+		for sti=0:n_key_states-1
+			st=sti*n_tokens
+			key_state=m_all_key_states[sti]
+			enabled_mask=m_enabled_from_inside[key_state]
+			for i=0:brackets.n-1
+				if !(enabled_mask&(1<<i)):continue
+				type=brackets[i].type
+				tok0=brackets[i].tok0
+				tok1=brackets[i].tok1
+				mask_i=1<<i
+				if type==REAL_TYPE_MOV:
+					//m_and will be noted later
+					foreach tok in tok0
+						bdfa[st+tok].m_and|=mask_i
+						bdfa[st+tok].m_xor|=mask_i
+					foreach tok in tok1
+						bdfa[st+tok].m_and|=mask_i
+				else if type==REAL_TYPE_XOR:
+					foreach tok in tok0
+						bdfa[st+tok].m_xor|=mask_i
+					foreach tok in tok1
+						bdfa[st+tok].m_xor|=mask_i
+				else if type==REAL_TYPE_ADD:
+					foreach tok in tok0
+						assert(!bdfa[st+tok].m_delta)
+						bdfa[st+tok].m_delta+=i16(1)
+					foreach tok in tok1
+						assert(!bdfa[st+tok].m_delta)
+						bdfa[st+tok].m_delta+=i16(-1)
+				else
+					assert(0)
+			for i=0:n_tokens-1
+				bdfa[st+i].m_and=~bdfa[st+i].m_and
+				key_state_i=((key_state&bdfa[st+i].m_and)^bdfa[st+i].m_xor)
+				bdfa[st+i].m_next_state=u16((m_id_from_key_state[key_state_i])*n_tokens)
+				assert(m_id_from_key_state[key_state_i]>=0)
+		ret.m_id_from_key_state=m_id_from_key_state
+		ret.m_n_key_states=n_key_states
+		ret.m_token_lengths=token_lengths
+		ret.m_n_tokens=n_tokens
+		ret.m_bracket_dfa=bdfa
+		/////////////
+		//the coloring rules
+		m_coloring_rules=obj["m_coloring_rules"].as(JSObject)
+		ret.m_coloring_rules=new TColorRule[]
+		for i=0:m_coloring_rules.length()-1
+			obj_i=m_coloring_rules[i].as(JSObject)
+			if !obj_i:return JS.ReturnError("undefined coloring rules")
+			bid=obj_i["bid"].or(0)
+			ret.m_coloring_rules.push(TColorRule(){
+				color_name:obj_i["color_name"].or(""),
+				bmask:1<<bid})
+		/////////
+		//1 bitmask + 1 counter for each nested + 1 min
+		ret.m_total_state_size=3*m_all_key_states.n
+		return JS.Return(ret)
+	}
+})
+
+registerStateHandler("renderer_programmer",CLayouter_programmer)
+registerStateHandler("colorer_programmer",CColorer_programmer)

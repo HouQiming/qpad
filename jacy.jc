@@ -1,0 +1,39 @@
+import "text-box.jc"
+import "code-editor.jc"
+import "uisandbox.jc"
+import Gui2D.*
+import Javascript.*
+import System.Console.*
+import Uisandbox.*
+
+__generate_json("js_units","gui2d/ui.js")
+__generate_json("js_units","gui2d/widgets.js")
+__generate_json("js_units","gui2d/dockbar.js")
+
+(function(){
+	JS=new JSContext
+	jsio=JS.New()
+	JS.GetGlobal()["IO"]=jsio
+	jsio["ReadFile"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		ret=System.IO.ReadAll(fn)
+		if !ret:
+			return 0
+		else
+			return JS.Return(ret)
+	}
+	jsio["CreateFile"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		data=JS.Param(1).or(new string)
+		f=System.IO.CreateFile(fn)
+		if f:
+			lg=f.Write(data)
+			f.Close()
+			return JS.Return(lg)
+		else
+			return 0
+	}
+	sbox=setupModuleSystem(JS,1)
+	sbox.UILoadZip(string.NULL)
+	sbox.UIRunJS(JS,"res/jacy.js")
+})()

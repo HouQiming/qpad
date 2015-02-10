@@ -1,0 +1,73 @@
+import "text-box.jc"
+import Gui2D.*
+import Javascript.*
+import System.Console.*
+import System.Math.*
+import GL.*
+
+class CSandbox
+	JSContext JS
+	m_relative_scaling=1.f
+	js_eval=function(JSContext JS_original){
+		s_code=JS_original.Param(0).as(string)
+		s_file=JS_original.Param(1).or("<eval>")
+		if !s_code:return 0
+		R=Gui2D.detail.g_renderer
+		tmp=R.m_pixels_per_unit
+		R.m_pixels_per_unit=tmp*m_relative_scaling
+		err=JS.evalVoid(s_code,s_file)
+		R.m_pixels_per_unit=tmp
+		if err:
+			return JS_original.ReturnError(err["stack"].or(""))
+		else
+			return 0
+	}
+	js_DrawWindow=function(JSContext JS_original){
+		//we can only draw sub-windows at integer locations
+		R=Gui2D.detail.g_renderer
+		x=int(JS_original.Param(0).as(float)*R.m_pixels_per_unit)
+		y=int(JS_original.Param(1).as(float)*R.m_pixels_per_unit)
+		hwnd=JS["UI"]["sandbox_main_window"].as(CSandboxWindow)
+		if !hwnd:
+			return 0
+		else
+			w=int(ceil(f32(hwnd.w)*R.m_pixels_per_unit*m_relative_scaling))
+			h=int(ceil(f32(hwnd.h)*R.m_pixels_per_unit*m_relative_scaling))
+			prev_viewport=new int[4]
+			glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
+			glViewport(x,prev_viewport[1]+prev_viewport[3]-y-h,w,h)
+			R.DrawWindow(__pointer(hwnd))
+			glViewport(prev_viewport[0],prev_viewport[1],prev_viewport[2],prev_viewport[3])
+			return JS_original.Return(1)
+	}
+	js_ReadBack=function(JSContext JS_original){
+		s_code=JS_original.Param(0).as(string)
+		s_file=JS_original.Param(1).or("<eval>")
+		if !s_code:return 0
+		R=Gui2D.detail.g_renderer
+		tmp=R.m_pixels_per_unit
+		R.m_pixels_per_unit=tmp*m_relative_scaling
+		s_ret=JS.eval(string,s_code,s_file)
+		R.m_pixels_per_unit=tmp
+		if !s_ret:
+			return 0
+		else
+			return JS_original.Return(s_ret)
+	}
+	//use a pre-created window object
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"m_relative_scaling")
+		proto.ExportMethod(this,"eval",js_eval)
+		proto.ExportMethod(this,"DrawWindow",js_DrawWindow)
+		proto.ExportMethod(this,"_ReadBack",js_ReadBack)
+	}
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["CreateSandbox"]=function(JSContext JS){
+		JS_new=new JSContext
+		sbox=setupModuleSystem(JS_new,0)
+		//load our own zip for the units
+		sbox.UILoadZip(string.NULL)
+		return JS.Return(new CSandbox(){JS:JS_new})
+	}
+})
