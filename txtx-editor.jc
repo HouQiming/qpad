@@ -1,0 +1,270 @@
+import "text-box.jc"
+import System.Math.*
+import System.Algorithm.*
+import System.Console.*
+import Gui2D.detail.*
+import Javascript.*
+import TextBox.*
+
+//separate document and stylesheet?
+CHAR_INSERT_OBJECT=1
+CHAR_SET_STYLE=2
+class CLayouter_fancy
+	MODE_BB=0
+	MODE_SEEK=1
+	MODE_RENDER=2
+	/////////
+	m_wrap_width=800.f
+	m_tab_width=8
+	m_font=TFont()
+	m_color=0xff000000
+	m_bgcolor_selection=0xff800000
+	CHyphenator m_hyphenator
+	/////////////////
+	name=function(){return "renderer"}
+	stateSize=function(){return 2}
+	isLineOnly=function(){return 1}
+	/////////////////
+	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
+		!? //DP with CHAR_SET_STYLE
+		line_breaks=new i64[]
+		if m_wrap_width>0.f:
+			line_breaksi=DPLayoutText(m_font,s,m_wrap_width, m_hyphenator)
+			line_breaks=new i64[line_breaksi.n]
+			for i=0:line_breaks.n-1
+				line_breaks[i]=i64(line_breaksi[i]&0x7fffffff)|(i64(line_breaksi[i]&0x80000000)<<32)
+		else
+			//it's the *additional* line_breaks
+			line_breaks.push(0LL)
+			line_breaks.push(i64(s.n))
+		return line_breaks
+	}
+	AddString=function(i64[] a,i64[] line_breaks,string s_context,string s,iptr ofs){
+		bb=_RenderText(MODE_BB,a,line_breaks,s,ofs, 0LL,0LL,0.f,0.f,0.f).bb
+		a[0]=bb.x
+		a[1]=bb.y
+	}
+	Add=function(i64[] a,i64[] b){
+		bb=combineEditorOffset(long2(a[0],a[1]),long2(b[0],b[1]))
+		a[0]=bb.x
+		a[1]=bb.y
+	}
+	/////////////////
+	Compare=function(i64[] a,i64[] b){
+		ret=__C_compare(a[1],b[1])
+		if ret==0:ret=__C_compare(a[0],b[0])
+		return ret
+	}
+	SeekInBlock=function(i64[] a,i64[] line_breaks,string s,i64[] b){
+		return iptr(_RenderText(MODE_SEEK,a,line_breaks,s,s.n, b[0],b[1],0.f,0.f,0.f).seek_ret)
+	}
+	/////////////////
+	long3 m_caret_overlay
+	JSObject m_overlay_obj
+	i64 m_caret_offset
+	SetTextStyle=function(JSObject obj){
+		m_font=obj["font"].as(TFont)
+		m_font.h/=g_renderer.m_pixels_per_unit
+		m_color=int(obj["color"].or(u32(m_color)))
+		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
+		m_tab_width=obj["tab_width"].or(8)
+		m_wrap_width=obj["wrap_width"].or(0.f)
+		m_hyphenator=obj["hyphenator"].or(g_default_hyphenator)
+	}
+	SetCaretOverlay=function(i64 x,i64 y,JSObject obj){
+		m_overlay_obj=obj
+		w_overlayd=0.
+		if obj:
+			s=obj["text"].as(string)
+			if s:
+				w_overlayd=GetStringWidth(m_font,s)
+		w_overlay=double2fixed(w_overlayd)
+		m_caret_overlay=long3(x,y,w_overlay)
+		m_caret_offset=0LL
+		return w_overlay
+	}
+	GetCaretOffset=function(){
+		//Writeln(m_caret_overlay,' ',m_caret_offset)
+		//if m_overlay_obj:
+		//	Writeln(m_overlay_obj["text"].as(string))
+		return m_caret_offset
+	}
+	charWidth=inline(ch){
+		return float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))
+	}
+	charHeight=inline(){
+		return float2fixed(g_renderer.GetCharacterHeight(m_font))
+	}
+	_RenderText=function(int mode,i64[] a,i64[] line_breaks,string s,iptr ofs, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+		if mode==MODE_RENDER:
+			//Writeln('before fnt_scaled ',m_font.h,' ',scaling)
+			fnt_scaled=m_font
+			fnt_scaled.h*=scaling
+			//smart emboldening for SRGB
+			if g_renderer.m_srgb_supported:
+				fnt_scaled.embolden+=int((1.f-float(19589*(m_color&0xff)+38470*((m_color>>8)&0xff)+7477*((m_color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
+			//Writeln('after fnt_scaled ',m_font.h)
+			//scalingd=double(scaling)
+		w_tab=i64(m_tab_width)*charWidth(' ')
+		hc=charHeight()
+		x=a[0]
+		y=a[1]
+		if mode==MODE_RENDER:
+			//if epsEqual(y,m_caret_overlay.y)&&x>m_caret_overlay.x:
+			if y==m_caret_overlay.y&&x>m_caret_overlay.x:
+				x+=m_caret_overlay.z
+		is_wrapping=(m_wrap_width>0.f)
+		w_space=charWidth(' ')
+		w_hyphen=charWidth('-')
+		for i=0:line_breaks.n-2
+			got_newline=0
+			//justified wrapping
+			space_padding=0LL
+			space_padding_rem=0
+			need_to_pad_non_space=0
+			has_hyphen=0
+			i_padding=0
+			if is_wrapping&&i<line_breaks.n-1:
+				nspaces=0
+				n_trailing_space=0
+				n_paddable_non_space=0
+				w_total=0LL
+				if line_breaks[i+1]<0LL:
+					//we have a hyphen
+					has_hyphen=1
+					w_total+=w_hyphen
+				for ch,I in Utf8Chars(s[iptr(line_breaks[i]&0x7fffffffffffffffLL):iptr((line_breaks[i+1]&0x7fffffffffffffffLL)-1)])
+					if ch=='\r'||ch=='\n':
+						//nothing
+						if ch=='\n':
+							got_newline=1
+						continue
+					else if ch==' '||ch=='\t':
+						nspaces++
+						n_trailing_space++
+						w_total+=w_space
+					else
+						if isCJK(ch)||!isWordChar(ch):
+							n_paddable_non_space++
+						n_trailing_space=0
+						w_total+=charWidth(ch)
+				nspaces-=n_trailing_space
+				if !nspaces:
+					//count CJK or non-word chars
+					need_to_pad_non_space=1
+					nspaces=n_paddable_non_space
+				remaining_space=float2fixed(m_wrap_width)-(w_total-w_space*n_trailing_space)
+				//with paragraph consistency, got_newline should hold for i==line_breaks.n-2 unless we're at eof
+				if nspaces>0&&remaining_space>0LL&&!got_newline&&i<line_breaks.n-2:
+					space_padding=remaining_space/nspaces
+					space_padding_rem=int(remaining_space-space_padding*nspaces)
+				//Writeln(space_padding,' ',nspaces,' ',space_padding)
+			got_newline=0
+			///////////////
+			inline projectX(i64 x)
+				return fixed2float(x-scroll_x)*scaling+screen_x
+			inline projectY(i64 x)
+				return fixed2float(y-scroll_y)*scaling+screen_y
+			for ch,I in Utf8Chars(s[iptr(line_breaks[i]&0x7fffffffffffffffLL):iptr(min(line_breaks[i+1]&0x7fffffffffffffffLL,ofs))-1])
+				if mode==MODE_SEEK:
+					//if y>epsUp(dy)||dy>=epsDown(y)&&dy<epsDown(y+hc)&&x>=dx:
+					if y>scroll_y||scroll_y>=y&&scroll_y<y+hc&&x>=scroll_x:
+						return TRenderingInfo(){bb:long2(x,y),seek_ret:iptr(line_breaks[i]+I)}
+				if mode==MODE_RENDER:
+					//if epsEqual(x,m_caret_overlay.x)&&epsEqual(y,m_caret_overlay.y):
+					if x==m_caret_overlay.x&&y==m_caret_overlay.y:
+						if m_overlay_obj["type"].as(string)=="IME":
+							s_overlay=m_overlay_obj["text"].as(string)
+							yf=projectY(y)
+							if s_overlay:
+								cmap=new iptr[]
+								foreach chj,J in Utf8Chars(s_overlay)
+									cmap.push(J)
+								cmap.push(s_overlay.n)
+								overlay_sel0=m_overlay_obj["start"].as(iptr)
+								overlay_sel1=overlay_sel0+m_overlay_obj["length"].as(iptr)
+								overlay_sel0=min(overlay_sel0,cmap.n-1)
+								overlay_sel1=min(overlay_sel1,cmap.n-1)
+								if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
+									x_sel0=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel0]-1])
+									x_sel1=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel1]-1])
+									m_caret_offset=double2fixed(x_sel1)
+									if x_sel0>x_sel1:
+										(x_sel0,x_sel1)=(x_sel1,x_sel0)
+									//selection - pre-draw the highlight
+									if x_sel0<x_sel1:
+										g_renderer.DrawBitmap(0, float((fixed2float(x-scroll_x)+x_sel0)*scaling+screen_x),yf,float((x_sel1-x_sel0)*scaling),fixed2float(hc), m_bgcolor_selection)
+								else
+									assert(0)
+								xo=x
+								foreach chj,J in Utf8Chars(s_overlay)
+									dx_j=charWidth(chj)
+									g_renderer.DrawChar(fnt_scaled, projectX(xo),yf,m_color, chj)
+									xo+=dx_j
+							else
+								assert(0)
+							//draw the underline
+							y_underline=yf+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
+							g_renderer.DrawBitmap(0, projectX(x),y_underline,fixed2float(m_caret_overlay.z)*scaling,max(fnt_scaled.h*0.05f,1.f), m_color)
+						else
+							assert(0)
+						x+=m_caret_overlay.z
+				if ch=='\r'||ch=='\n':
+					//nothing
+					if ch=='\n':
+						got_newline=1
+						if !is_wrapping:
+							x=0LL
+							y+=hc
+					continue
+				else if ch==' ':
+					x+=w_space+space_padding
+					if i_padding<space_padding_rem:
+						i_padding++
+						x++
+				else if ch=='\t':
+					if is_wrapping:
+						x+=w_space+space_padding
+						if i_padding<space_padding_rem:
+							i_padding++
+							x++
+					else
+						x=(x/w_tab+1LL)*w_tab
+				else
+					dx_i=charWidth(ch)
+					if mode==MODE_RENDER:
+						g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_color, ch)
+					x+=dx_i
+			if (line_breaks[i+1]&0x7fffffffffffffffLL)>ofs:break
+			if is_wrapping:
+				if mode==MODE_RENDER&&has_hyphen:
+					g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_color, int('-'))
+				if got_newline||i<line_breaks.n-2:
+					x=0LL
+					y+=hc
+		return TRenderingInfo(){bb:long2(x,y),seek_ret:s.n}
+	}
+	RenderText=function(i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+		_RenderText(MODE_RENDER,a,pp,s,s.n,scroll_x,scroll_y,screen_x,screen_y,scaling)
+	}
+	GetCharacterHeightAt=function(i64[] a,i64[] pp,string s,iptr ofs){
+		return charHeight()
+	}
+	GetDefaultFont=function(){
+		return m_font
+	}
+	//////////////////////////////
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"m_color")
+	}
+
+
+registerStateHandler("renderer_fancy",CLayouter_fancy)
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["ParseHyphenator"]=function(JSContext JS){
+		sdata=JS.Param(0).or("")
+		return JS.Return(parseTexHyphenFile(JS,sdata))
+	}
+})
+

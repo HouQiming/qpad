@@ -22,6 +22,14 @@ __generate_json("js_units","gui2d/dockbar.js")
 		else
 			return JS.Return(ret)
 	}
+	jsio["ReadInternalFile"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		ret=UIReadAll(fn)
+		if !ret:
+			return 0
+		else
+			return JS.Return(ret)
+	}
 	jsio["CreateFile"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
 		data=JS.Param(1).or(new string)
@@ -35,5 +43,5 @@ __generate_json("js_units","gui2d/dockbar.js")
 	}
 	sbox=setupModuleSystem(JS,1)
 	sbox.UILoadZip(string.NULL)
-	sbox.UIRunJS(JS,"res/jacy.js")
+	sbox.UIRunJS(JS,"res/main.js")
 })()

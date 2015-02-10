@@ -5,7 +5,7 @@ import Gui2D.detail.*
 import Javascript.*
 import TextBox.*
 
-//todo: bracket seeking, indentation handler, line / column handler
+//todo: indentation handler, line / column handler
 
 /*
 or-ing tokens
