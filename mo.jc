@@ -12,6 +12,9 @@ __generate_json("js_units","gui2d/dockbar.js")
 
 (function(){
 	JS=new JSContext
+	sbox=setupModuleSystem(JS,1)
+	sbox.UILoadZip(string.NULL)
+	/////////////
 	jsio=JS.New()
 	JS.GetGlobal()["IO"]=jsio
 	jsio["ReadFile"]=function(JSContext JS){
@@ -24,7 +27,7 @@ __generate_json("js_units","gui2d/dockbar.js")
 	}
 	jsio["ReadInternalFile"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
-		ret=UIReadAll(fn)
+		ret=sbox.UIReadAll(fn)
 		if !ret:
 			return 0
 		else
@@ -41,7 +44,6 @@ __generate_json("js_units","gui2d/dockbar.js")
 		else
 			return 0
 	}
-	sbox=setupModuleSystem(JS,1)
-	sbox.UILoadZip(string.NULL)
+	/////////////
 	sbox.UIRunJS(JS,"res/main.js")
 })()
