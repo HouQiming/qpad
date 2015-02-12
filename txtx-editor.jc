@@ -9,14 +9,18 @@ import TextBox.*
 
 ///////////
 //pad the meta stuff to avoid accidental search hits
-META_CHAR=1
-META_CHAR_END=2
-///////////
-COMMAND_INSERT_OBJECT=3
-COMMAND_SET_STYLE=4
-COMMAND_RUBBER_SPACE=5
-///////////
-CHAR_NUMBERING_BASE=0xf0000
+//META_CHAR=1
+//META_CHAR_END=2
+/////////////
+//COMMAND_INSERT_OBJECT=3
+//COMMAND_SET_STYLE=4
+//COMMAND_RUBBER_SPACE=5
+/////////////
+//CHAR_NUMBERING_BASE=0xf0000
+COMMAND_INSERT_OBJECT=0xf0000
+COMMAND_RUBBER_SPACE=0xf7fff
+COMMAND_SET_STYLE=0xf8000
+COMMAND_END=0x100000
 
 /*
 todo:
@@ -301,7 +305,7 @@ MAX_HYPHENATABLE_WORD=256
 struct TLayoutAtom
 	int flags
 	int style_id
-	!? //word
+	int pword0,pword1
 	/////////////
 	i64 w,h
 	i64 tail_kerning
@@ -321,6 +325,8 @@ g_char_to_flags=(function(){
 	return ret
 })()
 g_utf8_ligatures=["IJ","Ĳ", "ij","ĳ", "եւ","և", "ff","ﬀ", "fi","ﬁ", "fl","ﬂ", "ffi","ﬃ", "ffl","ﬄ", "ſt","ﬅ", "st","ﬆ", "մն","ﬓ", "մե","ﬔ", "մի","ﬕ", "վն","ﬖ", "մխ","ﬗ", "אל","ﭏ"]
+g_arabic_table=[1536,1536,1536,1536,1537,1537,1537,1537,1538,1538,1538,1538,1539,1539,1539,1539,1540,1540,1540,1540,1541,1541,1541,1541,1542,1542,1542,1542,1543,1543,1543,1543,1544,1544,1544,1544,1545,1545,1545,1545,1546,1546,1546,1546,1547,1547,1547,1547,1548,1548,1548,1548,1549,1549,1549,1549,1550,1550,1550,1550,1551,1551,1551,1551,1552,1552,1552,1552,1553,1553,1553,1553,1554,1554,1554,1554,1555,1555,1555,1555,1556,1556,1556,1556,1557,1557,1557,1557,1558,1558,1558,1558,1559,1559,1559,1559,1560,1560,1560,1560,1561,1561,1561,1561,1562,1562,1562,1562,1563,1563,1563,1563,1564,1564,1564,1564,1565,1565,1565,1565,1566,1566,1566,1566,1567,1567,1567,1567,1568,1568,1568,1568,65152,1569,1569,1569,65153,1570,65154,1570,65155,1571,65156,1571,65157,1572,65158,1572,65159,1573,65160,1573,65161,65163,65162,65164,65165,1575,65166,1575,65167,65169,65168,65170,65171,1577,65172,1577,65173,65175,65174,65176,65177,65179,65178,65180,65181,65183,65182,65184,65185,65187,65186,65188,65189,65191,65190,65192,65193,1583,65194,1583,65195,1584,65196,1584,65197,1585,65198,1585,65199,1586,65200,1586,65201,65203,65202,65204,65205,65207,65206,65208,65209,65211,65210,65212,65213,65215,65214,65216,65217,65219,65218,65220,65221,65223,65222,65224,65225,65227,65226,65228,65229,65231,65230,65232,1595,1595,1595,1595,1596,1596,1596,1596,1597,1597,1597,1597,1598,1598,1598,1598,1599,1599,1599,1599,1600,1600,1600,1600,65233,65235,65234,65236,65237,65239,65238,65240,65241,65243,65242,65244,65245,65247,65246,65248,65249,65251,65250,65252,65253,65255,65254,65256,65257,65259,65258,65260,65261,1608,65262,1608,65263,64488,65264,64489,65265,65267,65266,65268,1611,1611,1611,1611,1612,1612,1612,1612,1613,1613,1613,1613,1614,1614,1614,1614,1615,1615,1615,1615,1616,1616,1616,1616,1617,1617,1617,1617,1618,1618,1618,1618,1619,1619,1619,1619,1620,1620,1620,1620,1621,1621,1621,1621,1622,1622,1622,1622,1623,1623,1623,1623,1624,1624,1624,1624,1625,1625,1625,1625,1626,1626,1626,1626,1627,1627,1627,1627,1628,1628,1628,1628,1629,1629,1629,1629,1630,1630,1630,1630,1631,1631,1631,1631,1632,1632,1632,1632,1633,1633,1633,1633,1634,1634,1634,1634,1635,1635,1635,1635,1636,1636,1636,1636,1637,1637,1637,1637,1638,1638,1638,1638,1639,1639,1639,1639,1640,1640,1640,1640,1641,1641,1641,1641,1642,1642,1642,1642,1643,1643,1643,1643,1644,1644,1644,1644,1645,1645,1645,1645,1646,1646,1646,1646,1647,1647,1647,1647,1648,1648,1648,1648,64336,1649,64337,1649,1650,1650,1650,1650,1651,1651,1651,1651,1652,1652,1652,1652,1653,1653,1653,1653,1654,1654,1654,1654,64477,1655,1655,1655,1656,1656,1656,1656,64358,64360,64359,64361,64350,64352,64351,64353,64338,64340,64339,64341,1660,1660,1660,1660,1661,1661,1661,1661,64342,64344,64343,64345,64354,64356,64355,64357,64346,64348,64347,64349,1665,1665,1665,1665,1666,1666,1666,1666,64374,64376,64375,64377,64370,64372,64371,64373,1669,1669,1669,1669,64378,64380,64379,64381,64382,64384,64383,64385,64392,1672,64393,1672,1673,1673,1673,1673,1674,1674,1674,1674,1675,1675,1675,1675,64388,1676,64389,1676,64386,1677,64387,1677,64390,1678,64391,1678,1679,1679,1679,1679,1680,1680,1680,1680,64396,1681,64397,1681,1682,1682,1682,1682,1683,1683,1683,1683,1684,1684,1684,1684,1685,1685,1685,1685,1686,1686,1686,1686,1687,1687,1687,1687,64394,1688,64395,1688,1689,1689,1689,1689,1690,1690,1690,1690,1691,1691,1691,1691,1692,1692,1692,1692,1693,1693,1693,1693,1694,1694,1694,1694,1695,1695,1695,1695,1696,1696,1696,1696,1697,1697,1697,1697,1698,1698,1698,1698,1699,1699,1699,1699,64362,64364,64363,64365,1701,1701,1701,1701,64366,64368,64367,64369,1703,1703,1703,1703,1704,1704,1704,1704,64398,64400,64399,64401,1706,1706,1706,1706,1707,1707,1707,1707,1708,1708,1708,1708,64467,64469,64468,64470,1710,1710,1710,1710,64402,64404,64403,64405,1712,1712,1712,1712,64410,64412,64411,64413,1714,1714,1714,1714,64406,64408,64407,64409,1716,1716,1716,1716,1717,1717,1717,1717,1718,1718,1718,1718,1719,1719,1719,1719,1720,1720,1720,1720,1721,1721,1721,1721,64414,1722,64415,1722,64416,64418,64417,64419,1724,1724,1724,1724,1725,1725,1725,1725,64426,64428,64427,64429,1727,1727,1727,1727,64420,1728,64421,1728,64422,64424,64423,64425,1730,1730,1730,1730,1731,1731,1731,1731,1732,1732,1732,1732,64480,1733,64481,1733,64473,1734,64474,1734,64471,1735,64472,1735,64475,1736,64476,1736,64482,1737,64483,1737,1738,1738,1738,1738,64478,1739,64479,1739,64508,64510,64509,64511,1741,1741,1741,1741,1742,1742,1742,1742,1743,1743,1743,1743,64484,64486,64485,64487,1745,1745,1745,1745,64430,1746,64431,1746,64432,1747,64433,1747,1748,1748,1748,1748,1749,1749,1749,1749,1750,1750,1750,1750,1751,1751,1751,1751,1752,1752,1752,1752,1753,1753,1753,1753,1754,1754,1754,1754,1755,1755,1755,1755,1756,1756,1756,1756,1757,1757,1757,1757,1758,1758,1758,1758,1759,1759,1759,1759,1760,1760,1760,1760,1761,1761,1761,1761,1762,1762,1762,1762,1763,1763,1763,1763,1764,1764,1764,1764,1765,1765,1765,1765,1766,1766,1766,1766,1767,1767,1767,1767,1768,1768,1768,1768,1769,1769,1769,1769,1770,1770,1770,1770,1771,1771,1771,1771,1772,1772,1772,1772,1773,1773,1773,1773,1774,1774,1774,1774,1775,1775,1775,1775,1776,1776,1776,1776,1777,1777,1777,1777,1778,1778,1778,1778,1779,1779,1779,1779,1780,1780,1780,1780,1781,1781,1781,1781,1782,1782,1782,1782,1783,1783,1783,1783,1784,1784,1784,1784,1785,1785,1785,1785,1786,1786,1786,1786,1787,1787,1787,1787,1788,1788,1788,1788,1789,1789,1789,1789,1790,1790,1790,1790,1791,1791,1791,1791]
+inline isArabic(ch){return u32(ch-0x600)<0x100u}
 class CStyle
 	UNDERLINED=1
 	STRIKE_OUT=2
@@ -334,62 +340,52 @@ class CEmbededObject
 ///////////////////////////////
 //separate document and stylesheet?
 class CLayouter_fancy
-	MODE_PREPROCESS=0
+	MODE_BB=0
 	MODE_SEEK=1
 	MODE_RENDER=2
 	/////////
 	m_wrap_width_in_fp=800LL*64LL
-	m_bgcolor=0xff000000
+	m_bgcolor=0xffffffff
 	m_bgcolor_selection=0xff800000
 	m_styles=new CStyle[]
 	m_objects=new CEmbededObject[]
 	CHyphenator m_hyphenator
 	/////////////////
 	name=function(){return "renderer"}
-	stateSize=function(){return 2}
+	stateSize=function(){return 3}
 	isLineOnly=function(){return 1}
 	/////////////////
-	//todo: seek / render / pre-available breaks
-	auto MakeRenderingText(string s)
-		!? //todo: hack out arabic, reverse RTL, replace ligatures
-		//todo: seek
-		return s.Replace(g_utf8_ligatures)
-	auto ProcessParagraph(int mode, i64[] acc,i64[] line_breaks,int offset_base,string s)
+	//todo: seek / render
+	auto PremakeRenderingText(string s)
+		auto su32=[int2(ch,int(I)) foreach ch,I in Utf8Chars(s)]
+		for J=0:su32.n-1
+			if isArabic(su32[J].x):
+				prev_arabic=(J>0&&isArabic(su32[J-1].x))
+				next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
+				su32[J].x=g_arabic_table[(su32[J].x-0x600)*4+next_arabic*2+prev_arabic]
+		return Unicode32ToUtf8(su32).Replace(g_utf8_ligatures)
+	auto PreprocessParagraph(i64[] result,int offset_base,string s,int has_tail_newline)
 		//create the "words"
 		style_id=0
 		p_last_word=0L
-		meta_char=0
 		words=new int3[]
 		hyp=m_hyphenator
 		no_hyp_points=new int[]
 		foreach ch,I,I_next in Utf8Chars(s)
-			if meta_char:
-				if meta_char<0:
-					meta_char=ch
-					if meta_char==COMMAND_RUBBER_SPACE:
-						words.push(int3(-2,0,0))
-						meta_char=0
-						p_last_word=I_next
-					continue
-				if meta_char==COMMAND_INSERT_OBJECT:
-					obj_id=ch-CHAR_NUMBERING_BASE
+			//use single char commands
+			if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_END:
+				if ch==COMMAND_RUBBER_SPACE:
+					words.push(int3(-2,0,I))
+				else if ch<COMMAND_SET_STYLE:
+					obj_id=ch-COMMAND_INSERT_OBJECT
 					if u32(obj_id)<u32(m_objects.n):
-						words.push(int3(-1,obj_id,0))
-					meta_char=0
-					p_last_word=I_next
-					continue
-				else if meta_char==COMMAND_SET_STYLE:
-					style_id_new=ch-CHAR_NUMBERING_BASE
+						words.push(int3(-1,obj_id,I))
+				else
+					style_id_new=ch-COMMAND_SET_STYLE
 					if u32(style_id_new)<u32(m_styles.n):
 						style_id=style_id_new
-					meta_char=0
-					p_last_word=I_next
-					continue
-				else
-					//invalid command, ignore without reading an arg
-					meta_char=0
-					p_last_word=I_next
-					//fall through
+				p_last_word=I_next
+				continue
 			if !isWordChar(ch)||isCJK(ch):
 				if p_last_word<I:
 					if I-p_last_word<MAX_HYPHENATABLE_WORD:
@@ -403,12 +399,6 @@ class CLayouter_fancy
 						p_last_hyphen=p
 					if p_last_hyphen<I-p_last_word:
 						words.push(int3(style_id,int(p_last_word+p_last_hyphen),int(I)))
-				if ch==META_CHAR:
-					meta_char=-1
-					continue
-				if ch==META_CHAR_END:
-					p_last_word=I_next
-					continue
 				words.push(int3(style_id,int(I),int(I_next)))
 				p_last_word=I_next
 		if p_last_word<s.n:
@@ -419,13 +409,13 @@ class CLayouter_fancy
 		foreach word_i in words
 			if word_i.x==-1:
 				//object
-				obj_id=~word_i.x
+				obj_id=word_i.y
 				pobj=m_objects[obj_id]
-				atoms.push(TLayoutAtom(){flags:FLAG_CAN_PAD_AFTER_WEAK, style_id:word_i.x, w:pobj.w,h:pobj.h, y_baseline:pobj.y_baseline})
+				atoms.push(TLayoutAtom(){flags:FLAG_CAN_PAD_AFTER_WEAK, style_id:word_i.x, w:pobj.w,h:pobj.h, y_baseline:pobj.y_baseline, pword0:obj_id, pword1:word_i.z})
 				continue
 			if word_i.x==-2:
 				//rubber space
-				atoms.push(TLayoutAtom(){flags:FLAG_RUBBER, style_id:word_i.x, w:pobj.w,h:pobj.h, y_baseline:pobj.y_baseline})
+				atoms.push(TLayoutAtom(){flags:FLAG_RUBBER, style_id:word_i.x, pword1:word_i.z})
 				continue
 			ch_first=0
 			foreach ch in Utf8Chars(s[word_i.y:word_i.z-1])
@@ -444,7 +434,7 @@ class CLayouter_fancy
 			flags|=(word_i.x&FLAG_HYPHENATE_AFTER)
 			style_id=(word_i.x&~FLAG_HYPHENATE_AFTER)
 			//pre-apply ligatures and pre-hack arabics, but do the real deed during rendering
-			s_render=MakeRenderingText(s[word_i.y:word_i.z-1])
+			s_render=PremakeRenderingText(MRT_MODE_PRECOMPUTE,s[word_i.y:word_i.z-1])
 			w_word=0LL
 			current_style=m_styles[style_id]
 			ch_prev=-1
@@ -463,121 +453,201 @@ class CLayouter_fancy
 				tail_kerning=float2fixed(g_renderer.GetKerning(ch_prev,ch_next))
 			else
 				tail_kerning=0LL
-			atoms.push(TLayoutAtom(){flags:flags, style_id:style_id, w:w_word,h:hc, y_baseline:y_baseline, tail_kerning:tail_kerning})
+			atoms.push(TLayoutAtom(){flags:flags, style_id:style_id, w:w_word,h:hc, y_baseline:y_baseline, tail_kerning:tail_kerning, pword0:word_i.y,pword1:word_i.z})
+		//////////////////////////////
+		//the real DP
+		//start from max-greedy, stop when the current line clearly makes it suboptimal
 		w_line=m_wrap_width_in_fp
-		if mode==MODE_PREPROCESS:
-			inline spaceBadness(w){return ((w*w)>>12)*w}
-			w_hyphen=g_renderer.GetCharacterAdvance(fnt,int('-'))
-			w_space=g_renderer.GetCharacterAdvance(fnt,int(' '))
-			LEADING_SPACE_BADNESS=1LL<<60
-			inline HYPHEN_BADNESS(style_id){return spaceBadness(charWidth(m_styles[style_id],'-')>>1)}
-			inline BAD_BOLEOL_BADNESS(style_id){return spaceBadness(charWidth(m_styles[style_id],' ')*20)}
-			//////////////////////////////
-			//the real DP
-			//start from max-greedy, stop when the current line clearly makes it suboptimal
-			n=int(atoms.n)
-			best=new float[n+1]
-			blast=new int[n+1]
-			j_min_last=0
-			wsum_last=0LL
-			//need O(n) j_min
-			for i=1:n
-				w0=0LL
-				base_badness=0LL
-				if i<n:
-					if atoms[i].flags&FLAG_BAD_BOL:
-						base_badness=BAD_BOLEOL_BADNESS(atoms[i].style_id)
-					if atoms[i].flags&FLAG_SPACE:
-						base_badness+=LEADING_SPACE_BADNESS
-				if atoms[i-1].flags&FLAG_HYPHENATE_AFTER:
-					w0=w_hyphen
-					base_badness+=HYPHEN_BADNESS(atoms[i-1].style_id)
-				if atoms[i-1].flags&FLAG_BAD_EOL:
-					base_badness+=BAD_BOLEOL_BADNESS(atoms[i-1].style_id)
-				//greedy first, extend to i and advance j_min_last
-				if atoms[i-1].nc_flags&FLAG_SPACE:
-					//it's a trailing space, advance *after* taking the current values
-					j_min=j_min_last
-					w=wsum_last+w0
-					/////////
-					if i>=2:
-						wsum_last+=atoms[i-2].tail_kerning
-					wsum_last+=atoms[i-1].lg
+		inline spaceBadness(w){return ((w*w)>>12)*w}
+		LEADING_SPACE_BADNESS=1LL<<60
+		inline HYPHEN_BADNESS(style_id){return spaceBadness(charWidth(m_styles[style_id],'-')>>1)}
+		inline BAD_BOLEOL_BADNESS(style_id){return spaceBadness(charWidth(m_styles[style_id],' ')*20)}
+		////
+		n=int(atoms.n)
+		best=new float[n+1]
+		blast=new int[n+1]
+		j_min_last=0
+		wsum_last=0LL
+		//need O(n) j_min
+		for i=1:n
+			w0=0LL
+			base_badness=0LL
+			if i<n:
+				if atoms[i].flags&FLAG_BAD_BOL:
+					base_badness=BAD_BOLEOL_BADNESS(atoms[i].style_id)
+				if atoms[i].flags&FLAG_SPACE:
+					base_badness+=LEADING_SPACE_BADNESS
+			if atoms[i-1].flags&FLAG_HYPHENATE_AFTER:
+				w0=w_hyphen
+				base_badness+=HYPHEN_BADNESS(atoms[i-1].style_id)
+			if atoms[i-1].flags&FLAG_BAD_EOL:
+				base_badness+=BAD_BOLEOL_BADNESS(atoms[i-1].style_id)
+			//greedy first, extend to i and advance j_min_last
+			if atoms[i-1].flags&FLAG_SPACE:
+				//it's a trailing space, advance *after* taking the current values
+				j_min=j_min_last
+				w=wsum_last+w0
+				/////////
+				if i>=2:
+					wsum_last+=atoms[i-2].tail_kerning
+				wsum_last+=atoms[i-1].w
+			else
+				if i>=2:
+					wsum_last+=atoms[i-2].tail_kerning
+				wsum_last+=atoms[i-1].w
+				while wsum_last>w_line:
+					wsum_last-=atoms[j_min_last].w+atoms[j_min_last].tail_kerning
+					j_min_last++
+				/////////
+				j_min=j_min_last
+				w=wsum_last+w0
+			w_tail=w_line-w
+			best_i=1LL<<62
+			blast_i=j_min
+			for j=j_min:i-1
+				if j==i-1&&(atoms[i-1].flags&FLAG_SPACE):
+					break
+				if w_tail>=0LL:
+					cost=best[j]
+					if i!=n:
+						cost_j=spaceBadness(w_tail)
+						if cost_j>=best_i:
+							break
+						cost+=cost_j
+					if best_i>cost:
+						best_i=cost
+						blast_i=j
+				w_tail+=atoms[j].w+atoms[j].tail_kerning
+			best[i]=best_i+base_badness
+			blast[i]=blast_i
+		lbreaks_backward=new int[]
+		p=n
+		for(;;)
+			lbreaks_backward.push(p)
+			if !p:break
+			p=blast[p]
+		if !lbreaks_backward.n:lbreaks_backward.push(0)
+		/////
+		line_breaks=new int[lbreaks_backward.n]
+		for i=0:lbreaks_backward.n-1
+			line_breaks[lbreaks_backward.n-1-i]=i64(lbreaks_backward[i]+offset_base)
+		///////////////////////////////////
+		//per-line merging and padding - and cache the result
+		//each component is a styled text range / object / space, the rendering of which should be self-evident
+		for li=0:line_breaks.n-2
+			//rubber, normal, weak
+			w=0LL
+			n_paddables=int3(0,0,0)
+			n_trailing_paddables=int3(0,0,0)
+			p_last=line_breaks[li+1]-1
+			h_up=0LL
+			h_down=0LL
+			for i=line_breaks[li]:p_last
+				w+=atoms[i].w
+				if i<p_last:
+					w+=atoms[i].tail_kerning
+				flags=atoms[i].flags
+				if flags&FLAG_RUBBER:
+					//rubbers are padded even when they're trailing
+					n_paddables.x++
+				else if flags&FLAG_CAN_PAD_AFTER:
+					n_paddables.y++
+					n_trailing_paddables.y++
+				else 
+					if flags&FLAG_CAN_PAD_AFTER_WEAK:
+						n_paddables.z++
+						n_trailing_paddables.z++
+					//weaks are not spaces, so the strongs are no longer trailing
+					n_trailing_paddables.x=0
+					n_trailing_paddables.y=0
+				h_up=max(h_up,atoms[i].y_baseline)
+				h_down=max(h_down,atoms[i].h-atoms[i].y_baseline)
+			n_paddables-=n_trailing_paddables
+			w_tail=w_line-w
+			w_pad=0LL
+			w_rem=0
+			n_spaces=0
+			padding_mode=-1
+			if w_tail>0LL:
+				//pad spaces
+				if n_paddables.x>0:
+					//rubber
+					n_spaces=n_paddables.x
+					padding_mode=0
+				else if li==line_breaks.n-1:
+					//last line, do not pad
 				else
-					if i>=2:
-						wsum_last+=atoms[i-2].tail_kerning
-					wsum_last+=atoms[i-1].lg
-					while wsum_last>w_line:
-						wsum_last-=atoms[j_min_last].w+atoms[j_min_last].tail_kerning
-						j_min_last++
-					/////////
-					j_min=j_min_last
-					w=wsum_last+w0
-				w_tail=w_line-w
-				best_i=1LL<<62
-				blast_i=j_min
-				for j=j_min:i-1
-					if j==i-1&&(atoms[i-1].nc_flags&FLAG_SPACE):
-						break
-					if w_tail>=0LL:
-						cost=best[j]
-						if i!=n:
-							cost_j=spaceBadness(w_tail)
-							if cost_j>=best_i:
-								break
-							cost+=cost_j
-						if best_i>cost:
-							best_i=cost
-							blast_i=j
-					w_tail+=atoms[j].w+atoms[j].tail_kerning
-				best[i]=best_i+base_badness
-				blast[i]=blast_i
-			lbreaks=new int[]
-			p=n
-			for(;;)
-				if !p:break
-				lbreaks.push(p)
-				p=blast[p]
-			if !lbreaks.n:lbreaks.push(0)
-			/////
-			n0=line_breaks.n
-			line_breaks.resize(n0+lbreaks.n)
-			for i=0:lbreaks.n-1
-				line_breaks[n0+lbreaks.n-1-i]=i64(lbreaks[i]+offset_base)
-			return
-		//per-line merging and padding - cache this instead?
-		!?
-		//the real rendering loop
-		!?
-		if mode==MODE_SEEK:
-		else if mode==MODE_RENDER:
-		else
-			assert(0)
-		
+					if n_paddables.y>0:
+						n_spaces=n_paddables.y
+						padding_mode=1
+					else if n_paddables.z>0:
+						n_spaces=n_paddables.z
+						padding_mode=2
+			if n_spaces>0:
+				w_pad=w_tail/i64(n_spaces)
+				w_rem=int(w_tail-w_pad*i64(n_spaces))
+			cur_word0=-1
+			cur_word1=-1
+			cur_style=-1
+			inline FlushWord()
+				if cur_style>=0:
+					result.push((i64(cur_style)<<42)|(i64(cur_word1)<<21)|i64(cur_word0))
+				cur_word0=-1
+				cur_word1=-1
+				cur_style=-1
+			inline addSpace(i64 dw,int ccnt)
+				FlushWord()
+				assert(i64(int(dw))==dw)
+				if dw:
+					result.push(i64(dw)|(i64(ccnt)<<21)|(-2LL<<42))
+			//newline
+			h_line=h_up+h_down
+			assert(i64(int(h_up))==h_up)
+			assert(i64(int(h_line))==h_line)
+			//-3: no newline
+			//-4: newline
+			//-5: hyphen + newline
+			result.push(h_line|(h_up<<21)|(((has_tail_newline||(li<line_breaks.n-1))?((atoms[line_breaks[li+1]-1].flags&FLAG_HYPHENATE_AFTER)?-5LL:-4LL):-3LL)<<42))
+			for i=line_breaks[li]:line_breaks[li+1]-1
+				if atoms[i].style_id==-1:
+					//object
+					FlushWord()
+					result.push(i64(atoms[i].pword0)|(i64(atoms[i].pword1)<<21)|(-1LL<<42))
+				else if atoms[i].style_id==-2:
+					assert(padding_mode==0)
+					addSpace(w_pad+i64(w_rem>0),atoms[i].pword1)
+					w_rem--
+				else
+					//word
+					if cur_style!=atoms[i].style_id||cur_word1!=atoms[i].pword0:
+						FlushWord()
+						cur_word0=atoms[i].pword0
+					//this is always needed
+					cur_word1=atoms[i].pword1
+					//padding mode 1 / 2
+					if atoms[i].flags&(padding_mode==1?FLAG_CAN_PAD_AFTER:FLAG_CAN_PAD_AFTER_WEAK):
+						addSpace(w_pad+i64(w_rem>0),atoms[i].pword0)
+						w_rem--
+					cur_style=atoms[i].style_id
+			FlushWord()
 	/////////////////
 	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
-		!? //DP with CHAR_SET_STYLE
-		line_breaks=new i64[]
-		if m_wrap_width>0.f:
-			line_breaksi=DPLayoutText(m_font,s,m_wrap_width, m_hyphenator)
-			line_breaks=new i64[line_breaksi.n]
-			for i=0:line_breaks.n-1
-				line_breaks[i]=i64(line_breaksi[i]&0x7fffffff)|(i64(line_breaksi[i]&0x80000000)<<32)
-		else
-			//it's the *additional* line_breaks
-			line_breaks.push(0LL)
-			line_breaks.push(i64(s.n))
-		return line_breaks
+		result=new i64[]
+		foreach sline,I in s.TokenizeEx("\n",s.TOKENIZE_ALLOW_EMPTY|s.TOKENIZE_INCLUDE_SEPARATOR)
+			PreprocessParagraph(result,I,sline,I+sline.n<s.n)
+		return result
 	}
-	AddString=function(i64[] a,i64[] line_breaks,string s_context,string s,iptr ofs){
-		bb=_RenderText(MODE_BB,a,line_breaks,s,ofs, 0LL,0LL,0.f,0.f,0.f).bb
+	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
+		bb=_RenderText(MODE_BB,a,pp,s,ofs, 0LL,0LL,0.f,0.f,0.f)
 		a[0]=bb.x
 		a[1]=bb.y
+		a[2]=bb.z
 	}
 	Add=function(i64[] a,i64[] b){
 		bb=combineEditorOffset(long2(a[0],a[1]),long2(b[0],b[1]))
 		a[0]=bb.x
 		a[1]=bb.y
+		a[2]=b[2]
 	}
 	/////////////////
 	Compare=function(i64[] a,i64[] b){
@@ -585,22 +655,13 @@ class CLayouter_fancy
 		if ret==0:ret=__C_compare(a[0],b[0])
 		return ret
 	}
-	SeekInBlock=function(i64[] a,i64[] line_breaks,string s,i64[] b){
-		return iptr(_RenderText(MODE_SEEK,a,line_breaks,s,s.n, b[0],b[1],0.f,0.f,0.f).seek_ret)
+	SeekInBlock=function(i64[] a,i64[] pp,string s,i64[] b){
+		return iptr(_RenderText(MODE_SEEK,a,pp,s,s.n, b[0],b[1],0.f,0.f,0.f).z)
 	}
 	/////////////////
 	long3 m_caret_overlay
 	JSObject m_overlay_obj
 	i64 m_caret_offset
-	SetTextStyle=function(JSObject obj){
-		m_font=obj["font"].as(TFont)
-		m_font.h/=g_renderer.m_pixels_per_unit
-		m_color=int(obj["color"].or(u32(m_color)))
-		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
-		m_tab_width=obj["tab_width"].or(8)
-		m_wrap_width_in_fp=fixed2float(obj["wrap_width"].or(800.f))
-		m_hyphenator=obj["hyphenator"].or(g_default_hyphenator)
-	}
 	SetCaretOverlay=function(i64 x,i64 y,JSObject obj){
 		m_overlay_obj=obj
 		w_overlayd=0.
@@ -614,9 +675,6 @@ class CLayouter_fancy
 		return w_overlay
 	}
 	GetCaretOffset=function(){
-		//Writeln(m_caret_overlay,' ',m_caret_offset)
-		//if m_overlay_obj:
-		//	Writeln(m_overlay_obj["text"].as(string))
 		return m_caret_offset
 	}
 	charWidth=inline(style,ch){
@@ -625,165 +683,154 @@ class CLayouter_fancy
 	charHeight=inline(style){
 		return float2fixed(g_renderer.GetCharacterHeight(style.font))
 	}
-	_RenderText=function(int mode,i64[] a,i64[] line_breaks,string s,iptr ofs, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
-		if mode==MODE_RENDER:
-			//Writeln('before fnt_scaled ',m_font.h,' ',scaling)
-			fnt_scaled=m_font
-			fnt_scaled.h*=scaling
-			//smart emboldening for SRGB
-			if g_renderer.m_srgb_supported:
-				fnt_scaled.embolden+=int((1.f-float(19589*(m_color&0xff)+38470*((m_color>>8)&0xff)+7477*((m_color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
-			//Writeln('after fnt_scaled ',m_font.h)
-			//scalingd=double(scaling)
-		w_tab=i64(m_tab_width)*charWidth(' ')
-		hc=charHeight()
+	//////////////////////////////////////////////
+	SetTextStyle=function(JSObject obj){
+		m_bgcolor=int(obj["bgcolor"].or(u32(m_bgcolor)))
+		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
+		m_tab_width=obj["tab_width"].or(8)
+		m_wrap_width_in_fp=fixed2float(obj["wrap_width"].or(800.f))
+		m_hyphenator=obj["hyphenator"].or(g_default_hyphenator)
+		/////////////////
+		js_styles=obj["styles"].as(JSObject)
+		assert(!!js_styles)
+		m_styles=new CStyle[]
+		for i=0:js_styles.length()-1
+			style_i=js_styles[i].as(JSObject)
+			assert(!!style_i)
+			font=style_i["font"].as(TFont)
+			color=style_i["color"].or(0xff000000)
+			flags=style_i["flags"].or(0)
+			assert(!!font.pfnt)
+			m_styles.push(new CStyle(){font:font,color:color,flags;flags})
+	}
+	_RenderText=function(int mode,i64[] a,i64[] pp,string s,iptr ofs, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+		inline projectX(i64 x)
+			return fixed2float(x-scroll_x)*scaling+screen_x
+		inline projectY(i64 x)
+			return fixed2float(y-scroll_y)*scaling+screen_y
+		//re-create the atoms, convert string, then render
 		x=a[0]
 		y=a[1]
-		if mode==MODE_RENDER:
-			//if epsEqual(y,m_caret_overlay.y)&&x>m_caret_overlay.x:
-			if y==m_caret_overlay.y&&x>m_caret_overlay.x:
-				x+=m_caret_overlay.z
-		is_wrapping=(m_wrap_width>0.f)
-		w_space=charWidth(' ')
-		w_hyphen=charWidth('-')
-		for i=0:line_breaks.n-2
-			got_newline=0
-			//justified wrapping
-			space_padding=0LL
-			space_padding_rem=0
-			need_to_pad_non_space=0
-			has_hyphen=0
-			i_padding=0
-			if is_wrapping&&i<line_breaks.n-1:
-				nspaces=0
-				n_trailing_space=0
-				n_paddable_non_space=0
-				w_total=0LL
-				if line_breaks[i+1]<0LL:
-					//we have a hyphen
-					has_hyphen=1
-					w_total+=w_hyphen
-				for ch,I in Utf8Chars(s[iptr(line_breaks[i]&0x7fffffffffffffffLL):iptr((line_breaks[i+1]&0x7fffffffffffffffLL)-1)])
-					if ch=='\r'||ch=='\n':
-						//nothing
-						if ch=='\n':
-							got_newline=1
-						continue
-					else if ch==' '||ch=='\t':
-						nspaces++
-						n_trailing_space++
-						w_total+=w_space
-					else
-						if isCJK(ch)||!isWordChar(ch):
-							n_paddable_non_space++
-						n_trailing_space=0
-						w_total+=charWidth(ch)
-				nspaces-=n_trailing_space
-				if !nspaces:
-					//count CJK or non-word chars
-					need_to_pad_non_space=1
-					nspaces=n_paddable_non_space
-				remaining_space=float2fixed(m_wrap_width)-(w_total-w_space*n_trailing_space)
-				//with paragraph consistency, got_newline should hold for i==line_breaks.n-2 unless we're at eof
-				if nspaces>0&&remaining_space>0LL&&!got_newline&&i<line_breaks.n-2:
-					space_padding=remaining_space/nspaces
-					space_padding_rem=int(remaining_space-space_padding*nspaces)
-				//Writeln(space_padding,' ',nspaces,' ',space_padding)
-			got_newline=0
-			///////////////
-			inline projectX(i64 x)
-				return fixed2float(x-scroll_x)*scaling+screen_x
-			inline projectY(i64 x)
-				return fixed2float(y-scroll_y)*scaling+screen_y
-			for ch,I in Utf8Chars(s[iptr(line_breaks[i]&0x7fffffffffffffffLL):iptr(min(line_breaks[i+1]&0x7fffffffffffffffLL,ofs))-1])
-				if mode==MODE_SEEK:
-					//if y>epsUp(dy)||dy>=epsDown(y)&&dy<epsDown(y+hc)&&x>=dx:
-					if y>scroll_y||scroll_y>=y&&scroll_y<y+hc&&x>=scroll_x:
-						return TRenderingInfo(){bb:long2(x,y),seek_ret:iptr(line_breaks[i]+I)}
+		need_newline=0
+		y_baseline=0LL
+		h_line=0LL
+		current_style_id=0
+		ch32_prev=int('\n')
+		SeekCheck=__inline_loop_body(ccnt){
+			if mode==MODE_SEEK:
+				if y>scroll_y||scroll_y>=y&&scroll_y<y+h_line&&x>=scroll_x:
+					return long3(x,y,i64(ccnt))
+		}
+		NewlineCheck=inline(){
+			if need_newline:
+				if mode==MODE_RENDER&&need_newline==2:
+					auto fnt_scaled=m_styles[current_style_id].font
+					fnt_scaled.h*=scaling
+					color=m_styles[current_style_id].color
+					if g_renderer.m_srgb_supported:
+						fnt_scaled.embolden+=int((1.f-float(19589*(color&0xff)+38470*((color>>8)&0xff)+7477*((color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
+					g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),color, int('-'))
+				x=0LL
+				y+=h_line
+		}
+		foreach atom_i in pp
+			style_id=int(atom_i>>42)
+			value1=int((atom_i>>21)&((1<<21)-1))
+			value0=int(atom_i&((1<<21)-1))
+			if style_id==-3||style_id==-4||style_id==-5:
+				//line start, -4LL means there's no new line in the end
+				NewlineCheck()
+				need_newline=(3-style_id)
+				y_baseline=i64(value1)
+				h_line=i64(value0)
+				ch32_prev=int('\n')
+			else if style_id==-2:
+				//space
+				x+=i64(value0)
+				SeekCheck(value1)
+				ch32_prev=int(' ')
+			else if style_id==-1:
+				//object
+				obj_id=value0
+				//todo: render it
+				x+=m_objects[obj_id].w
+				SeekCheck(value1)
+				ch32_prev=int('\n')
+			else
+				assert(style_id>=0)
+				current_style_id=style_id
+				//ignore RTL reversal here - conceptually it goes LTR, and we just flip it "visually"
+				//and precompute the ranges
+				//arabic transformations - in the recursion
 				if mode==MODE_RENDER:
-					//if epsEqual(x,m_caret_overlay.x)&&epsEqual(y,m_caret_overlay.y):
-					if x==m_caret_overlay.x&&y==m_caret_overlay.y:
-						if m_overlay_obj["type"].as(string)=="IME":
-							s_overlay=m_overlay_obj["text"].as(string)
-							yf=projectY(y)
-							if s_overlay:
-								cmap=new iptr[]
-								foreach chj,J in Utf8Chars(s_overlay)
-									cmap.push(J)
-								cmap.push(s_overlay.n)
-								overlay_sel0=m_overlay_obj["start"].as(iptr)
-								overlay_sel1=overlay_sel0+m_overlay_obj["length"].as(iptr)
-								overlay_sel0=min(overlay_sel0,cmap.n-1)
-								overlay_sel1=min(overlay_sel1,cmap.n-1)
-								if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
-									x_sel0=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel0]-1])
-									x_sel1=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel1]-1])
-									m_caret_offset=double2fixed(x_sel1)
-									if x_sel0>x_sel1:
-										(x_sel0,x_sel1)=(x_sel1,x_sel0)
-									//selection - pre-draw the highlight
-									if x_sel0<x_sel1:
-										g_renderer.DrawBitmap(0, float((fixed2float(x-scroll_x)+x_sel0)*scaling+screen_x),yf,float((x_sel1-x_sel0)*scaling),fixed2float(hc), m_bgcolor_selection)
-								else
-									assert(0)
-								xo=x
-								foreach chj,J in Utf8Chars(s_overlay)
-									dx_j=charWidth(chj)
-									g_renderer.DrawChar(fnt_scaled, projectX(xo),yf,m_color, chj)
-									xo+=dx_j
-							else
-								assert(0)
-							//draw the underline
-							y_underline=yf+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
-							g_renderer.DrawBitmap(0, projectX(x),y_underline,fixed2float(m_caret_overlay.z)*scaling,max(fnt_scaled.h*0.05f,1.f), m_color)
-						else
-							assert(0)
-						x+=m_caret_overlay.z
-				if ch=='\r'||ch=='\n':
-					//nothing
-					if ch=='\n':
-						got_newline=1
-						if !is_wrapping:
-							x=0LL
-							y+=hc
-					continue
-				else if ch==' ':
-					x+=w_space+space_padding
-					if i_padding<space_padding_rem:
-						i_padding++
-						x++
-				else if ch=='\t':
-					if is_wrapping:
-						x+=w_space+space_padding
-						if i_padding<space_padding_rem:
-							i_padding++
-							x++
-					else
-						x=(x/w_tab+1LL)*w_tab
-				else
-					dx_i=charWidth(ch)
+					fnt_scaled=m_styles[current_style_id].font
+					fnt_scaled.h*=scaling
+					//smart emboldening for SRGB
+					color=m_styles[current_style_id].color
+					if g_renderer.m_srgb_supported:
+						fnt_scaled.embolden+=int((1.f-float(19589*(color&0xff)+38470*((color>>8)&0xff)+7477*((color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
+				inline TranslateArabic(iptr ccnt0,string s_part)
+					auto su32=[int2(ch,int(ccnt0+I)) foreach ch,I in Utf8Chars(s_part)]
+					for J=0:su32.n-1
+						ch32=su32[J].x
+						if isArabic(ch32):
+							prev_arabic=(J>0&&isArabic(su32[J-1].x))
+							next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
+							ch32=g_arabic_table[(ch32-0x600)*4+next_arabic*2+prev_arabic]
+						//ch32
+						x+=g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32)
+						if mode==MODE_RENDER:
+							if ch32!=' '&&ch32!='\t'&&ch32!='\r':
+								g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_styles[current_style_id].color, ch32)
+						x+=charWidth(m_styles[current_style_id],ch32)
+						ch32_prev=ch32
+						SeekCheck(su32[J].y)
+				auto AddLigature(iptr ccnt0,iptr nc,string s_ligature)
+					ch32=0
+					foreach ch in Utf8Chars(s_ligature)
+						ch32=ch
+						break
+					x0=x
+					x+=g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32)
+					auto dx=charWidth(m_styles[current_style_id],ch32)
 					if mode==MODE_RENDER:
-						g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_color, ch)
-					x+=dx_i
-			if (line_breaks[i+1]&0x7fffffffffffffffLL)>ofs:break
-			if is_wrapping:
-				if mode==MODE_RENDER&&has_hyphen:
-					g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_color, int('-'))
-				if got_newline||i<line_breaks.n-2:
-					x=0LL
-					y+=hc
-		return TRenderingInfo(){bb:long2(x,y),seek_ret:s.n}
+						if ch32!=' '&&ch32!='\t'&&ch32!='\r':
+							g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_styles[current_style_id].color, ch32)
+					else if mode==MODE_SEEK:
+						for j=0:nc-1
+							xj=x+dx*i64(j+1)/i64(nc)
+							if y>scroll_y||scroll_y>=y&&scroll_y<y+h_line&&xj>=scroll_x:
+								return long3(xj,y,i64(ccnt0+j))
+					x+=dx
+					ch32_prev=ch32
+				spart=s[value0:value1-1]
+				ligature_poses=spart.FindAll(g_utf8_ligatures)
+				p_last=0L
+				for i=0:2:ligature_poses.n-2
+					p=ligature_poses[i]
+					id=ligature_poses[i+1]
+					if p_last<p:
+						TranslateArabic(value0+p_last,spart[p_last:p-1])
+					p_last0=p_last
+					p_last=p+g_utf8_ligatures[id*2+0].n
+					AddLigature(value0+p_last0,p_last-p_last0,g_utf8_ligatures[id*2+1])
+				if p_last<spart.n:
+					TranslateArabic(value0+p_last,spart[p_last:])
+		NewlineCheck()
+		return long3(x,y,i64(current_style_id))
 	}
 	RenderText=function(i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
 		_RenderText(MODE_RENDER,a,pp,s,s.n,scroll_x,scroll_y,screen_x,screen_y,scaling)
 	}
 	GetCharacterHeightAt=function(i64[] a,i64[] pp,string s,iptr ofs){
-		return charHeight()
+		bb=_RenderText(MODE_BB,a,pp,s,ofs, 0LL,0LL,0.f,0.f,0.f)
+		return charHeight(m_styles[bb.z])
 	}
 	GetDefaultFont=function(){
-		return m_font
+		return m_styles[0].font
 	}
 	//////////////////////////////
+	//todo: somehow load the objects
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"m_color")
 	}
@@ -797,4 +844,3 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return JS.Return(parseTexHyphenFile(JS,sdata))
 	}
 })
-
