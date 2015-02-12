@@ -4,9 +4,25 @@ require("gui2d/dockbar");
 
 UI.SetFontSharpening(1.5)
 
+var g_hyp_US=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
 var g_layout={
 	direction:'tab',
-	items:[],
+	items:[
+		{object_type:W.Edit,
+			id:"$test",
+			//font:UI.Font("res/fonts/cmunrm.ttf",32),
+			styles:[{font:UI.Font("res/fonts/cmunrm.ttf",32),color:0xff000000}],
+			//styles:[{font:UI.Font("calibri",32),color:0xff000000}],
+			state_handlers:["renderer_fancy"],
+			anchor_align:"fill",anchor_valign:"fill",
+			wrap_width:1024,
+			text:"test",
+			///////////////
+			show_background:1,bgcolor:0xffffffff,
+			///////////////
+			hyphenator:g_hyp_US,
+		},
+	],
 };
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);

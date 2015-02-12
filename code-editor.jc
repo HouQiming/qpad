@@ -1,9 +1,12 @@
+import "gui2d.jc"
+import "text-box.jc"
 import System.Math.*
 import System.Algorithm.*
 import System.Console.*
 import Gui2D.detail.*
 import Javascript.*
 import TextBox.*
+import TextBox.detail.*
 
 //todo: indentation handler, line / column handler
 
@@ -213,7 +216,7 @@ class CLayouter_programmer
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
 	}
-	SetCaretOverlay=function(i64 x,i64 y,JSObject obj){
+	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
 		m_overlay_obj=obj
 		w_overlayd=0.
 		if obj:

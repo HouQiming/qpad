@@ -4,6 +4,7 @@ import System.Math.*
 import System.Algorithm.*
 import System.Console.*
 import Gui2D.detail.*
+import TextBox.detail.*
 import Javascript.*
 import TextBox.*
 
@@ -278,22 +279,6 @@ auto parseTexHyphenFile(JSContext JS,string sdata)
 	ret.ops=dfa_ops
 	return ret
 
-auto DPLayoutText(TFont fnt,string s,float w_line, CHyphenator hyp)
-	//\n handling
-	lbreaks_ret=new int[]
-	foreach sline,I in s.TokenizeEx("\n",s.TOKENIZE_ALLOW_EMPTY|s.TOKENIZE_INCLUDE_SEPARATOR)
-		lbreaks_paragraph=DPLayoutParagraph(fnt,sline,w_line, hyp)
-		lbreaks_paragraph.pop()
-		foreach d in lbreaks_paragraph
-			lbreaks_ret.push(d+int(I))
-	lbreaks_ret.push(int(s.n))
-	//Writeln(s,' ',lbreaks_ret)
-	//for i=0:lbreaks_ret.n-2
-	//	Write(s[(lbreaks_ret[i]&0x7fffffff):(lbreaks_ret[i+1]&0x7fffffff)-1])
-	//	if lbreaks_ret[i+1]<0:Write('-')
-	//	Writeln()
-	return lbreaks_ret
-
 FLAG_IS_SPACE=0x80000000
 FLAG_HYPHENATE_AFTER=0x40000000//can also appear in the intermediate "words"
 FLAG_BAD_BOL=0x20000000
@@ -334,6 +319,19 @@ class CStyle
 	TFont font
 	int color
 	int flags
+	///////
+	string[] ligatures
+	auto FindLigatures()
+		pfnt=font.pfnt
+		while pfnt.fallbacks:
+			pfnt=pfnt.fallbacks[0]
+		ligatures=new string[]
+		for i=0:2:g_utf8_ligatures.n-2
+			chlig=Utf8CodeAt(g_utf8_ligatures[i+1],0)
+			(pfnt_glyph,gid)=g_renderer.SearchGlyph(pfnt,chlig)
+			if pfnt_glyph:
+				ligatures.push(g_utf8_ligatures[i])
+				ligatures.push(g_utf8_ligatures[i+1])
 class CEmbededObject
 	int obj_id
 	i64 w,h,y_baseline
@@ -356,14 +354,14 @@ class CLayouter_fancy
 	isLineOnly=function(){return 1}
 	/////////////////
 	//todo: seek / render
-	auto PremakeRenderingText(string s)
-		auto su32=[int2(ch,int(I)) foreach ch,I in Utf8Chars(s)]
+	auto PremakeRenderingText(int style_id,string s)
+		auto su32=Utf8ToUnicode32(s)
 		for J=0:su32.n-1
-			if isArabic(su32[J].x):
-				prev_arabic=(J>0&&isArabic(su32[J-1].x))
-				next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
-				su32[J].x=g_arabic_table[(su32[J].x-0x600)*4+next_arabic*2+prev_arabic]
-		return Unicode32ToUtf8(su32).Replace(g_utf8_ligatures)
+			if isArabic(su32[J]):
+				prev_arabic=(J>0&&isArabic(su32[J-1]))
+				next_arabic=(J<su32.n-1&&isArabic(su32[J+1]))
+				su32[J]=g_arabic_table[(su32[J]-0x600)*4+next_arabic*2+prev_arabic]
+		return Unicode32ToUtf8(su32).Replace(m_styles[style_id].ligatures)
 	auto PreprocessParagraph(i64[] result,int offset_base,string s,int has_tail_newline)
 		//create the "words"
 		style_id=0
@@ -434,7 +432,7 @@ class CLayouter_fancy
 			flags|=(word_i.x&FLAG_HYPHENATE_AFTER)
 			style_id=(word_i.x&~FLAG_HYPHENATE_AFTER)
 			//pre-apply ligatures and pre-hack arabics, but do the real deed during rendering
-			s_render=PremakeRenderingText(MRT_MODE_PRECOMPUTE,s[word_i.y:word_i.z-1])
+			s_render=PremakeRenderingText(style_id,s[word_i.y:word_i.z-1])
 			w_word=0LL
 			current_style=m_styles[style_id]
 			ch_prev=-1
@@ -450,7 +448,7 @@ class CLayouter_fancy
 				foreach ch in Utf8Chars(s[word_i.z:])
 					ch_next=ch
 					break
-				tail_kerning=float2fixed(g_renderer.GetKerning(ch_prev,ch_next))
+				tail_kerning=float2fixed(g_renderer.GetKerning(current_style.font,ch_prev,ch_next))
 			else
 				tail_kerning=0LL
 			atoms.push(TLayoutAtom(){flags:flags, style_id:style_id, w:w_word,h:hc, y_baseline:y_baseline, tail_kerning:tail_kerning, pword0:word_i.y,pword1:word_i.z})
@@ -464,7 +462,7 @@ class CLayouter_fancy
 		inline BAD_BOLEOL_BADNESS(style_id){return spaceBadness(charWidth(m_styles[style_id],' ')*20)}
 		////
 		n=int(atoms.n)
-		best=new float[n+1]
+		best=new i64[n+1]
 		blast=new int[n+1]
 		j_min_last=0
 		wsum_last=0LL
@@ -475,15 +473,15 @@ class CLayouter_fancy
 			if i<n:
 				if atoms[i].flags&FLAG_BAD_BOL:
 					base_badness=BAD_BOLEOL_BADNESS(atoms[i].style_id)
-				if atoms[i].flags&FLAG_SPACE:
+				if atoms[i].flags&FLAG_IS_SPACE:
 					base_badness+=LEADING_SPACE_BADNESS
 			if atoms[i-1].flags&FLAG_HYPHENATE_AFTER:
-				w0=w_hyphen
+				w0=charWidth(m_styles[atoms[i-1].style_id],'-')
 				base_badness+=HYPHEN_BADNESS(atoms[i-1].style_id)
 			if atoms[i-1].flags&FLAG_BAD_EOL:
 				base_badness+=BAD_BOLEOL_BADNESS(atoms[i-1].style_id)
 			//greedy first, extend to i and advance j_min_last
-			if atoms[i-1].flags&FLAG_SPACE:
+			if atoms[i-1].flags&FLAG_IS_SPACE:
 				//it's a trailing space, advance *after* taking the current values
 				j_min=j_min_last
 				w=wsum_last+w0
@@ -505,7 +503,7 @@ class CLayouter_fancy
 			best_i=1LL<<62
 			blast_i=j_min
 			for j=j_min:i-1
-				if j==i-1&&(atoms[i-1].flags&FLAG_SPACE):
+				if j==i-1&&(atoms[i-1].flags&FLAG_IS_SPACE):
 					break
 				if w_tail>=0LL:
 					cost=best[j]
@@ -530,7 +528,7 @@ class CLayouter_fancy
 		/////
 		line_breaks=new int[lbreaks_backward.n]
 		for i=0:lbreaks_backward.n-1
-			line_breaks[lbreaks_backward.n-1-i]=i64(lbreaks_backward[i]+offset_base)
+			line_breaks[lbreaks_backward.n-1-i]=i64(lbreaks_backward[i])
 		///////////////////////////////////
 		//per-line merging and padding - and cache the result
 		//each component is a styled text range / object / space, the rendering of which should be self-evident
@@ -542,6 +540,7 @@ class CLayouter_fancy
 			p_last=line_breaks[li+1]-1
 			h_up=0LL
 			h_down=0LL
+			w_trailing=0LL
 			for i=line_breaks[li]:p_last
 				w+=atoms[i].w
 				if i<p_last:
@@ -550,20 +549,27 @@ class CLayouter_fancy
 				if flags&FLAG_RUBBER:
 					//rubbers are padded even when they're trailing
 					n_paddables.x++
+					w_trailing=0LL
 				else if flags&FLAG_CAN_PAD_AFTER:
 					n_paddables.y++
 					n_trailing_paddables.y++
+					w_trailing+=atoms[i].w
 				else 
 					if flags&FLAG_CAN_PAD_AFTER_WEAK:
 						n_paddables.z++
-						n_trailing_paddables.z++
+						//n_trailing_paddables.z++
 					//weaks are not spaces, so the strongs are no longer trailing
 					n_trailing_paddables.x=0
 					n_trailing_paddables.y=0
+					w_trailing=0LL
 				h_up=max(h_up,atoms[i].y_baseline)
 				h_down=max(h_down,atoms[i].h-atoms[i].y_baseline)
+			w-=w_trailing
+			if atoms[p_last].flags&FLAG_HYPHENATE_AFTER:
+				w+=charWidth(m_styles[atoms[p_last].style_id],'-')
 			n_paddables-=n_trailing_paddables
-			w_tail=w_line-w
+			w_tail=max(w_line-w,0LL)
+			if li==line_breaks.n-2:w_tail=0LL
 			w_pad=0LL
 			w_rem=0
 			n_spaces=0
@@ -591,28 +597,29 @@ class CLayouter_fancy
 			cur_style=-1
 			inline FlushWord()
 				if cur_style>=0:
-					result.push((i64(cur_style)<<42)|(i64(cur_word1)<<21)|i64(cur_word0))
+					result.push((i64(cur_style)<<42)|(i64(offset_base+cur_word1)<<21)|i64(offset_base+cur_word0))
 				cur_word0=-1
 				cur_word1=-1
 				cur_style=-1
 			inline addSpace(i64 dw,int ccnt)
 				FlushWord()
-				assert(i64(int(dw))==dw)
+				assert(ccnt>=0)
 				if dw:
-					result.push(i64(dw)|(i64(ccnt)<<21)|(-2LL<<42))
+					assert(i64(int(dw))==dw&&dw>0L)
+					result.push(i64(dw)|(i64(offset_base+ccnt)<<21)|(-2LL<<42))
 			//newline
 			h_line=h_up+h_down
-			assert(i64(int(h_up))==h_up)
-			assert(i64(int(h_line))==h_line)
+			assert(i64(int(h_up))==h_up&&h_up>=0LL)
+			assert(i64(int(h_line))==h_line&&h_line>=0LL)
 			//-3: no newline
 			//-4: newline
 			//-5: hyphen + newline
-			result.push(h_line|(h_up<<21)|(((has_tail_newline||(li<line_breaks.n-1))?((atoms[line_breaks[li+1]-1].flags&FLAG_HYPHENATE_AFTER)?-5LL:-4LL):-3LL)<<42))
+			result.push(h_line|(h_up<<21)|(((has_tail_newline||(li<line_breaks.n-2))?((atoms[p_last].flags&FLAG_HYPHENATE_AFTER)?-5LL:-4LL):-3LL)<<42))
 			for i=line_breaks[li]:line_breaks[li+1]-1
 				if atoms[i].style_id==-1:
 					//object
 					FlushWord()
-					result.push(i64(atoms[i].pword0)|(i64(atoms[i].pword1)<<21)|(-1LL<<42))
+					result.push(i64(atoms[i].pword0)|(i64(offset_base+atoms[i].pword1)<<21)|(-1LL<<42))
 				else if atoms[i].style_id==-2:
 					assert(padding_mode==0)
 					addSpace(w_pad+i64(w_rem>0),atoms[i].pword1)
@@ -624,11 +631,11 @@ class CLayouter_fancy
 						cur_word0=atoms[i].pword0
 					//this is always needed
 					cur_word1=atoms[i].pword1
+					cur_style=atoms[i].style_id
 					//padding mode 1 / 2
 					if atoms[i].flags&(padding_mode==1?FLAG_CAN_PAD_AFTER:FLAG_CAN_PAD_AFTER_WEAK):
 						addSpace(w_pad+i64(w_rem>0),atoms[i].pword0)
 						w_rem--
-					cur_style=atoms[i].style_id
 			FlushWord()
 	/////////////////
 	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
@@ -662,13 +669,20 @@ class CLayouter_fancy
 	long3 m_caret_overlay
 	JSObject m_overlay_obj
 	i64 m_caret_offset
-	SetCaretOverlay=function(i64 x,i64 y,JSObject obj){
+	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
+		if !obj:
+			m_caret_overlay=long3(-1LL,-1LL,-1LL)
+			m_caret_offset=0LL
+			m_overlay_obj=obj
+			return 0LL
+		a=caller.GetStateAt(caller.m_handler_registration["renderer"].as(int),caller.m_caret_locator.ccnt)
+		style_id=int(a[2])
 		m_overlay_obj=obj
 		w_overlayd=0.
 		if obj:
 			s=obj["text"].as(string)
 			if s:
-				w_overlayd=GetStringWidth(m_font,s)
+				w_overlayd=GetStringWidth(m_styles[style_id].font,s)
 		w_overlay=double2fixed(w_overlayd)
 		m_caret_overlay=long3(x,y,w_overlay)
 		m_caret_offset=0LL
@@ -688,11 +702,12 @@ class CLayouter_fancy
 		m_bgcolor=int(obj["bgcolor"].or(u32(m_bgcolor)))
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		m_tab_width=obj["tab_width"].or(8)
-		m_wrap_width_in_fp=fixed2float(obj["wrap_width"].or(800.f))
+		m_wrap_width_in_fp=float2fixed(obj["wrap_width"].or(800.f))
 		m_hyphenator=obj["hyphenator"].or(g_default_hyphenator)
 		/////////////////
 		js_styles=obj["styles"].as(JSObject)
 		assert(!!js_styles)
+		assert(js_styles.length()>0)
 		m_styles=new CStyle[]
 		for i=0:js_styles.length()-1
 			style_i=js_styles[i].as(JSObject)
@@ -701,7 +716,9 @@ class CLayouter_fancy
 			color=style_i["color"].or(0xff000000)
 			flags=style_i["flags"].or(0)
 			assert(!!font.pfnt)
-			m_styles.push(new CStyle(){font:font,color:color,flags;flags})
+			nstyle_i=new CStyle(){font:font,color:color,flags:flags}
+			nstyle_i.FindLigatures()
+			m_styles.push(nstyle_i)
 	}
 	_RenderText=function(int mode,i64[] a,i64[] pp,string s,iptr ofs, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
 		inline projectX(i64 x)
@@ -711,25 +728,70 @@ class CLayouter_fancy
 		//re-create the atoms, convert string, then render
 		x=a[0]
 		y=a[1]
+		if y==m_caret_overlay.y&&x>m_caret_overlay.x:
+			x+=m_caret_overlay.z
 		need_newline=0
 		y_baseline=0LL
 		h_line=0LL
 		current_style_id=0
+		fnt_scaled=TFont()
+		dy_baseline=0LL
 		ch32_prev=int('\n')
+		OfsCheck=__inline_loop_body(ccnt){
+			if mode==MODE_BB:
+				if ccnt>=ofs:return long3(x,y,i64(current_style_id))
+		}
 		SeekCheck=__inline_loop_body(ccnt){
 			if mode==MODE_SEEK:
 				if y>scroll_y||scroll_y>=y&&scroll_y<y+h_line&&x>=scroll_x:
 					return long3(x,y,i64(ccnt))
 		}
+		myDrawChar=function(int ch32){
+			//todo: underline and strikeout
+			if x==m_caret_overlay.x&&y==m_caret_overlay.y:
+				if m_overlay_obj["type"].as(string)=="IME":
+					s_overlay=m_overlay_obj["text"].as(string)
+					yf=projectY(y+dy_baseline)
+					hc=charHeight(m_styles[current_style_id])
+					if s_overlay:
+						cmap=new iptr[]
+						foreach chj,J in Utf8Chars(s_overlay)
+							cmap.push(J)
+						cmap.push(s_overlay.n)
+						overlay_sel0=m_overlay_obj["start"].as(iptr)
+						overlay_sel1=overlay_sel0+m_overlay_obj["length"].as(iptr)
+						overlay_sel0=min(overlay_sel0,cmap.n-1)
+						overlay_sel1=min(overlay_sel1,cmap.n-1)
+						if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
+							x_sel0=GetStringWidth(m_styles[current_style_id].font,s_overlay[:cmap[overlay_sel0]-1])
+							x_sel1=GetStringWidth(m_styles[current_style_id].font,s_overlay[:cmap[overlay_sel1]-1])
+							m_caret_offset=double2fixed(x_sel1)
+							if x_sel0>x_sel1:
+								(x_sel0,x_sel1)=(x_sel1,x_sel0)
+							//selection - pre-draw the highlight
+							if x_sel0<x_sel1:
+								g_renderer.DrawBitmap(0, float((fixed2float(x-scroll_x)+x_sel0)*scaling+screen_x),yf,float((x_sel1-x_sel0)*scaling),fixed2float(hc), m_bgcolor_selection)
+						else
+							assert(0)
+						xo=x
+						foreach chj,J in Utf8Chars(s_overlay)
+							dx_j=charWidth(m_styles[current_style_id],chj)
+							g_renderer.DrawChar(fnt_scaled, projectX(xo),yf,m_styles[current_style_id].color, chj)
+							xo+=dx_j
+					else
+						assert(0)
+					//draw the underline
+					y_underline=yf+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
+					g_renderer.DrawBitmap(0, projectX(x),y_underline,fixed2float(m_caret_overlay.z)*scaling,max(fnt_scaled.h*0.05f,1.f), m_styles[current_style_id].color)
+				else
+					assert(0)
+				x+=m_caret_overlay.z
+			g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y+dy_baseline),m_styles[current_style_id].color, ch32)
+		}
 		NewlineCheck=inline(){
 			if need_newline:
 				if mode==MODE_RENDER&&need_newline==2:
-					auto fnt_scaled=m_styles[current_style_id].font
-					fnt_scaled.h*=scaling
-					color=m_styles[current_style_id].color
-					if g_renderer.m_srgb_supported:
-						fnt_scaled.embolden+=int((1.f-float(19589*(color&0xff)+38470*((color>>8)&0xff)+7477*((color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
-					g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),color, int('-'))
+					myDrawChar(int('-'))
 				x=0LL
 				y+=h_line
 		}
@@ -740,12 +802,14 @@ class CLayouter_fancy
 			if style_id==-3||style_id==-4||style_id==-5:
 				//line start, -4LL means there's no new line in the end
 				NewlineCheck()
-				need_newline=(3-style_id)
+				need_newline=(-3-style_id)
 				y_baseline=i64(value1)
 				h_line=i64(value0)
 				ch32_prev=int('\n')
+				current_style_id=0
 			else if style_id==-2:
 				//space
+				OfsCheck(value1)
 				x+=i64(value0)
 				SeekCheck(value1)
 				ch32_prev=int(' ')
@@ -753,6 +817,7 @@ class CLayouter_fancy
 				//object
 				obj_id=value0
 				//todo: render it
+				OfsCheck(value1)
 				x+=m_objects[obj_id].w
 				SeekCheck(value1)
 				ch32_prev=int('\n')
@@ -769,7 +834,8 @@ class CLayouter_fancy
 					color=m_styles[current_style_id].color
 					if g_renderer.m_srgb_supported:
 						fnt_scaled.embolden+=int((1.f-float(19589*(color&0xff)+38470*((color>>8)&0xff)+7477*((color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
-				inline TranslateArabic(iptr ccnt0,string s_part)
+					dy_baseline=y_baseline-float2fixed(g_renderer.GetFontBaseline(fnt_scaled))
+				__inline_loop_body TranslateArabic(iptr ccnt0,string s_part)
 					auto su32=[int2(ch,int(ccnt0+I)) foreach ch,I in Utf8Chars(s_part)]
 					for J=0:su32.n-1
 						ch32=su32[J].x
@@ -778,42 +844,46 @@ class CLayouter_fancy
 							next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
 							ch32=g_arabic_table[(ch32-0x600)*4+next_arabic*2+prev_arabic]
 						//ch32
-						x+=g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32)
+						x+=float2fixed(g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32))
+						OfsCheck(su32[J].y)
 						if mode==MODE_RENDER:
 							if ch32!=' '&&ch32!='\t'&&ch32!='\r':
-								g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_styles[current_style_id].color, ch32)
+								myDrawChar(ch32)
 						x+=charWidth(m_styles[current_style_id],ch32)
 						ch32_prev=ch32
 						SeekCheck(su32[J].y)
-				auto AddLigature(iptr ccnt0,iptr nc,string s_ligature)
+				__inline_loop_body AddLigature(iptr ccnt0,iptr nc,string s_ligature)
 					ch32=0
 					foreach ch in Utf8Chars(s_ligature)
 						ch32=ch
 						break
 					x0=x
-					x+=g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32)
+					x+=float2fixed(g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32))
 					auto dx=charWidth(m_styles[current_style_id],ch32)
 					if mode==MODE_RENDER:
 						if ch32!=' '&&ch32!='\t'&&ch32!='\r':
-							g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y),m_styles[current_style_id].color, ch32)
+							myDrawChar(ch32)
 					else if mode==MODE_SEEK:
 						for j=0:nc-1
 							xj=x+dx*i64(j+1)/i64(nc)
 							if y>scroll_y||scroll_y>=y&&scroll_y<y+h_line&&xj>=scroll_x:
 								return long3(xj,y,i64(ccnt0+j))
+					else if mode==MODE_BB:
+						for j=0:nc-1
+							if ccnt0+j>=ofs:return long3(x+dx*i64(j)/i64(nc),y,i64(current_style_id))
 					x+=dx
 					ch32_prev=ch32
 				spart=s[value0:value1-1]
-				ligature_poses=spart.FindAll(g_utf8_ligatures)
+				ligatures=m_styles[current_style_id].ligatures
+				ligature_poses=spart.FindAll(ligatures)
 				p_last=0L
 				for i=0:2:ligature_poses.n-2
 					p=ligature_poses[i]
 					id=ligature_poses[i+1]
 					if p_last<p:
 						TranslateArabic(value0+p_last,spart[p_last:p-1])
-					p_last0=p_last
-					p_last=p+g_utf8_ligatures[id*2+0].n
-					AddLigature(value0+p_last0,p_last-p_last0,g_utf8_ligatures[id*2+1])
+					p_last=p+ligatures[id*2+0].n
+					AddLigature(value0+p,p_last-p,ligatures[id*2+1])
 				if p_last<spart.n:
 					TranslateArabic(value0+p_last,spart[p_last:])
 		NewlineCheck()
@@ -832,7 +902,6 @@ class CLayouter_fancy
 	//////////////////////////////
 	//todo: somehow load the objects
 	__JS_prototype=function(JSObject proto){
-		proto.ExportProperty(this,"m_color")
 	}
 
 
