@@ -18,10 +18,10 @@ import TextBox.*
 //COMMAND_RUBBER_SPACE=5
 /////////////
 //CHAR_NUMBERING_BASE=0xf0000
-COMMAND_INSERT_OBJECT=0xf0000
-COMMAND_RUBBER_SPACE=0xf7fff
-COMMAND_SET_STYLE=0xf8000
-COMMAND_END=0x100000
+COMMAND_INSERT_OBJECT=0x100000
+COMMAND_RUBBER_SPACE=0x107fff
+COMMAND_SET_STYLE=0x108000
+COMMAND_END=0x110000
 
 /*
 todo:
@@ -41,11 +41,12 @@ class CHyphenator
 	u16[] ops
 	int n_char_types
 	int[int] char_map
-	min_hyphen=6
+	left_min=3
+	right_min=3
 	auto HyphenateWord(string sword)
 		exception=exceptions[sword.ToLower()]
 		if exception:return exception
-		if sword.n<min_hyphen:return new int[]
+		//if sword.n<min_hyphen:return new int[]
 		//returns int separation points
 		hyp_levels=new u8[]
 		hyp_points=new int[]
@@ -87,7 +88,7 @@ class CHyphenator
 		//Writeln(hyp_points)
 		n2=0
 		for i=0:hyp_points.n-3
-			if int(hyp_levels[i])&1:
+			if (int(hyp_levels[i])&1)&&i>=left_min&&i<sword.n-right_min:
 				hyp_points[n2++]=hyp_points[i+1]
 		hyp_points.resize(n2)
 		return hyp_points
@@ -371,19 +372,6 @@ class CLayouter_fancy
 		no_hyp_points=new int[]
 		foreach ch,I,I_next in Utf8Chars(s)
 			//use single char commands
-			if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_END:
-				if ch==COMMAND_RUBBER_SPACE:
-					words.push(int3(-2,0,I))
-				else if ch<COMMAND_SET_STYLE:
-					obj_id=ch-COMMAND_INSERT_OBJECT
-					if u32(obj_id)<u32(m_objects.n):
-						words.push(int3(-1,obj_id,I))
-				else
-					style_id_new=ch-COMMAND_SET_STYLE
-					if u32(style_id_new)<u32(m_styles.n):
-						style_id=style_id_new
-				p_last_word=I_next
-				continue
 			if !isWordChar(ch)||isCJK(ch):
 				if p_last_word<I:
 					if I-p_last_word<MAX_HYPHENATABLE_WORD:
@@ -397,7 +385,19 @@ class CLayouter_fancy
 						p_last_hyphen=p
 					if p_last_hyphen<I-p_last_word:
 						words.push(int3(style_id,int(p_last_word+p_last_hyphen),int(I)))
-				words.push(int3(style_id,int(I),int(I_next)))
+				if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_END:
+					if ch==COMMAND_RUBBER_SPACE:
+						words.push(int3(-2,0,I))
+					else if ch<COMMAND_SET_STYLE:
+						obj_id=ch-COMMAND_INSERT_OBJECT
+						if u32(obj_id)<u32(m_objects.n):
+							words.push(int3(-1,obj_id,I))
+					else
+						style_id_new=ch-COMMAND_SET_STYLE
+						if u32(style_id_new)<u32(m_styles.n):
+							style_id=style_id_new
+				else
+					words.push(int3(style_id,int(I),int(I_next)))
 				p_last_word=I_next
 		if p_last_word<s.n:
 			words.push(int3(style_id,int(p_last_word),int(s.n)))
@@ -569,7 +569,7 @@ class CLayouter_fancy
 				w+=charWidth(m_styles[atoms[p_last].style_id],'-')
 			n_paddables-=n_trailing_paddables
 			w_tail=max(w_line-w,0LL)
-			if li==line_breaks.n-2:w_tail=0LL
+			if li==line_breaks.n-2&&n_paddables.x==0:w_tail=0LL
 			w_pad=0LL
 			w_rem=0
 			n_spaces=0
@@ -621,9 +621,10 @@ class CLayouter_fancy
 					FlushWord()
 					result.push(i64(atoms[i].pword0)|(i64(offset_base+atoms[i].pword1)<<21)|(-1LL<<42))
 				else if atoms[i].style_id==-2:
-					assert(padding_mode==0)
-					addSpace(w_pad+i64(w_rem>0),atoms[i].pword1)
-					w_rem--
+					assert(padding_mode==0||padding_mode<0)
+					if padding_mode==0:
+						addSpace(w_pad+i64(w_rem>0),atoms[i].pword1)
+						w_rem--
 				else
 					//word
 					if cur_style!=atoms[i].style_id||cur_word1!=atoms[i].pword0:
@@ -641,7 +642,7 @@ class CLayouter_fancy
 	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
 		result=new i64[]
 		foreach sline,I in s.TokenizeEx("\n",s.TOKENIZE_ALLOW_EMPTY|s.TOKENIZE_INCLUDE_SEPARATOR)
-			PreprocessParagraph(result,I,sline,I+sline.n<s.n)
+			PreprocessParagraph(result,I,sline,sline.EndsWith("\n"))
 		return result
 	}
 	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
@@ -663,7 +664,7 @@ class CLayouter_fancy
 		return ret
 	}
 	SeekInBlock=function(i64[] a,i64[] pp,string s,i64[] b){
-		return iptr(_RenderText(MODE_SEEK,a,pp,s,s.n, b[0],b[1],0.f,0.f,0.f).z)
+		return iptr(_RenderText(MODE_SEEK,a,pp,s,s.n, b[0],b[1],0.f,0.f,0.f).w)
 	}
 	/////////////////
 	long3 m_caret_overlay
@@ -723,7 +724,7 @@ class CLayouter_fancy
 	_RenderText=function(int mode,i64[] a,i64[] pp,string s,iptr ofs, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
 		inline projectX(i64 x)
 			return fixed2float(x-scroll_x)*scaling+screen_x
-		inline projectY(i64 x)
+		inline projectY(i64 y)
 			return fixed2float(y-scroll_y)*scaling+screen_y
 		//re-create the atoms, convert string, then render
 		x=a[0]
@@ -739,12 +740,12 @@ class CLayouter_fancy
 		ch32_prev=int('\n')
 		OfsCheck=__inline_loop_body(ccnt){
 			if mode==MODE_BB:
-				if ccnt>=ofs:return long3(x,y,i64(current_style_id))
+				if ccnt>=ofs:return long4(x,y,i64(current_style_id),h_line)
 		}
 		SeekCheck=__inline_loop_body(ccnt){
 			if mode==MODE_SEEK:
 				if y>scroll_y||scroll_y>=y&&scroll_y<y+h_line&&x>=scroll_x:
-					return long3(x,y,i64(ccnt))
+					return long4(x,y,i64(current_style_id),i64(ccnt))
 		}
 		myDrawChar=function(int ch32){
 			//todo: underline and strikeout
@@ -834,7 +835,7 @@ class CLayouter_fancy
 					color=m_styles[current_style_id].color
 					if g_renderer.m_srgb_supported:
 						fnt_scaled.embolden+=int((1.f-float(19589*(color&0xff)+38470*((color>>8)&0xff)+7477*((color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
-					dy_baseline=y_baseline-float2fixed(g_renderer.GetFontBaseline(fnt_scaled))
+					dy_baseline=y_baseline-float2fixed(g_renderer.GetFontBaseline(m_styles[current_style_id].font))
 				__inline_loop_body TranslateArabic(iptr ccnt0,string s_part)
 					auto su32=[int2(ch,int(ccnt0+I)) foreach ch,I in Utf8Chars(s_part)]
 					for J=0:su32.n-1
@@ -847,7 +848,7 @@ class CLayouter_fancy
 						x+=float2fixed(g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32))
 						OfsCheck(su32[J].y)
 						if mode==MODE_RENDER:
-							if ch32!=' '&&ch32!='\t'&&ch32!='\r':
+							if ch32!=' '&&ch32!='\t'&&ch32!='\r'&&ch32!='\n':
 								myDrawChar(ch32)
 						x+=charWidth(m_styles[current_style_id],ch32)
 						ch32_prev=ch32
@@ -861,16 +862,15 @@ class CLayouter_fancy
 					x+=float2fixed(g_renderer.GetKerning(m_styles[current_style_id].font,ch32_prev,ch32))
 					auto dx=charWidth(m_styles[current_style_id],ch32)
 					if mode==MODE_RENDER:
-						if ch32!=' '&&ch32!='\t'&&ch32!='\r':
-							myDrawChar(ch32)
+						myDrawChar(ch32)
 					else if mode==MODE_SEEK:
 						for j=0:nc-1
 							xj=x+dx*i64(j+1)/i64(nc)
 							if y>scroll_y||scroll_y>=y&&scroll_y<y+h_line&&xj>=scroll_x:
-								return long3(xj,y,i64(ccnt0+j))
+								return long4(xj,y,i64(current_style_id),i64(ccnt0+j))
 					else if mode==MODE_BB:
 						for j=0:nc-1
-							if ccnt0+j>=ofs:return long3(x+dx*i64(j)/i64(nc),y,i64(current_style_id))
+							if ccnt0+j>=ofs:return long4(x+dx*i64(j)/i64(nc),y,i64(current_style_id),h_line)
 					x+=dx
 					ch32_prev=ch32
 				spart=s[value0:value1-1]
@@ -887,14 +887,18 @@ class CLayouter_fancy
 				if p_last<spart.n:
 					TranslateArabic(value0+p_last,spart[p_last:])
 		NewlineCheck()
-		return long3(x,y,i64(current_style_id))
+		if mode==MODE_SEEK:
+			return long4(x,y,i64(current_style_id),i64(s.n))
+		else
+			return long4(x,y,i64(current_style_id),h_line)
 	}
 	RenderText=function(i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
 		_RenderText(MODE_RENDER,a,pp,s,s.n,scroll_x,scroll_y,screen_x,screen_y,scaling)
 	}
 	GetCharacterHeightAt=function(i64[] a,i64[] pp,string s,iptr ofs){
 		bb=_RenderText(MODE_BB,a,pp,s,ofs, 0LL,0LL,0.f,0.f,0.f)
-		return charHeight(m_styles[bb.z])
+		//return charHeight(m_styles[bb.z])
+		return bb.w
 	}
 	GetDefaultFont=function(){
 		return m_styles[0].font

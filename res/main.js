@@ -11,12 +11,12 @@ var g_layout={
 		{object_type:W.Edit,
 			id:"$test",
 			//font:UI.Font("res/fonts/cmunrm.ttf",32),
-			styles:[{font:UI.Font("res/fonts/cmunrm.ttf",32),color:0xff000000}],
+			styles:[{font:UI.Font("res/fonts/cmunrm.ttf",32),color:0xff000000}, {font:UI.Font("res/fonts/cmunss.ttf",48),color:0xff000000}],
 			//styles:[{font:UI.Font("calibri",32),color:0xff000000}],
 			state_handlers:["renderer_fancy"],
 			anchor_align:"fill",anchor_valign:"fill",
 			wrap_width:1024,
-			text:"test",
+			text:IO.ReadAll("mo/test/example.txt"),
 			///////////////
 			show_background:1,bgcolor:0xffffffff,
 			///////////////
