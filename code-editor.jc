@@ -318,6 +318,7 @@ class CLayouter_programmer
 		y*=charHeight()
 		return long2(x,y)
 	}
+	//todo: IsAtLineWrap
 	//////////////////////////////
 	__JS_prototype=function(JSObject proto){}
 
