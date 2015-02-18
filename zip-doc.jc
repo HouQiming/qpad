@@ -1,0 +1,105 @@
+import "javascript.jc"
+import "gui2d.jc"
+import System.Math.*
+import System.Algorithm.*
+import System.Console.*
+import Gui2D.detail.*
+import Javascript.*
+
+/*
+id -> object
+	with JS callbacks
+		Save -> get a string
+			the file name is per-determined by id
+			id should be gced
+			or just use native references?
+				dfs to obtain the set of saved objects
+				create name upon saving
+		GetReferences
+		__unique_id
+Load
+Save
+*/
+stbi_zlib_compress=__c_function(__pointer,"stbi_zlib_compress","stb_image_write.h", "c_files","stb_image_write.c")
+stbiw__crc32=__c_function(u32,"stbiw__crc32","stb_image_write.h", "c_files","stb_image_write.c")
+
+auto zip(string s)
+	out_len=0
+	s_ret=stbi_zlib_compress(s,s.n,&out_len,8)
+	if !s_ret:return string.NULL
+	ret=new string
+	ret.d=iptr(s_ret)
+	ret.n=iptr(out_len)
+	ret.sz=ret.n
+	return ret
+
+inline crc32(string s){return stbiw__crc32(s,s.n)}
+
+g_unique_id=0LL
+auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
+	sz_written=0L
+	sz_data=0L
+	inline writeZip(string s)
+		sz_data+=s.n
+		sz_written+=fzip.Write(s)
+		if sz_written<sz_data:
+			return 0
+		else
+			return 1
+	objs=new JSObject[]
+	idmap=new JSObject[i64]
+	auto dfsObject(JSObject obj)
+		id_obj=obj["__unique_id"].or(-1LL)
+		if id_obj==-1LL:
+			id_obj=g_unique_id;g_unique_id++
+			obj["__unique_id"]=id_obj
+		if idmap[id_obj]:return
+		idmap[id_obj]=obj
+		objs.push(obj)
+		children=obj.CallMethod(JSObject,"GetReferences")
+		if children:
+			for i=0:children.length()-1
+				obj_i=children[i].as(JSObject)
+				if obj_i:
+					dfsObject(obj_i)
+	dfsObject(obj_root)
+	s_central=new string
+	nfiles=0
+	foreach obj in objs
+		id_obj=obj["__unique_id"].or(-1LL)
+		//Save accesses __unique_id of dependencies
+		s_save=obj.CallMethod(string,"Save")
+		if !s_save:
+			Writeln('error saving JS object ',id_obj)
+			assert(0)
+		fdata=zip(s_save)
+		crc=int(crc32(fdata))
+		s_local=new("PK\x03\x04\x0A\x00\x00\x00\x00\x00\x0C\x93\xC8D")
+		//CRC-32, size, size, namelen, paddinglen, name, padding
+		fn_zip=formatNumber(id_obj,{base:16,align:4})+"."+obj["default_extension"].or("bin")
+		s_local.push([crc,int(fdata.n),int(fdata.n),int(fn_zip.n)].ConvertToAsBinary(char))
+		//ppaddings=s_local.n-2
+		s_local.push(fn_zip)
+		//lg_padding=(-(fzip.Position()+s_local.n))&(ALIGNMENT-1)
+		//s_local[ppaddings]=lg_padding
+		//if lg_padding:
+		//	s_local.resize(s_local.n+lg_padding)
+		plocal=fzip.Position()
+		if !writeZip(s_local):return 0
+		if !writeZip(fdata):return 0
+		//add its central directory
+		s_central.push("PK\x01\x02\x0A\x00\x0A\x00\x08\x00\x00\x00\x0C\x93\xC8D")
+		s_central.push([crc,int(fdata.n),int(fdata.n),int(fn_zip.n),0,0].ConvertToAsBinary(char))
+		s_central.push('\0')
+		s_central.push('\0')
+		s_central.push([int(plocal)].ConvertToAsBinary(char))
+		s_central.push(fn_zip)
+		nfiles++
+		fdata.discard()
+	//write the new directory
+	p_central=fzip.Position()
+	s_central.push("PK\x05\x06\x00\x00\x00\x00")
+	s_central.push([int(nfiles)*0x00010001,int(s_central.n),int(p_central)].ConvertToAsBinary(char))
+	s_central.push("\x00\x00")
+	if !writeZip(s_central):return 0
+	return 1

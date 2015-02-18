@@ -338,7 +338,7 @@ class CStyle
 				ligatures.push(g_utf8_ligatures[i])
 				ligatures.push(g_utf8_ligatures[i+1])
 class CEmbededObject
-	int obj_id
+	JSObject obj
 	i64 w,h,y_baseline
 ///////////////////////////////
 //separate document and stylesheet?
@@ -359,7 +359,6 @@ class CLayouter_fancy
 	stateSize=function(){return 3}
 	isLineOnly=function(){return 1}
 	/////////////////
-	//todo: seek / render
 	auto PremakeRenderingText(int style_id,string s)
 		auto su32=Utf8ToUnicode32(s)
 		for J=0:su32.n-1
@@ -603,6 +602,7 @@ class CLayouter_fancy
 			inline FlushWord()
 				if cur_style>=0:
 					result.push((i64(cur_style)<<42)|(i64(offset_base+cur_word1)<<21)|i64(offset_base+cur_word0))
+					assert((result.back()>>42)!=-1LL)
 				cur_word0=-1
 				cur_word1=-1
 				cur_style=-1
@@ -612,6 +612,7 @@ class CLayouter_fancy
 				if dw:
 					assert(i64(int(dw))==dw&&dw>0L)
 					result.push(i64(dw)|(i64(offset_base+ccnt)<<21)|(-2LL<<42))
+					assert((result.back()>>42)!=-1LL)
 			//newline
 			h_line=h_up+h_down
 			assert(i64(int(h_up))==h_up&&h_up>=0LL)
@@ -624,6 +625,7 @@ class CLayouter_fancy
 				aflag|=ATOM_FLAG_HYPHEN
 			aflag|=(atoms[line_breaks[li]].style_id<0?atoms[line_breaks[li]].pword1:atoms[line_breaks[li]].pword0)+offset_base
 			result.push(h_line|(h_up<<21)|(i64(aflag)<<42))
+			assert((result.back()>>42)!=-1LL)
 			for i=line_breaks[li]:line_breaks[li+1]-1
 				if atoms[i].style_id==-1:
 					//object
@@ -643,9 +645,10 @@ class CLayouter_fancy
 					cur_word1=atoms[i].pword1
 					cur_style=atoms[i].style_id
 					//padding mode 1 / 2
-					if atoms[i].flags&(padding_mode==1?FLAG_CAN_PAD_AFTER:FLAG_CAN_PAD_AFTER_WEAK):
-						addSpace(w_pad+i64(w_rem>0),atoms[i].pword0)
-						w_rem--
+					if padding_mode==1||padding_mode==2:
+						if atoms[i].flags&(padding_mode==1?FLAG_CAN_PAD_AFTER:FLAG_CAN_PAD_AFTER_WEAK):
+							addSpace(w_pad+i64(w_rem>0),atoms[i].pword0)
+							w_rem--
 			FlushWord()
 	/////////////////
 	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
@@ -654,7 +657,9 @@ class CLayouter_fancy
 			n0=result.n
 			if m_h_blank_line_in_fp&&(sline=="\n"||sline=="\r\n"):
 				result.push(m_h_blank_line_in_fp|(m_h_blank_line_in_fp<<21)|(i64(ATOM_FLAG_LINE_BREAK|ATOM_FLAG_NEWLINE|I)<<42))
-				result.push(I|((I+1)<<21)|(0LL<<42))
+				assert((result.back()>>42)!=-1LL)
+				result.push(i64(I)|(i64(I+1)<<21)|(0LL<<42))
+				assert((result.back()>>42)!=-1LL)
 			else
 				PreprocessParagraph(result,I,sline,sline.EndsWith("\n"))
 			if n0<result.n:
@@ -836,7 +841,6 @@ class CLayouter_fancy
 			style_id=int(atom_i>>42)
 			value1=int((atom_i>>21)&((1<<21)-1))
 			value0=int(atom_i&((1<<21)-1))
-			//todo: pack a ccnt for the pre-newline-check checks
 			if style_id==-2:
 				//space
 				OfsCheck(value1)
@@ -846,7 +850,8 @@ class CLayouter_fancy
 			else if style_id==-1:
 				//object
 				obj_id=value0
-				//todo: render it
+				js_obj=m_objects[obj_id].obj
+				js_obj.CallMethod(JSObject,"RenderAsObject",projectX(x),projectY(y),fixed2float(m_objects[obj_id].w)*scaling,fixed2float(m_objects[obj_id].h)*scaling)
 				OfsCheck(value1)
 				x+=m_objects[obj_id].w
 				SeekCheck(value1)
@@ -870,7 +875,7 @@ class CLayouter_fancy
 				if mode==MODE_RENDER:
 					fnt_scaled=m_styles[current_style_id].font
 					fnt_scaled.h*=scaling
-					//smart emboldening for SRGB
+					//smart emboldening for SRGB - it has to be done *after* the scaling
 					color=m_styles[current_style_id].color
 					if g_renderer.m_srgb_supported:
 						fnt_scaled.embolden+=int((1.f-float(19589*(color&0xff)+38470*((color>>8)&0xff)+7477*((color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)

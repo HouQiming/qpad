@@ -1,6 +1,8 @@
 import "text-box.jc"
 import "code-editor.jc"
 import "txtx-editor.jc"
+import "zip-doc.jc"
+import "ooc-mipmap.jc"
 import "uisandbox.jc"
 import Gui2D.*
 import Javascript.*

@@ -1,0 +1,290 @@
+//do it the RA way - downsample, pack (in clamping mode), tile, zip
+/*
+or the simpler one texture per image mode? we only need one mipmap layer at any given time...
+and the re-uploading time is the same anyway
+
+in the OOM case, we just load higher mipmap levels
+
+that requires to mass-new / mass-delete textures
+	which is easier than the tiling shit...
+*/
+import "javascript.jc"
+import "gui2d.jc"
+import "g-l.jc"
+import System.Math.*
+import System.Algorithm.*
+import System.Console.*
+import Gui2D.detail.*
+import Gui2D.*
+import Javascript.*
+import GL.*
+
+class CRGBAImage
+	int[] rgba
+	int w,h
+	GLuint texid
+	int is_used
+	///////////
+	auto SavePNG()
+		len=0
+		spng=stbi_write_png_to_mem(rgba,w*4,w,h,4,&len)
+		if !spng:return string.NULL
+		ret=new string
+		ret.d=iptr(spng)
+		ret.n=iptr(len)
+		ret.sz=ret.n
+		return ret
+
+auto downSampleMipmap(CRGBAImage img)
+	picbuf=img.rgba
+	w0=img.w
+	h0=img.h
+	w=(w0+1)>>1
+	h=(h0+1)>>1
+	pbox=new int[w*h]
+	ppt=0
+	if w*2==w0:
+		for y=0:h0-1
+			pret=ppt
+			for i=0:2:w-2
+				C0=u32(picbuf[ppt])
+				C1=u32(picbuf[ppt+1])
+				picbuf[pret]=int(((C0&0xfefefefeu)>>1)+((C1&0xfefefefeu)>>1)+(C0&C1&0x01010101u))
+				pret++;ppt+=2
+	else
+		wit=1.f/float(2*w-1)
+		wt=float(w-1)/float(2*w-1)
+		wt1=1.f-wt//float(w)/float(2*w-1)
+		for y=0:h0-1
+			ppt=y*w0 // xb=0
+			pret=ppt
+			C0=u32(picbuf[ppt])
+			C1=u32(picbuf[ppt+1])
+			C=0
+			for i in crange(4)
+				C+=int(f32((C0>>(i*8))&255u)*wt1+f32((C1>>(i*8))&255u)*wt)<<(i*8)
+			picbuf[pret]=C
+			ppt+=2;wt0=wit
+			for xb=1:w-2
+				C0=u32(picbuf[ppt-1])
+				C1=u32(picbuf[ppt])
+				C2=u32(picbuf[ppt+1])
+				wt2=wt-wt0
+				for i in crange(4)
+					C+=int(f32((C0>>(i*8))&255u)*wt0+f32((C1>>(i*8))&255u)*wt1+f32((C1>>(i*8))&255u)*wt2)<<(i*8)
+				picbuf[pret]=C
+				pret++; ppt+=2; wt0+=wit
+			C0=u32(picbuf[ppt-1])
+			C1=u32(picbuf[ppt])
+			for i in crange(4)
+				C+=int(f32((C0>>(i*8))&255u)*wt+f32((C1>>(i*8))&255u)*wt1)<<(i*8)
+			picbuf[pret]=C
+	/////////////
+	ppt=0
+	if h*2==h0:
+		pret=0
+		for yb=0:h-1
+			ppt=(yb<<1)*w0
+			for xb=0:w-1
+				C0=u32(picbuf[ppt])
+				C1=u32(picbuf[ppt+w0])
+				pbox[pret]=int(((C0&0xfefefefeu)>>1)+((C1&0xfefefefeu)>>1)+(C0&C1&0x01010101u))
+				pret++;ppt++
+	else
+		wit=1.f/float(2*h-1)
+		wt=float(h-1)/float(2*h-1)
+		wt1=1.f-wt
+		pret=0; ppt=0
+		for xb=0:w-1
+			C0=u32(picbuf[ppt])
+			C1=u32(picbuf[ppt+w0])
+			C=0
+			for i in crange(4)
+				C+=int(f32((C0>>(i*8))&255u)*wt1+f32((C1>>(i*8))&255u)*wt)<<(i*8)
+			pbox[pret]=C
+			pret++;ppt++
+		wt0=wit
+		for yb=1:h-2
+			ppt=(yb<<1)*w0
+			for xb=0:w-1
+				C0=u32(picbuf[ppt-w0])
+				C1=u32(picbuf[ppt])
+				C2=u32(picbuf[ppt+w0])
+				wt2=wt-wt0
+				C=0
+				for i in crange(4)
+					C+=int(f32((C0>>(i*8))&255u)*wt0+f32((C1>>(i*8))&255u)*wt1+f32((C1>>(i*8))&255u)*wt2)<<(i*8)
+				pbox[pret]=C
+				pret++; ppt++
+			wt0+=wit
+		ppt=((h-1)<<1)*w0
+		for xb=0:w-1
+			C0=u32(picbuf[ppt-w0])
+			C1=u32(picbuf[ppt])
+			C=0
+			for i in crange(4)
+				C+=int(f32((C0>>(i*8))&255u)*wt+f32((C1>>(i*8))&255u)*wt1)<<(i*8)
+			pbox[pret]=C
+			pret++; ppt++
+	return new CRGBAImage(){rgba:pbox,w:w,h:h}
+
+class CRequestedMipmapLevel
+	CEmbeddedImage img
+	int lv_min
+	float x,y,w,h
+	GLuint texid
+class CEmbeddedImageManager
+	m_requests=new CRequestedMipmapLevel[]
+	m_budget=64<<20
+	m_tech=new GLTechnique
+	m_prev_cached_images=new CRGBAImage[]
+	m_cached_images=new CRGBAImage[]
+	auto BeginFrame()
+		m_requests.clear()
+	auto DrawMipmapAt(CEmbeddedImage img,float x,float y,float w,float h)
+		w0=img.m_mipmap[0].w
+		h0=img.m_mipmap[0].h
+		zoom_out=max(f32(w0)/w,f32(h0)/h)
+		lv_min=max(((__float_as_int(zoom_out))>>23)-127,0)
+		ctx=CRequestedMipmapLevel(){img:img,lv_min:lv_min,x:x,y:y,w:w,h:h}
+		window_w=g_renderer.m_window_w
+		window_h=g_renderer.m_window_h
+		mini_vbo=[x,y,0.f,0.f, x+w,y,1.f,0.f, x+w,y+h,1.f,1.f, x,y+h,0.f,1.f]
+		g_renderer.InsertNativeDrawCall(function(){
+			m_tech.SetVarying("vec2 uv;")
+			m_tech.SetVertexShader("
+			void main(){
+				vec2 P_scr=P*scale.xy;
+				uv=uv_vert;
+				gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
+			}")
+			if g_renderer.m_srgb_supported&&!g_renderer.m_tex_is_srgb:
+				m_tech.SetFragmentShader("void main(){vec4 C_tex=texture2D(tex0,uv);gl_FragColor=vec4(pow(C_tex.xyz,vec3("+formatNumber(g_renderer.m_gamma,{frac:7})+")),C_tex.w);}")
+			else
+				m_tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
+			m_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 4*sizeof(float),mini_vbo.d)
+			m_tech.SetVertexPointer("uv_vert", 2,GL_FLOAT,0, 4*sizeof(float),mini_vbo.d+2*sizeof(int))
+			m_tech.SetUniform("scale",float2(2.f/f32(window_w),2.f/f32(window_h)))
+			m_tech.SetTexture2D("tex0", ctx.texid)
+			m_tech.Draw(0u,GL_QUADS,4)
+			mini_vbo.discard()
+		})
+		m_requests.push(ctx)
+	auto EndFrame()
+		delta=0
+		for(;;)
+			mem=0L
+			foreach req in m_requests
+				mem+=req.img.GetMipmapMemory(req.lv_min+delta)
+			if mem<m_budget:
+				break
+			delta++
+			if delta>=16:
+				break
+		//single-frame cache
+		m_prev_cached_images=m_cached_images
+		m_cached_images=new CRGBAImage[]
+		foreach img in m_prev_cached_images
+			img.is_used=0
+		foreach req in m_requests
+			mipmap_img=req.img.RequestMipmap(req.lv_min+delta)
+			if mipmap_img.texid:
+				if !mipmap_img.is_used:
+					mipmap_img.is_used=1
+					m_cached_images.push(mipmap_img)
+			else
+				mipmap_img.texid=glCreateTexture(g_renderer.m_tex_is_srgb?GL_SRGB_ALPHA:GL_RGBA8,
+					mipmap_img.w,mipmap_img.h,GL_LINEAR,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,__pointer(mipmap_img.rgba.d))
+				m_cached_images.push(mipmap_img)
+			req.texid=mipmap_img.texid
+		foreach img in m_prev_cached_images
+			if !img.is_used:
+				tid=img.texid
+				glDeleteTextures(1,&tid)
+				img.texid=0u
+g_manager=new CEmbeddedImageManager
+registerRenderingHook(g_manager)
+
+class CEmbeddedImage
+	m_mipmap=new CRGBAImage[]
+	string m_raw_image
+	auto GetMipmapMemory(int level)
+		img=m_mipmap[0]
+		w=img.w;h=img.h
+		for i=0:level-1
+			w=(w+1)>>1
+			h=(h+1)>>1
+		return iptr(w*h)
+	auto RequestMipmap(int level)
+		while m_mipmap.n<=level
+			img=m_mipmap.back()
+			if img.w==1&&img.h==1:
+				return img
+			m_mipmap.push(downSampleMipmap(img))
+		return m_mipmap[level]
+	/////////////////////
+	default_extension="png"
+	JS_RenderAsObject=function(JSContext JS){
+		g_manager.DrawMipmapAt(this,JS.Param(0).or(0.f),JS.Param(1).or(0.f),JS.Param(2).or(1.f),JS.Param(3).or(1.f))
+		return 0
+	}
+	JS_GetReferences=function(JSContext JS){
+		return 0
+	}
+	JS_Save=function(JSContext JS){
+		if m_raw_image:
+			return JS.Return(m_raw_image)
+		else
+			return JS.Return(m_mipmap[0].SavePNG())
+	}
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"default_extension")
+		proto.ExportMethod(this,"RenderAsObject",JS_RenderAsObject)
+		proto.ExportMethod(this,"GetReferences",JS_GetReferences)
+		proto.ExportMethod(this,"Save",JS_Save)
+	}
+
+//hotkey + win dlg first
+if Platform.IS_WINDOWS:
+	osal_PickImageWin=__c_function(int,"osal_PickImageWin","filedlg.h","c_files","filedlg.c")
+	__generate_json("lib_files","comdlg32.lib")
+	auto PickImage()
+		s_userdir=System.Env.ExpandEnvironmentStrings(string("%USERPROFILE%"))
+		if !s_userdir.n||s_userdir[0]=='%':
+			s_userdir=System.Env.ExpandEnvironmentStrings(string("%SystemDrive%%HOMEPATH%"))
+		s_userdir.push("\\Pictures")
+		if !System.IO.DirExists(s_userdir):
+			//no "My Pictures"
+			s_userdir="."
+		buf=System.Algorithm.Utf8ToUnicode(s_userdir)
+		if buf.n<260:buf.resize(260)
+		if osal_PickImageWin(buf):
+			s=System.Algorithm.UnicodeToUtf8(buf)
+			pz=s.IndexOf(char(0))
+			if pz>=0:
+				s.resize(pz)
+			return s
+		else
+			return string.NULL
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["CreateEmbeddedImageFromFileData"]=function(JSContext JS){
+		s_fdata=JS.Param(0).as(string)
+		if !s_fdata:return 0
+		bmp=g_renderer.LoadImage(s_fdata)
+		if !bmp.rgba:return 0
+		ret=new CEmbeddedImage
+		if !s_fdata.StartsWith("BM"):
+			//keep the original representation unless it's a BMP
+			ret.m_raw_image=s_fdata
+		ret.m_mipmap=[new CRGBAImage(){rgba:bmp.rgba,w:bmp.w,h:bmp.h}]
+		return JS.Return(ret)
+	}
+	JS_UI["PickImage"]=function(JSContext JS){
+		ret=PickImage()
+		if !ret:
+			return 0
+		else
+			return JS.Return(ret)
+	}
+})
