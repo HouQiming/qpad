@@ -48,5 +48,10 @@ __generate_json("js_units","gui2d/dockbar.js")
 			return 0
 	}
 	/////////////
+	Duktape=JS.GetGlobal()["Duktape"]
+	Duktape["__utf8_fromCharCode"]=function(JSContext JS){
+		return JS.Return(System.Algorithm.Unicode32ToUtf8([JS.Param(0).or(0)]))
+	}
+	/////////////
 	sbox.UIRunJS(JS,"res/main.js")
 })()

@@ -719,13 +719,14 @@ class CLayouter_fancy
 		return m_caret_offset
 	}
 	IsAtLineWrap=function(i64[] a,i64[] pp,string s,iptr ofs){
-		foreach atom_i in pp
-			style_id=int(atom_i>>42)
-			if style_id!=-1&&style_id!=-2&&(style_id&ATOM_FLAG_LINE_BREAK):
-				ccnt=(style_id&ATOM_MASK_CCNT)
-				if ccnt==ofs&&(ofs>=s.n||s[ofs]!='\n'):
-					return 1
-				if ccnt>ofs:break
+		if pp.n>0:
+			foreach atom_i,I in pp[1:]
+				style_id=int(atom_i>>42)
+				if style_id!=-1&&style_id!=-2&&(style_id&ATOM_FLAG_LINE_BREAK):
+					ccnt=(style_id&ATOM_MASK_CCNT)
+					if ccnt==ofs&&(ofs>=s.n||s[ofs]!='\n'):
+						return 1
+					if ccnt>ofs:break
 		return 0
 	}
 	IsCharInvisible=function(int ch){
@@ -749,6 +750,9 @@ class CLayouter_fancy
 		js_styles=obj["styles"].as(JSObject)
 		assert(!!js_styles)
 		assert(js_styles.length()>0)
+		UpdateStyles(js_styles)
+	}
+	UpdateStyles=function(JSObject js_styles){
 		m_styles=new CStyle[]
 		for i=0:js_styles.length()-1
 			style_i=js_styles[i].as(JSObject)
@@ -949,9 +953,15 @@ class CLayouter_fancy
 	}
 	//////////////////////////////
 	//todo: somehow load the objects
-	__JS_prototype=function(JSObject proto){
+	JS_UpdateStyles=function(JSContext JS){
+		js_styles=JS.Param(0).as(JSObject)
+		if !js_styles||js_styles.length()<=0:return 0
+		UpdateStyles(js_styles)
+		return 0
 	}
-
+	__JS_prototype=function(JSObject proto){
+		proto.ExportMethod(this,"UpdateStyles",JS_UpdateStyles)
+	}
 
 registerStateHandler("renderer_fancy",CLayouter_fancy)
 
@@ -959,5 +969,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ParseHyphenator"]=function(JSContext JS){
 		sdata=JS.Param(0).or("")
 		return JS.Return(parseTexHyphenFile(JS,sdata))
+	}
+	JS_UI["RemoveStylingCharacters"]=function(JSContext JS){
+		s=JS.Param(0).as(string)
+		if !s:return 0
+		return JS.Return(Unicode32ToUtf8([ch foreach ch in Utf8ToUnicode32(s) if !(ch>=COMMAND_SET_STYLE&&ch<COMMAND_END)]))
 	}
 })
