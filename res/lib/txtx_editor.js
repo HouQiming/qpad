@@ -300,22 +300,38 @@ W.TxtxView=function(id,attrs){
 				doc.caret_color,doc.caret_flicker);
 		}
 		var renderer=doc.GetRenderer();
-		//todo: do not update while dragging? should be fine?
 		var embeded_objects=renderer.g_rendered_objects;
 		if(embeded_objects.length){
 			UI.Begin(obj)
+				var fondragstart=UI.HackCallback(function(obj_i){
+					var real_obj=renderer.GetObject(obj_i.numerical_id);
+					obj_i.change_mode="translate";
+					obj_i.translate_y_original=obj_i.y;
+					obj_i.translate_y_baseline=real_obj.y_baseline;
+				})
+				var fonscalestart=UI.HackCallback(function(obj_i){
+					var real_obj=renderer.GetObject(obj_i.numerical_id);
+					obj_i.change_mode="scale";
+					obj_i.baseline_ratio=real_obj.y_baseline/real_obj.h;
+				})
+				var fonchange=UI.HackCallback(function(obj_i){
+					var real_obj=renderer.GetObject(obj_i.numerical_id);
+					if(obj_i.change_mode=="translate"){
+						real_obj.y_baseline=obj_i.translate_y_baseline-(obj_i.y-obj_i.translate_y_original)/scale;
+					}else{
+						real_obj.y_baseline=obj_i.baseline_ratio*obj_i.h/scale;
+					}
+					real_obj.w=obj_i.w/scale;
+					real_obj.h=obj_i.h/scale;
+					doc.ed.InvalidateStates([obj_i.ccnt,lg_rubber_space])
+					UI.Refresh()
+				})
 				for(var i=0;i<embeded_objects.length;i++){
 					var obj_i=embeded_objects[i];
 					obj_i.id="$"+obj_i.numerical_id;
-					obj_i.OnChange=UI.HackCallback(function(obj_i){
-						var real_obj=renderer.GetObject(obj_i.numerical_id);
-						real_obj.y_baseline=(real_obj.y_baseline/real_obj.h)*obj_i.h;
-						real_obj.w=obj_i.w;
-						real_obj.h=obj_i.h;
-						//todo: baseline moving along with translation
-						//todo: editor invalidation (attach ccnt in obj)
-						UI.Refresh()
-					});
+					obj_i.OnScaleStart=fonscalestart;
+					obj_i.OnDragStart=fondragstart;
+					obj_i.OnChange=fonchange;
 				}
 				W.Group("embeded_objects",{
 					layout_direction:'inside',layout_align:'left',layout_valign:'up',x:0,y:0,

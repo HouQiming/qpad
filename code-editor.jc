@@ -231,7 +231,7 @@ class CLayouter_programmer
 	GetCaretOffset=function(){
 		return m_caret_offset
 	}
-	RenderText=function(i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+	RenderText=function(i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
 		//todo: keywords
 		fnt_scaled=m_font
 		fnt_scaled.h*=scaling

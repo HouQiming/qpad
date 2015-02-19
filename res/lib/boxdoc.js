@@ -81,6 +81,7 @@ var ScaleKnob_prototype={
 		this.drag_w=attrs.w;
 		this.drag_h=attrs.h;
 		this.is_dragging=1;
+		if(attrs.OnScaleStart){attrs.OnScaleStart(attrs);}
 		UI.CaptureMouse(this);
 	},
 	OnMouseMove:function(event){
@@ -103,9 +104,10 @@ var ScaleKnob_prototype={
 		UI.Refresh()
 	},
 	OnMouseUp:function(event){
+		var attrs=this.owner;
 		UI.ReleaseMouse(this);
 		this.is_dragging=0;
-		//todo: check for simple clicks?
+		if(attrs.OnScaleFinish){attrs.OnScaleFinish(attrs);}
 	},
 };
 W.BoxDocumentItem=function(id,attrs0){
