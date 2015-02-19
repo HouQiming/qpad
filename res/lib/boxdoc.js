@@ -12,6 +12,9 @@ var BoxDocumentItem_prototype={
 	can_rotate:0,
 	rotation_arm_length:16,
 	can_scale:1,
+	locked_aspect_ratio:0,
+	w_min:1,
+	h_min:1,
 	knob_scale:{
 		w:12,
 		h:12,
@@ -85,6 +88,7 @@ var ScaleKnob_prototype={
 		var attrs=this.owner;
 		var x_scale=(event.x-this.drag_x_anchor)/this.dx_base;
 		var y_scale=(event.y-this.drag_y_anchor)/this.dy_base;
+		if(this.lock_aspect_ratio){x_scale=Math.min(x_scale,y_scale);y_scale=x_scale;}
 		if(x_scale){
 			x_scale=Math.max(x_scale,attrs.w_min/this.drag_w);
 			attrs.x=this.drag_x_anchor+this.drag_x0*x_scale;

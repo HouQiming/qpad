@@ -340,6 +340,19 @@ class CStyle
 class CEmbededObject
 	JSObject obj
 	i64 w,h,y_baseline
+	///////////
+	JS_get_w=function(JSContext JS){return JS.Return(fixed2double(w))}
+	JS_get_h=function(JSContext JS){return JS.Return(fixed2double(h))}
+	JS_get_y_baseline=function(JSContext JS){return JS.Return(fixed2double(y_baseline))}
+	JS_set_w=function(JSContext JS){w=double2fixed(JS.Param(0).as(double));return 0}
+	JS_set_h=function(JSContext JS){h=double2fixed(JS.Param(0).as(double));return 0}
+	JS_set_y_baseline=function(JSContext JS){y_baseline=double2fixed(JS.Param(0).as(double));return 0}
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"obj")
+		proto.ExportGetterSetter(this,"w",JS_get_w,JS_set_w)
+		proto.ExportGetterSetter(this,"h",JS_get_h,JS_set_h)
+		proto.ExportGetterSetter(this,"y_baseline",JS_get_y_baseline,JS_set_y_baseline)
+	}
 ///////////////////////////////
 //separate document and stylesheet?
 class CLayouter_fancy
@@ -506,7 +519,7 @@ class CLayouter_fancy
 			w_tail=w_line-w
 			best_i=1LL<<62
 			blast_i=j_min
-			for j=j_min:i-1
+			for j=min(j_min,i-1):i-1
 				if j==i-1&&(atoms[i-1].flags&FLAG_IS_SPACE):
 					break
 				if w_tail>=0LL:
@@ -765,6 +778,11 @@ class CLayouter_fancy
 			nstyle_i.FindLigatures()
 			m_styles.push(nstyle_i)
 	}
+	//////////////////////
+	JSObject[] g_rendered_objects
+	BeginRender=function(){
+		g_rendered_objects=new JSObject[]
+	}
 	_RenderText=function(int mode,i64[] a,i64[] pp,string s,iptr ofs, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
 		inline projectX(i64 x)
 			return fixed2float(x-scroll_x)*scaling+screen_x
@@ -855,10 +873,24 @@ class CLayouter_fancy
 				//object
 				obj_id=value0
 				js_obj=m_objects[obj_id].obj
-				js_obj.CallMethod(JSObject,"RenderAsObject",projectX(x),projectY(y),fixed2float(m_objects[obj_id].w)*scaling,fixed2float(m_objects[obj_id].h)*scaling)
+				if mode==MODE_RENDER:
+					rendered_x=projectX(x)
+					rendered_y=projectY(y)
+					rendered_w=fixed2float(m_objects[obj_id].w)*scaling
+					rendered_h=fixed2float(m_objects[obj_id].h)*scaling
+					js_obj.CallMethod(JSObject,"RenderAsObject",rendered_x,rendered_y,rendered_w,rendered_h)
+					auto JS=js_obj.m_jsctx
+					obj_rendered_pos=JS.New()
+					obj_rendered_pos["numerical_id"]=obj_id
+					obj_rendered_pos["x"]=rendered_x
+					obj_rendered_pos["y"]=rendered_y
+					obj_rendered_pos["w"]=rendered_w
+					obj_rendered_pos["h"]=rendered_h
+					obj_rendered_pos["ccnt"]=rendered_h
+					g_rendered_objects.push(obj_rendered_pos,!?+value1)
 				OfsCheck(value1)
 				x+=m_objects[obj_id].w
-				SeekCheck(value1)
+				SeekCheck(value1) 
 				ch32_prev=int('\n')
 			else if style_id&ATOM_FLAG_LINE_BREAK:
 				//line start
@@ -959,8 +991,28 @@ class CLayouter_fancy
 		UpdateStyles(js_styles)
 		return 0
 	}
+	JS_InsertObject=function(JSContext JS){
+		obj=JS.Param(0).as(JSObject)
+		if !obj:return 0
+		w=double2fixed(JS.Param(1).as(double))
+		h=double2fixed(JS.Param(2).as(double))
+		y_baseline=double2fixed(JS.Param(3).as(double))
+		n0=m_objects.n
+		m_objects.push(CEmbededObject(){obj:obj,w:w,h:h,y_baseline:y_baseline})
+		return JS.Return(n0)
+	}
+	JS_GetObject=function(JSContext JS){
+		id=JS.Param(0).or(-1)
+		if u32(id)<u32(m_objects.n):
+			return JS.Return(m_objects[id])
+		else
+			return 0
+	}
 	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"g_rendered_objects")
 		proto.ExportMethod(this,"UpdateStyles",JS_UpdateStyles)
+		proto.ExportMethod(this,"InsertObject",JS_InsertObject)
+		proto.ExportMethod(this,"GetObject",JS_GetObject)
 	}
 
 registerStateHandler("renderer_fancy",CLayouter_fancy)
