@@ -87,10 +87,10 @@ class CLayouter_programmer
 	//final format: pre-tab width, has-tabbed-ness, tab-enter width, has-enter-ness, post-enter width
 	//do not use a render-central design
 	AddString=function(i64[] a,i64[] unused,string s_context,string s,iptr ofs){
-		w_pre_tab=0LL
-		w_tab_enter=0LL
-		w_post_enter=0LL
-		flags=0
+		w_pre_tab=a[0]
+		w_tab_enter=a[1]
+		w_post_enter=a[2]
+		flags=int(a[3])
 		foreach ch,I in Utf8Chars(s)
 			if I>=ofs:break
 			if ch=='\t':

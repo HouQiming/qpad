@@ -43,7 +43,7 @@ var g_GetFontFromStyle_callbacks={
 			if(flags&STYLE_FONT_BOLD){
 				if(flags&STYLE_FONT_ITALIC){font_name="res/fonts/cmunso.ttf";}else{font_name="res/fonts/cmunsx.ttf"}
 			}else if(flags&STYLE_FONT_ITALIC){
-				font_name="res/fonts/cmunsl.ttf";
+				font_name="res/fonts/cmunsi.ttf";
 			}else{
 				font_name="res/fonts/cmunss.ttf";
 			}
