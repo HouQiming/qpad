@@ -121,10 +121,9 @@ var RerunUserCode=function(){
 	code_box.has_errors=0;
 	var ed=code_box.ed;
 	var s_code=ed.GetText(range_0,range_1-range_0);
-	// instrument /*widget几*/, do we need 几?
-	var re_widget=new RegExp('/\\*widget(.)\\*/\\(',"g")
+	var re_widget=new RegExp('/\\*widget\\*/\\(',"g")
 	var ftranslate_widget=function(smatch,sname){
-		return "UI.__report_widget('"+sname+"',";
+		return "UI.__report_widget(";
 	};
 	s_code=s_code.replace(re_widget,ftranslate_widget);
 	try{
@@ -138,12 +137,21 @@ var RerunUserCode=function(){
 	return 1;
 };
 
+var nthIndex=function(str, pat, n){
+    var L= str.length, i= -1;
+    while(n>=0 && i++<L){
+        i= str.indexOf(pat, i);
+        n--;
+    }
+    return i>=L?-1:i;
+}
+
 var DrawUserFrame=function(){
 	var code_box=UI.top.app.code_box;
 	var inner_widgets=[];
 	if(!code_box.has_errors){
 		try{
-			g_sandbox.eval("UI.__reported_widgets=[];UI.DrawFrame();");
+			g_sandbox.eval("UI.__init_widget_report();UI.DrawFrame();");
 			inner_widgets=g_sandbox.ReadBack('UI.__get_widget_report()');
 		}catch(err){
 			ParseCodeError(err)
@@ -198,8 +206,8 @@ var DrawUserFrame=function(){
 			var range_1=code_box.working_range.point1.ccnt;
 			code_box.has_errors=0;
 			var s_code=ed.GetText(range_0,range_1-range_0);
-			var s_widget_key="/*widget"+obj.id.substr(1)+"*/(";
-			var utf8_offset=s_code.indexOf(s_widget_key)
+			var s_widget_key="/*widget*/(";
+			var utf8_offset=nthIndex(s_code,s_widget_key,parseInt(obj.id.substr(1)))
 			if(utf8_offset<0){
 				throw new Error("panic: UI->widget desync");
 			}

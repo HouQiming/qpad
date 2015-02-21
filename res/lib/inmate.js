@@ -4,10 +4,13 @@ if(UI.is_real){
 	throw new Error("you're not in jail and there is no inmate");
 }
 
-UI.__reported_widgets=[];
+UI.__init_widget_report=function(){
+	UI.__reported_widgets=[];
+	UI.g_widget_name=0;
+};
 
-UI.__report_widget=function(wname,attrs){
-	UI.__reported_widgets.push([wname,attrs]);
+UI.__report_widget=function(attrs){
+	UI.__reported_widgets.push([UI.g_widget_name++,attrs]);
 	return attrs;
 };
 
