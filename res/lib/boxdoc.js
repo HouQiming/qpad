@@ -212,4 +212,8 @@ W.BoxDocumentItem=function(id,attrs0){
 	return obj;
 }
 
+W.BoxDocument=function(id,attrs){
+	!? //todo: drag sel
+}
+
 //todo: cursor system - SDL_CreateSystemCursor, SDL_SetCursor

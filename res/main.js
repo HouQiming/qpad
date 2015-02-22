@@ -137,13 +137,13 @@ var RerunUserCode=function(){
 	return 1;
 };
 
-var nthIndex=function(str, pat, n){
-    var L= str.length, i= -1;
-    while(n>=0 && i++<L){
-        i= str.indexOf(pat, i);
-        n--;
-    }
-    return i>=L?-1:i;
+var nthIndex=function(str,pat,n){
+	var L=str.length,i=-1;
+	while(n>=0&&i++<L){
+		i=str.indexOf(pat,i);
+		n--;
+	}
+	return i>=L?-1:i;
 }
 
 var DrawUserFrame=function(){
