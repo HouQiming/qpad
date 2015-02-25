@@ -314,7 +314,7 @@ UI.Application=function(id,attrs){
 				W.Group("controls",{
 					layout_direction:'inside',layout_align:'left',layout_valign:'up',x:16,y:16,w:sandbox_main_window_w,h:sandbox_main_window_h,
 					'snapping_coords':snapping_coords,
-					'item_object':W.BoxDocumentItem,'items':code_box.document_items})
+					'item_template':{object_type:W.BoxDocumentItem},'items':code_box.document_items})
 			}
 		UI.End();
 		///////////////////

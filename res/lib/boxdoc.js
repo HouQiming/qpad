@@ -166,6 +166,7 @@ var ScaleKnob_prototype={
 W.BoxDocumentItem=function(id,attrs0){
 	var obj=UI.Keep(id,attrs0,BoxDocumentItem_prototype);
 	UI.StdStyling(id,obj,attrs0, "box_document_item");
+	obj.mouse_cursor=(obj.selected?"sizeall":undefined)
 	W.Region(id,obj);//this does the anchoring
 	obj.parent=UI.context_parent;
 	if(obj.selected){
@@ -197,14 +198,14 @@ W.BoxDocumentItem=function(id,attrs0){
 					var y2=y0+obj.h;
 					var x1=(x0+x2)*0.5;
 					var y1=(y0+y2)*0.5;
-					knob.x=x0;knob.y=y0;UI.RoundRect(knob);W.Region("scale_knob00",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x2+dx,y_anchor:y2+dy},ScaleKnob_prototype);
-					knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region("scale_knob10",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,y_anchor:y2+dy},ScaleKnob_prototype);
-					knob.x=x2;knob.y=y0;UI.RoundRect(knob);W.Region("scale_knob20",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x0+dx,y_anchor:y2+dy},ScaleKnob_prototype);
-					knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region("scale_knob01",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x2+dx},ScaleKnob_prototype);
-					knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region("scale_knob21",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x0+dx},ScaleKnob_prototype);
-					knob.x=x0;knob.y=y2;UI.RoundRect(knob);W.Region("scale_knob02",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x2+dx,y_anchor:y0+dy},ScaleKnob_prototype);
-					knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region("scale_knob12",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,y_anchor:y0+dy},ScaleKnob_prototype);
-					knob.x=x2;knob.y=y2;UI.RoundRect(knob);W.Region("scale_knob22",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x0+dx,y_anchor:y0+dy},ScaleKnob_prototype);
+					knob.x=x0;knob.y=y0;UI.RoundRect(knob);W.Region("scale_knob00",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x2+dx,y_anchor:y2+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
+					knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region("scale_knob10",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,y_anchor:y2+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+					knob.x=x2;knob.y=y0;UI.RoundRect(knob);W.Region("scale_knob20",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x0+dx,y_anchor:y2+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
+					knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region("scale_knob01",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x2+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+					knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region("scale_knob21",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x0+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+					knob.x=x0;knob.y=y2;UI.RoundRect(knob);W.Region("scale_knob02",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x2+dx,y_anchor:y0+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
+					knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region("scale_knob12",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,y_anchor:y0+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+					knob.x=x2;knob.y=y2;UI.RoundRect(knob);W.Region("scale_knob22",{x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:obj,x_anchor:x0+dx,y_anchor:y0+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
 				}
 			UI.End(obj);
 		}
@@ -213,7 +214,7 @@ W.BoxDocumentItem=function(id,attrs0){
 }
 
 W.BoxDocument=function(id,attrs){
-	!? //todo: drag sel
+	//todo: drag sel
 }
 
-//todo: cursor system - SDL_CreateSystemCursor, SDL_SetCursor
+//todo: cursor system - UI.SDL_SetSystemCursor(UI.SDL_SYSTEM_CURSOR_IBEAM)
