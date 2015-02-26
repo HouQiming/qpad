@@ -21,7 +21,6 @@ LEVEL_PARAGRAPH=3
 LEVEL_NORMAL=4
 LEVEL_SMALL=5
 ////////////////
-var g_hyp_US=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
 var g_computer_modern_flags=[STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,0,0];
 var g_computer_modern_sizes=[48,48,42,30,30,24];
 var g_GetFontFromStyle_callbacks={
@@ -68,7 +67,6 @@ var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
 TxtxEditor_prototype.wrap_width=1024;
 TxtxEditor_prototype.root_style_name="computer_modern";
-TxtxEditor_prototype.hyphenator=g_hyp_US;
 ////////////////
 TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
 	var ed=this.ed;
@@ -263,6 +261,9 @@ TxtxEditor_prototype.additional_hotkeys=[
 ];
 UI.CreateTxtxDocument=function(attrs){
 	//todo: loading from file
+	if(!TxtxEditor_prototype.hyphenator){
+		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
+	}
 	var ret=Object.create(TxtxEditor_prototype);
 	ret.wrap_width=attrs.w;
 	ret.w=attrs.w;

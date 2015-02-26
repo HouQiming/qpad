@@ -55,7 +55,7 @@ g_sandbox.ReadBack=function(s){return JSON.parse(g_sandbox._ReadBack("JSON.strin
 g_sandbox.eval("var UI=require('gui2d/ui');var W=require('gui2d/widgets');require('res/lib/inmate');")
 //todo: new project, adding widgets, widget type vs Application, parameter defaulting
 //xywh: relative mode?
-g_sandbox.m_relative_scaling=0.5;
+g_sandbox.m_relative_scaling=1;//0.5;
 var g_initial_code=IO.ReadAll("mo\\test\\uiediting.js");
 var g_language_C=Language.Define(function(lang){
 	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
@@ -191,24 +191,53 @@ var DrawUserFrame=function(){
 		}
 		var re_param_replacer=new RegExp("\\'([xywh])\\':([^,]+),","g");
 		//set OnChange
-		var fonstart=UI.HackCallback(function(obj){
+		var fonstart=UI.HackCallback(function(){
 			code_box.undo_needed=0;
+			this.user_anchor_x=this.x;
+			this.user_anchor_y=this.y;
+			this.user_anchor_w=this.w;
+			this.user_anchor_h=this.h;
 		});
-		var fonchange=UI.HackCallback(function(obj){
+		var fonchange=UI.HackCallback(function(tr){
 			//we only consider top level groups, so we ignore non-top-level anchoring
 			//create a replacement object first
-			var obj_replacement={x:obj.x/g_sandbox.m_relative_scaling,y:obj.y/g_sandbox.m_relative_scaling,w:obj.w/g_sandbox.m_relative_scaling,h:obj.h/g_sandbox.m_relative_scaling};
+			//var obj_replacement={x:obj.x/g_sandbox.m_relative_scaling,y:obj.y/g_sandbox.m_relative_scaling,w:obj.w/g_sandbox.m_relative_scaling,h:obj.h/g_sandbox.m_relative_scaling};
 			//todo: snapping support in boxdoc
+			var obj_replacement={
+				x:this.user_anchor_x,
+				y:this.user_anchor_y,
+				w:this.user_anchor_w,
+				h:this.user_anchor_h};
+			if(tr.scale){
+				obj_replacement.x+=obj_replacement.w*tr.relative_anchor[0]
+				obj_replacement.y+=obj_replacement.h*tr.relative_anchor[1]
+				obj_replacement.w*=tr.scale[0]
+				obj_replacement.h*=tr.scale[1]
+				obj_replacement.x-=obj_replacement.w*tr.relative_anchor[0]
+				obj_replacement.y-=obj_replacement.h*tr.relative_anchor[1]
+			}
+			if(tr.translation){
+				obj_replacement.x+=tr.translation[0];
+				obj_replacement.y+=tr.translation[1];
+			}
+			obj_replacement.x/=g_sandbox.m_relative_scaling
+			obj_replacement.y/=g_sandbox.m_relative_scaling
+			obj_replacement.w/=g_sandbox.m_relative_scaling
+			obj_replacement.h/=g_sandbox.m_relative_scaling
 			//////////
 			var ed=code_box.ed;
-			if(code_box.undo_needed){ed.Undo();}
 			var range_0=code_box.working_range.point0.ccnt;
 			var range_1=code_box.working_range.point1.ccnt;
 			code_box.has_errors=0;
 			var s_code=ed.GetText(range_0,range_1-range_0);
 			var s_widget_key="/*widget*/(";
-			var utf8_offset=nthIndex(s_code,s_widget_key,parseInt(obj.id.substr(1)))
+			var utf8_offset=nthIndex(s_code,s_widget_key,parseInt(this.id.substr(1)))
 			if(utf8_offset<0){
+				//print("=================")
+				//print(s_code)
+				//print("-----------------")
+				//print(range_0,range_1)
+				//print("-----------------")
 				throw new Error("panic: UI->widget desync");
 			}
 			var byte_offset=ed.ConvertUTF8OffsetToBytesize(range_0,utf8_offset);
@@ -223,18 +252,20 @@ var DrawUserFrame=function(){
 				return s_replacement;
 			});
 			s_code=s_code.replace(re_param_replacer,freplace_params);
-			ed.Edit([byte_offset,byte_offset_widget_end-byte_offset,s_code]);
-			code_box.undo_needed=1;
-			code_box.need_to_rerun=1;
+			//ed.Edit([byte_offset,byte_offset_widget_end-byte_offset,s_code]);
+			//print(byte_offset,byte_offset_widget_end-byte_offset)
+			code_box.transform_ops.push(byte_offset)
+			code_box.transform_ops.push(byte_offset_widget_end-byte_offset)
+			code_box.transform_ops.push(s_code)
 		});
-		var fonfinish=UI.HackCallback(function(obj){
+		var fonfinish=UI.HackCallback(function(){
 			code_box.undo_needed=0;
 		});
 		for(var i=0;i<items.length;i++){
 			var item_i=items[i];
-			item_i.OnDragStart=fonstart;
-			item_i.OnChange=fonchange;
-			item_i.OnDragFinish=fonfinish;
+			item_i.AnchorTransform=fonstart;
+			item_i.SetTransform=fonchange;
+			item_i.FinalizeTransform=fonfinish;
 			item_i.w_min=1;
 			item_i.h_min=1;
 			//item_i.old_values={x:item_i.x,y:item_i.y,w:item_i.w,h:item_i.h};
@@ -291,7 +322,7 @@ UI.Application=function(id,attrs){
 			//create the boxes
 			if(code_box.document_items){
 				var items=code_box.document_items;
-				var snapping_coords={'x':[],'y':[],'tolerance':4,color:0xff0000ff}
+				var snapping_coords={'x':[],'y':[],'tolerance':4}
 				for(var i=0;i<items.length;i++){
 					var item_i=items[i];
 					if(wnd.controls&&wnd.controls[item_i.id]&&wnd.controls[item_i.id].is_dragging){
@@ -311,10 +342,25 @@ UI.Application=function(id,attrs){
 					if(snapping_coords.rect_x){UI.RoundRect(snapping_coords.rect_x);}
 					if(snapping_coords.rect_y){UI.RoundRect(snapping_coords.rect_y);}
 				}
-				W.Group("controls",{
-					layout_direction:'inside',layout_align:'left',layout_valign:'up',x:16,y:16,w:sandbox_main_window_w,h:sandbox_main_window_h,
+				W.BoxDocument("controls",{
+					x:16,y:16,w:sandbox_main_window_w,h:sandbox_main_window_h,
+					'border_color':0xcccc773f,'border_width':2,
+					'color':0x44cc773f,
 					'snapping_coords':snapping_coords,
-					'item_template':{object_type:W.BoxDocumentItem},'items':code_box.document_items})
+					'items':code_box.document_items,
+					'BeginTransform':function(){
+						var ed=code_box.ed;
+						if(code_box.undo_needed){ed.Undo();}
+						code_box.transform_ops=[];
+					},
+					'EndTransform':function(){
+						var ed=code_box.ed;
+						ed.Edit(code_box.transform_ops);
+						code_box.transform_ops=null;
+						code_box.undo_needed=1;
+						code_box.need_to_rerun=1;
+					},
+				})
 			}
 		UI.End();
 		///////////////////
