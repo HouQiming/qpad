@@ -4,15 +4,16 @@ require("gui2d/dockbar");
 require("res/lib/txtx_editor");
 require("res/lib/subwin");
 
-var g_icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
+var g_icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24,0);
 UI.SetFontSharpening(1.5)
 UI.default_styles={
 	button:{
 		transition_dt:0.1,
-		round:24,border_width:3,padding:12,
+		round:4,border_width:3,padding:12,
 		$:{
 			out:{
-				border_color:0xffcc773f,color:0xffffffff,
+				border_width:0,
+				border_color:0x00ffffff,color:0x00ffffff,
 				icon_color:0xffcc773f,
 				text_color:0xffcc773f,
 			},
@@ -87,7 +88,22 @@ UI.default_styles={
 				},
 			}
 		},
-	}
+	},
+	tab_label:{
+		shadow_color:0x80000000, shadow_size:6,
+		font:UI.Font("res/fonts/opensans.ttf",24), padding:16,
+		$:{
+			active:{
+				text_color:0xffffffff,
+			},
+			inactive:{
+				text_color:0xff444444,
+			},
+		}
+	},
+	tabbed_document:{
+		h_caption:32, h_bar:4, color:0xffbbbbbb,
+	},
 };
 var g_all_property_windows=[
 	{
@@ -161,12 +177,24 @@ var g_all_property_windows=[
 //		},
 //	],
 //};
+var g_all_document_windows=[{
+		color:0xffcc773f,title:"Document 0",
+		body:function(){
+			//todo
+		},
+	},{
+		color:0xff3f77cc,title:"Document 1",
+		body:function(){
+			//todo
+		},
+	},
+]
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
 		///////////////////
 		UI.Begin(W.Window('app',{
-				title:'Mini-Office',w:1280,h:720,bgcolor:0xffbbbbbb,
+				title:'Mini-Office',w:1280,h:720,bgcolor:0xfff0f0f0,
 				designated_screen_size:1080,flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1}));
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
@@ -176,6 +204,7 @@ UI.Application=function(id,attrs){
 			//W.DockingLayout("dockbar",{anchor:UI.context_parent,anchor_align:"fill",anchor_valign:"fill",layout:g_layout})
 			//W.RoundRect("",{x:4,y:128, w:80+12,h:256+12,border_width:-6,round:20,color:0x80000000});
 			//W.RoundRect("",{x:4,y:128, w:80,h:256,round:16,color:[{x:0,y:0,color:0xffffffff},{x:1,y:0,color:0xffd0d0d0}]});
+			var w_bar=2;
 			W.Group("property_bar",{
 				'anchor':'parent','anchor_align':"right",'anchor_valign':"fill",
 				'x':0,'y':0,'w':320,
@@ -183,6 +212,16 @@ UI.Application=function(id,attrs){
 				///////////
 				'layout_direction':'down','layout_spacing':0,'layout_align':'fill','layout_valign':'up',
 			});
+			W.TabbedDocument("document_area",{
+				'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
+				'x':0,'y':0,'w':UI.top.app.w-UI.top.app.property_bar.w,
+				items:g_all_document_windows,
+			})
+			W.RoundRect("-",{
+				'anchor':UI.top.app.property_bar,'anchor_align':"left",'anchor_valign':"fill",
+				'x':0,'y':0,'w':w_bar,
+				color:0xffcc773f,
+			})
 		UI.End();
 	UI.End();
 };
