@@ -334,6 +334,7 @@ W.TxtxView=function(id,attrs){
 					obj_i.OnDragStart=fondragstart;
 					obj_i.OnChange=fonchange;
 				}
+				//todo: region-less boxDocument, improve the updating mechanism
 				W.Group("embeded_objects",{
 					layout_direction:'inside',layout_align:'left',layout_valign:'up',x:0,y:0,
 					'item_object':W.BoxDocumentItem,'items':embeded_objects})

@@ -26,7 +26,7 @@ __generate_json("js_units","gui2d/dockbar.js")
 		if !ret:
 			return 0
 		else
-			return JS.Return(ret)
+			return JS.Return(new(ret))
 	}
 	jsio["UIReadAll"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)

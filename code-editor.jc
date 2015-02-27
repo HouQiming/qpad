@@ -330,7 +330,7 @@ class CColorer_programmer
 	SetTextStyle=function(JSObject obj){
 		m_lang=obj["language"].as(CLanguageDescription)
 	}
-	//state format: ~and_mask|xor_mask, global bracket delta
+	//state format: ~and_mask|xor_mask, global bracket delta, min brackets
 	inline EnumTokens(string s_context,string s)
 		//do the dfa and get all tokens
 		return {'forEach':inline(fbody_outer){
@@ -385,9 +385,9 @@ class CColorer_programmer
 				if min_value>inc_value:
 					min_value=inc_value
 			//if !sti:Writeln(' ',inc_value,' ',ofs)
+			a[pa+2]=min(a[pa+2],a[pa+1]+i64(min_value))
 			a[pa+0]=((i64(~and_mask)<<32)|i64(u32(xor_mask)))
 			a[pa+1]+=i64(inc_value)
-			a[pa+2]=min(a[pa+2],i64(min_value))
 	}
 	Add=function(i64[] a,i64[] b){
 		ld=m_lang

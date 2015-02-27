@@ -11,52 +11,8 @@ g_sandbox.ReadBack=function(s){return JSON.parse(g_sandbox._ReadBack("JSON.strin
 g_sandbox.eval("var UI=require('gui2d/ui');var W=require('gui2d/widgets');require('res/lib/inmate');")
 //todo: new project, adding widgets, widget type vs Application, parameter defaulting
 //xywh: relative mode?
-g_sandbox.m_relative_scaling=0.5;
-var g_initial_code="\
-/* Test comment string */\n\
-UI.default_styles.button={\n\
-	transition_dt:0.1,\n\
-	round:24,border_width:3,padding:12,\n\
-	$:{\n\
-		out:{\n\
-			border_color:0xffcc773f,color:0xffffffff,\n\
-			icon_color:0xffcc773f,\n\
-			text_color:0xffcc773f,\n\
-		},\n\
-		over:{\n\
-			border_color:0xffcc773f,color:0xffcc773f,\n\
-			icon_color:0xffffffff,\n\
-			text_color:0xffffffff,\n\
-		},\n\
-		down:{\n\
-			border_color:0xffaa5522,color:0xffaa5522,\n\
-			icon_color:0xffffffff,\n\
-			text_color:0xffffffff,\n\
-		},\n\
-	}\n\
-};\n\
-\n\
-UI.Application=function(id,attrs){\n\
-	attrs=UI.Keep(id,attrs);\n\
-	UI.Begin(attrs);\n\
-		var wnd=UI.Begin(W.Window('app',{\n\
-						title:'Jacy test code',w:1280,h:720,bgcolor:0xffffffff,\n\
-						designated_screen_size:1440,flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,\n\
-						is_main_window:1}));\n\
-			/*widget一*/(W.Text('',{\n\
-				'w':UI.context_parent.w-32,\n\
-				'x':16,'y':16,\n\
-				font:UI.Font('msyh',128,-100),text:'标题很细',\n\
-				color:0xff000000,\n\
-				}));\n\
-			/*widget二*/(W.Button('ok',{\n\
-				'x':400,'y':400,\n\
-				font:UI.Font('ArialUni',48),text:'OK',\n\
-				OnClick:function(){UI.DestroyWindow(wnd)}}));\n\
-		UI.End();\n\
-	UI.End();\n\
-};\n\
-";
+g_sandbox.m_relative_scaling=1;//0.5;
+var g_initial_code=IO.ReadAll("mo\\test\\uiediting.js");
 var g_language_C=Language.Define(function(lang){
 	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
@@ -121,15 +77,14 @@ var RerunUserCode=function(){
 	code_box.has_errors=0;
 	var ed=code_box.ed;
 	var s_code=ed.GetText(range_0,range_1-range_0);
-	// instrument /*widget几*/
-	var re_widget=new RegExp('/\\*widget(.)\\*/\\(',"g")
+	var re_widget=new RegExp('/\\*widget\\*/\\(',"g")
 	var ftranslate_widget=function(smatch,sname){
-		return "UI.__report_widget('"+sname+"',";
+		return "UI.__report_widget(";
 	};
 	s_code=s_code.replace(re_widget,ftranslate_widget);
 	try{
 		g_sandbox.eval(ed.GetText());
-		g_sandbox.eval("UI.Application=function(id,attrs){"+s_code+"};");
+		g_sandbox.eval("UI.top={};UI.Application=function(id,attrs){"+s_code+"};");
 	}catch(err){
 		ParseCodeError(err)
 		code_box.has_errors=1;
@@ -138,12 +93,21 @@ var RerunUserCode=function(){
 	return 1;
 };
 
+var nthIndex=function(str,pat,n){
+	var L=str.length,i=-1;
+	while(n>=0&&i++<L){
+		i=str.indexOf(pat,i);
+		n--;
+	}
+	return i>=L?-1:i;
+}
+
 var DrawUserFrame=function(){
 	var code_box=UI.top.app.code_box;
 	var inner_widgets=[];
 	if(!code_box.has_errors){
 		try{
-			g_sandbox.eval("UI.__reported_widgets=[];UI.DrawFrame();");
+			g_sandbox.eval("UI.__init_widget_report();UI.DrawFrame();");
 			inner_widgets=g_sandbox.ReadBack('UI.__get_widget_report()');
 		}catch(err){
 			ParseCodeError(err)
@@ -183,24 +147,53 @@ var DrawUserFrame=function(){
 		}
 		var re_param_replacer=new RegExp("\\'([xywh])\\':([^,]+),","g");
 		//set OnChange
-		var fonstart=UI.HackCallback(function(obj){
+		var fonstart=UI.HackCallback(function(){
 			code_box.undo_needed=0;
+			this.user_anchor_x=this.user_x;
+			this.user_anchor_y=this.user_y;
+			this.user_anchor_w=this.w;
+			this.user_anchor_h=this.h;
 		});
-		var fonchange=UI.HackCallback(function(obj){
+		var fonchange=UI.HackCallback(function(tr){
 			//we only consider top level groups, so we ignore non-top-level anchoring
 			//create a replacement object first
-			var obj_replacement={x:obj.x/g_sandbox.m_relative_scaling,y:obj.y/g_sandbox.m_relative_scaling,w:obj.w/g_sandbox.m_relative_scaling,h:obj.h/g_sandbox.m_relative_scaling};
+			//var obj_replacement={x:obj.x/g_sandbox.m_relative_scaling,y:obj.y/g_sandbox.m_relative_scaling,w:obj.w/g_sandbox.m_relative_scaling,h:obj.h/g_sandbox.m_relative_scaling};
 			//todo: snapping support in boxdoc
+			var obj_replacement={
+				x:this.user_anchor_x,
+				y:this.user_anchor_y,
+				w:this.user_anchor_w,
+				h:this.user_anchor_h};
+			if(tr.scale){
+				obj_replacement.x+=obj_replacement.w*tr.relative_anchor[0]
+				obj_replacement.y+=obj_replacement.h*tr.relative_anchor[1]
+				obj_replacement.w*=tr.scale[0]
+				obj_replacement.h*=tr.scale[1]
+				obj_replacement.x-=obj_replacement.w*tr.relative_anchor[0]
+				obj_replacement.y-=obj_replacement.h*tr.relative_anchor[1]
+			}
+			if(tr.translation){
+				obj_replacement.x+=tr.translation[0];
+				obj_replacement.y+=tr.translation[1];
+			}
+			obj_replacement.x/=g_sandbox.m_relative_scaling
+			obj_replacement.y/=g_sandbox.m_relative_scaling
+			obj_replacement.w/=g_sandbox.m_relative_scaling
+			obj_replacement.h/=g_sandbox.m_relative_scaling
 			//////////
 			var ed=code_box.ed;
-			if(code_box.undo_needed){ed.Undo();}
 			var range_0=code_box.working_range.point0.ccnt;
 			var range_1=code_box.working_range.point1.ccnt;
 			code_box.has_errors=0;
 			var s_code=ed.GetText(range_0,range_1-range_0);
-			var s_widget_key="/*widget"+obj.id.substr(1)+"*/(";
-			var utf8_offset=s_code.indexOf(s_widget_key)
+			var s_widget_key="/*widget*/(";
+			var utf8_offset=nthIndex(s_code,s_widget_key,parseInt(this.id.substr(1)))
 			if(utf8_offset<0){
+				//print("=================")
+				//print(s_code)
+				//print("-----------------")
+				//print(range_0,range_1)
+				//print("-----------------")
 				throw new Error("panic: UI->widget desync");
 			}
 			var byte_offset=ed.ConvertUTF8OffsetToBytesize(range_0,utf8_offset);
@@ -215,20 +208,24 @@ var DrawUserFrame=function(){
 				return s_replacement;
 			});
 			s_code=s_code.replace(re_param_replacer,freplace_params);
-			ed.Edit([byte_offset,byte_offset_widget_end-byte_offset,s_code]);
-			code_box.undo_needed=1;
-			code_box.need_to_rerun=1;
+			//ed.Edit([byte_offset,byte_offset_widget_end-byte_offset,s_code]);
+			//print(byte_offset,byte_offset_widget_end-byte_offset)
+			code_box.transform_ops.push(byte_offset)
+			code_box.transform_ops.push(byte_offset_widget_end-byte_offset)
+			code_box.transform_ops.push(s_code)
 		});
-		var fonfinish=UI.HackCallback(function(obj){
+		var fonfinish=UI.HackCallback(function(){
 			code_box.undo_needed=0;
 		});
 		for(var i=0;i<items.length;i++){
 			var item_i=items[i];
-			item_i.OnDragStart=fonstart;
-			item_i.OnChange=fonchange;
-			item_i.OnDragFinish=fonfinish;
+			item_i.AnchorTransform=fonstart;
+			item_i.SetTransform=fonchange;
+			item_i.FinalizeTransform=fonfinish;
 			item_i.w_min=1;
 			item_i.h_min=1;
+			item_i.user_x=item_i.x;
+			item_i.user_y=item_i.y;
 			//item_i.old_values={x:item_i.x,y:item_i.y,w:item_i.w,h:item_i.h};
 		}
 		code_box.document_items=items;
@@ -241,11 +238,14 @@ UI.Application=function(id,attrs){
 		///////////////////
 		var wnd=UI.Begin(W.Window('app',{
 				title:'Jacy IDE',w:1280,h:720,bgcolor:0xffbbbbbb,
-				designated_screen_size:1440,flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
+				designated_screen_size:1080,flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1}));
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
-				W.Hotkey("",{key:["ALT","F4"],action:function(){UI.DestroyWindow(wnd)}});
+				W.Hotkey("",{key:"ALT+F4",action:function(){UI.DestroyWindow(wnd)}});
 			}
+			W.Hotkey("",{key:"CTRL+S",action:function(){
+				IO.CreateFile("mo\\test\\uiediting.js",UI.top.app.code_box.ed.GetText());
+			}});
 			var ed_rect=W.RoundRect("",{
 				color:0xffffffff,border_color:0xff444444,border_width:2,
 				anchor:parent(),anchor_align:"right",anchor_valign:"center",
@@ -253,12 +253,12 @@ UI.Application=function(id,attrs){
 			});
 			//var tick0=Duktape.__ui_get_tick();
 			var code_box=W.Edit("code_box",{
-				font:UI.Font("res/fonts/inconsolata.ttf",32),color:0xff000000,
+				font:UI.Font("res/fonts/inconsolata.ttf",24),color:0xff000000,
 				tab_width:4,
 				text:g_initial_code,//todo
 				anchor:ed_rect,anchor_align:"center",anchor_valign:"center",
 				///////////////
-				state_handlers:["renderer_programmer","colorer_programmer"],
+				state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode"],
 				language:g_language_C,
 				color_string:0xff0055aa,
 				color_comment:0xff008000,
@@ -282,9 +282,38 @@ UI.Application=function(id,attrs){
 			})
 			//create the boxes
 			if(code_box.document_items){
-				W.Group("controls",{
-					layout_direction:'inside',layout_align:'left',layout_valign:'up',x:16,y:16,
-					'item_object':W.BoxDocumentItem,'items':code_box.document_items})
+				var items=code_box.document_items;
+				var snapping_coords={'x':[],'y':[],'tolerance':4}
+				for(var i=0;i<items.length;i++){
+					var item_i=items[i];
+					if(wnd.controls&&wnd.controls.group.selection&&wnd.controls.group.selection[item_i.id]){
+						//avoid self-snapping
+						continue;
+					}
+					snapping_coords.x.push(item_i.x);snapping_coords.x.push(item_i.x+item_i.w);
+					snapping_coords.y.push(item_i.y);snapping_coords.y.push(item_i.y+item_i.h);
+				}
+				var sandbox_main_window_w=g_sandbox.ReadBack('[UI.sandbox_main_window_w]')[0]*g_sandbox.m_relative_scaling
+				var sandbox_main_window_h=g_sandbox.ReadBack('[UI.sandbox_main_window_h]')[0]*g_sandbox.m_relative_scaling
+				W.BoxDocument("controls",{
+					x:16,y:16,w:sandbox_main_window_w,h:sandbox_main_window_h,
+					'border_color':0xcccc773f,'border_width':2,
+					'color':0x44cc773f,
+					'snapping_coords':snapping_coords,
+					'items':code_box.document_items,
+					'BeginTransform':function(){
+						var ed=code_box.ed;
+						if(code_box.undo_needed){ed.Undo();}
+						code_box.transform_ops=[];
+					},
+					'EndTransform':function(){
+						var ed=code_box.ed;
+						ed.Edit(code_box.transform_ops);
+						code_box.transform_ops=null;
+						code_box.undo_needed=1;
+						code_box.need_to_rerun=1;
+					},
+				})
 			}
 		UI.End();
 		///////////////////

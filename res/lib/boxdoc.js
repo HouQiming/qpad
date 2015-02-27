@@ -90,7 +90,7 @@ var BoxDocumentItem_prototype={
 	OnMouseMove:function(event){
 		var doc=this.parent;
 		if(!doc.is_dragging){return;}
-		TestSnappingCoords(this,event, this.drag_x_anchor-this.drag_x_base,this.drag_y_anchor-this.drag_y_base, this.w,this.h);
+		TestSnappingCoords(this,event, this.drag_x_anchor-this.drag_x_base-doc.x,this.drag_y_anchor-this.drag_y_base-doc.y, this.w,this.h);
 		var dx=event.x-this.drag_x_base;
 		var dy=event.y-this.drag_y_base;
 		if(!doc.drag_initiated&&(Math.abs(dx)>this.min_dragging_initiation||Math.abs(dy)>this.min_dragging_initiation)){
@@ -130,7 +130,7 @@ var ScaleKnob_prototype={
 		var obj=this.owner;
 		var doc=obj.parent;
 		if(!doc.is_dragging){return;}
-		TestSnappingCoords(obj,event, this.w*0.5,this.h*0.5,0,0);//todo
+		//TestSnappingCoords(obj,event, this.w*0.5,this.h*0.5,0,0);
 		var x_scale=(event.x-this.drag_x_anchor)/this.dx_base;
 		var y_scale=(event.y-this.drag_y_anchor)/this.dy_base;
 		if(this.lock_aspect_ratio){x_scale=Math.min(x_scale,y_scale);y_scale=x_scale;}
@@ -138,6 +138,7 @@ var ScaleKnob_prototype={
 			x_scale=Math.max(x_scale,obj.w_min/this.drag_w);
 			//obj.x=this.drag_x_anchor+this.drag_x0*x_scale;
 			//obj.w=this.drag_w*x_scale;
+		}else{
 			x_scale=1.0;
 		}
 		if(y_scale){
@@ -301,8 +302,8 @@ W.BoxDocument=function(id,attrs){
 			'parent':obj})
 		//draw the snapping rects
 		if(obj.is_dragging&&!(UI.IsPressed("LSHIFT")||UI.IsPressed("RSHIFT"))){
-			if(obj.group.snapping_rect_x){UI.RoundRect(obj.group.snapping_rect_x);}
-			if(obj.group.snapping_rect_y){UI.RoundRect(obj.group.snapping_rect_y);}
+			if(obj.snapping_rect_x){UI.RoundRect(obj.snapping_rect_x);}
+			if(obj.snapping_rect_y){UI.RoundRect(obj.snapping_rect_y);}
 		}
 		//draw the sel box
 		if(obj.is_selecting){
