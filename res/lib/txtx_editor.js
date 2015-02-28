@@ -265,7 +265,7 @@ UI.CreateTxtxDocument=function(attrs){
 		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
 	}
 	var ret=Object.create(TxtxEditor_prototype);
-	ret.wrap_width=attrs.w;
+	ret.wrap_width=(attrs.wrap_width||attrs.w);
 	ret.w=attrs.w;
 	ret.h=attrs.h;
 	ret.Init();
@@ -291,6 +291,11 @@ W.TxtxView=function(id,attrs){
 	var ed=doc.ed;
 	ed.Render({x:scroll_x,y:scroll_y,w:obj.w/scale,h:obj.h/scale, scr_x:obj.x,scr_y:obj.y, scale:scale});
 	if(!obj.is_read_only){
+		if(doc.w!=obj.w/scale||doc.h!=obj.h/scale){
+			doc.w=obj.w/scale;
+			doc.h=obj.h/scale;
+			UI.Refresh()
+		}
 		if(UI.HasFocus(obj)){
 			var ed_caret=doc.GetCaretXY();
 			var x_caret=obj.x+(ed_caret.x-scroll_x+ed.m_caret_offset)*scale;

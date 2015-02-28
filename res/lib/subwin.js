@@ -9,12 +9,12 @@ W.SubWindow=function(id,attrs){
 	UI.StdAnchoring(id,obj);
 	UI.RoundRect(obj)
 	UI.Begin(obj)
-		UI.Begin(UI.Keep("caption",W.RoundRect("-",{
+		UI.Begin(UI.Keep("caption",W.RoundRect("",{
 				'x':0,'y':0,'w':obj.w,'h':obj.h_caption,
 				'border_color':obj.border_color,'border_width':obj.border_width,
 				'color':obj.caption_color})))
 			//text
-			W.Text("-",{
+			W.Text("",{
 				'anchor':'parent','anchor_align':"left",'anchor_valign':"center",
 				'x':obj.padding,'y':0,
 				'font':obj.font,'text':obj.title,'color':obj.text_color,
@@ -35,8 +35,12 @@ W.SubWindow=function(id,attrs){
 }
 
 ///////////////////////
+W.TabLabel_prototype={
+	//todo: mouseover, dragging, click-sel, possible color animation
+	//use style color rather than per-tab color for animation?
+}
 W.TabLabel=function(id,attrs){
-	var obj=UI.Keep(id,attrs);
+	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
 	UI.StdStyling(id,obj,attrs, "tab_label",obj.selected?"active":"inactive");
 	if(!attrs.w){
 		obj.text=obj.title;
@@ -54,7 +58,7 @@ W.TabLabel=function(id,attrs){
 				color:obj.color,
 			})
 		}
-		W.Text("-",{
+		W.Text("",{
 			'anchor':'parent','anchor_align':"center",'anchor_valign':"center",
 			'x':0,'y':0,
 			'font':obj.font,'text':obj.title,'color':obj.text_color,
@@ -78,16 +82,18 @@ W.TabbedDocument=function(id,attrs){
 			items:obj.items,
 			selection:sel,
 		})
-		if(obj.labels[tabid]){
-			var tab=obj.labels[tabid];
+		obj.h_content=obj.h-(obj.h_caption+obj.h_bar);
+		obj.active_tab=obj.labels[tabid]
+		if(obj.active_tab){
+			var tab=obj.active_tab;
 			//theme-colored bar
-			W.RoundRect("-",{
+			W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:obj.h_caption,h:obj.h_bar,
 				color:tab.color})
-			UI.Begin(UI.Keep(tabid,W.RoundRect("-",{
+			UI.Begin(UI.Keep(tabid,W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
-				x:0,y:obj.h_caption+obj.h_bar,h:obj.h-(obj.h_caption+obj.h_bar),
+				x:0,y:obj.h_caption+obj.h_bar,h:obj.h_content,
 				color:obj.color, border_width:obj.border_width, border_color:obj.border_color,
 			})))
 				//use body: object_type==undefined needed for TabLabel
