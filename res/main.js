@@ -31,6 +31,43 @@ var SetUIColorTheme=function(C){
 				},
 			}
 		},
+		check_button:{
+			transition_dt:0.1,
+			round:0,border_width:3,padding:12,
+			$:{
+				out:{
+					border_color:0x00ffffff,color:0x00ffffff,
+					icon_color:C[0],
+					text_color:C[0],
+				},
+				over:{
+					border_color:C[0],color:C[0],
+					icon_color:0xffffffff,
+					text_color:0xffffffff,
+				},
+				down:{
+					border_color:C[1],color:C[1],
+					icon_color:0xffffffff,
+					text_color:0xffffffff,
+				},
+				////////////////////
+				checked_out:{
+					border_color:C[0],color:0x00ffffff,
+					icon_color:C[0],
+					text_color:C[0],
+				},
+				checked_over:{
+					border_color:C[0],color:C[0],
+					icon_color:0xffffffff,
+					text_color:0xffffffff,
+				},
+				checked_down:{
+					border_color:C[1],color:C[1],
+					icon_color:0xffffffff,
+					text_color:0xffffffff,
+				},
+			}
+		},
 		menu_item:{
 			font:UI.Font("res/fonts/opensans.ttf",24),
 			transition_dt:0.1,
@@ -160,61 +197,7 @@ var NewTxtxDocument=function(){
 			})
 		},
 		property_windows:[
-			{
-				'title':'Text properties',h:114,
-				body:function(){
-					/*widget*/(W.Button('bold',{
-						'x':13.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'B',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.Button('italic',{
-						'x':45.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'I',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.Button('underlined',{
-						'x':77.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'U',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.Button('super',{
-						'x':109.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'^',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.Button('sub',{
-						'x':141.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'_',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.Button('align_l',{
-						'x':176.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'1',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.Button('align_c',{
-						'x':208.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'2',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.Button('align_r',{
-						'x':240.02037844241704,'y':74,'w':32,'h':32,
-						font:g_icon_font,text:'3',
-						OnClick:function(){/*todo*/}}));
-					/*widget*/(W.ComboBox("font_box",{
-						'x':13.02037844241704,'y':36,'w':166.83966387238038,'h':29,
-						items:[
-							{text:"Roman"},
-							{text:"Sans Serif"},
-							{text:"Typewriter"},
-						],
-					}));
-					/*widget*/(W.ComboBox("size_box",{
-						'x':191.0906294148415,'y':36,'w':80.92974902757557,'h':29,
-						items:[
-							{text:"Tiny"},
-							{text:"Small"},
-							{text:"Normal"},
-							{text:"Large"},
-							{text:"Huge"},
-						],
-					}));
-				}
-			}
+			W.subwindow_text_properties
 		],
 	}
 }

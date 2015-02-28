@@ -322,7 +322,7 @@ g_arabic_table=[1536,1536,1536,1536,1537,1537,1537,1537,1538,1538,1538,1538,1539
 inline isArabic(ch){return u32(ch-0x600)<0x100u}
 //they're relative to font height
 SUPERSCRIPT_BASELINE=-32//.0/64.0
-SUBSCRIPT_BASELINE=4//.0/64.0
+SUBSCRIPT_BASELINE=12//.0/64.0
 class CStyle
 	UNDERLINED=1
 	STRIKED_OUT=2
@@ -839,7 +839,7 @@ class CLayouter_fancy
 				auto y_underline=y_baseline+(y_baseline>>5)
 				g_renderer.DrawBitmap(0, 
 					projectX(x0_underline),projectY(y+y_underline),
-					projectX(x_underline)-projectX(x_underline),max(fixed2float(y_baseline>>4),1.f), m_styles[underline_style_id].color)
+					projectX(x)-projectX(x0_underline),max(fixed2float(y_baseline>>4),1.f), m_styles[underline_style_id].color)
 			x0_underline=0LL;underline_style_id=-1
 		}
 		FlushStrikeout=function(){
@@ -847,7 +847,7 @@ class CLayouter_fancy
 				auto y_strikeout=(y_baseline>>1)-(y_baseline>>5)
 				g_renderer.DrawBitmap(0, 
 					projectX(x0_strikeout),projectY(y+y_strikeout),
-					projectX(x_strikeout)-projectX(x_strikeout),max(fixed2float(y_baseline>>4),1.f), m_styles[strikeout_style_id].color)
+					projectX(x)-projectX(x0_strikeout),max(fixed2float(y_baseline>>4),1.f), m_styles[strikeout_style_id].color)
 			x0_strikeout=0LL;strikeout_style_id=-1
 		}
 		myDrawChar=function(int ch32){

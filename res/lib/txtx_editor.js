@@ -12,64 +12,19 @@ STYLE_UNDERLINED=1
 STYLE_STRIKE_OUT=2
 STYLE_SUPERSCRIPT=4
 STYLE_SUBSCRIPT=8
-STYLE_FONT_BOLD=(1<<16)
-STYLE_FONT_ITALIC=(1<<17)
-!?
-STYLE_FONT_TYPE_WRITER=(1<<18)
-STYLE_FONT_SANS_SERIF=(1<<19)
-LEVEL_CHAPTER=0
-LEVEL_SECTION=1
-LEVEL_SUBSECTION=2
-LEVEL_PARAGRAPH=3
-LEVEL_NORMAL=4
-LEVEL_SMALL=5
+STYLE_FONT_ITALIC=(1<<16)
+STYLE_FONT_BOLD=(1<<17)
 ////////////////
-var g_computer_modern_flags=[STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,STYLE_FONT_SANS_SERIF|STYLE_FONT_BOLD,0,0];
-var g_computer_modern_sizes=[48,48,42,30,30,24];
-var g_GetFontFromStyle_callbacks={
-	"computer_modern":function(params){
-		var font_name;
-		var level=(params.level);
-		var flags=(params.flags||0)^g_computer_modern_flags[level];
-		var size=g_computer_modern_sizes[level];
-		var embolden=0;
-		if(flags&STYLE_FONT_TYPE_WRITER){
-			if(flags&STYLE_FONT_BOLD){
-				if(flags&STYLE_FONT_ITALIC){font_name="res/fonts/cmuntx.ttf";}else{font_name="res/fonts/cmuntb.ttf";}
-			}else if(flags&STYLE_FONT_ITALIC){
-				font_name="res/fonts/cmunit.ttf";
-			}else{
-				font_name="res/fonts/cmuntt.ttf"
-			}
-		}else if(flags&STYLE_FONT_SANS_SERIF){
-			if(flags&STYLE_FONT_BOLD){
-				if(flags&STYLE_FONT_ITALIC){font_name="res/fonts/cmunso.ttf";}else{font_name="res/fonts/cmunsx.ttf"}
-			}else if(flags&STYLE_FONT_ITALIC){
-				font_name="res/fonts/cmunsi.ttf";
-			}else{
-				font_name="res/fonts/cmunss.ttf";
-			}
-		}else{
-			if(flags&STYLE_FONT_BOLD){
-				if(flags&STYLE_FONT_ITALIC){font_name="res/fonts/cmunbi.ttf";}else{font_name="res/fonts/cmunbx.ttf"}
-			}else if(flags&STYLE_FONT_ITALIC){
-				font_name="res/fonts/cmunci.ttf";
-			}else{
-				font_name="res/fonts/cmunrm.ttf";
-			}
-		}
-		//print(font_name,size,JSON.stringify(params));
-		return UI.Font(font_name,size,embolden)
-	},
-};
-var GetFontFromStyle=function(name,params){
-	return g_GetFontFromStyle_callbacks[name](params);
+//embolden and potential shear
+var g_registered_fonts={
+	'Roman':      ["res/fonts/cmunrm.ttf","res/fonts/cmunci.ttf","res/fonts/cmunbx.ttf","res/fonts/cmunbi.ttf"],
+	'Sans Serif': ["res/fonts/cmunss.ttf","res/fonts/cmunsi.ttf","res/fonts/cmunsx.ttf","res/fonts/cmunso.ttf"],
+	'Typewriter': ["res/fonts/cmuntt.ttf","res/fonts/cmunit.ttf","res/fonts/cmuntb.ttf","res/fonts/cmuntx.ttf"],
 };
 ////////////////
 var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
 TxtxEditor_prototype.wrap_width=1024;
-TxtxEditor_prototype.root_style_name="computer_modern";
 //TxtxEditor_prototype.disable_scrolling_x=1
 ////////////////
 TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
@@ -83,7 +38,7 @@ TxtxEditor_prototype.GetCurrentStyleObject=function(){
 TxtxEditor_prototype.Init=function(){
 	this.m_style_map={};
 	this.styles=[];
-	this.CreateStyle({color:0xff000000,level:LEVEL_NORMAL,flags:0})
+	this.CreateStyle({"font_face":"Roman","font_size":30,"flags":0,"color":0xff000000,"relative_line_space":0,"relative_paragraph_space":0.8})
 	W.Edit_prototype.Init.call(this);
 };
 TxtxEditor_prototype.HookedEdit=function(ops){
@@ -107,13 +62,48 @@ TxtxEditor_prototype.GetRenderer=function(){
 	var ed=this.ed;
 	return ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
 };
+var g_style_core_properties=["font_face","font_size","flags","color","relative_line_space","relative_paragraph_space"];
+TxtxEditor_prototype.CloneStyle=function(params){
+	var ret={};
+	for(var i=0;i<g_style_core_properties.length;i++){
+		var id=g_style_core_properties[i];
+		ret[id]=params[id];
+	}
+	return ret;
+}
 TxtxEditor_prototype.CreateStyle=function(params){
-	var name=[this.root_style_name,(params.level||0),(params.flags||0),(params.color||0xff000000)].join("_")
+	var lspace=(params.relative_line_space||0.0);
+	var pspace=(params.relative_paragraph_space||0.8);
+	if(!params.font_face){params.font_face="Roman";}
+	if(!params.font_size){params.font_size=30;}
+	if(!params.flags){params.flags=0;}
+	var name=[params.font_face,params.font_size,params.flags,(params.color||0xff000000),lspace,pspace].join("_")
 	if(this.m_style_map[name]){
 		return this.m_style_map[name];
 	}
 	this.m_style_map[name]=this.styles.length;
-	params.font=GetFontFromStyle(this.root_style_name,params);
+	var font_name,size=params.font_size,embolden=0;
+	if(!g_registered_fonts[params.font_face]){
+		//external font
+		font_name=params.font_face;
+		if(params.flags&STYLE_FONT_BOLD){embolden=200;}
+	}else{
+		font_name=g_registered_fonts[params.font_face][(params.flags>>16)&3];
+		if(!font_name){
+			font_name=g_registered_fonts[params.font_face][(params.flags>>16)&1];
+			if(!font_name){
+				font_name=g_registered_fonts[params.font_face][0];
+			}
+			if(params.flags&STYLE_FONT_BOLD){embolden=200;}
+		}
+	}
+	if(params.flags&(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT)){
+		size*=0.75;
+	}
+	params.font=UI.Font(font_name,size,embolden);
+	//space multipliers should ignore super/sub scripts
+	params.line_space=lspace*params.font_size;
+	params.paragraph_space=pspace*params.font_size;
 	this.styles.push(params);
 	var ed=this.ed;
 	if(ed){
@@ -220,47 +210,40 @@ TxtxEditor_prototype.SetRubberPadding=function(line0,line1,mask){
 		UI.Refresh();
 	}
 }
+TxtxEditor_prototype.ToggleStyleFlag=function(style_flag){
+	var new_style=this.CloneStyle(this.GetCurrentStyleObject());
+	new_style.flags^=style_flag;
+	this.SetTextStyle(new_style)
+}
 TxtxEditor_prototype.additional_hotkeys=[
-	{key:"CTRL+B",action:function(obj){
-		var cur_state=obj.GetCurrentStyleObject();
-		obj.SetTextStyle({color:cur_state.color,level:(cur_state.level),flags:((cur_state.flags||0)^STYLE_FONT_BOLD)})
+	{key:"CTRL+B",action:function(){
+		this.ToggleStyleFlag(STYLE_FONT_BOLD)
 	}},
-	{key:"CTRL+I",action:function(obj){
-		var cur_state=obj.GetCurrentStyleObject();
-		obj.SetTextStyle({color:cur_state.color,level:(cur_state.level),flags:((cur_state.flags||0)^STYLE_FONT_ITALIC)})
+	{key:"CTRL+I",action:function(){
+		this.ToggleStyleFlag(STYLE_FONT_ITALIC)
 	}},
-	{key:"ALT+SHIFT+LEFT",action:function(obj){
-		var sel=obj.GetLineSelection();
-		var cur_state=obj.GetCurrentStyleObject();
-		obj.SetTextStyle({color:cur_state.color,level:Math.max((cur_state.level)-1,0),flags:(cur_state.flags||0)},sel)
+	{key:"CTRL+L",action:function(){
+		var sel=this.GetSelection();
+		this.SetRubberPadding(this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1,0)
 	}},
-	{key:"ALT+SHIFT+RIGHT",action:function(obj){
-		var sel=obj.GetLineSelection();
-		var cur_state=obj.GetCurrentStyleObject();
-		obj.SetTextStyle({color:cur_state.color,level:Math.min((cur_state.level)+1,LEVEL_SMALL),flags:(cur_state.flags||0)},sel)
+	{key:"CTRL+E",action:function(){
+		var sel=this.GetSelection();
+		this.SetRubberPadding(this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1,3)
 	}},
-	{key:"CTRL+L",action:function(obj){
-		var sel=obj.GetSelection();
-		obj.SetRubberPadding(obj.GetLC(sel[0])[0],obj.GetLC(sel[1])[0]+1,0)
-	}},
-	{key:"CTRL+E",action:function(obj){
-		var sel=obj.GetSelection();
-		obj.SetRubberPadding(obj.GetLC(sel[0])[0],obj.GetLC(sel[1])[0]+1,3)
-	}},
-	{key:"CTRL+R",action:function(obj){
-		var sel=obj.GetSelection();
-		obj.SetRubberPadding(obj.GetLC(sel[0])[0],obj.GetLC(sel[1])[0]+1,1)
+	{key:"CTRL+R",action:function(){
+		var sel=this.GetSelection();
+		this.SetRubberPadding(this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1,1)
 	}},
 	//todo: event-listening plugin: 1. 2. 3. centering and stuff
-	{key:"ALT+I",action:function(obj){
+	{key:"ALT+I",action:function(){
 		var img_name=UI.PickImage();
 		if(!img_name){return;}
 		var s_data=IO.ReadAll(img_name)
 		if(!s_data){return;}//todo: show error notification
 		var obj_img=UI.CreateEmbeddedImageFromFileData(s_data);
 		if(!obj_img){return;}//todo: show error notification
-		var oid=obj.GetRenderer().InsertObject(obj_img,obj_img.w,obj_img.h,obj_img.h)
-		obj.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
+		var oid=this.GetRenderer().InsertObject(obj_img,obj_img.w,obj_img.h,obj_img.h)
+		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
 	}},
 ];
 var InitPrototype=function(){
@@ -278,6 +261,71 @@ UI.CreateTxtxDocument=function(attrs){
 	ret.h=attrs.h;
 	ret.Init();
 	return ret;
+};
+
+var g_active_txtx_editor;
+UI.frame_callbacks.push(function(){g_active_txtx_editor=null;})
+
+var ToggleStyleFlag=function(style_flag){
+	if(!g_active_txtx_editor){return;}
+	g_active_txtx_editor.doc.ToggleStyleFlag(style_flag)
+}
+
+W.subwindow_text_properties={
+	'id':'text_properties',
+	'title':'Text properties',h:114,
+	body:function(){
+		/*widget*/(W.Button('bold',{
+			'x':13.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'B',
+			OnClick:function(){ToggleStyleFlag(STYLE_FONT_BOLD)}}));
+		/*widget*/(W.Button('italic',{
+			'x':45.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'I',
+			OnClick:function(){ToggleStyleFlag(STYLE_FONT_ITALIC)}}));
+		/*widget*/(W.Button('underlined',{
+			'x':77.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'U',
+			OnClick:function(){ToggleStyleFlag(STYLE_UNDERLINED)}}));
+		/*widget*/(W.Button('superscript',{
+			'x':109.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'^',
+			OnClick:function(){ToggleStyleFlag(STYLE_SUPERSCRIPT)}}));
+		/*widget*/(W.Button('subscript',{
+			'x':141.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'_',
+			OnClick:function(){ToggleStyleFlag(STYLE_SUBSCRIPT)}}));
+		/*widget*/(W.Button('align_l',{
+			'x':176.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'1',
+			OnClick:function(){/*todo*/}}));
+		/*widget*/(W.Button('align_c',{
+			'x':208.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'2',
+			OnClick:function(){/*todo*/}}));
+		/*widget*/(W.Button('align_r',{
+			'x':240.02037844241704,'y':74,'w':32,'h':32,
+			style:UI.default_styles.check_button,font:g_icon_font,text:'3',
+			OnClick:function(){/*todo*/}}));
+		/*widget*/(W.ComboBox("font_box",{
+			'x':13.02037844241704,'y':36,'w':166.83966387238038,'h':29,
+			items:[
+				{text:"Roman"},
+				{text:"Sans Serif"},
+				{text:"Typewriter"},
+			],
+		}));
+		/*widget*/(W.ComboBox("size_box",{
+			'x':191.0906294148415,'y':36,'w':80.92974902757557,'h':29,
+			items:[
+				{text:"24"},
+				{text:"28"},
+				{text:"30"},
+				{text:"32"},
+				{text:"44"},
+			],
+		}));
+	}
 };
 
 W.TxtxEditor=function(id,attrs){
@@ -332,73 +380,24 @@ W.TxtxEditor=function(id,attrs){
 				'disable_region':1,
 			})
 		}
+		var text_ppt_window=UI.top.app.property_bar.text_properties
+		if(text_ppt_window){
+			//current style to UI
+			var cur_state=obj.doc.GetCurrentStyleObject();
+			//["font_face","font_size","flags","color","relative_line_space","relative_paragraph_space"];
+			UI.SetComboBoxText(text_ppt_window.font_box, cur_state.font_face)
+			UI.SetComboBoxText(text_ppt_window.size_box, cur_state.font_size)
+			text_ppt_window.underlined.checked=!!(cur_state.flags&STYLE_UNDERLINED);
+			//text_ppt_window.strike_out.checked=!!(cur_state.flags&STYLE_STRIKE_OUT);
+			text_ppt_window.superscript.checked=!!(cur_state.flags&STYLE_SUPERSCRIPT);
+			text_ppt_window.subscript.checked=!!(cur_state.flags&STYLE_SUBSCRIPT);
+			text_ppt_window.italic.checked=!!(cur_state.flags&STYLE_FONT_ITALIC);
+			text_ppt_window.bold.checked=!!(cur_state.flags&STYLE_FONT_BOLD);
+			//todo: color and the color dialog
+			//todo: rubber space detection
+			//spacings do not appear here
+		}
 	UI.End()
-	/*
-	W.PureRegion(id,obj)
-	var doc=obj.doc;
-	UI.DrawBitmap(0,obj.x,obj.y,obj.w,obj.h,obj.bgcolor);
-	var scale=obj.scale;
-	var scroll_x=doc.scroll_x;
-	var scroll_y=doc.scroll_y;
-	var ed=doc.ed;
-	ed.Render({x:scroll_x,y:scroll_y,w:obj.w/scale,h:obj.h/scale, scr_x:obj.x,scr_y:obj.y, scale:scale});
-	if(!obj.is_read_only){
-		if(doc.w!=obj.w/scale||doc.h!=obj.h/scale){
-			doc.w=obj.w/scale;
-			doc.h=obj.h/scale;
-			UI.Refresh()
-		}
-		doc.x=obj.x;doc.y=obj.y;
-		if(UI.HasFocus(obj)){
-			var ed_caret=doc.GetCaretXY();
-			var x_caret=obj.x+(ed_caret.x-scroll_x+ed.m_caret_offset)*scale;
-			var y_caret=obj.y+(ed_caret.y-scroll_y)*scale;
-			UI.SetCaret(UI.context_window,
-				x_caret,y_caret,
-				doc.caret_width,ed.GetCharacterHeightAt(doc.sel1.ccnt)*scale,
-				doc.caret_color,doc.caret_flicker);
-		}
-		var renderer=doc.GetRenderer();
-		var embeded_objects=renderer.g_rendered_objects;
-		if(embeded_objects.length){
-			UI.Begin(obj)
-				var fondragstart=UI.HackCallback(function(obj_i){
-					var real_obj=renderer.GetObject(obj_i.numerical_id);
-					obj_i.change_mode="translate";
-					obj_i.translate_y_original=obj_i.y;
-					obj_i.translate_y_baseline=real_obj.y_baseline;
-				})
-				var fonscalestart=UI.HackCallback(function(obj_i){
-					var real_obj=renderer.GetObject(obj_i.numerical_id);
-					obj_i.change_mode="scale";
-					obj_i.baseline_ratio=real_obj.y_baseline/real_obj.h;
-				})
-				var fonchange=UI.HackCallback(function(obj_i){
-					var real_obj=renderer.GetObject(obj_i.numerical_id);
-					if(obj_i.change_mode=="translate"){
-						real_obj.y_baseline=obj_i.translate_y_baseline-(obj_i.y-obj_i.translate_y_original)/scale;
-					}else{
-						real_obj.y_baseline=obj_i.baseline_ratio*obj_i.h/scale;
-					}
-					real_obj.w=obj_i.w/scale;
-					real_obj.h=obj_i.h/scale;
-					doc.ed.InvalidateStates([obj_i.ccnt,lg_rubber_space])
-					UI.Refresh()
-				})
-				for(var i=0;i<embeded_objects.length;i++){
-					var obj_i=embeded_objects[i];
-					obj_i.id="$"+obj_i.numerical_id;
-					obj_i.OnScaleStart=fonscalestart;
-					obj_i.OnDragStart=fondragstart;
-					obj_i.OnChange=fonchange;
-				}
-				//todo: region-less boxDocument, improve the updating mechanism
-				W.Group("embeded_objects",{
-					layout_direction:'inside',layout_align:'left',layout_valign:'up',x:0,y:0,
-					'item_object':W.BoxDocumentItem,'items':embeded_objects})
-			UI.End(obj)
-		}
-	}
-	*/
+	g_active_txtx_editor=obj;
 	return obj;
 };

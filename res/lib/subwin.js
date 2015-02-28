@@ -66,10 +66,22 @@ W.TabLabel=function(id,attrs){
 	UI.End()
 	return obj
 }
+
+var SearchByProperty=function(list,property,value){
+	for(var i=0;i<list.length;i++){
+		if(list[i][property]==value){return i;}
+	}
+	return -1;
+};
 W.TabbedDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs);
 	UI.StdStyling(id,obj,attrs, "tabbed_document");
 	UI.StdAnchoring(id,obj);
+	if((obj.n_tabs_last_checked||0)<obj.items.length){
+		//new tab activating
+		obj.current_tab_id=(obj.items[obj.items.length-1].id||"$"+(obj.items.length-1));
+		obj.n_tabs_last_checked=obj.items.length;
+	}
 	UI.Begin(obj)
 		var sel={}
 		var tabid=(obj.current_tab_id||"$0");
@@ -101,5 +113,20 @@ W.TabbedDocument=function(id,attrs){
 			UI.End()
 		}
 	UI.End()
+	W.Hotkey("",{key:"CTRL+TAB",action:UI.HackCallback(function(){
+		var num_id=SearchByProperty(obj.items,"id",tabid)
+		if(num_id<0){return;}
+		num_id++;if(num_id>=obj.items.length){num_id=0;}
+		obj.current_tab_id=obj.items[num_id].id
+		UI.Refresh()
+	})});
+	W.Hotkey("",{key:"CTRL+SHIFT+TAB",action:UI.HackCallback(function(){
+		var num_id=SearchByProperty(obj.items,"id",tabid)
+		if(num_id<0){return;}
+		if(!num_id){num_id=obj.items.length;}
+		num_id--;
+		obj.current_tab_id=obj.items[num_id].id
+		UI.Refresh()
+	})});
 	return obj
 }
