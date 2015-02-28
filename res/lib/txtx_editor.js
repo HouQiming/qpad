@@ -67,6 +67,7 @@ var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
 TxtxEditor_prototype.wrap_width=1024;
 TxtxEditor_prototype.root_style_name="computer_modern";
+TxtxEditor_prototype.disable_scrolling_x=1
 ////////////////
 TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
 	var ed=this.ed;
@@ -247,7 +248,7 @@ TxtxEditor_prototype.additional_hotkeys=[
 		var sel=obj.GetSelection();
 		obj.SetRubberPadding(obj.GetLC(sel[0])[0],obj.GetLC(sel[1])[0]+1,1)
 	}},
-	//todo: event-listening plugin: 1. 2. 3. and stuff
+	//todo: event-listening plugin: 1. 2. 3. centering and stuff
 	{key:"ALT+I",action:function(obj){
 		var img_name=UI.PickImage();
 		if(!img_name){return;}
@@ -272,17 +273,21 @@ UI.CreateTxtxDocument=function(attrs){
 	return ret;
 };
 
+!?
 W.TxtxView_prototype={
 	OnTextEdit:function(event){if(!this.is_read_only){this.doc.OnTextEdit(event);}},
 	OnTextInput:function(event){if(!this.is_read_only){this.doc.OnTextInput(event);}},
 	OnKeyDown:function(event){if(!this.is_read_only){this.doc.OnKeyDown(event);}},
 	OnMouseDown:function(event){if(!this.is_read_only){this.doc.OnMouseDown(event);}},
+	OnMouseMove:function(event){if(!this.is_read_only){this.doc.OnMouseMove(event);}},
 	OnMouseUp:function(event){if(!this.is_read_only){this.doc.OnMouseUp(event);}},
+	mouse_cursor:"ibeam",
 };
 W.TxtxView=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TxtxView_prototype);
 	UI.StdStyling(id,obj,attrs, "txtx_view",obj.focus_state||"blur");
 	UI.StdAnchoring(id,obj);
+	W.PureRegion(id,obj)
 	var doc=obj.doc;
 	UI.DrawBitmap(0,obj.x,obj.y,obj.w,obj.h,obj.bgcolor);
 	var scale=obj.scale;
@@ -296,6 +301,7 @@ W.TxtxView=function(id,attrs){
 			doc.h=obj.h/scale;
 			UI.Refresh()
 		}
+		doc.x=obj.x;doc.y=obj.y;
 		if(UI.HasFocus(obj)){
 			var ed_caret=doc.GetCaretXY();
 			var x_caret=obj.x+(ed_caret.x-scroll_x+ed.m_caret_offset)*scale;

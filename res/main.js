@@ -50,7 +50,7 @@ var SetUIColorTheme=function(C){
 		},
 		menu:{
 			transition_dt:0.1,
-			round:0,border_width:2,padding:8,
+			round:4,border_width:2,padding:8,
 			layout_spacing:0,
 			border_color:C[0],color:0xffffffff,
 		},
@@ -110,7 +110,7 @@ var SetUIColorTheme=function(C){
 		},
 	};
 };
-SetUIColorTheme([0xffcc773f,0xffaa5522])
+SetUIColorTheme([0xffcc7733,0xffaa5522])
 
 //var g_doc=UI.CreateTxtxDocument({w:1200,h:1600});
 //var g_layout={
@@ -191,8 +191,8 @@ var NewTxtxDocument=function(){
 					/*widget*/(W.ComboBox("font_box",{
 						'x':13.02037844241704,'y':36,'w':166.83966387238038,'h':29,
 						items:[
-							{text:"Serif"},
-							{text:"Sans"},
+							{text:"Roman"},
+							{text:"Sans Serif"},
 							{text:"Typewriter"},
 						],
 					}));
@@ -255,6 +255,14 @@ UI.Application=function(id,attrs){
 			//////////////////////////
 			W.Hotkey("",{key:"CTRL+N",action:function(){
 				g_all_document_windows.push(NewTxtxDocument())
+				UI.Refresh()
+			}});
+			W.Hotkey("",{key:"CTRL+T",action:function(){
+				if(UI.default_styles.tab_label.color==0xffcc7733){
+					SetUIColorTheme([0xff33aa55,0xff229944])
+				}else{
+					SetUIColorTheme([0xffcc7733,0xffaa5522])
+				}
 				UI.Refresh()
 			}});
 		UI.End();
