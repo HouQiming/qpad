@@ -291,7 +291,7 @@ W.BoxDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.BoxDocument_prototype);
 	UI.StdStyling(id,obj,attrs,"box_document");
 	UI.StdAnchoring(id,obj);
-	W.PureRegion(id,obj)
+	if(!obj.disable_region){W.PureRegion(id,obj)}
 	UI.Begin(obj)
 		W.Group("group",{
 			layout_direction:'inside',layout_align:'left',layout_valign:'up',

@@ -108,6 +108,14 @@ var SetUIColorTheme=function(C){
 			transition_dt:0.1,
 			h_caption:32, h_bar:4, color:0xffbbbbbb,
 		},
+		box_document:{
+			border_color:(0xcc000000&C[0]),border_width:2,
+			color:(0x44000000&C[0]),
+		},
+		txtx_editor:{
+			border_color:0xff000000,border_width:2,
+			color:0xffffffff,
+		},
 	};
 };
 SetUIColorTheme([0xffcc7733,0xffaa5522])
@@ -141,15 +149,14 @@ SetUIColorTheme([0xffcc7733,0xffaa5522])
 //Open is a single function, determine document type inside, then call New + SetText
 var NewTxtxDocument=function(){
 	//todo: page property window
-	var doc=UI.CreateTxtxDocument({w:1200,h:UI.top.app.document_area.h_content});
 	return {
 		title:"<New>",
-		doc:doc,
 		body:function(){
-			W.TxtxView("view",{
+			W.TxtxEditor("editor",{
 				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
-				'x':0,'y':0,'w':doc.wrap_width,
-				doc:doc,scale:1,bgcolor:0xffffffff,
+				'x':0,'y':0,'w':1300,
+				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
+				scale:1,bgcolor:0xffffffff,
 			})
 		},
 		property_windows:[

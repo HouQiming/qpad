@@ -10,8 +10,11 @@ COMMAND_SET_STYLE=0x108000
 COMMAND_END=0x110000
 STYLE_UNDERLINED=1
 STYLE_STRIKE_OUT=2
+STYLE_SUPERSCRIPT=4
+STYLE_SUBSCRIPT=8
 STYLE_FONT_BOLD=(1<<16)
 STYLE_FONT_ITALIC=(1<<17)
+!?
 STYLE_FONT_TYPE_WRITER=(1<<18)
 STYLE_FONT_SANS_SERIF=(1<<19)
 LEVEL_CHAPTER=0
@@ -67,7 +70,7 @@ var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
 TxtxEditor_prototype.wrap_width=1024;
 TxtxEditor_prototype.root_style_name="computer_modern";
-TxtxEditor_prototype.disable_scrolling_x=1
+//TxtxEditor_prototype.disable_scrolling_x=1
 ////////////////
 TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
 	var ed=this.ed;
@@ -260,11 +263,15 @@ TxtxEditor_prototype.additional_hotkeys=[
 		obj.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
 	}},
 ];
-UI.CreateTxtxDocument=function(attrs){
-	//todo: loading from file
+var InitPrototype=function(){
 	if(!TxtxEditor_prototype.hyphenator){
 		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
 	}
+};
+
+UI.CreateTxtxDocument=function(attrs){
+	//todo: loading from file
+	InitPrototype();
 	var ret=Object.create(TxtxEditor_prototype);
 	ret.wrap_width=(attrs.wrap_width||attrs.w);
 	ret.w=attrs.w;
@@ -273,20 +280,60 @@ UI.CreateTxtxDocument=function(attrs){
 	return ret;
 };
 
-!?
-W.TxtxView_prototype={
-	OnTextEdit:function(event){if(!this.is_read_only){this.doc.OnTextEdit(event);}},
-	OnTextInput:function(event){if(!this.is_read_only){this.doc.OnTextInput(event);}},
-	OnKeyDown:function(event){if(!this.is_read_only){this.doc.OnKeyDown(event);}},
-	OnMouseDown:function(event){if(!this.is_read_only){this.doc.OnMouseDown(event);}},
-	OnMouseMove:function(event){if(!this.is_read_only){this.doc.OnMouseMove(event);}},
-	OnMouseUp:function(event){if(!this.is_read_only){this.doc.OnMouseUp(event);}},
-	mouse_cursor:"ibeam",
-};
-W.TxtxView=function(id,attrs){
-	var obj=UI.Keep(id,attrs,W.TxtxView_prototype);
-	UI.StdStyling(id,obj,attrs, "txtx_view",obj.focus_state||"blur");
+W.TxtxEditor=function(id,attrs){
+	var obj=UI.Keep(id,attrs);
+	UI.StdStyling(id,obj,attrs, "txtx_editor",obj.focus_state||"blur");
 	UI.StdAnchoring(id,obj);
+	UI.RoundRect(obj)
+	UI.Begin(obj)
+		//handle page properties
+		var w0=obj.page_margin_left
+		var w1=obj.page_width
+		var w2=obj.page_margin_right
+		//todo: not-wide-enough case
+		InitPrototype();
+		var doc=W.Edit("doc",{
+			'x':obj.x+w0,'y':obj.y,'w':w1+w2,'h':obj.h,
+			'wrap_width':w1,
+		},TxtxEditor_prototype)
+		var renderer=doc.GetRenderer();
+		var embeded_objects=renderer.g_rendered_objects;
+		if(embeded_objects.length){
+			var fanchortransform=UI.HackCallback(function(){
+				var real_obj=renderer.GetObject(this.numerical_id);
+				this.translate_y_original=this.y;
+				this.translate_y_baseline=real_obj.y_baseline;
+				this.baseline_ratio=real_obj.y_baseline/real_obj.h;
+				this.scale_w_original=real_obj.w
+				this.scale_h_original=real_obj.h
+			})
+			var fonchange=UI.HackCallback(function(tr){
+				var real_obj=renderer.GetObject(this.numerical_id);
+				if(tr.translation){
+					real_obj.y_baseline=this.translate_y_baseline-(tr.translation[1]);
+				}else{
+					real_obj.w=this.scale_w_original*tr.scale[0]
+					real_obj.h=this.scale_h_original*tr.scale[1]
+					real_obj.y_baseline=this.baseline_ratio*real_obj.h;
+				}
+				doc.ed.InvalidateStates([this.ccnt,lg_rubber_space])
+				UI.Refresh()
+			})
+			for(var i=0;i<embeded_objects.length;i++){
+				var obj_i=embeded_objects[i];
+				obj_i.id="$"+obj_i.numerical_id;
+				obj_i.AnchorTransform=fanchortransform;
+				obj_i.SetTransform=fonchange;
+			}
+			//region-less boxDocument
+			W.BoxDocument("embeded_objects",{
+				'x':0,'y':0,'w':obj.x+w0+w1+w2,'h':obj.y+obj.h,
+				'items':embeded_objects,
+				'disable_region':1,
+			})
+		}
+	UI.End()
+	/*
 	W.PureRegion(id,obj)
 	var doc=obj.doc;
 	UI.DrawBitmap(0,obj.x,obj.y,obj.w,obj.h,obj.bgcolor);
@@ -352,5 +399,6 @@ W.TxtxView=function(id,attrs){
 			UI.End(obj)
 		}
 	}
+	*/
 	return obj;
 };
