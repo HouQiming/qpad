@@ -210,6 +210,60 @@ TxtxEditor_prototype.SetRubberPadding=function(line0,line1,mask){
 		UI.Refresh();
 	}
 }
+TxtxEditor_prototype.GetTextAsPersistentForm=function(raw_ccnt0,raw_ccnt1){
+	var ed=this.ed;
+	var renderer=this.GetRenderer()
+	var ccnt0=(raw_ccnt0||0)
+	var ccnt1=(raw_ccnt1||ed.GetTextSize())
+	var stext=ed.GetText(ccnt0,ccnt1-ccnt0)
+	var perm=renderer.Internal_ConvertTextToPersistentForm(stext,this.GetStyleIDAt(ccnt0))
+	for(var i=0;i<perm.objects.length;i++){
+		var obj_i=renderer.GetObject(perm.objects[i]);
+		perm.objects[i]={obj:obj_i.obj, w:obj_i.w, h:obj_i.h, y_baseline:obj_i.y_baseline}
+	}
+	for(var i=0;i<perm.styles.length;i++){
+		perm.styles[i]=this.CloneStyle(this.styles[perm.styles[i]])
+	}
+	return perm
+}
+//add the objects / styles and return a local string for Edit calls
+TxtxEditor_prototype.PastePersistentText=function(perm){
+	var ed=this.ed;
+	var renderer=this.GetRenderer()
+	var objects=[]
+	var styles=[]
+	//can't destroy the original
+	for(var i=0;i<perm.objects.length;i++){
+		var obj_i=perm.objects[i];
+		objects[i]=renderer.InsertObject(obj_i,obj_i.w,obj_i.h,obj_i.h)
+	}
+	for(var i=0;i<perm.styles.length;i++){
+		styles[i]=this.CreateStyle(this.CloneStyle(perm.styles[i]))
+	}
+	return renderer.Internal_TranslateStylesAndObjects(perm.text,objects,styles)
+}
+
+//todo: save/load
+var g_internal_clipboard_indicator_text=Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT);
+var g_internal_clipboard;
+TxtxEditor_prototype.Copy=function(){
+	var ccnt0=this.sel0.ccnt;
+	var ccnt1=this.sel1.ccnt;
+	var ed=this.ed
+	if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
+	if(ccnt0<ccnt1){
+		g_internal_clipboard=this.GetTextAsPersistentForm(ccnt0,ccnt1)
+		UI.SDL_SetClipboardText(g_internal_clipboard_indicator_text)
+	}
+}
+TxtxEditor_prototype.Paste=function(){
+	var stext=UI.SDL_GetClipboardText()
+	if(stext==g_internal_clipboard_indicator_text){
+		stext=this.PastePersistentText(g_internal_clipboard)
+	}
+	this.OnTextInput({"text":stext})
+}
+
 TxtxEditor_prototype.ToggleStyleFlag=function(style_flag){
 	var new_style=this.CloneStyle(this.GetCurrentStyleObject());
 	new_style.flags^=style_flag;

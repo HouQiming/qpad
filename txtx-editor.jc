@@ -726,7 +726,7 @@ class CLayouter_fancy
 		return iptr(_RenderText(MODE_SEEK,0LL,a,pp,s,s.n, b[0],b[1],0.f,0.f,0.f).w)
 	}
 	/////////////////
-	long3 m_caret_overlay
+	m_caret_overlay=long3(-1LL,-1LL,-1LL)
 	JSObject m_overlay_obj
 	i64 m_caret_offset
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
@@ -822,6 +822,14 @@ class CLayouter_fancy
 		fnt_scaled=TFont()
 		dy_baseline=0LL
 		ch32_prev=int('\n')
+		if mode==MODE_RENDER:
+			fnt_scaled=m_styles[current_style_id].font
+			fnt_scaled.h*=scaling
+			//smart emboldening for SRGB - it has to be done *after* the scaling
+			color=m_styles[current_style_id].color
+			if g_renderer.m_srgb_supported:
+				fnt_scaled.embolden+=int((1.f-float(19589*(color&0xff)+38470*((color>>8)&0xff)+7477*((color>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
+			dy_baseline=y_baseline-float2fixed(g_renderer.GetFontBaseline(m_styles[current_style_id].font))
 		OfsCheck=__inline_loop_body(ccnt){
 			if mode==MODE_BB&&h_line:
 				//never return before the first newline
@@ -852,7 +860,7 @@ class CLayouter_fancy
 		}
 		myDrawChar=function(int ch32){
 			if x==m_caret_overlay.x&&y==m_caret_overlay.y:
-				if m_overlay_obj["type"].as(string)=="IME":
+				if m_overlay_obj&&m_overlay_obj["type"].as(string)=="IME":
 					s_overlay=m_overlay_obj["text"].as(string)
 					yf=projectY(y+dy_baseline)
 					hc=charHeight(m_styles[current_style_id])
@@ -887,6 +895,7 @@ class CLayouter_fancy
 					auto y_underline=yf+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height*(1.f+1.f/32.f))
 					g_renderer.DrawBitmap(0, projectX(x),y_underline,fixed2float(m_caret_overlay.z)*scaling,max(fnt_scaled.h*0.05f,1.f), m_styles[current_style_id].color)
 				else
+					//Writeln(x,' ',m_caret_overlay.x,' ',y,' ',m_caret_overlay.y)
 					assert(0)
 				x+=m_caret_overlay.z
 			if ch32!=int(' '):
@@ -915,11 +924,10 @@ class CLayouter_fancy
 		NewlineCheck=inline(){
 			FlushUnderline()
 			FlushStrikeout()
+			if mode==MODE_RENDER:myDrawChar(int(' '))
 			if newline_flags:
 				if mode==MODE_RENDER&&(newline_flags&ATOM_FLAG_HYPHEN):
 					myDrawChar(int('-'))
-				else
-					myDrawChar(int(' '))
 				x=0LL
 				y+=h_line
 		}
@@ -1072,11 +1080,81 @@ class CLayouter_fancy
 		else
 			return 0
 	}
+	JS_ConvertTextToPersistentForm=function(JSContext JS){
+		stext=JS.Param(0).as(string)
+		if !stext:return 0
+		style0=JS.Param(1).or(0)
+		obj_reach=new int[m_objects.n]
+		style_reach=new int[m_styles.n]
+		if u32(style0)<u32(style_reach.n):
+			style_reach[style0]=1
+		stext32=new int[]
+		if u32(style0)<u32(style_reach.n):
+			stext32.push(COMMAND_SET_STYLE+style0)
+		foreach ch in Utf8Chars(stext)
+			if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_INSERT_OBJECT+obj_reach.n:
+				obj_reach[ch-COMMAND_INSERT_OBJECT]=1
+			if ch>=COMMAND_SET_STYLE&&ch<COMMAND_SET_STYLE+style_reach.n:
+				style_reach[ch-COMMAND_SET_STYLE]=1
+			stext32.push(ch)
+		obj_subset=new int[]
+		style_subset=new int[]
+		//Writeln(obj_reach,' ',style_reach)
+		foreach d,I in obj_reach
+			d0=d
+			obj_reach[I]=obj_subset.n
+			if d0:obj_subset.push(I)
+		foreach d,I in style_reach
+			d0=d
+			style_reach[I]=style_subset.n
+			if d0:style_subset.push(I)
+		//Writeln(obj_reach,' ',style_reach,' ',obj_subset,' ',style_subset)
+		foreach ch,I in stext32
+			if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_INSERT_OBJECT+obj_reach.n:
+				stext32[I]=obj_reach[ch-COMMAND_INSERT_OBJECT]+COMMAND_INSERT_OBJECT
+			if ch>=COMMAND_SET_STYLE&&ch<COMMAND_SET_STYLE+style_reach.n:
+				stext32[I]=style_reach[ch-COMMAND_SET_STYLE]+COMMAND_SET_STYLE
+		ret=JS.New()
+		ret["text"]=Unicode32ToUtf8(stext32)
+		ret["objects"]=obj_subset
+		ret["styles"]=style_subset
+		return JS.Return(ret)
+	}
+	JS_TranslateStylesAndObjects=function(JSContext JS){
+		stext=JS.Param(0).as(string)
+		js_obj_subset=JS.Param(1).as(JSObject)
+		js_style_subset=JS.Param(2).as(JSObject)
+		if !stext||!js_obj_subset||!js_style_subset:return 0
+		obj_subset=new int[]
+		style_subset=new int[]
+		for i=0:js_obj_subset.length()-1
+			obj_id=js_obj_subset[i].or(-1)
+			if u32(obj_id)<u32(m_objects.n):
+				obj_subset.push(obj_id)
+		for i=0:js_style_subset.length()-1
+			style_id=js_style_subset[i].or(-1)
+			if u32(style_id)<u32(m_styles.n):
+				style_subset.push(style_id)
+		stext32=new int[]
+		foreach ch in Utf8Chars(stext)
+			if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_RUBBER_SPACE:
+				if ch<COMMAND_INSERT_OBJECT+obj_subset.n:
+					stext32.push(obj_subset[ch-COMMAND_INSERT_OBJECT]+COMMAND_INSERT_OBJECT)
+					continue
+			if ch>=COMMAND_SET_STYLE&&ch<COMMAND_END:
+				if ch<COMMAND_SET_STYLE+style_subset.n:
+					stext32.push(style_subset[ch-COMMAND_SET_STYLE]+COMMAND_SET_STYLE)
+					continue
+			stext32.push(ch)
+		return JS.Return(Unicode32ToUtf8(stext32))
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"g_rendered_objects")
 		proto.ExportMethod(this,"UpdateStyles",JS_UpdateStyles)
 		proto.ExportMethod(this,"InsertObject",JS_InsertObject)
 		proto.ExportMethod(this,"GetObject",JS_GetObject)
+		proto.ExportMethod(this,"Internal_ConvertTextToPersistentForm",JS_ConvertTextToPersistentForm)
+		proto.ExportMethod(this,"Internal_TranslateStylesAndObjects",JS_TranslateStylesAndObjects)
 	}
 
 registerStateHandler("renderer_fancy",CLayouter_fancy)

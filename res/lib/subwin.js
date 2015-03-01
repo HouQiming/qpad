@@ -36,8 +36,7 @@ W.SubWindow=function(id,attrs){
 
 ///////////////////////
 W.TabLabel_prototype={
-	//todo: mouseover, dragging, click-sel, possible color animation
-	//use style color rather than per-tab color for animation?
+	//todo: inactive tab mouseover, dragging, click-sel 
 }
 W.TabLabel=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
