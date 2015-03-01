@@ -26,7 +26,8 @@ __generate_json("js_units","gui2d/dockbar.js")
 		if !ret:
 			return 0
 		else
-			return JS.Return(new(ret))
+			//return JS.Return(new(ret))
+			return JS.Return(ret)
 	}
 	jsio["UIReadAll"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
@@ -47,6 +48,41 @@ __generate_json("js_units","gui2d/dockbar.js")
 		else
 			return 0
 	}
+	/////////////
+	dname_base=0
+	jsio["GetNewDocumentName"]=function(JSContext JS){
+		fn_base=JS.Param(0).as(string)
+		s_ext=JS.Param(1).as(string)
+		s_path_hint=JS.Param(2).or("document")
+		if !fn_base||!s_ext:
+			return 0
+		//todo: per-platform s_path_hint translation
+		if Platform.IS_WINDOWS:
+			s_userdir=System.Env.ExpandEnvironmentStrings(string("%USERPROFILE%"))
+			if !s_userdir.n||s_userdir[0]=='%':
+				s_userdir=System.Env.ExpandEnvironmentStrings(string("%SystemDrive%%HOMEPATH%"))
+			if s_path_hint=="pictures":
+				s_userdir.push("\\Pictures")
+			else
+				s_userdir.push("\\Documents")
+			if !System.IO.DirExists(s_userdir):
+				//no "My Pictures"
+				s_userdir=new(".")
+			else
+				s_userdir=s_userdir.Replace(["\\","/"])
+		else
+			//todo
+			assert(0)
+		fn_base=s_userdir+"/"+fn_base
+		for(;;)
+			fn=FormatAsText(fn_base,formatNumber(dname_base,{base:16,align:4}),".",s_ext)
+			dname_base++
+			if System.IO.FileExists(fn):continue
+			return JS.Return(fn)
+	}
+	/////////////
+	if Platform.IS_WINDOWS:
+		//todo: int osal_DoFileDialogWin(short* buf, short* filter,short* def_ext,int is_save)
 	/////////////
 	Duktape=JS.GetGlobal()["Duktape"]
 	Duktape["__utf8_fromCharCode"]=function(JSContext JS){

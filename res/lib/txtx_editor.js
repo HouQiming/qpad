@@ -1,6 +1,7 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
+var LOADER=require("res/lib/objloader");
 
 //todo: inserting objects - editor hook, file dlg - gallery dlg - additional_hotkeys
 //CreateEmbeddedImageFromFileData, PickImage
@@ -242,8 +243,49 @@ TxtxEditor_prototype.PastePersistentText=function(perm){
 	}
 	return renderer.Internal_TranslateStylesAndObjects(perm.text,objects,styles)
 }
-
-//todo: save/load
+//////////////////////////
+TxtxEditor_prototype.GetReferences=function(){
+	var renderer=this.GetRenderer()
+	var n=renderer.GetObjectCount()
+	var objects=[]
+	for(var i=0;i<n;i++){
+		objects[i]=this.GetObject(i).obj
+	}
+	return objects
+}
+TxtxEditor_prototype.default_extension="txt";
+TxtxEditor_prototype.enable_compression=1
+TxtxEditor_prototype.Save=function(){
+	var perm=this.GetTextAsPersistentForm()
+	for(var i=0;i<perm.objects.length;i++){
+		perm.objects[i].obj=perm.objects[i].obj.__unique_id
+	}
+	var s_text=perm.text;
+	perm.text=undefined;
+	var s_json=JSON.stringify(perm);
+	return ["txtx\n",s_json,"\n",s_text].join();
+}
+TxtxEditor_prototype.SetReferences=function(obj_list){
+	var perm=this.pending_load;this.pending_load=null;
+	!? //where do we put it? is it a text box or a full document?
+	//save it inside? no, use the id: only the root gets to be a document (the tab of which should be added here)
+}
+//////////////////////////
+LOADER.RegisterLoader("txtx",function(sdata,is_root){
+	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
+	var pline1=sdata.indexOf('\n',pline0+1);if(pline1<0){return;}
+	var perm=JSON.parse(sdata.substr(pline0+1,pline1-pline0-1));
+	perm.text=sdata.substr(pline1+1)
+	if(is_root){
+		//this is a new tab -- the object we return doesn't even matter
+		//todo: disallow cyclic reference and use active load? could keep is_root
+		!? .pending_load=perm
+	}else{
+		!?
+	}
+	return !?
+})
+//////////////////////////
 var g_internal_clipboard_indicator_text=Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT);
 var g_internal_clipboard;
 TxtxEditor_prototype.Copy=function(){
@@ -263,7 +305,7 @@ TxtxEditor_prototype.Paste=function(){
 	}
 	this.OnTextInput({"text":stext})
 }
-
+//////////////////////////
 TxtxEditor_prototype.ToggleStyleFlag=function(style_flag){
 	var new_style=this.CloneStyle(this.GetCurrentStyleObject());
 	new_style.flags^=style_flag;
@@ -368,16 +410,29 @@ W.subwindow_text_properties={
 				{text:"Sans Serif"},
 				{text:"Typewriter"},
 			],
+			OnChange:function(){
+				if(!g_active_txtx_editor){return;}
+				var doc=g_active_txtx_editor.doc;
+				var new_style=doc.CloneStyle(doc.GetCurrentStyleObject());
+				new_style.font_face=this.GetSelection().text;
+				doc.SetTextStyle(new_style)
+			},
 		}));
 		/*widget*/(W.ComboBox("size_box",{
 			'x':191.0906294148415,'y':36,'w':80.92974902757557,'h':29,
 			items:[
 				{text:"24"},
-				{text:"28"},
 				{text:"30"},
-				{text:"32"},
 				{text:"44"},
+				{text:"64"},
 			],
+			OnChange:function(){
+				if(!g_active_txtx_editor){return;}
+				var doc=g_active_txtx_editor.doc;
+				var new_style=doc.CloneStyle(doc.GetCurrentStyleObject());
+				new_style.font_size=parseInt(this.GetSelection().text);
+				doc.SetTextStyle(new_style)
+			},
 		}));
 	}
 };
@@ -439,8 +494,8 @@ W.TxtxEditor=function(id,attrs){
 			//current style to UI
 			var cur_state=obj.doc.GetCurrentStyleObject();
 			//["font_face","font_size","flags","color","relative_line_space","relative_paragraph_space"];
-			UI.SetComboBoxText(text_ppt_window.font_box, cur_state.font_face)
-			UI.SetComboBoxText(text_ppt_window.size_box, cur_state.font_size)
+			text_ppt_window.font_box.SetText(cur_state.font_face)
+			text_ppt_window.size_box.SetText(cur_state.font_size)
 			text_ppt_window.underlined.checked=!!(cur_state.flags&STYLE_UNDERLINED);
 			//text_ppt_window.strike_out.checked=!!(cur_state.flags&STYLE_STRIKE_OUT);
 			text_ppt_window.superscript.checked=!!(cur_state.flags&STYLE_SUPERSCRIPT);
@@ -451,6 +506,14 @@ W.TxtxEditor=function(id,attrs){
 			//todo: rubber space detection
 			//spacings do not appear here
 		}
+		obj.Save=UI.HackCallback(function(){
+			//todo: save as: int osal_DoFileDialogWin(short* buf, short* filter,short* def_ext,int is_save){
+			//we can do without it on phones: save as opens rename in file explorer
+			UI.SaveZipDocument(obj.file_name,this.doc)
+			obj.saved_point=this.doc.ed.GetUndoQueueLength();
+			UI.Refresh()
+		})
+		obj.title=UI.GetMainFileName(obj.file_name)+((obj.saved_point||0)!=obj.doc.ed.GetUndoQueueLength()?" *":"")
 	UI.End()
 	g_active_txtx_editor=obj;
 	return obj;

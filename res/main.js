@@ -7,7 +7,8 @@ require("res/lib/subwin");
 var g_icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24,0);
 UI.SetFontSharpening(1.5)
 
-var SetUIColorTheme=function(C){
+UI.SetUIColorTheme=function(C){
+	UI.current_theme_color=C[0];
 	UI.default_styles={
 		button:{
 			transition_dt:0.1,
@@ -155,7 +156,7 @@ var SetUIColorTheme=function(C){
 		},
 	};
 };
-SetUIColorTheme([0xffcc7733,0xffaa5522])
+UI.SetUIColorTheme([0xffcc7733,0xffaa5522])
 
 //var g_doc=UI.CreateTxtxDocument({w:1200,h:1600});
 //var g_layout={
@@ -187,18 +188,20 @@ SetUIColorTheme([0xffcc7733,0xffaa5522])
 var NewTxtxDocument=function(){
 	//todo: page property window
 	return {
-		title:"<New>",
+		file_name:IO.GetNewDocumentName("doc","txtx","document"),
 		body:function(){
-			W.TxtxEditor("editor",{
+			return W.TxtxEditor("body",{
 				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
 				'x':0,'y':0,'w':1300,
 				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
+				'file_name':this.file_name,
 				scale:1,bgcolor:0xffffffff,
 			})
 		},
 		property_windows:[
 			W.subwindow_text_properties
 		],
+		color_theme:[0xffcc7733,0xffaa5522],
 	}
 }
 //
@@ -247,13 +250,12 @@ UI.Application=function(id,attrs){
 				g_all_document_windows.push(NewTxtxDocument())
 				UI.Refresh()
 			}});
-			W.Hotkey("",{key:"CTRL+T",action:function(){
-				if(UI.default_styles.tab_label.color==0xffcc7733){
-					SetUIColorTheme([0xff33aa55,0xff229944])
-				}else{
-					SetUIColorTheme([0xffcc7733,0xffaa5522])
+			W.Hotkey("",{key:"CTRL+S",action:function(){
+				var doc_area=UI.top.app.document_area;
+				var active_document=doc_area[doc_area.active_tab.id];
+				if(active_document&&active_document.body&&active_document.body.Save){
+					active_document.body.Save.call(active_document.body)
 				}
-				UI.Refresh()
 			}});
 		UI.End();
 	UI.End();

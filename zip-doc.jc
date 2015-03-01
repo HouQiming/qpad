@@ -31,12 +31,14 @@ auto zip(string s)
 	ret.d=iptr(s_ret)
 	ret.n=iptr(out_len)
 	ret.sz=ret.n
-	return ret
+	return ret[2:]//strip the header
 
 inline crc32(string s){return stbiw__crc32(s,s.n)}
 
 g_unique_id=0LL
 auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
+	//JS=obj_root.GetContext()
+	//JS.GetGlobal()["UI"]["SaveObject"]
 	sz_written=0L
 	sz_data=0L
 	inline writeZip(string s)
@@ -72,12 +74,19 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 		if !s_save:
 			Writeln('error saving JS object ',id_obj)
 			assert(0)
-		fdata=zip(s_save)
-		crc=int(crc32(fdata))
-		s_local=new("PK\x03\x04\x0A\x00\x00\x00\x00\x00\x0C\x93\xC8D")
+		sz_original=s_save.n
+		//the compression doesn't work yet
+		enable_compression=obj["enable_compression"].or(0)
+		crc=int(crc32(s_save))
+		if enable_compression:
+			s_local=new("PK\x03\x04\x0A\x00\x00\x00\x08\x00\x0C\x93\xC8D")
+			fdata=zip(s_save)
+		else
+			s_local=new("PK\x03\x04\x0A\x00\x00\x00\x00\x00\x0C\x93\xC8D")
+			fdata=s_save
 		//CRC-32, size, size, namelen, paddinglen, name, padding
 		fn_zip=formatNumber(id_obj,{base:16,align:4})+"."+obj["default_extension"].or("bin")
-		s_local.push([crc,int(fdata.n),int(fdata.n),int(fn_zip.n)].ConvertToAsBinary(char))
+		s_local.push([crc,int(fdata.n),int(sz_original),int(fn_zip.n)].ConvertToAsBinary(char))
 		//ppaddings=s_local.n-2
 		s_local.push(fn_zip)
 		//lg_padding=(-(fzip.Position()+s_local.n))&(ALIGNMENT-1)
@@ -88,14 +97,20 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 		if !writeZip(s_local):return 0
 		if !writeZip(fdata):return 0
 		//add its central directory
-		s_central.push("PK\x01\x02\x0A\x00\x0A\x00\x08\x00\x00\x00\x0C\x93\xC8D")
-		s_central.push([crc,int(fdata.n),int(fdata.n),int(fn_zip.n),0,0].ConvertToAsBinary(char))
+		if enable_compression:
+			s_central.push("PK\x01\x02\x0A\x00\x0A\x00\x00\x00\x08\x00\x0C\x93\xC8D")
+		else
+			s_central.push("PK\x01\x02\x0A\x00\x0A\x00\x00\x00\x00\x00\x0C\x93\xC8D")
+		s_central.push([crc,int(fdata.n),int(sz_original),int(fn_zip.n),0,0].ConvertToAsBinary(char))
 		s_central.push('\0')
 		s_central.push('\0')
 		s_central.push([int(plocal)].ConvertToAsBinary(char))
 		s_central.push(fn_zip)
 		nfiles++
 		fdata.discard()
+	//wipe __unique_id for the next save
+	foreach obj in objs
+		obj["__unique_id"]=-1LL
 	//write the new directory
 	p_central=fzip.Position()
 	s_central.push("PK\x05\x06\x00\x00\x00\x00")
@@ -103,3 +118,54 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 	s_central.push("\x00\x00")
 	if !writeZip(s_central):return 0
 	return 1
+
+auto LoadZipDocument(JSContext JS,string fname)
+	/*
+	native zip reader calls LOADER.ParseObject to get an array
+	then call SetReferences on each object with that array
+	*/
+	sraw=System.IO.ReadAll(fname)
+	if !sraw:return JSObject.NULL
+	zipfile=ParseZip(sraw)
+	if !zipfile:return JSObject.NULL
+	oid_to_sdata=new string[int]
+	omax=-1
+	foreach fn in zipfile.AllFileNames()
+		pdot=fn.LastIndexOf(int('.'))
+		oid=fn[:pdot-1].asHex(int)
+		if oid_to_sdata[oid]:return JSObject.NULL
+		sdata=zipfile.ReadAll(fn)
+		if !sdata:return JSObject.NULL
+		oid_to_sdata[oid]=sdata
+		omax=max(omax,oid)
+	omax++
+	floader=JS.GetGlobal()["LOADER"]["ParseObject"].as(JSObject)
+	obj_list=JS.NewArray()
+	for i=0:omax-1
+		sdata_i=oid_to_sdata[i]
+		if !sdata_i:return JSObject.NULL
+		obj_loaded=floader.Call(JSObject,sdata_i,i==0)
+		if !obj_loaded:return JSObject.NULL
+		obj_list[i]=obj_loaded
+	for i=0:omax-1
+		obj_loaded=obj_list[i].as(JSObject)
+		obj_loaded.CallMethod(JSObject,"SetReferences",obj_list)
+	obj0=obj_list[0].as(JSObject)
+	return obj0
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["SaveZipDocument"]=function(JSContext JS){
+		sfile=JS.Param(0).as(string)
+		obj=JS.Param(1).as(JSObject)
+		if !sfile||!obj:return 0
+		fzip=System.IO.CreateFile(sfile)
+		if !fzip:return 0
+		return JS.Return(SaveZipDocument(fzip,obj))
+	}
+	JS_UI["LoadZipDocument"]=function(JSContext JS){
+		fname=JS.Param(0).as(string)
+		if !fname:return JSObject.NULL
+		obj0=LoadZipDocument(JS,fname)
+		return JS.Return(obj0)
+	}
+})

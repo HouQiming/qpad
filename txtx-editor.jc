@@ -373,7 +373,7 @@ class CLayouter_fancy
 	MODE_RENDER=2
 	/////////
 	m_wrap_width_in_fp=800LL*64LL
-	m_h_blank_line_in_fp=0LL
+	//m_h_blank_line_in_fp=0LL
 	m_bgcolor=0xffffffff
 	m_bgcolor_selection=0xff800000
 	m_styles=new CStyle[]
@@ -430,6 +430,7 @@ class CLayouter_fancy
 				p_last_word=I_next
 		if p_last_word<s.n:
 			words.push(int3(style_id,int(p_last_word),int(s.n)))
+		tail_style_id=style_id
 		////////////
 		//hyphenate the words
 		atoms=new TLayoutAtom[]
@@ -570,7 +571,7 @@ class CLayouter_fancy
 			h_up=0LL
 			h_down=0LL
 			h_lspace=0LL
-			h_pspace=0LL
+			//h_pspace=0LL
 			w_trailing=0LL
 			for i=line_breaks[li]:p_last
 				w+=atoms[i].w
@@ -598,7 +599,7 @@ class CLayouter_fancy
 				if atoms[i].style_id>=0:
 					pstyle=m_styles[atoms[i].style_id]
 					h_lspace=max(h_lspace,pstyle.line_space)
-					h_pspace=max(h_pspace,pstyle.paragraph_space)
+					//h_pspace=max(h_pspace,pstyle.paragraph_space)
 			w-=w_trailing
 			if atoms[p_last].flags&FLAG_HYPHENATE_AFTER:
 				w+=charWidth(m_styles[atoms[p_last].style_id],'-')
@@ -615,8 +616,6 @@ class CLayouter_fancy
 					//rubber
 					n_spaces=n_paddables.x
 					padding_mode=0
-				else if li==line_breaks.n-1:
-					//last line, do not pad
 				else
 					if n_paddables.y>0:
 						n_spaces=n_paddables.y
@@ -646,8 +645,9 @@ class CLayouter_fancy
 					assert((result.back()>>42)!=-1LL)
 			//newline
 			h_line=h_up+h_down+h_lspace
-			if li==line_breaks.n-2:
-				h_line+=h_pspace
+			if li==line_breaks.n-2&&line_breaks.n==2&&!p_last:
+				//empty line - switch to paragraph space
+				h_line=m_styles[tail_style_id].paragraph_space
 			assert(i64(int(h_up))==h_up&&h_up>=0LL)
 			assert(i64(int(h_line))==h_line&&h_line>=0LL)
 			//////////////////
@@ -688,13 +688,13 @@ class CLayouter_fancy
 		result=new i64[]
 		foreach sline,I in s.TokenizeEx("\n",s.TOKENIZE_ALLOW_EMPTY|s.TOKENIZE_INCLUDE_SEPARATOR)
 			n0=result.n
-			if m_h_blank_line_in_fp&&(sline=="\n"||sline=="\r\n"):
-				result.push(m_h_blank_line_in_fp|(m_h_blank_line_in_fp<<21)|(i64(ATOM_FLAG_LINE_BREAK|ATOM_FLAG_NEWLINE|I)<<42))
-				assert((result.back()>>42)!=-1LL)
-				result.push(i64(I)|(i64(I+1)<<21)|(0LL<<42))
-				assert((result.back()>>42)!=-1LL)
-			else
-				PreprocessParagraph(result,I,sline,sline.EndsWith("\n"))
+			//if m_h_blank_line_in_fp&&(sline=="\n"||sline=="\r\n"):
+			//	result.push(m_h_blank_line_in_fp|(m_h_blank_line_in_fp<<21)|(i64(ATOM_FLAG_LINE_BREAK|ATOM_FLAG_NEWLINE|I)<<42))
+			//	assert((result.back()>>42)!=-1LL)
+			//	result.push(i64(I)|(i64(I+1)<<21)|(0LL<<42))
+			//	assert((result.back()>>42)!=-1LL)
+			//else
+			PreprocessParagraph(result,I,sline,sline.EndsWith("\n"))
 			if n0<result.n:
 				//shove back real newlines to \n
 				aflag=(result[n0]>>42)
@@ -777,7 +777,7 @@ class CLayouter_fancy
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width_in_fp=float2fixed(obj["wrap_width"].or(800.f))
-		m_h_blank_line_in_fp=float2fixed(obj["h_blank_line"].or(0.f))
+		//m_h_blank_line_in_fp=float2fixed(obj["h_blank_line"].or(0.f))
 		m_hyphenator=obj["hyphenator"].or(g_default_hyphenator)
 		/////////////////
 		js_styles=obj["styles"].as(JSObject)
@@ -816,8 +816,8 @@ class CLayouter_fancy
 		if y==m_caret_overlay.y&&x>m_caret_overlay.x:
 			x+=m_caret_overlay.z
 		newline_flags=0
-		y_baseline=0LL
-		h_line=0LL
+		y_baseline=float2fixed(g_renderer.GetFontBaseline(m_styles[0].font))
+		h_line=charHeight(m_styles[0])
 		current_style_id=0
 		fnt_scaled=TFont()
 		dy_baseline=0LL
@@ -1073,6 +1073,9 @@ class CLayouter_fancy
 		m_objects.push(CEmbededObject(){obj:obj,w:w,h:h,y_baseline:y_baseline})
 		return JS.Return(n0)
 	}
+	JS_GetObjectCount=function(JSContext JS){
+		return JS.Return(m_objects.n)
+	}
 	JS_GetObject=function(JSContext JS){
 		id=JS.Param(0).or(-1)
 		if u32(id)<u32(m_objects.n):
@@ -1153,6 +1156,7 @@ class CLayouter_fancy
 		proto.ExportMethod(this,"UpdateStyles",JS_UpdateStyles)
 		proto.ExportMethod(this,"InsertObject",JS_InsertObject)
 		proto.ExportMethod(this,"GetObject",JS_GetObject)
+		proto.ExportMethod(this,"GetObjectCount",JS_GetObjectCount)
 		proto.ExportMethod(this,"Internal_ConvertTextToPersistentForm",JS_ConvertTextToPersistentForm)
 		proto.ExportMethod(this,"Internal_TranslateStylesAndObjects",JS_TranslateStylesAndObjects)
 	}
