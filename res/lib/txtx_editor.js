@@ -235,7 +235,7 @@ TxtxEditor_prototype.PastePersistentText=function(perm){
 	//can't destroy the original
 	for(var i=0;i<perm.objects.length;i++){
 		var obj_i=perm.objects[i];
-		objects[i]=renderer.InsertObject(obj_i.obj,obj_i.w,obj_i.h,obj_i.h)
+		objects[i]=renderer.InsertObject(obj_i.obj,obj_i.w,obj_i.h,obj_i.y_baseline)
 	}
 	for(var i=0;i<perm.styles.length;i++){
 		styles[i]=this.CreateStyle(this.CloneStyle(perm.styles[i]))
