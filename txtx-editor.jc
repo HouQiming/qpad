@@ -838,6 +838,7 @@ class CLayouter_fancy
 	}
 	IsCharInvisible=function(int ch){
 		return ch>=COMMAND_SET_STYLE&&ch<COMMAND_END
+		//return ch>=COMMAND_RUBBER_SPACE&&ch<COMMAND_END
 	}
 	charWidth=inline(style,ch){
 		return max(float2fixed(g_renderer.GetCharacterAdvance(style.font,int(ch))),1LL)
