@@ -11,3 +11,11 @@ LOADER.ParseObject=function(sdata,is_root){
 	if(!parser){return undefined;}
 	return parser(sdata,is_root)
 }
+!? //todo: active loader
+
+LOADER.LoadFile=function(fname){
+	//todo: a general "load file"
+	var zip_file=LoadZipDocument(fname)
+	!?
+}
+

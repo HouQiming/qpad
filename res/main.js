@@ -185,26 +185,6 @@ UI.SetUIColorTheme([0xffcc7733,0xffaa5522])
 //},
 
 //Open is a single function, determine document type inside, then call New + SetText
-var NewTxtxDocument=function(){
-	//todo: page property window
-	return {
-		file_name:IO.GetNewDocumentName("doc","txtx","document"),
-		body:function(){
-			return W.TxtxEditor("body",{
-				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
-				'x':0,'y':0,'w':1300,
-				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
-				'file_name':this.file_name,
-				scale:1,bgcolor:0xffffffff,
-			})
-		},
-		property_windows:[
-			W.subwindow_text_properties
-		],
-		color_theme:[0xffcc7733,0xffaa5522],
-	}
-}
-//
 
 var g_all_document_windows=[];
 UI.Application=function(id,attrs){
@@ -247,7 +227,7 @@ UI.Application=function(id,attrs){
 			}
 			//////////////////////////
 			W.Hotkey("",{key:"CTRL+N",action:function(){
-				g_all_document_windows.push(NewTxtxDocument())
+				g_all_document_windows.push(UI.NewTxtxDocument())
 				UI.Refresh()
 			}});
 			W.Hotkey("",{key:"CTRL+S",action:function(){

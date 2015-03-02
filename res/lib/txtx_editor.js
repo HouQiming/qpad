@@ -271,6 +271,26 @@ TxtxEditor_prototype.SetReferences=function(obj_list){
 	//save it inside? no, use the id: only the root gets to be a document (the tab of which should be added here)
 }
 //////////////////////////
+UI.NewTxtxDocument=function(){
+	//todo: page property window
+	return {
+		file_name:IO.GetNewDocumentName("doc","txtx","document"),
+		body:function(){
+			return W.TxtxEditor("body",{
+				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
+				'x':0,'y':0,'w':1300,
+				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
+				'file_name':this.file_name,
+				scale:1,bgcolor:0xffffffff,
+			})
+		},
+		property_windows:[
+			W.subwindow_text_properties
+		],
+		color_theme:[0xffcc7733,0xffaa5522],
+	}
+};
+!? //a general "load file"
 LOADER.RegisterLoader("txtx",function(sdata,is_root){
 	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
 	var pline1=sdata.indexOf('\n',pline0+1);if(pline1<0){return;}
@@ -279,12 +299,21 @@ LOADER.RegisterLoader("txtx",function(sdata,is_root){
 	if(is_root){
 		//this is a new tab -- the object we return doesn't even matter
 		//todo: disallow cyclic reference and use active load? could keep is_root
+		//the loading-from-which-document problem
+		//and loading non-zip, potentially-large files (extension-handler association)
+		/*
+		separate document loader and object loader
+			all zip documents go through the object loader
+			but object 0 is always handled specially
+		*/
 		!? .pending_load=perm
 	}else{
 		!?
 	}
 	return !?
 })
+!?
+
 //////////////////////////
 var g_internal_clipboard_indicator_text=Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT);
 var g_internal_clipboard;
