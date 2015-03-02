@@ -156,7 +156,7 @@ TxtxEditor_prototype.GetEnhancedHome=function(ccnt0){
 	if(ed.GetText(ccnt,lg_rubber_space)==s_rubber_space){
 		ccnt+=lg_rubber_space;
 	}
-	ccnt=this.SnapToVisualBoundary(this.ed.MoveToBoundary(ccnt,1,"space"),1);
+	ccnt=this.SnapToValidLocation(this.ed.MoveToBoundary(ccnt,1,"space"),1);
 	//todo: numbering
 	return ccnt;
 }
@@ -166,7 +166,7 @@ TxtxEditor_prototype.GetEnhancedEnd=function(ccnt0){
 	if(ed.GetText(ccnt-lg_rubber_space,lg_rubber_space)==s_rubber_space){
 		ccnt-=lg_rubber_space;
 	}
-	return this.SnapToVisualBoundary(this.ed.MoveToBoundary(ccnt,-1,"space"),-1);
+	return this.SnapToValidLocation(this.ed.MoveToBoundary(ccnt,-1,"space"),-1);
 }
 TxtxEditor_prototype.GetLineSelection=function(){
 	var sel=this.GetSelection();
