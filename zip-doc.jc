@@ -38,7 +38,7 @@ inline crc32(string s){return stbiw__crc32(s,s.n)}
 auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 	//JS=obj_root.GetContext()
 	//JS.GetGlobal()["UI"]["SaveObject"]
-	g_unique_id=0LL
+	g_unique_id=0
 	sz_written=0L
 	sz_data=0L
 	inline writeZip(string s)
@@ -49,10 +49,10 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 		else
 			return 1
 	objs=new JSObject[]
-	idmap=new JSObject[i64]
+	idmap=new JSObject[int]
 	auto dfsObject(JSObject obj)
-		id_obj=obj["__unique_id"].or(-1LL)
-		if id_obj==-1LL:
+		id_obj=obj["__unique_id"].or(-1)
+		if id_obj==-1:
 			id_obj=g_unique_id;g_unique_id++
 			obj["__unique_id"]=id_obj
 		if idmap[id_obj]:return
@@ -68,7 +68,7 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 	s_central=new string
 	nfiles=0
 	foreach obj in objs
-		id_obj=obj["__unique_id"].or(-1LL)
+		id_obj=obj["__unique_id"].or(-1)
 		//Save accesses __unique_id of dependencies
 		s_save=obj.CallMethod(string,"Save")
 		if !s_save:
@@ -110,7 +110,7 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 		fdata.discard()
 	//wipe __unique_id for the next save
 	foreach obj in objs
-		obj["__unique_id"]=-1LL
+		obj["__unique_id"]=-1
 	//write the new directory
 	p_central=fzip.Position()
 	s_central.push("PK\x05\x06\x00\x00\x00\x00")
@@ -129,21 +129,25 @@ auto LoadZipDocument(JSContext JS,string fname)
 	zipfile=ParseZip(sraw)
 	if !zipfile:return JSObject.NULL
 	oid_to_sdata=new string[int]
+	oid_to_ext=new string[int]
 	omax=-1
 	foreach fn in zipfile.AllFileNames()
 		pdot=fn.LastIndexOf('.')
+		if pdot<0:return JSObject.NULL
 		oid=fn[:pdot-1].asHex(int)
 		if oid_to_sdata[oid]:return JSObject.NULL
 		sdata=zipfile.ReadAll(fn)
 		if !sdata:return JSObject.NULL
 		oid_to_sdata[oid]=sdata
+		oid_to_ext[oid]=fn[pdot+1:].ToLower()
 		omax=max(omax,oid)
 	omax++
 	data_list=JS.NewArray()
 	for i=0:omax-1
 		sdata_i=oid_to_sdata[i]
 		if !sdata_i:return JSObject.NULL
-		data_list[i]=sdata_i
+		data_list[i*2+0]=sdata_i
+		data_list[i*2+1]=oid_to_ext[i]
 	return data_list
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){

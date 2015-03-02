@@ -245,6 +245,7 @@ class CEmbeddedImage
 			m_mipmap.push(downSampleMipmap(img))
 		return m_mipmap[level]
 	/////////////////////
+	__unique_id=-1.0
 	default_extension="png"
 	JS_RenderAsObject=function(JSContext JS){
 		g_manager.DrawMipmapAt(this,JS.Param(0).or(0.f),JS.Param(1).or(0.f),JS.Param(2).or(1.f),JS.Param(3).or(1.f))
@@ -262,6 +263,7 @@ class CEmbeddedImage
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"w")
 		proto.ExportProperty(this,"h")
+		proto.ExportProperty(this,"__unique_id")
 		proto.ExportProperty(this,"default_extension")
 		proto.ExportMethod(this,"RenderAsObject",JS_RenderAsObject)
 		proto.ExportMethod(this,"GetReferences",JS_GetReferences)

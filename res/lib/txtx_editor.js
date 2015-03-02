@@ -3,8 +3,7 @@ var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
 var LOADER=require("res/lib/objloader");
 
-//todo: inserting objects - editor hook, file dlg - gallery dlg - additional_hotkeys
-//CreateEmbeddedImageFromFileData, PickImage
+//todo: inserting objects - GUI
 COMMAND_INSERT_OBJECT=0x100000
 COMMAND_RUBBER_SPACE=0x107fff
 COMMAND_SET_STYLE=0x108000
@@ -236,7 +235,7 @@ TxtxEditor_prototype.PastePersistentText=function(perm){
 	//can't destroy the original
 	for(var i=0;i<perm.objects.length;i++){
 		var obj_i=perm.objects[i];
-		objects[i]=renderer.InsertObject(obj_i,obj_i.w,obj_i.h,obj_i.h)
+		objects[i]=renderer.InsertObject(obj_i.obj,obj_i.w,obj_i.h,obj_i.h)
 	}
 	for(var i=0;i<perm.styles.length;i++){
 		styles[i]=this.CreateStyle(this.CloneStyle(perm.styles[i]))
@@ -249,7 +248,7 @@ TxtxEditor_prototype.GetReferences=function(){
 	var n=renderer.GetObjectCount()
 	var objects=[]
 	for(var i=0;i<n;i++){
-		objects[i]=this.GetObject(i).obj
+		objects.push(renderer.GetObject(i).obj)
 	}
 	return objects
 }
@@ -292,23 +291,30 @@ UI.NewTxtxDocument=function(fname0,perm){
 		color_theme:[0xffcc7733,0xffaa5522],
 	}
 };
-LOADER.RegisterLoader("txtx",function(data_list,id,fname){
-	var sdata=data_list[id];
+LOADER.RegisterLoader("png",function(data_list,id,fname){
+	var sdata=data_list[id*2+0];
+	var obj_img=UI.CreateEmbeddedImageFromFileData(sdata);
+	if(!obj_img){throw new Error("invalid image")}
+	return obj_img
+})
+LOADER.RegisterLoader("txt",function(data_list,id,fname){
+	var sdata=data_list[id*2+0];
 	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
 	var pline1=sdata.indexOf('\n',pline0+1);if(pline1<0){return;}
 	var perm=JSON.parse(sdata.substr(pline0+1,pline1-pline0-1));
 	perm.text=sdata.substr(pline1+1)
 	for(var i=0;i<perm.objects.length;i++){
-		if(!(perm.objects[i]<data_list.length&&perm.objects[i]>=0)){
-			throw new Error("invalid object id");
+		var obj_id=perm.objects[i].obj
+		if(!(obj_id*2<data_list.length&&obj_id>=0)){
+			throw new Error("invalid object id '@1'".replace('@1',obj_id));
 		}
-		perm.objects[i]=LOADER.LoadObject(data_list,perm.objects[i])
+		perm.objects[i].obj=LOADER.LoadObject(data_list,obj_id)
 	}
 	if(id==0){
 		UI.NewTab(UI.NewTxtxDocument(fname,perm));
 	}else{
 		//todo
-		throw new Error("unimplemented")
+		throw new Error("textbox unimplemented")
 	}
 })
 

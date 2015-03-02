@@ -7,12 +7,12 @@ LOADER.RegisterLoader=function(name,f){
 }
 LOADER.LoadObject=function(data_list,id,fname){
 	//todo: should use extension instead? raw images...
-	var sdata=data_list[id]
-	var p_newline=sdata.indexOf("\n");
-	var sformat=sdata.substr(0,p_newline)
+	var sdata=data_list[id*2+0]
+	var sformat=data_list[id*2+1]
+	//var p_newline=sdata.indexOf("\n");
+	//var sformat=sdata.substr(0,p_newline)
 	var parser=LOADER.m_loaders[sformat];
 	if(!parser){
-		print(sdata)
 		throw new Error("invalid document format '@1'".replace("@1",sformat))
 	}
 	return parser(data_list,id,fname)
