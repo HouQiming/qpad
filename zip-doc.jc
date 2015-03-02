@@ -35,10 +35,10 @@ auto zip(string s)
 
 inline crc32(string s){return stbiw__crc32(s,s.n)}
 
-g_unique_id=0LL
 auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 	//JS=obj_root.GetContext()
 	//JS.GetGlobal()["UI"]["SaveObject"]
+	g_unique_id=0LL
 	sz_written=0L
 	sz_data=0L
 	inline writeZip(string s)
@@ -131,7 +131,7 @@ auto LoadZipDocument(JSContext JS,string fname)
 	oid_to_sdata=new string[int]
 	omax=-1
 	foreach fn in zipfile.AllFileNames()
-		pdot=fn.LastIndexOf(int('.'))
+		pdot=fn.LastIndexOf('.')
 		oid=fn[:pdot-1].asHex(int)
 		if oid_to_sdata[oid]:return JSObject.NULL
 		sdata=zipfile.ReadAll(fn)
@@ -139,19 +139,12 @@ auto LoadZipDocument(JSContext JS,string fname)
 		oid_to_sdata[oid]=sdata
 		omax=max(omax,oid)
 	omax++
-	floader=JS.GetGlobal()["LOADER"]["ParseObject"].as(JSObject)
-	obj_list=JS.NewArray()
+	data_list=JS.NewArray()
 	for i=0:omax-1
 		sdata_i=oid_to_sdata[i]
 		if !sdata_i:return JSObject.NULL
-		obj_loaded=floader.Call(JSObject,sdata_i,i==0)
-		if !obj_loaded:return JSObject.NULL
-		obj_list[i]=obj_loaded
-	for i=0:omax-1
-		obj_loaded=obj_list[i].as(JSObject)
-		obj_loaded.CallMethod(JSObject,"SetReferences",obj_list)
-	obj0=obj_list[0].as(JSObject)
-	return obj0
+		data_list[i]=sdata_i
+	return data_list
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["SaveZipDocument"]=function(JSContext JS){
@@ -164,8 +157,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	}
 	JS_UI["LoadZipDocument"]=function(JSContext JS){
 		fname=JS.Param(0).as(string)
-		if !fname:return JSObject.NULL
-		obj0=LoadZipDocument(JS,fname)
-		return JS.Return(obj0)
+		if !fname:return 0
+		data_list=LoadZipDocument(JS,fname)
+		return JS.Return(data_list)
 	}
 })

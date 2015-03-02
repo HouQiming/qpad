@@ -5,17 +5,21 @@ LOADER.m_loaders={};
 LOADER.RegisterLoader=function(name,f){
 	LOADER.m_loaders[name]=f;
 }
-LOADER.ParseObject=function(sdata,is_root){
+LOADER.LoadObject=function(data_list,id,fname){
+	var sdata=data_list[id]
 	var p_newline=sdata.indexOf("\n");
-	var parser=LOADER.m_loaders[sdata.substr(0,p_newline)];
-	if(!parser){return undefined;}
-	return parser(sdata,is_root)
+	var sformat=sdata.substr(0,p_newline)
+	var parser=LOADER.m_loaders[sformat];
+	if(!parser){
+		print(sdata)
+		throw new Error("invalid document format '@1'".replace("@1",sformat))
+	}
+	return parser(data_list,id,fname)
 }
-!? //todo: active loader
 
 LOADER.LoadFile=function(fname){
-	//todo: a general "load file"
-	var zip_file=LoadZipDocument(fname)
-	!?
+	//todo: a general "load file" - extension based
+	var data_list=UI.LoadZipDocument(fname)
+	return LOADER.LoadObject(data_list,0,fname)
 }
 

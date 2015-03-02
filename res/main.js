@@ -1,5 +1,6 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
+var LOADER=require("res/lib/objloader");
 require("gui2d/dockbar");
 require("res/lib/txtx_editor");
 require("res/lib/subwin");
@@ -184,9 +185,12 @@ UI.SetUIColorTheme([0xffcc7733,0xffaa5522])
 //	},
 //},
 
-//Open is a single function, determine document type inside, then call New + SetText
-
 var g_all_document_windows=[];
+UI.NewTab=function(tab){
+	g_all_document_windows.push(tab)
+	return tab;
+}
+
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -236,6 +240,12 @@ UI.Application=function(id,attrs){
 				if(active_document&&active_document.body&&active_document.body.Save){
 					active_document.body.Save.call(active_document.body)
 				}
+			}});
+			W.Hotkey("",{key:"CTRL+O",action:function(){
+				var fn=IO.DoFileDialog(["Txtx documents (*.txtx)","*.txtx","All File","*.*"]);
+				if(!fn){return;}
+				LOADER.LoadFile(fn);
+				UI.Refresh()
 			}});
 		UI.End();
 	UI.End();

@@ -263,26 +263,28 @@ TxtxEditor_prototype.Save=function(){
 	var s_text=perm.text;
 	perm.text=undefined;
 	var s_json=JSON.stringify(perm);
-	return ["txtx\n",s_json,"\n",s_text].join();
-}
-TxtxEditor_prototype.SetReferences=function(obj_list){
-	var perm=this.pending_load;this.pending_load=null;
-	!? //where do we put it? is it a text box or a full document?
-	//save it inside? no, use the id: only the root gets to be a document (the tab of which should be added here)
+	return ["txtx\n",s_json,"\n",s_text].join("");
 }
 //////////////////////////
-UI.NewTxtxDocument=function(){
+UI.NewTxtxDocument=function(fname0,perm){
 	//todo: page property window
 	return {
-		file_name:IO.GetNewDocumentName("doc","txtx","document"),
+		file_name:(fname0||IO.GetNewDocumentName("doc","txtx","document")),
 		body:function(){
-			return W.TxtxEditor("body",{
+			var body=W.TxtxEditor("body",{
 				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
 				'x':0,'y':0,'w':1300,
 				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
 				'file_name':this.file_name,
-				scale:1,bgcolor:0xffffffff,
+				'scale':1,'bgcolor':0xffffffff,
 			})
+			if(perm){
+				var sbody=body.doc.PastePersistentText(perm)
+				body.doc.ed.Edit([0,0,sbody],1)
+				perm=undefined;
+				UI.Refresh()
+			}
+			return body;
 		},
 		property_windows:[
 			W.subwindow_text_properties
@@ -290,29 +292,25 @@ UI.NewTxtxDocument=function(){
 		color_theme:[0xffcc7733,0xffaa5522],
 	}
 };
-!? //a general "load file"
-LOADER.RegisterLoader("txtx",function(sdata,is_root){
+LOADER.RegisterLoader("txtx",function(data_list,id,fname){
+	var sdata=data_list[id];
 	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
 	var pline1=sdata.indexOf('\n',pline0+1);if(pline1<0){return;}
 	var perm=JSON.parse(sdata.substr(pline0+1,pline1-pline0-1));
 	perm.text=sdata.substr(pline1+1)
-	if(is_root){
-		//this is a new tab -- the object we return doesn't even matter
-		//todo: disallow cyclic reference and use active load? could keep is_root
-		//the loading-from-which-document problem
-		//and loading non-zip, potentially-large files (extension-handler association)
-		/*
-		separate document loader and object loader
-			all zip documents go through the object loader
-			but object 0 is always handled specially
-		*/
-		!? .pending_load=perm
-	}else{
-		!?
+	for(var i=0;i<perm.objects.length;i++){
+		if(!(perm.objects[i]<data_list.length&&perm.objects[i]>=0)){
+			throw new Error("invalid object id");
+		}
+		perm.objects[i]=LOADER.LoadObject(data_list,perm.objects[i])
 	}
-	return !?
+	if(id==0){
+		UI.NewTab(UI.NewTxtxDocument(fname,perm));
+	}else{
+		//todo
+		throw new Error("unimplemented")
+	}
 })
-!?
 
 //////////////////////////
 var g_internal_clipboard_indicator_text=Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT);

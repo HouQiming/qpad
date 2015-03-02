@@ -7,6 +7,7 @@ import "uisandbox.jc"
 import Gui2D.*
 import Javascript.*
 import System.Console.*
+import System.Algorithm.*
 import Uisandbox.*
 
 __generate_json("js_units","gui2d/ui.js")
@@ -82,7 +83,44 @@ __generate_json("js_units","gui2d/dockbar.js")
 	}
 	/////////////
 	if Platform.IS_WINDOWS:
-		//todo: int osal_DoFileDialogWin(short* buf, short* filter,short* def_ext,int is_save)
+		osal_DoFileDialogWin=__c_function(int,"osal_DoFileDialogWin","filedlg.h","c_files","filedlg.c")
+		jsio["DoFileDialog"]=function(JSContext JS){
+			//DoFileDialog(["Txtx documents (*.txtx)","*.txtx","All Files","*.*"],"txtx",0)
+			filter_strs=JS.Param(0).as(JSObject)
+			if !filter_strs:return 0
+			n=filter_strs.length()
+			if n&1||n<2:return 0
+			s_def_ext=new(JS.Param(1).or(""))
+			s_def_ext.push(char(0))
+			s_filter=new string
+			for i=0:2:n-2
+				s_filter.push(filter_strs[i].or(""))
+				s_filter.push(char(0))
+				s_filter.push(filter_strs[i+1].or(""))
+				s_filter.push(char(0))
+			s_filter.push(char(0))
+			ws_filter=Utf8ToUnicode(s_filter)
+			ws_def_ext=Utf8ToUnicode(s_def_ext)
+			is_save=JS.Param(2).or(0)
+			///////////
+			s_userdir=System.Env.ExpandEnvironmentStrings(string("%USERPROFILE%"))
+			if !s_userdir.n||s_userdir[0]=='%':
+				s_userdir=System.Env.ExpandEnvironmentStrings(string("%SystemDrive%%HOMEPATH%"))
+			s_userdir.push("\\Documents")
+			if !System.IO.DirExists(s_userdir):
+				s_userdir=new(".")
+			s_userdir.push('\\*')
+			ws_userdir=Utf8ToUnicode(s_userdir)
+			if ws_userdir.n<260:ws_userdir.resize(260)
+			if !osal_DoFileDialogWin(ws_userdir,ws_filter,ws_def_ext,is_save):
+				return 0
+			s_ret=UnicodeToUtf8(ws_userdir)
+			p=s_ret.IndexOf(char(0))
+			if p>=0:s_ret.resize(p)
+			return JS.Return(s_ret)
+		}
+	else
+		//todo
 	/////////////
 	Duktape=JS.GetGlobal()["Duktape"]
 	Duktape["__utf8_fromCharCode"]=function(JSContext JS){
