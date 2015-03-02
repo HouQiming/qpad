@@ -6,6 +6,7 @@ LOADER.RegisterLoader=function(name,f){
 	LOADER.m_loaders[name]=f;
 }
 LOADER.LoadObject=function(data_list,id,fname){
+	//todo: should use extension instead? raw images...
 	var sdata=data_list[id]
 	var p_newline=sdata.indexOf("\n");
 	var sformat=sdata.substr(0,p_newline)

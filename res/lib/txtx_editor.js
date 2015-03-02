@@ -371,9 +371,13 @@ TxtxEditor_prototype.additional_hotkeys=[
 ];
 var InitPrototype=function(){
 	if(!TxtxEditor_prototype.hyphenator){
-		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
+		//TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
+		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.dfa"));
 	}
 };
+
+//var hyp=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"))
+//IO.CreateFile("test/ushyphmax.dfa",hyp.toString())
 
 UI.CreateTxtxDocument=function(attrs){
 	//todo: loading from file

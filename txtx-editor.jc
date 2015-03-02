@@ -101,8 +101,37 @@ class CHyphenator
 			if i:SWrite(s,'-')
 			SWrite(s,sword[hyp_points[i]:hyp_points[i+1]-1])
 		return s
+	JS_toString=function(JSContext JS){
+		obj_big=JS.New()
+		obj_temp=JS.NewArray();p=0
+		foreach d,k in exceptions
+			obj_temp[p]=k;p++
+			obj_temp[p]=d;p++
+		obj_big["exceptions"]=obj_temp
+		obj_temp=JS.NewArray();p=0
+		foreach d,k in char_map
+			obj_temp[p]=k;p++
+			obj_temp[p]=d;p++
+		obj_big["char_map"]=obj_temp
+		obj_big["left_min"]=left_min
+		obj_big["right_min"]=right_min
+		obj_big["n_char_types"]=n_char_types
+		obj_big["size_dfa"]=dfa.n
+		obj_big["size_ops"]=ops.n
+		s0=new string
+		s0.push(JS.GetGlobal()["JSON"].CallMethod(string,"stringify",obj_big))
+		s0.push('\n')
+		if s0.n&1:
+			s0.push('\n')
+		s0.push(dfa[0:].ConvertToAsBinary(char))
+		s0.push(ops[0:].ConvertToAsBinary(char))
+		return JS.Return(s0)
+	}
+	__JS_prototype=function(JSObject proto){
+		proto.ExportMethod(this,"toString",JS_toString)
+	}
 
-auto createDefaultHyphenator()
+auto createNullHyphenator()
 	ret=new CHyphenator
 	ret.exceptions=new int[][string]
 	ret.dfa=[u16(0)]
@@ -111,7 +140,44 @@ auto createDefaultHyphenator()
 	ret.char_map=new int[int]
 	return ret
 
-g_default_hyphenator=createDefaultHyphenator()
+g_null_hyphenator=createNullHyphenator()
+
+auto parseCachedHyphenator(JSContext JS,string sdata)
+	pline=sdata.IndexOf('\n')
+	if pline<0:return CHyphenator.NULL
+	obj_big=JS.GetGlobal()["JSON"].CallMethod(JSObject,"parse",sdata[:pline-1])
+	if (pline+1)&1:pline++
+	pu16=sdata[pline+1:].ConvertToAsBinary(u16)
+	ret=new CHyphenator
+	ret.left_min=obj_big["left_min"].as(int)
+	ret.right_min=obj_big["right_min"].as(int)
+	ret.n_char_types=obj_big["n_char_types"].as(int)
+	size_dfa=obj_big["size_dfa"].as(int)
+	size_ops=obj_big["size_ops"].as(int)
+	ret.dfa=pu16[:size_dfa-1]
+	ret.ops=pu16[size_dfa:]
+	///////////
+	obj_temp=obj_big["char_map"].as(JSObject)
+	n=obj_temp.length()
+	assert(!(n&1))
+	ret.char_map=new int[int]
+	for i=0:2:n-2
+		k=obj_temp[i+0].as(int)
+		d=obj_temp[i+1].as(int)
+		ret.char_map[k]=d
+	obj_temp=obj_big["exceptions"].as(JSObject)
+	n=obj_temp.length()
+	assert(!(n&1))
+	ret.exceptions=new int[][string]
+	for i=0:2:n-2
+		k=obj_temp[i+0].as(string)
+		obj_value=obj_temp[i+1].as(JSObject)
+		m_i=obj_value.length()
+		d=new int[m_i]
+		for j=0:m_i-1
+			d[j]=obj_value[j].as(int)
+		ret.exceptions[k]=d
+	return ret
 
 auto parseTexHyphenFile(JSContext JS,string sdata)
 	//pack ops at the tail as i8
@@ -778,7 +844,7 @@ class CLayouter_fancy
 		m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width_in_fp=float2fixed(obj["wrap_width"].or(800.f))
 		//m_h_blank_line_in_fp=float2fixed(obj["h_blank_line"].or(0.f))
-		m_hyphenator=obj["hyphenator"].or(g_default_hyphenator)
+		m_hyphenator=obj["hyphenator"].or(g_null_hyphenator)
 		/////////////////
 		js_styles=obj["styles"].as(JSObject)
 		assert(!!js_styles)
@@ -1166,7 +1232,11 @@ registerStateHandler("renderer_fancy",CLayouter_fancy)
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ParseHyphenator"]=function(JSContext JS){
 		sdata=JS.Param(0).or("")
-		return JS.Return(parseTexHyphenFile(JS,sdata))
+		if sdata.StartsWith("{"):
+			ret=parseCachedHyphenator(JS,sdata)
+		else
+			ret=parseTexHyphenFile(JS,sdata)
+		return JS.Return(ret)
 	}
 	JS_UI["RemoveStylingCharacters"]=function(JSContext JS){
 		s=JS.Param(0).as(string)
