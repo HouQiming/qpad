@@ -11,10 +11,12 @@ import System.Algorithm.*
 import Uisandbox.*
 
 __generate_json("js_units","gui2d/ui.js")
+__generate_json("js_units","gui2d/gl.js")
 __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
 
 (function(){
+	Gui2D.ProvideGLFunctions()
 	JS=new JSContext
 	sbox=setupModuleSystem(JS,1)
 	sbox.UILoadZip(string.NULL)

@@ -77,6 +77,7 @@ var BoxDocumentItem_prototype={
 		}else{
 			doc.group.selection[this.id]=1;
 		}
+		doc.OnSelectionChange()
 		this.drag_x_anchor=this.x;
 		this.drag_y_anchor=this.y;
 		this.drag_x_base=event.x;
@@ -238,6 +239,7 @@ W.BoxDocument_prototype={
 			}
 		}
 		this.group.selection=sel;
+		this.OnSelectionChange()
 		UI.Refresh()
 	},
 	OnMouseUp:function(event){
@@ -286,6 +288,7 @@ W.BoxDocument_prototype={
 		this.snapping_rect_y=null;
 		UI.Refresh();
 	},
+	OnSelectionChange:function(){},
 };
 W.BoxDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.BoxDocument_prototype);

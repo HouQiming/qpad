@@ -344,6 +344,9 @@ TxtxEditor_prototype.ToggleStyleFlag=function(style_flag){
 	new_style.flags^=style_flag;
 	this.SetTextStyle(new_style)
 }
+TxtxEditor_prototype.OnSelectionChange=function(){
+	this.sync_object_selection_to_boxdoc=1
+}
 TxtxEditor_prototype.additional_hotkeys=[
 	{key:"CTRL+B",action:function(){
 		this.ToggleStyleFlag(STYLE_FONT_BOLD)
@@ -519,11 +522,43 @@ W.TxtxEditor=function(id,attrs){
 				obj_i.AnchorTransform=fanchortransform;
 				obj_i.SetTransform=fonchange;
 			}
+			if(doc.sync_object_selection_to_boxdoc&&obj.embeded_objects){
+				var sel={}
+				var ccnt0=doc.sel0.ccnt;
+				var ccnt1=doc.sel1.ccnt;
+				if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
+				for(var i=0;i<embeded_objects.length;i++){
+					var obj_i=embeded_objects[i];
+					if(obj_i.ccnt>=ccnt0&&obj_i.ccnt<ccnt1){
+						sel[obj_i.id]=1;
+					}
+				}
+				obj.embeded_objects.group.selection=sel;
+			}
+			var fOnSelectionChange=UI.HackCallback(function(){
+				var sel=obj.embeded_objects.group.selection;
+				var ccnt0=doc.ed.GetTextSize()
+				var ccnt1=0
+				for(var k in sel){
+					if(sel[k]){
+						var ccnt=obj.embeded_objects.group[k].ccnt
+						ccnt0=Math.min(ccnt0,ccnt)
+						ccnt1=Math.max(ccnt1,ccnt+lg_rubber_space)
+					}
+				}
+				if(ccnt0<ccnt1){
+					doc.sel0.ccnt=ccnt0;
+					doc.sel1.ccnt=ccnt1;
+					UI.Refresh()
+				}
+				doc.sync_object_selection_to_boxdoc=0;
+			})
 			//region-less boxDocument
 			W.BoxDocument("embeded_objects",{
 				'x':0,'y':0,'w':obj.x+w0+w1+w2,'h':obj.y+obj.h,
 				'items':embeded_objects,
 				'disable_region':1,
+				'OnSelectionChange':fOnSelectionChange
 			})
 		}
 		var text_ppt_window=UI.top.app.property_bar.text_properties
