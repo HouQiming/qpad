@@ -1,6 +1,7 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
+require("res/lib/color_picker");
 var LOADER=require("res/lib/objloader");
 
 //todo: inserting objects - GUI
@@ -409,7 +410,7 @@ var ToggleStyleFlag=function(style_flag){
 
 W.subwindow_text_properties={
 	'id':'text_properties',
-	'title':'Text properties',h:114,
+	'title':'Text properties',h:254,
 	body:function(){
 		/*widget*/(W.Button('bold',{
 			'x':13.02037844241704,'y':74,'w':32,'h':32,
@@ -474,6 +475,10 @@ W.subwindow_text_properties={
 				doc.SetTextStyle(new_style)
 			},
 		}));
+		//todo
+		/*widget*/(W.ColorPicker('color_picker',{
+			'x':13.02037844241704,'y':114,'w':32,'h':32,
+			'mode':'hsv'}));
 	}
 };
 

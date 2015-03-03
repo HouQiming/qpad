@@ -5,8 +5,9 @@ require("gui2d/dockbar");
 require("res/lib/txtx_editor");
 require("res/lib/subwin");
 
-var g_icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24,0);
 UI.SetFontSharpening(1.5)
+var g_icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
+UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
 
 UI.SetUIColorTheme=function(C){
 	UI.current_theme_color=C[0];
@@ -154,6 +155,50 @@ UI.SetUIColorTheme=function(C){
 		txtx_editor:{
 			border_color:0xff000000,border_width:2,
 			color:0xffffffff,
+		},
+		slider:{
+			transition_dt:0.1,
+			bgcolor:[{x:0,y:0,color:0xffbbbbbb},{x:0,y:1,color:0xffdddddd}],
+			//border_width:2, border_color:0xff444444,
+			round:8,
+			color:C[0],
+			padding:0,
+			//label_text:'▲',
+			//label_raise:0.4,
+			//label_font:UI.Font("res/fonts/opensans.ttf",32),
+			//label_color:C[0],
+			middle_bar:{
+				w:8,h:8,
+				round:2,
+				color:0xffffffff, border_width:2, border_color:0xff444444,
+			},
+		},
+		edit_box:{
+			transition_dt:0.1,
+			round:4,padding:8,
+			color:0xffffffff,
+			border_width:0,
+			border_color:0xffffffff,
+			font:UI.Font("res/fonts/opensans.ttf",24),
+			text_color:0xff000000,
+			$:{
+				blur:{
+					border_width:0,
+					border_color:0xffffffff,
+				},
+				focus:{
+					border_width:2,
+					border_color:C[0],
+				},
+			},
+		},
+		color_picker:{
+			w_text:32,w_slider:128,w_edit:64,
+			h_slider:32,
+			h_space:12,
+			padding:4,
+			text_color:0xff000000,
+			font:UI.Font("res/fonts/opensans.ttf",24),
 		},
 	};
 };
