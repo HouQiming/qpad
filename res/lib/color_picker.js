@@ -13,6 +13,7 @@ W.ColorPickerPrototype={
 	OnChange:function(value){this.value=value;}
 }
 W.ColorPicker=function(id,attrs){
+	//todo: value should always be an rgb color
 	var obj=UI.StdWidget(id,attrs,"color_picker",W.ColorPickerPrototype)
 	var C=obj.value;
 	UI.GLWidget(function(){
@@ -21,7 +22,7 @@ W.ColorPicker=function(id,attrs){
 		var vbo=UI.glCreateCPUBuffer(12*12)
 		var P_arr=[],C_arr=[];
 		var x0,y0,x1,y1,C0,C1;
-		x0=obj.x+obj.w_text;x1=x0+obj.w_slider
+		x0=obj.x+obj.w_text+obj.padding;x1=x0+obj.w_slider
 		////////////
 		y0=obj.y
 		y1=y0+obj.h_slider
@@ -57,10 +58,11 @@ W.ColorPicker=function(id,attrs){
 		////////////
 		var style_owner_drawn_slider={
 			//transition_dt:0,
-			//bgcolor:0,
+			bgcolor:0,
 			//round:0,
-			//color:0,
+			color:0,
 			//padding:0,
+			border_width:obj.border_width,border_color:obj.border_color,
 			label_text:'▲',
 			label_raise:0.35,
 			label_font:UI.Font("res/fonts/opensans.ttf,!",48),
@@ -70,26 +72,30 @@ W.ColorPicker=function(id,attrs){
 				color:0xff444444,
 			},
 		};
-		x0=obj.x+obj.w_text;x1=x0+obj.w_slider
+		x0=obj.x+obj.w_text+obj.padding;x1=x0+obj.w_slider
 		y1=obj.y-obj.h_space
 		////////////
-		var labels=(obj.mode=="hsv"?['H','S','V']:['R','G','B'])
-		for(var i=0;i<3;i++){(function(i){
+		var labels=(obj.mode=="hsv"?['H','S','V','A']:['R','G','B','A'])
+		for(var i=0;i<4;i++){(function(i){
 			y0=y1+obj.h_space
 			y1=y0+obj.h_slider
+			if(i==3){
+				y0+=obj.h_slider*0.25;
+				y1-=obj.h_slider*0.25;
+			}
 			slider=W.Slider("slider"+i,{x:x0,y:y0,w:x1-x0,h:y1-y0,
-				style:style_owner_drawn_slider,value:((C>>(i*8))&0xff)/255.0,
+				style:i<3?style_owner_drawn_slider:undefined,value:((C>>(i*8))&0xff)/255.0,
 				OnChange:function(value){
 					obj.OnChange((C&~(0xff<<(i*8)))|((Math.max(Math.min((value*255.0)|0,255),0)||0)<<(i*8)))
 				},
 			})
 			W.Text("label"+i,{
 				anchor:slider,anchor_placement:'left',anchor_valign:'center',
-				x:obj.padding,y:0,font:obj.font,color:obj.text_color,text:labels[i],
+				x:obj.padding,y:0,font:obj.font,color:obj.text_color,text:labels[i],w:obj.w_text,
 			})
 			W.EditBox("edit"+i,{
-				anchor:slider,anchor_placement:'right',anchor_valign:'fill',
-				x:obj.padding,y:0,w:obj.w_edit,
+				anchor:slider,anchor_placement:'right',anchor_valign:'center',
+				x:obj.padding,y:0,w:obj.w_edit,h:obj.h_edit,
 				font:obj.font,value:(((C>>(i*8))&0xff)/255.0).toFixed(2),
 				OnChange:function(value){
 					obj.OnChange((C&~(0xff<<(i*8)))|((Math.max(Math.min((parseFloat(value)*255.0)|0,255),0)||0)<<(i*8)))

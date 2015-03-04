@@ -410,8 +410,9 @@ var ToggleStyleFlag=function(style_flag){
 
 W.subwindow_text_properties={
 	'id':'text_properties',
-	'title':'Text properties',h:254,
+	'title':'Text properties',h:300,
 	body:function(){
+		var parent=UI.context_parent;
 		/*widget*/(W.Button('bold',{
 			'x':13.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'B',
@@ -478,7 +479,10 @@ W.subwindow_text_properties={
 		//todo
 		/*widget*/(W.ColorPicker('color_picker',{
 			'x':13.02037844241704,'y':114,'w':32,'h':32,
-			'mode':'hsv'}));
+			'mode':'rgb'}));
+		/*widget*/(W.RoundRect('',{
+			'x':233.02037844241704,'y':114,'w':100,'h':100,
+			color:parent.color_picker.value}));
 	}
 };
 
@@ -557,6 +561,7 @@ W.TxtxEditor=function(id,attrs){
 					UI.Refresh()
 				}
 				doc.sync_object_selection_to_boxdoc=0;
+				//todo: hide sel-related dialogs
 			})
 			//region-less boxDocument
 			W.BoxDocument("embeded_objects",{
@@ -579,7 +584,7 @@ W.TxtxEditor=function(id,attrs){
 			text_ppt_window.subscript.checked=!!(cur_state.flags&STYLE_SUBSCRIPT);
 			text_ppt_window.italic.checked=!!(cur_state.flags&STYLE_FONT_ITALIC);
 			text_ppt_window.bold.checked=!!(cur_state.flags&STYLE_FONT_BOLD);
-			//todo: color and the color dialog
+			//todo: color and the color dialog: OK button, hide in onselchange
 			//todo: rubber space detection
 			//spacings do not appear here
 		}

@@ -24,8 +24,8 @@ void main(){
 			C.xyz=vec3(v,p,q);
 		}
 	}
-	if(srgb_supported==0.0){
-		C.xyz=pow(C.xyz,vec3(1.0/srgb_gamma));
+	if(srgb_supported>0.0){
+		C.xyz=pow(C.xyz,vec3(srgb_gamma));
 	}
 	gl_FragColor=C;
 }
