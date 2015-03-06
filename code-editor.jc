@@ -239,7 +239,7 @@ class CLayouter_programmer
 		//coulddo: per-color emboldening
 		if g_renderer.m_srgb_supported:
 			color_default=m_cached_colors[0]
-			fnt_scaled.embolden+=int((1.f-float(19589*(color_default&0xff)+38470*((color_default>>8)&0xff)+7477*((color_default>>16)&0xff))/float(0xff0000))*3000.f/fnt_scaled.h)
+			fnt_scaled.SmartEmbolden(m_cached_colors[0])
 		hc=charHeight()
 		x=GetFlatX(a)
 		if x>m_caret_overlay.x:

@@ -297,6 +297,10 @@ if Platform.IS_WINDOWS:
 			return s
 		else
 			return string.NULL
+else
+	auto PickImage()
+		//todo
+		return string.NULL
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["CreateEmbeddedImageFromFileData"]=function(JSContext JS){

@@ -14,6 +14,7 @@ __generate_json("js_units","gui2d/ui.js")
 __generate_json("js_units","gui2d/gl.js")
 __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
+__generate_json("icon_file","icon256.png")
 
 (function(){
 	Gui2D.ProvideGLFunctions()
@@ -25,6 +26,7 @@ __generate_json("js_units","gui2d/dockbar.js")
 	JS.GetGlobal()["IO"]=jsio
 	jsio["ReadAll"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
+		if !fn:return 0
 		ret=System.IO.ReadAll(fn)
 		if !ret:
 			return 0
@@ -34,6 +36,7 @@ __generate_json("js_units","gui2d/dockbar.js")
 	}
 	jsio["UIReadAll"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
+		if !fn:return 0
 		ret=sbox.UIReadAll(fn)
 		if !ret:
 			return 0
@@ -42,6 +45,7 @@ __generate_json("js_units","gui2d/dockbar.js")
 	}
 	jsio["CreateFile"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
+		if !fn:return 0
 		data=JS.Param(1).or(new string)
 		f=System.IO.CreateFile(fn)
 		if f:
@@ -74,8 +78,7 @@ __generate_json("js_units","gui2d/dockbar.js")
 			else
 				s_userdir=s_userdir.Replace(["\\","/"])
 		else
-			//todo
-			assert(0)
+			s_userdir=System.Env.GetStoragePath()
 		fn_base=s_userdir+"/"+fn_base
 		for(;;)
 			fn=FormatAsText(fn_base,formatNumber(dname_base,{base:16,align:4}),".",s_ext)

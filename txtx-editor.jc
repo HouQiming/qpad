@@ -1241,9 +1241,37 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret=parseTexHyphenFile(JS,sdata)
 		return JS.Return(ret)
 	}
-	JS_UI["RemoveStylingCharacters"]=function(JSContext JS){
+	//JS_UI["RemoveStylingCharacters"]=function(JSContext JS){
+	//	s=JS.Param(0).as(string)
+	//	if !s:return 0
+	//	return JS.Return(Unicode32ToUtf8([ch foreach ch in Utf8ToUnicode32(s) if !(ch>=COMMAND_SET_STYLE&&ch<COMMAND_END)]))
+	//}
+	JS_UI["TokenizeByStylingRegions"]=function(JSContext JS){
 		s=JS.Param(0).as(string)
 		if !s:return 0
-		return JS.Return(Unicode32ToUtf8([ch foreach ch in Utf8ToUnicode32(s) if !(ch>=COMMAND_SET_STYLE&&ch<COMMAND_END)]))
+		ret=JS.NewArray()
+		n=0
+		cur_style=0
+		I_last=0L
+		foreach ch,I,I_next in Utf8Chars(s)
+			if ch>=COMMAND_SET_STYLE&&ch<COMMAND_END:
+				if I_last<I:
+					ret[n+0]=cur_style
+					ret[n+1]=s[I_last:I-1]
+					n+=2
+				I_last=I_next
+				cur_style=ch-COMMAND_SET_STYLE
+			if ch=='\n':
+				if I_last<I_next:
+					ret[n+0]=cur_style
+					ret[n+1]=s[I_last:I_next-1]
+					n+=2
+				I_last=I_next
+				cur_style=0
+		if I_last<s.n:
+			ret[n+0]=cur_style
+			ret[n+1]=s[I_last:]
+			n+=2
+		return JS.Return(ret)
 	}
 })

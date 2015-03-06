@@ -85,9 +85,11 @@ W.ColorPicker=function(id,attrs){
 			}
 			slider=W.Slider("slider"+i,{x:x0,y:y0,w:x1-x0,h:y1-y0,
 				style:i<3?style_owner_drawn_slider:undefined,value:((C>>(i*8))&0xff)/255.0,
-				OnChange:function(value){
-					obj.OnChange((C&~(0xff<<(i*8)))|((Math.max(Math.min((value*255.0)|0,255),0)||0)<<(i*8)))
+				OnChange:function(value,mode){
+					obj.OnChange((C&~(0xff<<(i*8)))|((Math.max(Math.min((value*255.0)|0,255),0)||0)<<(i*8)),mode)
 				},
+				BeginContinuousChange:function(){obj.BeginContinuousChange()},
+				EndContinuousChange:function(){obj.EndContinuousChange()},
 			})
 			W.Text("label"+i,{
 				anchor:slider,anchor_placement:'left',anchor_valign:'center',
@@ -102,7 +104,8 @@ W.ColorPicker=function(id,attrs){
 				},
 			})
 		})(i)}
-		//todo: SelectionWidget for rgb-hsv
+		//todo: W.Select for rgb / hsv
+		//and the bar
 	UI.End()
 	return obj
 }

@@ -3,15 +3,18 @@ var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
 var Language=require("res/lib/langdef");
 
+//todo: smartification - make rubber controls auto-resize when faced with dimension changes
+//rubber-control > space
+//or scale-to-fit-some-edge
+
 function parent(){return UI.context_parent;}
 
-UI.SetFontSharpening(1.5)
 var g_sandbox=UI.CreateSandbox();
 g_sandbox.ReadBack=function(s){return JSON.parse(g_sandbox._ReadBack("JSON.stringify("+s+")"))}
 g_sandbox.eval("var UI=require('gui2d/ui');var W=require('gui2d/widgets');require('res/lib/inmate');")
-//todo: new project, adding widgets, widget type vs Application, parameter defaulting
 //xywh: relative mode?
 g_sandbox.m_relative_scaling=1;//0.5;
+var g_params={padding:12};
 var g_initial_code=IO.ReadAll("mo\\test\\uiediting.js");
 var g_language_C=Language.Define(function(lang){
 	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
@@ -32,44 +35,13 @@ var g_language_C=Language.Define(function(lang){
 		}
 	});
 });
-//todo
-
-var UpdateWorkingCode=function(){
-	var code_box=UI.top.app.code_box;
-	var ed=code_box.ed;
-	var ccnt_sel=code_box.sel1.ccnt;
-	var range_0=code_box.FindBracket(0,ccnt_sel,-1);
-	var range_1=code_box.FindBracket(0,ccnt_sel,1);
-	var working_range=code_box.working_range;
-	if(!working_range){
-		working_range={};
-		code_box.working_range=working_range;
-	}
-	if(working_range.point0&&range_0==working_range.point0.ccnt&&range_1==working_range.point1.ccnt){
-		return;
-	}
-	if(!(range_0>=18&&ed.GetText(range_0-18,18)=='function(id,attrs)')){
-		//if it's not a valid control, leave it alone
-		return;
-	}
-	if(!working_range.point0){
-		working_range.point0=ed.CreateLocator(range_0,-1); working_range.point0.undo_tracked=1;
-		working_range.point1=ed.CreateLocator(range_1,1); working_range.point1.undo_tracked=1;
-	}
-	working_range.point0.ccnt=range_0;
-	working_range.point1.ccnt=range_1;
-	code_box.document_items=[];
-	code_box.need_to_rerun=1;
-};
 
 var ParseCodeError=function(err){
 	//todo
 	print(err.stack)
 }
 
-//todo: maintain global code (like styling) separately
-var RerunUserCode=function(){
-	var code_box=UI.top.app.code_box;
+var RerunUserCode=function(code_box){
 	var working_range=code_box.working_range;
 	if(!working_range||!working_range.point0){return 0;}
 	var range_0=working_range.point0.ccnt;
@@ -78,10 +50,11 @@ var RerunUserCode=function(){
 	var ed=code_box.ed;
 	var s_code=ed.GetText(range_0,range_1-range_0);
 	var re_widget=new RegExp('/\\*widget\\*/\\(',"g")
+	var re_editor=new RegExp('/\\*editor: ',"g")
 	var ftranslate_widget=function(smatch,sname){
 		return "UI.__report_widget(";
 	};
-	s_code=s_code.replace(re_widget,ftranslate_widget);
+	s_code=s_code.replace(re_widget,ftranslate_widget).replace(re_editor,"");
 	try{
 		g_sandbox.eval(ed.GetText());
 		g_sandbox.eval("UI.top={};UI.Application=function(id,attrs){"+s_code+"};");
@@ -93,17 +66,7 @@ var RerunUserCode=function(){
 	return 1;
 };
 
-var nthIndex=function(str,pat,n){
-	var L=str.length,i=-1;
-	while(n>=0&&i++<L){
-		i=str.indexOf(pat,i);
-		n--;
-	}
-	return i>=L?-1:i;
-}
-
-var DrawUserFrame=function(){
-	var code_box=UI.top.app.code_box;
+var DrawFrame=function(code_box){
 	var inner_widgets=[];
 	if(!code_box.has_errors){
 		try{
@@ -158,7 +121,6 @@ var DrawUserFrame=function(){
 			//we only consider top level groups, so we ignore non-top-level anchoring
 			//create a replacement object first
 			//var obj_replacement={x:obj.x/g_sandbox.m_relative_scaling,y:obj.y/g_sandbox.m_relative_scaling,w:obj.w/g_sandbox.m_relative_scaling,h:obj.h/g_sandbox.m_relative_scaling};
-			//todo: snapping support in boxdoc
 			var obj_replacement={
 				x:this.user_anchor_x,
 				y:this.user_anchor_y,
@@ -230,103 +192,288 @@ var DrawUserFrame=function(){
 		}
 		code_box.document_items=items;
 	}
-};
+}
 
-UI.Application=function(id,attrs){
-	attrs=UI.Keep(id,attrs);
-	UI.Begin(attrs);
-		///////////////////
-		var wnd=UI.Begin(W.Window('app',{
-				title:'Jacy IDE',w:1280,h:720,bgcolor:0xffbbbbbb,
-				designated_screen_size:1080,flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
-				is_main_window:1}));
-			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
-				W.Hotkey("",{key:"ALT+F4",action:function(){UI.DestroyWindow(wnd)}});
+var nthIndex=function(str,pat,n){
+	var L=str.length,i=-1;
+	while(n>=0&&i++<L){
+		i=str.indexOf(pat,i);
+		n--;
+	}
+	return i>=L?-1:i;
+}
+
+W.subwindow_insertion_bar={
+	'title':'Insert widgets',h:500,
+	body:function(){
+		var obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'top',x:8,y:32,
+			font:UI.Font("res/fonts/opensans.ttf",24),color:0xff000000,text:"Zoom"})
+		obj_temp=W.Slider("zoom",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,w:180,h:24,h_slider:8,property_name:'scale'})
+		W.Text("-",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,
+			font:UI.Font("res/fonts/opensans.ttf",24),color:0xff000000,
+			text:(g_sandbox.m_relative_scaling*100).toFixed(0)+"%"})
+		obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'top',x:8,y:64,
+			font:UI.Font("res/fonts/opensans.ttf",24),color:0xff000000,text:"Padding"})
+		W.EditBox("padding_editor",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,w:32,h:28,
+			property_name:'padding'})
+		W.Group("layout",{
+			anchor:'parent',anchor_align:'fill',anchor_valign:'top',
+			x:8,y:96,h:400,
+			layout_direction:"down",layout_spacing:12,
+			item_template:{object_type:W.Button,padding:4},
+			items:[
+				{text:'Label',property_name:'Label'},
+				{text:'Button',property_name:'Button'},
+				{text:'EditBox',property_name:'EditBox'},
+				{text:'Slider',property_name:'Slider'},
+				{text:'Select',property_name:'Select'},
+			],
+		})
+	}
+};
+var g_template_code=IO.UIReadAll("res/misc/ui_template.js")
+UI.NewUIEditorDocument=function(fname0){
+	var s_data=(IO.ReadAll(fname0)||g_template_code);
+	return {
+		file_name:(fname0||IO.GetNewDocumentName("ui","js","document")),
+		body:function(){
+			var body=W.UIEditor("body",{
+				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
+				'x':0,'y':0,
+				'file_name':this.file_name,
+				'bgcolor':0xfff0f0f0,
+			})
+			if(s_data){
+				var code_box=body.doc
+				var ed=code_box.ed;
+				ed.Edit([0,0,s_data],1)
+				var s_code=ed.GetText();
+				var s_widget_key="/*insert here*/";
+				var utf8_offset=nthIndex(s_code,s_widget_key,0)
+				if(utf8_offset>=0){
+					var byte_offset=ed.ConvertUTF8OffsetToBytesize(0,utf8_offset);
+					code_box.sel0.ccnt=byte_offset
+					code_box.sel1.ccnt=byte_offset
+					code_box.OnSelectionChange()
+				}
+				///////////
+				s_data=undefined;
+				UI.Refresh()
 			}
-			W.Hotkey("",{key:"CTRL+S",action:function(){
-				IO.CreateFile("mo\\test\\uiediting.js",UI.top.app.code_box.ed.GetText());
-			}});
-			var ed_rect=W.RoundRect("",{
-				color:0xffffffff,border_color:0xff444444,border_width:2,
-				anchor:parent(),anchor_align:"right",anchor_valign:"center",
-				x:16,y:0,w:wnd.w*0.3,h:wnd.h-32,
-			});
+			return body;
+		},
+		property_windows:[
+			W.subwindow_insertion_bar
+		],
+		color_theme:[0xff5511aa],
+	}
+};
+LOADER.RegisterLoaderForExtension("js",function(fn){UI.NewTab(UI.NewUIEditorDocument(fn))})
+
+W.UIEditor=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"ui_editor");
+	UI.Begin(obj);
+		///////////////////
+		var ed_rect=W.RoundRect("",{
+			color:0xffffffff,border_color:UI.current_theme_color,border_width:2,round:4,
+			anchor:parent(),anchor_align:"right",anchor_valign:"center",
+			x:8,y:0,w:obj.w*0.4,h:obj.h-16,
+		});
+		//var tick0=Duktape.__ui_get_tick();
+		var code_box=W.Edit("doc",{
+			font:UI.Font("res/fonts/inconsolata.ttf",24),color:0xff000000,
+			tab_width:4,
+			text:"",
+			anchor:ed_rect,anchor_align:"center",anchor_valign:"center",
+			///////////////
+			state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode"],
+			language:g_language_C,
+			color_string:0xff0055aa,
+			color_comment:0xff008000,
+			///////////////
+			OnSelectionChange:function(){
+				var code_box=obj.doc;
+				var ed=code_box.ed;
+				var ccnt_sel=code_box.sel1.ccnt;
+				var range_0=code_box.FindBracket(0,ccnt_sel,-1);
+				var range_1=code_box.FindBracket(0,ccnt_sel,1);
+				var working_range=code_box.working_range;
+				if(!working_range){
+					working_range={};
+					code_box.working_range=working_range;
+				}
+				if(working_range.point0&&range_0==working_range.point0.ccnt&&range_1==working_range.point1.ccnt){
+					return;
+				}
+				if(!(range_0>=18&&ed.GetText(range_0-18,18)=='function(id,attrs)')){
+					//if it's not a valid control, leave it alone
+					return;
+				}
+				if(!working_range.point0){
+					working_range.point0=ed.CreateLocator(range_0,-1); working_range.point0.undo_tracked=1;
+					working_range.point1=ed.CreateLocator(range_1,1); working_range.point1.undo_tracked=1;
+				}
+				working_range.point0.ccnt=range_0;
+				working_range.point1.ccnt=range_1;
+				code_box.document_items=[];
+				code_box.need_to_rerun=1;
+			},
+			OnChange:function(){
+				code_box.need_to_rerun=1;
+			},
+			///////////////
+			x:0,y:0,w:ed_rect.w-8,h:ed_rect.h-8,
+		});
+		var w_sandbox_area=obj.w-ed_rect.w-24
+		//print("code_box:",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
+		//the sandbox is effectively a GLwidget
+		//todo: scrolling / clipping - use a transformation hack and a smaller viewport
+		UI.GLWidget(function(){
 			//var tick0=Duktape.__ui_get_tick();
-			var code_box=W.Edit("code_box",{
-				font:UI.Font("res/fonts/inconsolata.ttf",24),color:0xff000000,
-				tab_width:4,
-				text:g_initial_code,//todo
-				anchor:ed_rect,anchor_align:"center",anchor_valign:"center",
-				///////////////
-				state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode"],
-				language:g_language_C,
-				color_string:0xff0055aa,
-				color_comment:0xff008000,
-				///////////////
-				OnSelectionChange:function(){
-					UpdateWorkingCode();
+			//todo: scrolling
+			g_sandbox.DrawSandboxScreen(obj.x+8,obj.y+8,w_sandbox_area,obj.h-16,0,0);
+			//print("g_sandbox.DrawWindow",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
+		})
+		//create the boxes
+		if(code_box.document_items){
+			var items=code_box.document_items;
+			var snapping_coords={'x':[],'y':[],'tolerance':4}
+			for(var i=0;i<items.length;i++){
+				var item_i=items[i];
+				if(obj.controls&&obj.controls.group.selection&&obj.controls.group.selection[item_i.id]){
+					//avoid self-snapping
+					continue;
+				}
+				snapping_coords.x.push(item_i.x);snapping_coords.x.push(item_i.x+item_i.w);
+				snapping_coords.y.push(item_i.y);snapping_coords.y.push(item_i.y+item_i.h);
+			}
+			var sandbox_main_window_w=g_sandbox.ReadBack('[UI.sandbox_main_window_w]')[0]*g_sandbox.m_relative_scaling
+			var sandbox_main_window_h=g_sandbox.ReadBack('[UI.sandbox_main_window_h]')[0]*g_sandbox.m_relative_scaling
+			W.BoxDocument("controls",{
+				x:obj.x+8,y:obj.y+8,w:sandbox_main_window_w,h:sandbox_main_window_h,
+				'border_color':UI.current_theme_color&0xccffffff,'border_width':2,
+				'color':UI.current_theme_color&0x44ffffff,
+				'snapping_coords':snapping_coords,
+				'items':code_box.document_items,
+				'BeginTransform':function(){
+					var ed=code_box.ed;
+					if(code_box.undo_needed){ed.Undo();}
+					code_box.transform_ops=[];
 				},
-				OnChange:function(){
+				'EndTransform':function(){
+					code_box.HookedEdit(code_box.transform_ops);
+					code_box.transform_ops=null;
+					code_box.undo_needed=1;
 					code_box.need_to_rerun=1;
 				},
-				///////////////
-				x:0,y:0,w:ed_rect.w-8,h:ed_rect.h-8,
-			});
-			//print("code_box:",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
-			//the sandbox is effectively a GLwidget
-			//todo: clipping - use a transformation hack
-			UI.GLWidget(function(){
-				//var tick0=Duktape.__ui_get_tick();
-				g_sandbox.DrawWindow(16,16);
-				//print("g_sandbox.DrawWindow",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
 			})
-			//create the boxes
-			if(code_box.document_items){
-				var items=code_box.document_items;
-				var snapping_coords={'x':[],'y':[],'tolerance':4}
-				for(var i=0;i<items.length;i++){
-					var item_i=items[i];
-					if(wnd.controls&&wnd.controls.group.selection&&wnd.controls.group.selection[item_i.id]){
-						//avoid self-snapping
-						continue;
-					}
-					snapping_coords.x.push(item_i.x);snapping_coords.x.push(item_i.x+item_i.w);
-					snapping_coords.y.push(item_i.y);snapping_coords.y.push(item_i.y+item_i.h);
-				}
-				var sandbox_main_window_w=g_sandbox.ReadBack('[UI.sandbox_main_window_w]')[0]*g_sandbox.m_relative_scaling
-				var sandbox_main_window_h=g_sandbox.ReadBack('[UI.sandbox_main_window_h]')[0]*g_sandbox.m_relative_scaling
-				W.BoxDocument("controls",{
-					x:16,y:16,w:sandbox_main_window_w,h:sandbox_main_window_h,
-					'border_color':0xcccc773f,'border_width':2,
-					'color':0x44cc773f,
-					'snapping_coords':snapping_coords,
-					'items':code_box.document_items,
-					'BeginTransform':function(){
-						var ed=code_box.ed;
-						if(code_box.undo_needed){ed.Undo();}
-						code_box.transform_ops=[];
-					},
-					'EndTransform':function(){
-						var ed=code_box.ed;
-						ed.Edit(code_box.transform_ops);
-						code_box.transform_ops=null;
-						code_box.undo_needed=1;
-						code_box.need_to_rerun=1;
-					},
-				})
-			}
-		UI.End();
+		}
 		///////////////////
 		//this calls BeginPaint which is not reentrant... consider it as a separate window
 		//var s_code=ed_box.ed.GetText();
-		//g_sandbox.eval("UI.Application=function(id,attrs){"+s_code+"};UI.DrawFrame();");
+		//g_sandbox.eval("UI.Application=function(id,obj){"+s_code+"};UI.DrawFrame();");
 		//var tick0=Duktape.__ui_get_tick();
-		if(code_box.need_to_rerun){
-			code_box.need_to_rerun=0;
-			RerunUserCode();
+		UI.CallNextFrame(function(){
+			if(code_box.need_to_rerun){
+				code_box.need_to_rerun=0;
+				RerunUserCode(code_box);
+			}
+			DrawFrame(code_box)
+			return 0
+		})
+		obj.InsertCode=UI.HackCallback(function(placing_hint,s_insertion){
+			if(!code_box.working_range||!code_box.working_range.point0){return;}
+			var ed=code_box.ed;
+			var range_0=code_box.working_range.point0.ccnt;
+			var range_1=code_box.working_range.point1.ccnt;
+			code_box.has_errors=0;
+			var s_code=ed.GetText(range_0,range_1-range_0);
+			var s_widget_key="/*insert here*/";
+			var utf8_offset=nthIndex(s_code,s_widget_key,0)
+			if(utf8_offset<0){
+				print("please don't remove the '/*insert here*/' comment")//todo
+				return;
+			}
+			var byte_offset=ed.ConvertUTF8OffsetToBytesize(range_0,utf8_offset);
+			var y_bottom_top=0,y_bottom_bottom=0,x_rightmost=0,h_standard=32
+			var x,y,w,h
+			if(code_box.document_items){
+				for(var i=0;i<code_box.document_items.length;i++){
+					var box_i=code_box.document_items[i];
+					if(y_bottom_top<box_i.y/g_sandbox.m_relative_scaling){
+						y_bottom_top=box_i.y/g_sandbox.m_relative_scaling;
+						if(h_standard){h_standard=box_i.h/g_sandbox.m_relative_scaling}
+					}
+					if(y_bottom_bottom<(box_i.y+box_i.h)/g_sandbox.m_relative_scaling){y_bottom_bottom=(box_i.y+box_i.h)/g_sandbox.m_relative_scaling;}
+				}
+			}else{
+				y_bottom_top=g_params.padding;
+			}
+			if(placing_hint=="line"){
+				x=x_rightmost+g_params.padding
+				w=sandbox_main_window_w/g_sandbox.m_relative_scaling-g_params.padding-x
+				y=y_bottom_bottom+g_params.padding
+				h=h_standard
+			}else{
+				if(code_box.document_items){
+					for(var i=0;i<code_box.document_items.length;i++){
+						var box_i=code_box.document_items[i];
+						if(y_bottom_top<(box_i.y+box_i.h)/g_sandbox.m_relative_scaling){
+							y_bottom_top=box_i.y/g_sandbox.m_relative_scaling;
+							if(x_rightmost<(box_i.x+box_i.w)/g_sandbox.m_relative_scaling){
+								x_rightmost=(box_i.x+box_i.w)/g_sandbox.m_relative_scaling
+							}
+						}
+					}
+				}
+				x=x_rightmost+g_params.padding
+				w=sandbox_main_window_w/g_sandbox.m_relative_scaling-g_params.padding-x
+				y=y_bottom_top
+				h=h_standard
+				if(w<=0){
+					x_rightmost=0
+					y=y_bottom_bottom+g_params.padding
+					x=x_rightmost+g_params.padding
+					w=sandbox_main_window_w/g_sandbox.m_relative_scaling-g_params.padding-x
+				}
+			}
+			var pos_str=["'x':",x,",'y':",y,",'w':",w,",'h':",h].join("");
+			if(s_insertion.indexOf('W.Label(')>=0){
+				//Text objects are implicitly sized
+				pos_str=["'x':",x,",'y':",y].join("");
+			}
+			var ops=[byte_offset,0,'/*widget*/('+s_insertion.replace(new RegExp('\\$id\\$','g'),byte_offset.toString()).replace('$pos$',pos_str)+');\n\t']
+			code_box.HookedEdit(ops);
+			code_box.sel0.ccnt=ops[0]
+			code_box.sel1.ccnt=ops[0]+Duktape.__byte_length(ops[2])
+			code_box.need_to_rerun=1;
+			UI.Refresh()
+		})
+		////////////////////////
+		UI.document_property_sheet={
+			'Label':[0,function(){obj.InsertCode("line","W.Label('text_$id$',{$pos$,\n\t\ttext:'label'})")}],
+			'Button':[0,function(){obj.InsertCode("line","W.Button('button_$id$',{$pos$,\n\t\tproperty_name:'button_$id$',\n\t\ttext:'Button'})")}],
+			'EditBox':[0,function(){obj.InsertCode("value","W.EditBox('editbox_$id$',{$pos$,\n\t\tproperty_name:'editbox_$id$'})")}],
+			'Slider':[0,function(){obj.InsertCode("value","W.Slider('slider_$id$',{$pos$,\n\t\tproperty_name:'slider_$id$'})")}],
+			'Select':[0,function(){obj.InsertCode("value","W.Select('select_$id$',{$pos$,\n\t\tproperty_name:'select_$id$',\n\t\titems:[0,1]})")}],
+			'scale':[
+				(Math.log(g_sandbox.m_relative_scaling)+2)/3,
+				function(value){
+					g_sandbox.m_relative_scaling=Math.exp(value*3-2)
+					if(Math.abs(g_sandbox.m_relative_scaling-1)<0.1){g_sandbox.m_relative_scaling=1;}
+					code_box.need_to_rerun=1;
+					UI.Refresh()
+				}],
+			'padding':[g_params.padding.toString(),function(value){g_params.padding=value;}],
 		}
-		DrawUserFrame();
-		//print("DrawUserFrame:",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
+		////////////////////////
+		obj.Save=UI.HackCallback(function(){
+			IO.CreateFile(obj.file_name,this.doc.ed.GetText())
+			obj.saved_point=this.doc.ed.GetUndoQueueLength();
+			UI.Refresh()
+		})
+		obj.title=UI.GetMainFileName(obj.file_name)+((obj.saved_point||0)!=obj.doc.ed.GetUndoQueueLength()?" *":"")
+	//print("DrawUserFrame:",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
 	UI.End();
+	return obj
 };
-UI.Run()

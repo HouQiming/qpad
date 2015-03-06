@@ -33,7 +33,7 @@ TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
 	return ed.GetStateAt(ed.m_handler_registration["renderer"],ccnt,"ddl")[2];
 };
 TxtxEditor_prototype.GetCurrentStyleObject=function(){
-	var style_id=this.GetStyleIDAt(this.GetSelection()[0]);
+	var style_id=this.GetStyleIDAt(this.GetSelection()[1]);
 	return this.styles[style_id];
 };
 TxtxEditor_prototype.Init=function(){
@@ -72,13 +72,19 @@ TxtxEditor_prototype.CloneStyle=function(params){
 	}
 	return ret;
 }
+TxtxEditor_prototype.GetStyleName=function(params){
+	var lspace=(params.relative_line_space||0.0);
+	var pspace=(params.relative_paragraph_space||0.8);
+	return name=[params.font_face,params.font_size,params.flags,params.color,lspace,pspace].join("_")
+}
 TxtxEditor_prototype.CreateStyle=function(params){
 	var lspace=(params.relative_line_space||0.0);
 	var pspace=(params.relative_paragraph_space||0.8);
 	if(!params.font_face){params.font_face="Roman";}
 	if(!params.font_size){params.font_size=30;}
 	if(!params.flags){params.flags=0;}
-	var name=[params.font_face,params.font_size,params.flags,(params.color||0xff000000),lspace,pspace].join("_")
+	if(params.color==undefined){params.color=0xff000000;}
+	var name=this.GetStyleName(params)
 	if(this.m_style_map[name]){
 		return this.m_style_map[name];
 	}
@@ -113,30 +119,36 @@ TxtxEditor_prototype.CreateStyle=function(params){
 	}
 	return this.m_style_map[name];
 };
-TxtxEditor_prototype.SetTextStyle=function(params,sel){
-	if(!sel)sel=this.GetSelection();
-	var sid=this.CreateStyle(params);
+TxtxEditor_prototype.ModifyTextStyle=function(fcallback,sel){
+	if(!sel){sel=this.GetSelection();}
 	var ed=this.ed;
-	var s_style=Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+sid);
 	var sel_side=(this.sel0.ccnt<this.sel1.ccnt);
 	var ops;
 	var new_sel;
-	ops=[sel[0],0,s_style];
-	new_sel=[sel[0]+Duktape.__byte_length(s_style),sel[1]+Duktape.__byte_length(s_style)]
+	var obj=this;
+	UI.HackCallback(fcallback)
+	var ModifyStyle=UI.HackCallback(function(sid){
+		var new_style=obj.CloneStyle(obj.styles[sid]);
+		fcallback(new_style)
+		return obj.CreateStyle(new_style)
+	});
 	if(sel[0]<sel[1]){
 		var s_original=ed.GetText(sel[0],sel[1]-sel[0]);
-		var s_wiped=UI.RemoveStylingCharacters(s_original);
-		var sid_original=this.GetStyleIDAt(sel[1]);
-		if(s_wiped!=s_original){
-			ops=[sel[0],sel[1]-sel[0],s_style+s_wiped+Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+sid_original)];
-			new_sel[1]=new_sel[0]+Duktape.__byte_length(s_wiped)
-		}else{
-			if(sid_original!=sid){
-				ops.push(sel[1])
-				ops.push(0)
-				ops.push(Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+sid_original))
-			}
+		var styling_regions=UI.TokenizeByStylingRegions(s_original)
+		if(styling_regions.length>0){
+			styling_regions[0]=this.GetStyleIDAt(sel[0]);
 		}
+		for(var i=0;i<styling_regions.length;i+=2){
+			//map all the styles and re-join them
+			styling_regions[i]=Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+ModifyStyle(styling_regions[i]));
+		}
+		styling_regions.push(Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+this.GetStyleIDAt(sel[1])))
+		ops=[sel[0],sel[1]-sel[0],styling_regions.join("")];
+		new_sel=[sel[0],sel[0]+Duktape.__byte_length(ops[2])]
+	}else{
+		var s_style=Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+ModifyStyle(this.GetStyleIDAt(sel[0])));
+		ops=[sel[0],0,s_style];
+		new_sel=[sel[0]+Duktape.__byte_length(s_style),sel[0]+Duktape.__byte_length(s_style)]
 	}
 	ed.Edit(ops);
 	if(sel_side==1){
@@ -174,7 +186,29 @@ TxtxEditor_prototype.GetLineSelection=function(){
 	sel[1]=Math.max(this.GetEnhancedEnd(sel[1]),sel[0])
 	return sel;
 }
-TxtxEditor_prototype.SetRubberPadding=function(line0,line1,mask){
+TxtxEditor_prototype.GetRubberPadding=function(line0){
+	var ccnt0=this.SeekLC(line0,0)
+	var ccnt1=this.SeekLC(line0+1,0)
+	var ed=this.ed;
+	var mask=0;
+	var lg0=0;
+	if(ccnt1>0&&ed.GetText(ccnt1-1,1)=="\n"){ccnt1--;}
+	if(ccnt0>=ccnt1){return 0;}
+	if(ed.GetText(ccnt0,lg_rubber_space)==s_rubber_space){
+		lg0=lg_rubber_space;
+		mask|=1
+	}
+	if(ccnt1>ccnt0+lg0&&ed.GetText(ccnt1-lg_rubber_space,lg_rubber_space)==s_rubber_space){
+		mask|=2
+	}
+	return mask
+}
+TxtxEditor_prototype.SetRubberPadding=function(mask,line0,line1){
+	if(!line0){
+		var sel=this.GetSelection();
+		line0=this.GetLC(sel[0])[0];
+		line1=this.GetLC(sel[1])[0]+1;
+	}
 	var line_ccnts=[];
 	for(var i=line0;i<=line1;i++){
 		line_ccnts.push(this.SeekLC(i,0));
@@ -289,16 +323,16 @@ UI.NewTxtxDocument=function(fname0,perm){
 		property_windows:[
 			W.subwindow_text_properties
 		],
-		color_theme:[0xffcc7733,0xffaa5522],
+		color_theme:[0xffcc7733],
 	}
 };
-LOADER.RegisterLoader("png",function(data_list,id,fname){
+LOADER.RegisterZipLoader("png",function(data_list,id,fname){
 	var sdata=data_list[id*2+0];
 	var obj_img=UI.CreateEmbeddedImageFromFileData(sdata);
 	if(!obj_img){throw new Error("invalid image")}
 	return obj_img
 })
-LOADER.RegisterLoader("txt",function(data_list,id,fname){
+LOADER.RegisterZipLoader("txt",function(data_list,id,fname){
 	var sdata=data_list[id*2+0];
 	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
 	var pline1=sdata.indexOf('\n',pline0+1);if(pline1<0){return;}
@@ -340,11 +374,6 @@ TxtxEditor_prototype.Paste=function(){
 	this.OnTextInput({"text":stext})
 }
 //////////////////////////
-TxtxEditor_prototype.ToggleStyleFlag=function(style_flag){
-	var new_style=this.CloneStyle(this.GetCurrentStyleObject());
-	new_style.flags^=style_flag;
-	this.SetTextStyle(new_style)
-}
 TxtxEditor_prototype.OnSelectionChange=function(){
 	this.sync_object_selection_to_boxdoc=1
 }
@@ -357,15 +386,15 @@ TxtxEditor_prototype.additional_hotkeys=[
 	}},
 	{key:"CTRL+L",action:function(){
 		var sel=this.GetSelection();
-		this.SetRubberPadding(this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1,0)
+		this.SetRubberPadding(0,this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1)
 	}},
 	{key:"CTRL+E",action:function(){
 		var sel=this.GetSelection();
-		this.SetRubberPadding(this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1,3)
+		this.SetRubberPadding(3,this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1)
 	}},
 	{key:"CTRL+R",action:function(){
 		var sel=this.GetSelection();
-		this.SetRubberPadding(this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1,1)
+		this.SetRubberPadding(1,this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1)
 	}},
 	//todo: event-listening plugin: 1. 2. 3. centering and stuff
 	{key:"ALT+I",action:function(){
@@ -379,6 +408,29 @@ TxtxEditor_prototype.additional_hotkeys=[
 		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
 	}},
 ];
+/////////////////////////////////////////
+TxtxEditor_prototype.BeginContinuousUndo=function(){
+	this.m_contundo_point=this.ed.GetUndoQueueLength();
+	this.m_style_count=this.styles.length;
+}
+TxtxEditor_prototype.PerformContinuousUndo=function(){
+	while(this.ed.GetUndoQueueLength()>this.m_contundo_point){
+		this.ed.Undo()
+	}
+	var n0=this.m_style_count,n1=this.styles.length;
+	for(var i=n0;i<n1;i++){
+		var name=this.GetStyleName(this.styles[i]);
+		this.m_style_map[name]=undefined;
+		this.styles[i]=undefined;
+	}
+	this.styles.length=this.m_style_count;
+}
+TxtxEditor_prototype.EndContinuousUndo=function(){
+	this.m_contundo_point=undefined
+	this.m_style_count=undefined
+}
+/////////////////////////////////////////
+
 var InitPrototype=function(){
 	if(!TxtxEditor_prototype.hyphenator){
 		//TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
@@ -389,62 +441,60 @@ var InitPrototype=function(){
 //var hyp=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"))
 //IO.CreateFile("test/ushyphmax.dfa",hyp.toString())
 
-UI.CreateTxtxDocument=function(attrs){
-	//todo: loading from file
-	InitPrototype();
-	var ret=Object.create(TxtxEditor_prototype);
-	ret.wrap_width=(attrs.wrap_width||attrs.w);
-	ret.w=attrs.w;
-	ret.h=attrs.h;
-	ret.Init();
-	return ret;
-};
-
-var g_active_txtx_editor;
-UI.frame_callbacks.push(function(){g_active_txtx_editor=null;})
-
-var ToggleStyleFlag=function(style_flag){
-	if(!g_active_txtx_editor){return;}
-	g_active_txtx_editor.doc.ToggleStyleFlag(style_flag)
-}
+//var g_active_txtx_editor;
+//UI.frame_callbacks.push(function(){g_active_txtx_editor=null;})
+//var ToggleStyleFlag=function(style_flag){
+//	if(!g_active_txtx_editor){return;}
+//	g_active_txtx_editor.doc.ToggleStyleFlag(style_flag)
+//}
 
 W.subwindow_text_properties={
-	'id':'text_properties',
+	//'id':'text_properties',
 	'title':'Text properties',h:300,
 	body:function(){
 		var parent=UI.context_parent;
 		/*widget*/(W.Button('bold',{
 			'x':13.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'B',
-			OnClick:function(){ToggleStyleFlag(STYLE_FONT_BOLD)}}));
+			property_name:"bold"}));
 		/*widget*/(W.Button('italic',{
 			'x':45.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'I',
-			OnClick:function(){ToggleStyleFlag(STYLE_FONT_ITALIC)}}));
+			property_name:"italic"}));
 		/*widget*/(W.Button('underlined',{
 			'x':77.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'U',
-			OnClick:function(){ToggleStyleFlag(STYLE_UNDERLINED)}}));
+			property_name:"underlined"}));
 		/*widget*/(W.Button('superscript',{
 			'x':109.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'^',
-			OnClick:function(){ToggleStyleFlag(STYLE_SUPERSCRIPT)}}));
+			property_name:"superscript"}));
 		/*widget*/(W.Button('subscript',{
 			'x':141.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'_',
-			OnClick:function(){ToggleStyleFlag(STYLE_SUBSCRIPT)}}));
+			property_name:"subscript"}));
 		/*widget*/(W.Button('align_l',{
 			'x':176.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'1',
-			OnClick:function(){/*todo*/}}));
+			property_name:"align_l"}));
 		/*widget*/(W.Button('align_c',{
 			'x':208.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'2',
-			OnClick:function(){/*todo*/}}));
+			property_name:"align_c"}));
 		/*widget*/(W.Button('align_r',{
 			'x':240.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:g_icon_font,text:'3',
-			OnClick:function(){/*todo*/}}));
+			property_name:"align_r"}));
+		//todo
+		/*widget*/(W.ColorPicker('color_picker',{
+			'x':13.02037844241704,'y':124,'w':32,'h':32,
+			'mode':'rgb',
+			property_name:"text_color"}));
+		/*widget*/(W.RoundRect('',{
+			'x':233.02037844241704,'y':124,'w':100,'h':100,
+			color:parent.color_picker.value,
+			border_width:1.5,border_color:0xff444444}));
+		//todo
 		/*widget*/(W.ComboBox("font_box",{
 			'x':13.02037844241704,'y':36,'w':166.83966387238038,'h':29,
 			items:[
@@ -452,13 +502,7 @@ W.subwindow_text_properties={
 				{text:"Sans Serif"},
 				{text:"Typewriter"},
 			],
-			OnChange:function(){
-				if(!g_active_txtx_editor){return;}
-				var doc=g_active_txtx_editor.doc;
-				var new_style=doc.CloneStyle(doc.GetCurrentStyleObject());
-				new_style.font_face=this.GetSelection().text;
-				doc.SetTextStyle(new_style)
-			},
+			property_name:"font_face",
 		}));
 		/*widget*/(W.ComboBox("size_box",{
 			'x':191.0906294148415,'y':36,'w':80.92974902757557,'h':29,
@@ -468,28 +512,15 @@ W.subwindow_text_properties={
 				{text:"44"},
 				{text:"64"},
 			],
-			OnChange:function(){
-				if(!g_active_txtx_editor){return;}
-				var doc=g_active_txtx_editor.doc;
-				var new_style=doc.CloneStyle(doc.GetCurrentStyleObject());
-				new_style.font_size=parseInt(this.GetSelection().text);
-				doc.SetTextStyle(new_style)
-			},
+			property_name:"font_size",
 		}));
-		//todo
-		/*widget*/(W.ColorPicker('color_picker',{
-			'x':13.02037844241704,'y':114,'w':32,'h':32,
-			'mode':'rgb'}));
-		/*widget*/(W.RoundRect('',{
-			'x':233.02037844241704,'y':114,'w':100,'h':100,
-			color:parent.color_picker.value}));
 	}
 };
 
 W.TxtxEditor=function(id,attrs){
-	var obj=UI.Keep(id,attrs);
-	UI.StdStyling(id,obj,attrs, "txtx_editor",obj.focus_state||"blur");
-	UI.StdAnchoring(id,obj);
+	var obj=UI.StdWidget(id,attrs,"txtx_editor");
+	//UI.StdStyling(id,obj,attrs, "txtx_editor",obj.focus_state||"blur");
+	//UI.StdAnchoring(id,obj);
 	UI.RoundRect(obj)
 	UI.Begin(obj)
 		//handle page properties
@@ -561,7 +592,6 @@ W.TxtxEditor=function(id,attrs){
 					UI.Refresh()
 				}
 				doc.sync_object_selection_to_boxdoc=0;
-				//todo: hide sel-related dialogs
 			})
 			//region-less boxDocument
 			W.BoxDocument("embeded_objects",{
@@ -571,22 +601,45 @@ W.TxtxEditor=function(id,attrs){
 				'OnSelectionChange':fOnSelectionChange
 			})
 		}
-		var text_ppt_window=UI.top.app.property_bar.text_properties
-		if(text_ppt_window){
-			//current style to UI
-			var cur_state=obj.doc.GetCurrentStyleObject();
-			//["font_face","font_size","flags","color","relative_line_space","relative_paragraph_space"];
-			text_ppt_window.font_box.SetText(cur_state.font_face)
-			text_ppt_window.size_box.SetText(cur_state.font_size)
-			text_ppt_window.underlined.checked=!!(cur_state.flags&STYLE_UNDERLINED);
-			//text_ppt_window.strike_out.checked=!!(cur_state.flags&STYLE_STRIKE_OUT);
-			text_ppt_window.superscript.checked=!!(cur_state.flags&STYLE_SUPERSCRIPT);
-			text_ppt_window.subscript.checked=!!(cur_state.flags&STYLE_SUBSCRIPT);
-			text_ppt_window.italic.checked=!!(cur_state.flags&STYLE_FONT_ITALIC);
-			text_ppt_window.bold.checked=!!(cur_state.flags&STYLE_FONT_BOLD);
-			//todo: color and the color dialog: OK button, hide in onselchange
-			//todo: rubber space detection
-			//spacings do not appear here
+		/////////////////////////////////////////////
+		//create the property sheet
+		var cur_state=doc.GetCurrentStyleObject();
+		var sel=doc.GetSelection();
+		var cur_line=doc.GetLC(sel[0])[0]
+		//todo: smart undo here - avoid style explosion
+		//and restore the style count too
+		//invalidate upon MouseUp
+		//additional callbacks: BeginContinuousChange, EndContinuousChange, extra arg for OnChange
+		//editor method: BeginContinuousUndo, EndContinuousUndo
+		UI.document_property_sheet={
+			"font_face":[cur_state.font_face,function(value){doc.ModifyTextStyle(function(style){style.font_face=value});}],
+			"font_size":[cur_state.font_size,function(value){doc.ModifyTextStyle(function(style){style.font_size=value});}],
+			"underlined":[!!(cur_state.flags&STYLE_UNDERLINED),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_UNDERLINED)|(value?STYLE_UNDERLINED:0))});}],
+			//"strike_out":[!!(cur_state.flags&STYLE_STRIKE_OUT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_STRIKE_OUT)|(value?STYLE_STRIKE_OUT:0))});}],
+			"superscript":[!!(cur_state.flags&STYLE_SUPERSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUPERSCRIPT:0))});}],
+			"subscript":[!!(cur_state.flags&STYLE_SUBSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUBSCRIPT:0))});}],
+			"italic":[!!(cur_state.flags&STYLE_FONT_ITALIC),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_ITALIC)|(value?STYLE_FONT_ITALIC:0))});}],
+			"bold":[!!(cur_state.flags&STYLE_FONT_BOLD),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_BOLD)|(value?STYLE_FONT_BOLD:0))});}],
+			//////
+			"text_color":[
+				cur_state.color,
+				function(value,is_continuous){
+					if(is_continuous){
+						doc.PerformContinuousUndo()
+					}
+					doc.ModifyTextStyle(function(style){style.color=value});
+				},
+				function(){doc.BeginContinuousUndo();},
+				function(){doc.EndContinuousUndo();}],
+			"align_l":[
+				doc.GetRubberPadding(cur_line)==0,
+				function(value){doc.SetRubberPadding(0)}],
+			"align_c":[
+				doc.GetRubberPadding(cur_line)==3,
+				function(value){doc.SetRubberPadding(value?3:0)}],
+			"align_r":[
+				doc.GetRubberPadding(cur_line)==1,
+				function(value){doc.SetRubberPadding(value?1:0)}],
 		}
 		obj.Save=UI.HackCallback(function(){
 			//todo: save as: int osal_DoFileDialogWin(short* buf, short* filter,short* def_ext,int is_save){

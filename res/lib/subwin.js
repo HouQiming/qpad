@@ -43,7 +43,7 @@ W.TabLabel=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
 	UI.StdStyling(id,obj,attrs, "tab_label",obj.selected?"active":"inactive");
 	if(!attrs.w){
-		obj.text=obj.title;
+		obj.text=(obj.title||UI.GetMainFileName(obj.file_name));
 		obj.w=UI.MeasureIconText(obj).w;
 	}
 	UI.StdAnchoring(id,obj);
@@ -61,7 +61,7 @@ W.TabLabel=function(id,attrs){
 		W.Text("",{
 			'anchor':'parent','anchor_align':"center",'anchor_valign':"center",
 			'x':0,'y':0,
-			'font':obj.font,'text':obj.title,'color':obj.text_color,
+			'font':obj.font,'text':obj.text,'color':obj.text_color,
 		})
 	UI.End()
 	return obj
@@ -101,16 +101,16 @@ W.TabbedDocument=function(id,attrs){
 			var tab=obj.active_tab;
 			//theme-colored bar
 			if(UI.current_theme_color!=tab.color_theme[0]){
-				UI.SetUIColorTheme(tab.color_theme[0])
+				UI.Theme_Minimalistic(tab.color_theme)
 			}
 			W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:obj.h_caption,h:obj.h_bar,
-				color:tab.color})
+				color:obj.border_color})
 			var obj_tab=UI.Begin(UI.Keep(tabid,W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:obj.h_caption+obj.h_bar,h:obj.h_content,
-				color:obj.color, border_width:obj.border_width, border_color:obj.border_color,
+				color:obj.color
 			})))
 				//use body: object_type==undefined needed for TabLabel
 				tab.body.call(tab)
@@ -139,22 +139,4 @@ W.TabbedDocument=function(id,attrs){
 		UI.Refresh()
 	})});
 	return obj
-}
-
-var g_regexp_chopdir=new RegExp("(.*)[/\\\\]([^/\\\\]*)");
-var g_regexp_chopext=new RegExp("(.*)\\.([^.]*)");
-
-UI.GetMainFileName=function(fname){
-	var ret=fname.match(g_regexp_chopdir);
-	var main_name=null;
-	if(!ret){
-		main_name=fname;
-	}else{
-		main_name=ret[2];
-	}
-	ret=main_name.match(g_regexp_chopext);
-	if(ret){
-		main_name=ret[1];
-	}
-	return main_name;
 }

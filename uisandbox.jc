@@ -25,18 +25,29 @@ class CSandbox
 	js_DrawWindow=function(JSContext JS_original){
 		//we can only draw sub-windows at integer locations
 		R=Gui2D.detail.g_renderer
-		x=int(JS_original.Param(0).as(float)*R.m_pixels_per_unit)
-		y=int(JS_original.Param(1).as(float)*R.m_pixels_per_unit)
+		x_tar=int(JS_original.Param(0).as(float)*R.m_pixels_per_unit)
+		y_tar=int(JS_original.Param(1).as(float)*R.m_pixels_per_unit)
+		w_tar=int(JS_original.Param(2).as(float)*R.m_pixels_per_unit)
+		h_tar=int(JS_original.Param(3).as(float)*R.m_pixels_per_unit)
+		x_src=JS_original.Param(4).or(0.f)
+		y_src=JS_original.Param(5).or(0.f)
 		hwnd=JS["UI"]["sandbox_main_window"].as(CSandboxWindow)
 		if !hwnd:
 			return 0
 		else
-			w=int(ceil(f32(hwnd.w)*R.m_pixels_per_unit*m_relative_scaling))
-			h=int(ceil(f32(hwnd.h)*R.m_pixels_per_unit*m_relative_scaling))
+			w_src=f32(hwnd.w)*R.m_pixels_per_unit*m_relative_scaling
+			h_src=f32(hwnd.h)*R.m_pixels_per_unit*m_relative_scaling
+			w_tar=min(w_tar,int(ceil(w_src)))
+			h_tar=min(h_tar,int(ceil(h_src)))
 			prev_viewport=new int[4]
+			scale_x=w_src/f32(w_tar)
+			scale_y=h_src/f32(h_tar)
+			offset_x=-x_src
+			offset_y=-y_src
+			///////////
 			glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
-			glViewport(x,prev_viewport[1]+prev_viewport[3]-y-h,w,h)
-			R.DrawWindow(__pointer(hwnd))
+			glViewport(x_tar,prev_viewport[1]+prev_viewport[3]-y_tar-h_tar,w_tar,h_tar)
+			R.DrawWindow(__pointer(hwnd),float2(offset_x,offset_y),float2(scale_x,scale_y))
 			glViewport(prev_viewport[0],prev_viewport[1],prev_viewport[2],prev_viewport[3])
 			return JS_original.Return(1)
 	}
@@ -58,7 +69,7 @@ class CSandbox
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"m_relative_scaling")
 		proto.ExportMethod(this,"eval",js_eval)
-		proto.ExportMethod(this,"DrawWindow",js_DrawWindow)
+		proto.ExportMethod(this,"DrawSandboxScreen",js_DrawWindow)
 		proto.ExportMethod(this,"_ReadBack",js_ReadBack)
 	}
 
