@@ -49,6 +49,7 @@ var RerunUserCode=function(code_box){
 	code_box.has_errors=0;
 	var ed=code_box.ed;
 	var s_code=ed.GetText(range_0,range_1-range_0);
+	if(!s_code){return 0;}
 	var re_widget=new RegExp('/\\*widget\\*/\\(',"g")
 	var re_editor=new RegExp('/\\*editor: ',"g")
 	var ftranslate_widget=function(smatch,sname){
@@ -66,6 +67,45 @@ var RerunUserCode=function(code_box){
 	return 1;
 };
 
+//obj_replacement==undefined for getting original
+//over-matching is fine
+var re_param_replacer=new RegExp("\\'([xywh])\\':([^,]+),","g");
+var transform_xywh=function(code_box,ord,obj_replacement){
+	var obj_ret={};
+	var ed=code_box.ed;
+	var range_0=code_box.working_range.point0.ccnt;
+	var range_1=code_box.working_range.point1.ccnt;
+	code_box.has_errors=0;
+	var s_code=ed.GetText(range_0,range_1-range_0);
+	var s_widget_key="/*widget*/(";
+	var utf8_offset=nthIndex(s_code,s_widget_key,ord)
+	if(utf8_offset<0){
+		throw new Error("panic: UI->widget desync");
+	}
+	var byte_offset=ed.ConvertUTF8OffsetToBytesize(range_0,utf8_offset);
+	var lg_key=Duktape.__byte_length(s_widget_key);
+	//use JS search and convert back to ccnt...
+	var byte_offset_widget_end=code_box.FindOuterBracket(byte_offset+lg_key,1);
+	//do the replacement
+	s_code=ed.GetText(byte_offset,byte_offset_widget_end-byte_offset);
+	var freplace_params=UI.HackCallback(function(smatch,s_name,s_value){
+		if(!obj_replacement){
+			obj_ret[s_name]=s_value;
+			return smatch;
+		}
+		if(!obj_replacement[s_name]){return smatch;}
+		var s_replacement="'"+s_name+"':"+obj_replacement[s_name].toString()+",";
+		return s_replacement;
+	});
+	s_code=s_code.replace(re_param_replacer,freplace_params);
+	if(obj_replacement){
+		code_box.transform_ops.push(byte_offset)
+		code_box.transform_ops.push(byte_offset_widget_end-byte_offset)
+		code_box.transform_ops.push(s_code)
+	}
+	return obj_ret;
+};
+	
 var DrawFrame=function(code_box){
 	var inner_widgets=[];
 	if(!code_box.has_errors){
@@ -108,7 +148,6 @@ var DrawFrame=function(code_box){
 				items.push(attrs);
 			}
 		}
-		var re_param_replacer=new RegExp("\\'([xywh])\\':([^,]+),","g");
 		//set OnChange
 		var fonstart=UI.HackCallback(function(){
 			code_box.undo_needed=0;
@@ -116,6 +155,8 @@ var DrawFrame=function(code_box){
 			this.user_anchor_y=this.user_y;
 			this.user_anchor_w=this.w;
 			this.user_anchor_h=this.h;
+			///////////////
+			this.old_xywh=transform_xywh(code_box,parseInt(this.id.substr(1)))
 		});
 		var fonchange=UI.HackCallback(function(tr){
 			//we only consider top level groups, so we ignore non-top-level anchoring
@@ -142,39 +183,22 @@ var DrawFrame=function(code_box){
 			obj_replacement.y/=g_sandbox.m_relative_scaling
 			obj_replacement.w/=g_sandbox.m_relative_scaling
 			obj_replacement.h/=g_sandbox.m_relative_scaling
-			//////////
-			var ed=code_box.ed;
-			var range_0=code_box.working_range.point0.ccnt;
-			var range_1=code_box.working_range.point1.ccnt;
-			code_box.has_errors=0;
-			var s_code=ed.GetText(range_0,range_1-range_0);
-			var s_widget_key="/*widget*/(";
-			var utf8_offset=nthIndex(s_code,s_widget_key,parseInt(this.id.substr(1)))
-			if(utf8_offset<0){
-				//print("=================")
-				//print(s_code)
-				//print("-----------------")
-				//print(range_0,range_1)
-				//print("-----------------")
-				throw new Error("panic: UI->widget desync");
+			if(this.inmate_placement!="inside"||this.inmate_align!="left"||this.inmate_valign!="up"){
+				var dx_source_code_space=obj_replacement.x-this.user_anchor_x/g_sandbox.m_relative_scaling
+				var dy_source_code_space=obj_replacement.y-this.user_anchor_y/g_sandbox.m_relative_scaling
+				if(this.inmate_placement=='left'||this.inmate_align=='right'){
+					dx_source_code_space*=-1;
+				}
+				if(this.inmate_placement=='up'||this.inmate_align=='down'){
+					dy_source_code_space*=-1;
+				}
+				obj_replacement.x=(parseFloat(this.old_xywh.x)||0)+dx_source_code_space
+				obj_replacement.y=(parseFloat(this.old_xywh.y)||0)+dy_source_code_space
 			}
-			var byte_offset=ed.ConvertUTF8OffsetToBytesize(range_0,utf8_offset);
-			var lg_key=Duktape.__byte_length(s_widget_key);
-			//use JS search and convert back to ccnt...
-			var byte_offset_widget_end=code_box.FindOuterBracket(byte_offset+lg_key,1);
-			//do the replacement
-			s_code=ed.GetText(byte_offset,byte_offset_widget_end-byte_offset);
-			var freplace_params=UI.HackCallback(function(smatch,s_name){
-				if(!obj_replacement[s_name]){return smatch;}
-				var s_replacement="'"+s_name+"':"+obj_replacement[s_name].toString()+",";
-				return s_replacement;
-			});
-			s_code=s_code.replace(re_param_replacer,freplace_params);
+			//////////
+			transform_xywh(code_box,parseInt(this.id.substr(1)),obj_replacement)
 			//ed.Edit([byte_offset,byte_offset_widget_end-byte_offset,s_code]);
 			//print(byte_offset,byte_offset_widget_end-byte_offset)
-			code_box.transform_ops.push(byte_offset)
-			code_box.transform_ops.push(byte_offset_widget_end-byte_offset)
-			code_box.transform_ops.push(s_code)
 		});
 		var fonfinish=UI.HackCallback(function(){
 			code_box.undo_needed=0;

@@ -31,6 +31,7 @@ UI.Application=function(id,attrs){
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
 				W.Hotkey("",{key:"ALT+F4",action:function(){UI.DestroyWindow(UI.top.app)}});
 			}
+			//todo: initially-shown autohidepanel
 			var w_bar=2;
 			var w_property_bar=320;
 			var property_windows=[]

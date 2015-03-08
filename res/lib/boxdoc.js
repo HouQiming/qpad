@@ -8,9 +8,9 @@ UI.SNAP_RIGHT=4
 var DrawSnappingLine=function(parent,x,dim){
 	var rect;
 	if(dim=="x"){
-		rect={'x':x+parent.x,'y':parent.y,'w':1/UI.pixels_per_unit,'h':parent.h}
+		rect={'x':x+parent.x-parent.w_snapping_line*0.5,'y':parent.y,'w':parent.w_snapping_line,'h':parent.h}
 	}else{
-		rect={'x':parent.x,'y':x+parent.y,'w':parent.w,'h':1/UI.pixels_per_unit}
+		rect={'x':parent.x,'y':x+parent.y-parent.w_snapping_line*0.5,'w':parent.w,'h':parent.w_snapping_line}
 	}
 	rect.border_width=0;
 	rect.color=parent.color;
@@ -122,8 +122,8 @@ var ScaleKnob_prototype={
 	OnMouseDown:function(event){
 		var obj=this.owner;
 		var doc=obj.parent;
-		this.dx_base=(event.x-this.x_anchor);
-		this.dy_base=(event.y-this.y_anchor);
+		this.dx_base=(this.x+this.w*0.5-this.x_anchor);
+		this.dy_base=(this.y+this.h*0.5-this.y_anchor);
 		this.drag_x_anchor=this.x_anchor;
 		this.drag_y_anchor=this.y_anchor;
 		this.dx_center=(this.x+this.w*0.5)-event.x-doc.x;
@@ -144,8 +144,8 @@ var ScaleKnob_prototype={
 		if(this.y_anchor_rel==0){snap_y.push(UI.SNAP_RIGHT,this.dy_center)}
 		if(this.y_anchor_rel==1){snap_y.push(UI.SNAP_LEFT,this.dy_center)}
 		TestSnappingCoords(obj,event, snap_x,snap_y);
-		var x_scale=(event.x-this.drag_x_anchor)/this.dx_base;
-		var y_scale=(event.y-this.drag_y_anchor)/this.dy_base;
+		var x_scale=(event.x+this.dx_center+doc.x-this.drag_x_anchor)/this.dx_base;
+		var y_scale=(event.y+this.dy_center+doc.y-this.drag_y_anchor)/this.dy_base;
 		if(this.lock_aspect_ratio){x_scale=Math.min(x_scale,y_scale);y_scale=x_scale;}
 		if(x_scale){
 			x_scale=Math.max(x_scale,obj.w_min/this.drag_w);

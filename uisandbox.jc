@@ -46,7 +46,7 @@ class CSandbox
 			offset_y=-y_src
 			///////////
 			glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
-			glViewport(x_tar,prev_viewport[1]+prev_viewport[3]-y_tar-h_tar,w_tar,h_tar)
+			glViewport(prev_viewport[0]+x_tar,prev_viewport[1]+prev_viewport[3]-y_tar-h_tar,w_tar,h_tar)
 			R.DrawWindow(__pointer(hwnd),float2(offset_x,offset_y),float2(scale_x,scale_y))
 			glViewport(prev_viewport[0],prev_viewport[1],prev_viewport[2],prev_viewport[3])
 			return JS_original.Return(1)
