@@ -344,8 +344,17 @@ W.UIEditor=function(id,attrs){
 					//avoid self-snapping
 					continue;
 				}
-				snapping_coords.x.push(item_i.x);snapping_coords.x.push(item_i.x+item_i.w);
-				snapping_coords.y.push(item_i.y);snapping_coords.y.push(item_i.y+item_i.h);
+				snapping_coords.x.push(UI.SNAP_LEFT,item_i.x);
+				snapping_coords.x.push(UI.SNAP_CENTER,item_i.x+item_i.w*0.5);
+				snapping_coords.x.push(UI.SNAP_RIGHT,item_i.x+item_i.w);
+				snapping_coords.y.push(UI.SNAP_LEFT,item_i.y);
+				snapping_coords.y.push(UI.SNAP_CENTER,item_i.y+item_i.h*0.5);
+				snapping_coords.y.push(UI.SNAP_RIGHT,item_i.y+item_i.h);
+				///////////
+				snapping_coords.x.push(UI.SNAP_RIGHT,item_i.x-g_params.padding);
+				snapping_coords.x.push(UI.SNAP_LEFT,item_i.x+item_i.w+g_params.padding);
+				snapping_coords.y.push(UI.SNAP_RIGHT,item_i.y-g_params.padding);
+				snapping_coords.y.push(UI.SNAP_LEFT,item_i.y+item_i.h+g_params.padding);
 			}
 			var sandbox_main_window_w=g_sandbox.ReadBack('[UI.sandbox_main_window_w]')[0]*g_sandbox.m_relative_scaling
 			var sandbox_main_window_h=g_sandbox.ReadBack('[UI.sandbox_main_window_h]')[0]*g_sandbox.m_relative_scaling

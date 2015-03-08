@@ -251,8 +251,8 @@ class CLayouter_programmer
 			auto x=x0-y*wrap_width
 			y*=hc
 			return float2(fixed2float(x-scroll_x)*scaling+screen_x,fixed2float(y-scroll_y)*scaling+screen_y)
-		for ch,I in Utf8Chars(s)
-			if x==m_caret_overlay.x&&m_overlay_obj:
+		auto testOverlay()
+			if m_overlay_obj&&x==m_caret_overlay.x:
 				s_overlay=m_overlay_obj["text"].as(string)
 				prj_x=projectXY(x)
 				if s_overlay:
@@ -290,6 +290,8 @@ class CLayouter_programmer
 					y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
 					g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.y)*scaling,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
 				x+=m_caret_overlay.y
+		for ch,I in Utf8Chars(s)
+			testOverlay()
 			if ch=='\n':
 				x=(x/wrap_width+1LL)*wrap_width
 			else if ch=='\r':
@@ -304,6 +306,7 @@ class CLayouter_programmer
 				prj_x=projectXY(x)
 				g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids?int(color_ids[I]):0], ch)
 				x+=dx_i
+		testOverlay()
 	}
 	GetCharacterHeightAt=function(i64[] a,i64[] pp,string s,iptr ofs){
 		return charHeight()

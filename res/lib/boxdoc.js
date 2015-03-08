@@ -1,6 +1,10 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 
+UI.SNAP_LEFT=1
+UI.SNAP_CENTER=2
+UI.SNAP_RIGHT=4
+
 var DrawSnappingLine=function(parent,x,dim){
 	var rect;
 	if(dim=="x"){
@@ -13,32 +17,30 @@ var DrawSnappingLine=function(parent,x,dim){
 	//print(JSON.stringify(rect))
 	parent["snapping_rect_"+dim]=rect;
 }
-var TestSnappingOneDim=function(parent,event,dim, dx,w){
+var TestSnappingOneDim=function(parent,event,dim, masks){
+	//coord, mask, ...
 	var coords=parent.snapping_coords;
 	var coords_x=coords[dim];
 	var x=event[dim];
 	var tolerance=(coords.tolerance||8);
 	parent["snapping_rect_"+dim]=null;
-	for(var i=0;i<coords_x.length;i++){
-		if(Math.abs(x+dx-coords_x[i])<tolerance){
-			event[dim]=(coords_x[i]-dx);
-			DrawSnappingLine(parent,coords_x[i],dim)
-			return;
-		}
-		if(Math.abs(x+dx+w-coords_x[i])<tolerance){
-			event[dim]=(coords_x[i]-dx-w);
-			DrawSnappingLine(parent,coords_x[i],dim)
-			return;
+	for(var i=0;i<coords_x.length;i+=2){
+		for(var j=0;j<masks.length;j+=2){
+			if(Math.abs(x+masks[j+1]-coords_x[i+1])<tolerance&&(coords_x[i]&masks[j])){
+				event[dim]=(coords_x[i+1]-masks[j+1]);
+				DrawSnappingLine(parent,coords_x[i+1],dim)
+				return;
+			}
 		}
 	}
 };
-var TestSnappingCoords=function(obj,event, dx,dy,w,h){
+var TestSnappingCoords=function(obj,event, masks_x,masks_y){
 	var parent=obj.parent;
 	var coords=parent.snapping_coords;
 	if(!coords){return;}
 	if(UI.IsPressed("LSHIFT")||UI.IsPressed("RSHIFT")){return;}
-	TestSnappingOneDim(parent,event,"x",dx,w)
-	TestSnappingOneDim(parent,event,"y",dy,h)
+	TestSnappingOneDim(parent,event,"x",masks_x)
+	TestSnappingOneDim(parent,event,"y",masks_y)
 };
 
 //interface change: AnchorTransform, SetTransform
@@ -91,7 +93,11 @@ var BoxDocumentItem_prototype={
 	OnMouseMove:function(event){
 		var doc=this.parent;
 		if(!doc.is_dragging){return;}
-		TestSnappingCoords(this,event, this.drag_x_anchor-this.drag_x_base-doc.x,this.drag_y_anchor-this.drag_y_base-doc.y, this.w,this.h);
+		var snap_dx=this.drag_x_anchor-this.drag_x_base-doc.x;
+		var snap_dy=this.drag_y_anchor-this.drag_y_base-doc.y;
+		TestSnappingCoords(this,event, 
+			[UI.SNAP_LEFT,snap_dx, UI.SNAP_CENTER,snap_dx+this.w*0.5, UI.SNAP_RIGHT,snap_dx+this.w],
+			[UI.SNAP_LEFT,snap_dy, UI.SNAP_CENTER,snap_dy+this.h*0.5, UI.SNAP_RIGHT,snap_dy+this.h]);
 		var dx=event.x-this.drag_x_base;
 		var dy=event.y-this.drag_y_base;
 		if(!doc.drag_initiated&&(Math.abs(dx)>this.min_dragging_initiation||Math.abs(dy)>this.min_dragging_initiation)){
@@ -120,8 +126,8 @@ var ScaleKnob_prototype={
 		this.dy_base=(event.y-this.y_anchor);
 		this.drag_x_anchor=this.x_anchor;
 		this.drag_y_anchor=this.y_anchor;
-		this.drag_x0=obj.x-this.x_anchor;
-		this.drag_y0=obj.y-this.y_anchor;
+		this.dx_center=(this.x+this.w*0.5)-event.x-doc.x;
+		this.dy_center=(this.y+this.h*0.5)-event.y-doc.y;
 		this.drag_w=obj.w;
 		this.drag_h=obj.h;
 		doc.AnchorTransform()
@@ -131,7 +137,13 @@ var ScaleKnob_prototype={
 		var obj=this.owner;
 		var doc=obj.parent;
 		if(!doc.is_dragging){return;}
-		//TestSnappingCoords(obj,event, this.w*0.5,this.h*0.5,0,0);
+		var snap_x=[]
+		var snap_y=[]
+		if(this.x_anchor_rel==0){snap_x.push(UI.SNAP_RIGHT,this.dx_center)}
+		if(this.x_anchor_rel==1){snap_x.push(UI.SNAP_LEFT,this.dx_center)}
+		if(this.y_anchor_rel==0){snap_y.push(UI.SNAP_RIGHT,this.dy_center)}
+		if(this.y_anchor_rel==1){snap_y.push(UI.SNAP_LEFT,this.dy_center)}
+		TestSnappingCoords(obj,event, snap_x,snap_y);
 		var x_scale=(event.x-this.drag_x_anchor)/this.dx_base;
 		var y_scale=(event.y-this.drag_y_anchor)/this.dy_base;
 		if(this.lock_aspect_ratio){x_scale=Math.min(x_scale,y_scale);y_scale=x_scale;}
