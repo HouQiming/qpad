@@ -31,7 +31,7 @@ UI.BeginVirtualWindow=function(id,attrs){
 	UI.Begin(UI.Keep(id,attrs));
 	UI.Begin(W.Window('app',{
 		title:'',w:attrs.w,h:attrs.h,bgcolor:attrs.bgcolor,
-		designated_screen_size:Math.min(w,h),flags:UI.SDL_WINDOW_MAXIMIZED,
+		designated_screen_size:Math.min(attrs.w,attrs.h),flags:UI.SDL_WINDOW_MAXIMIZED,
 		is_main_window:1}));
 }
 

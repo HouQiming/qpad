@@ -25,7 +25,7 @@ UI.Application=function(id,attrs){
 	UI.Begin(attrs);
 		///////////////////
 		UI.Begin(W.Window('app',{
-				title:'Mini-Office',w:1280,h:720,bgcolor:0xfff0f0f0,
+				title:'UI Editor',w:1280,h:720,bgcolor:0xfff0f0f0,
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1}));
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
@@ -73,7 +73,7 @@ UI.Application=function(id,attrs){
 					active_document.body.Save.call(active_document.body)
 				}
 			}});
-			//todo: drag-loading...
+			//todo: drag-loading
 			W.Hotkey("",{key:"CTRL+O",action:function(){
 				var fn=IO.DoFileDialog(["Txtx documents (*.txtx)","*.txtx","All File","*.*"]);
 				if(!fn){return;}
@@ -84,7 +84,7 @@ UI.Application=function(id,attrs){
 	UI.End();
 	//todo
 	if(!g_all_document_windows.length){
-		g_all_document_windows.push(UI.NewTxtxDocument())
+		//g_all_document_windows.push(UI.NewTxtxDocument())
 		g_all_document_windows.push(UI.NewUIEditorDocument())
 	}
 };
