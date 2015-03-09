@@ -307,7 +307,7 @@ UI.NewTxtxDocument=function(fname0,perm){
 		body:function(){
 			var body=W.TxtxEditor("body",{
 				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
-				'x':0,'y':0,'w':1300,
+				'x':0,'y':0,'w':Math.min(1300,UI.context_parent.w),
 				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
 				'file_name':this.file_name,
 				'scale':1,'bgcolor':0xffffffff,
@@ -527,11 +527,20 @@ W.TxtxEditor=function(id,attrs){
 		var w0=obj.page_margin_left
 		var w1=obj.page_width
 		var w2=obj.page_margin_right
-		//todo: not-wide-enough case
+		if(w0+w1+w2>obj.w){
+			var w_excess=w0+w1+w2-obj.w
+			var ratio0=(w0+w2?w0/(w0+w2):0);
+			w0=Math.max(w0-ratio0*w_excess,0)
+			w2=Math.max(w2-(1-ratio0)*w_excess,0)
+			if(w1>obj.w){
+				//really not wide enough
+				w1=obj.w
+			}
+		}
 		InitPrototype();
 		var doc=W.Edit("doc",{
 			'x':obj.x+w0,'y':obj.y,'w':w1+w2,'h':obj.h,
-			'wrap_width':w1,
+			'wrap_width':obj.page_width,
 		},TxtxEditor_prototype)
 		var renderer=doc.GetRenderer();
 		var embeded_objects=renderer.g_rendered_objects;

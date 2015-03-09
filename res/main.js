@@ -24,31 +24,46 @@ UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
 		///////////////////
-		UI.Begin(W.Window('app',{
+		var app=UI.Begin(W.Window('app',{
 				title:'UI Editor',w:1280,h:720,bgcolor:0xfff0f0f0,
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1}));
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
-				W.Hotkey("",{key:"ALT+F4",action:function(){UI.DestroyWindow(UI.top.app)}});
+				W.Hotkey("",{key:"ALT+F4",action:function(){UI.DestroyWindow(app)}});
 			}
-			//todo: initially-shown autohidepanel
-			var w_bar=2;
 			var w_property_bar=320;
-			var property_windows=[]
+			var obj_panel=W.AutoHidePanel("property_panel",{
+				x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:w_property_bar,
+				anchor_placement:UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):(app.w<app.h?'down':'right'),
+				knob_size:UI.IS_MOBILE?40:16,
+			});
+			var panel_placement=obj_panel.anchor_placement
 			UI.document_property_sheet={};
+			//todo: all depends on panel_placement
 			W.TabbedDocument("document_area",{
 				'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
-				'x':0,'y':0,'w':UI.top.app.w-w_property_bar,
+				'x':0,'y':0,'w':obj_panel.x,
 				items:g_all_document_windows,
 			})
-			if(UI.top.app.document_area.active_tab){
-				property_windows=(UI.top.app.document_area.active_tab.property_windows||property_windows);
+			var property_windows=[]
+			if(app.document_area.active_tab){
+				property_windows=(app.document_area.active_tab.property_windows||property_windows);
 			}
 			//////////////////////////
-			//todo: hiding
+			var w_shadow=8
+			var w_bar=4;
+			var shadow_color=0xaa000000
+			UI.RoundRect({
+				x:obj_panel.x-w_bar-w_shadow,y:-w_shadow,w:w_shadow*2,h:app.h+w_shadow*2,
+				color:shadow_color,border_width:-w_shadow,round:w_shadow,
+			})
+			UI.RoundRect({
+				x:obj_panel.x-w_bar,y:0,w:w_property_bar,h:app.h,
+				color:0xfff0f0f0,border_width:0,
+			})
 			if(w_property_bar>0){
 				W.Group("property_bar",{
-					'anchor':'parent','anchor_align':"right",'anchor_valign':"fill",
+					'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
 					'x':0,'y':0,'w':w_property_bar,
 					item_template:{'object_type':W.SubWindow},items:property_windows,
 					///////////
@@ -56,8 +71,8 @@ UI.Application=function(id,attrs){
 					'property_sheet':UI.document_property_sheet,
 				});
 				W.RoundRect("",{
-					'anchor':UI.top.app.property_bar,'anchor_align':"left",'anchor_valign':"fill",
-					'x':0,'y':0,'w':w_bar,
+					'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
+					'x':-w_bar,'y':0,'w':w_bar,
 					'color':UI.current_theme_color,
 				})
 			}
@@ -68,7 +83,7 @@ UI.Application=function(id,attrs){
 				UI.Refresh()
 			}});
 			W.Hotkey("",{key:"CTRL+S",action:function(){
-				var doc_area=UI.top.app.document_area;
+				var doc_area=app.document_area;
 				var active_document=doc_area[doc_area.active_tab.id];
 				if(active_document&&active_document.body&&active_document.body.Save){
 					active_document.body.Save.call(active_document.body)
