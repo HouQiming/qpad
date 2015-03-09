@@ -230,18 +230,18 @@ var nthIndex=function(str,pat,n){
 W.subwindow_insertion_bar={
 	'title':'Insert widgets',h:500,
 	body:function(){
-		var obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'top',x:8,y:32,
+		var obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'up',x:8,y:32,
 			font:UI.Font("res/fonts/opensans.ttf",24),color:0xff000000,text:"Zoom"})
 		obj_temp=W.Slider("zoom",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,w:180,h:24,h_slider:8,property_name:'scale'})
 		W.Text("-",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,
 			font:UI.Font("res/fonts/opensans.ttf",24),color:0xff000000,
 			text:(g_sandbox.m_relative_scaling*100).toFixed(0)+"%"})
-		obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'top',x:8,y:64,
+		obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'up',x:8,y:64,
 			font:UI.Font("res/fonts/opensans.ttf",24),color:0xff000000,text:"Padding"})
 		W.EditBox("padding_editor",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,w:32,h:28,
 			property_name:'padding'})
 		W.Group("layout",{
-			anchor:'parent',anchor_align:'fill',anchor_valign:'top',
+			anchor:'parent',anchor_align:'fill',anchor_valign:'up',
 			x:8,y:96,h:400,
 			layout_direction:"down",layout_spacing:12,
 			item_template:{object_type:W.Button,padding:4},

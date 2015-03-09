@@ -32,36 +32,68 @@ UI.Application=function(id,attrs){
 				W.Hotkey("",{key:"ALT+F4",action:function(){UI.DestroyWindow(app)}});
 			}
 			var w_property_bar=320;
+			//UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):
 			var obj_panel=W.AutoHidePanel("property_panel",{
 				x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:w_property_bar,
-				anchor_placement:UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):(app.w<app.h?'down':'right'),
+				anchor_placement:(app.w<app.h?'down':'right'),
 				knob_size:UI.IS_MOBILE?40:16,
 			});
+			var reg_panel=UI.context_regions.pop()
 			var panel_placement=obj_panel.anchor_placement
 			UI.document_property_sheet={};
-			//todo: all depends on panel_placement
-			W.TabbedDocument("document_area",{
-				'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
-				'x':0,'y':0,'w':obj_panel.x,
-				items:g_all_document_windows,
-			})
+			if(panel_placement=='down'){
+				W.TabbedDocument("document_area",{
+					'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
+					'x':0,'y':0,'h':obj_panel.y,
+					items:g_all_document_windows,
+				})
+			}else{
+				W.TabbedDocument("document_area",{
+					'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
+					'x':0,'y':0,'w':obj_panel.x,
+					items:g_all_document_windows,
+				})
+			}
 			var property_windows=[]
 			if(app.document_area.active_tab){
 				property_windows=(app.document_area.active_tab.property_windows||property_windows);
 			}
+			UI.context_regions.push(reg_panel)
 			//////////////////////////
-			var w_shadow=8
+			var w_shadow=6
 			var w_bar=4;
 			var shadow_color=0xaa000000
-			UI.RoundRect({
-				x:obj_panel.x-w_bar-w_shadow,y:-w_shadow,w:w_shadow*2,h:app.h+w_shadow*2,
-				color:shadow_color,border_width:-w_shadow,round:w_shadow,
-			})
-			UI.RoundRect({
-				x:obj_panel.x-w_bar,y:0,w:w_property_bar,h:app.h,
-				color:0xfff0f0f0,border_width:0,
-			})
-			if(w_property_bar>0){
+			if(panel_placement=='down'){
+				UI.RoundRect({
+					x:-w_shadow,y:obj_panel.y-w_bar-w_shadow,w:app.w+w_shadow*2,h:w_shadow*2,
+					color:shadow_color,border_width:-w_shadow,round:w_shadow,
+				})
+				UI.RoundRect({
+					x:0,y:obj_panel.y-w_bar,w:app.w,h:w_property_bar,
+					color:0xfff0f0f0,border_width:0,
+				})
+				W.Group("property_bar",{
+					'anchor':obj_panel,'anchor_align':"fill",'anchor_valign':"up",
+					'x':0,'y':0,'h':w_property_bar,
+					item_template:{'object_type':W.SubWindow},items:property_windows,
+					///////////
+					'layout_direction':'right','layout_spacing':0,'layout_align':'left','layout_valign':'fill',
+					'property_sheet':UI.document_property_sheet,
+				});
+				W.RoundRect("",{
+					'anchor':obj_panel,'anchor_align':"fill",'anchor_valign':"up",
+					'x':0,'y':-w_bar,'h':w_bar,
+					'color':UI.current_theme_color,
+				})
+			}else{
+				UI.RoundRect({
+					x:obj_panel.x-w_bar-w_shadow,y:-w_shadow,w:w_shadow*2,h:app.h+w_shadow*2,
+					color:shadow_color,border_width:-w_shadow,round:w_shadow,
+				})
+				UI.RoundRect({
+					x:obj_panel.x-w_bar,y:0,w:w_property_bar,h:app.h,
+					color:0xfff0f0f0,border_width:0,
+				})
 				W.Group("property_bar",{
 					'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
 					'x':0,'y':0,'w':w_property_bar,
