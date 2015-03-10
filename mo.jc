@@ -15,6 +15,7 @@ __generate_json("js_units","gui2d/gl.js")
 __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
 __generate_json("icon_file","icon256.png")
+//__generate_json("linux_cc","clang")
 
 (function(){
 	Gui2D.ProvideGLFunctions()

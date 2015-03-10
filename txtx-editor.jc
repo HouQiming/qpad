@@ -869,7 +869,10 @@ class CLayouter_fancy
 	}
 	//////////////////////
 	JSObject[] g_rendered_objects
-	BeginRender=function(){
+	BeginRender=function(JSObject obj){
+		if obj:
+			m_bgcolor=int(obj["bgcolor"].or(u32(m_bgcolor)))
+			m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		g_rendered_objects=new JSObject[]
 	}
 	_RenderText=function(int mode,i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
@@ -884,7 +887,7 @@ class CLayouter_fancy
 			x+=m_caret_overlay.z
 		newline_flags=0
 		y_baseline=float2fixed(g_renderer.GetFontBaseline(m_styles[0].font))
-		h_line=charHeight(m_styles[0])
+		h_line=(ccnt_base?0LL:charHeight(m_styles[0]))
 		current_style_id=0
 		fnt_scaled=TFont()
 		dy_baseline=0LL
@@ -1034,6 +1037,17 @@ class CLayouter_fancy
 				ch32_prev=int('\n')
 			else if style_id&ATOM_FLAG_LINE_BREAK:
 				//line start
+				//modified ofscheck: real \n test
+				//if mode==MODE_BB&&h_line:
+				//	ccnt_line_start=(style_id&ATOM_MASK_CCNT)
+				//	if ccnt_line_start>=ofs:
+				//		foreach ch32,I in CharToUtf8Backward(s[:ccnt_line_start-1].ReverseOrder(),iptr)
+				//			if !IsCharInvisible(ch32):
+				//				if ch32=='\n'&&I<ofs:
+				//					//it's after the newline, change it
+				//					h_line=i64(value0)
+				//				break
+				//		return long4(x,y,i64(current_style_id),h_line)
 				OfsCheck(style_id&ATOM_MASK_CCNT)
 				SeekCheck(style_id&ATOM_MASK_CCNT)
 				NewlineCheck()
@@ -1042,6 +1056,9 @@ class CLayouter_fancy
 				h_line=i64(value0)
 				ch32_prev=int('\n')
 				current_style_id=0
+				if !ofs:
+					//re-check for block-head case
+					return long4(x,y,i64(current_style_id),h_line)
 			else
 				assert(style_id>=0)
 				current_style_id=style_id
@@ -1116,8 +1133,8 @@ class CLayouter_fancy
 	RenderText=function(i64 ccnt_base,i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
 		_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n,scroll_x,scroll_y,screen_x,screen_y,scaling)
 	}
-	GetCharacterHeightAt=function(i64[] a,i64[] pp,string s,iptr ofs){
-		bb=_RenderText(MODE_BB,0LL,a,pp,s,ofs, 0LL,0LL,0.f,0.f,0.f)
+	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
+		bb=_RenderText(MODE_BB,ccnt_base,a,pp,s,ofs, 0LL,0LL,0.f,0.f,0.f)
 		//return charHeight(m_styles[bb.z])
 		return bb.w
 	}
@@ -1220,6 +1237,13 @@ class CLayouter_fancy
 			stext32.push(ch)
 		return JS.Return(Unicode32ToUtf8(stext32))
 	}
+	JS_UpdatePermanentStyles=function(JSObject proto){
+		obj=JS.Param(0).as(JSObject)
+		m_tab_width=obj["tab_width"].or(m_tab_width)
+		m_wrap_width_in_fp=float2fixed(obj["wrap_width"].or(fixed2float(m_wrap_width_in_fp)))
+		m_hyphenator=obj["hyphenator"].or(m_hyphenator)
+		return 0
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"g_rendered_objects")
 		proto.ExportMethod(this,"UpdateStyles",JS_UpdateStyles)
@@ -1228,6 +1252,7 @@ class CLayouter_fancy
 		proto.ExportMethod(this,"GetObjectCount",JS_GetObjectCount)
 		proto.ExportMethod(this,"Internal_ConvertTextToPersistentForm",JS_ConvertTextToPersistentForm)
 		proto.ExportMethod(this,"Internal_TranslateStylesAndObjects",JS_TranslateStylesAndObjects)
+		proto.ExportMethod(this,"Internal_UpdatePermanentStyles",JS_UpdatePermanentStyles)
 	}
 
 registerStateHandler("renderer_fancy",CLayouter_fancy)

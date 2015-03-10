@@ -110,13 +110,12 @@ UI.Application=function(id,attrs){
 			}
 			//////////////////////////
 			W.Hotkey("",{key:"CTRL+N",action:function(){
-				//g_all_document_windows.push(UI.NewTxtxDocument())
-				g_all_document_windows.push(UI.NewUIEditorDocument())
+				UI.NewUIEditorTab()
 				UI.Refresh()
 			}});
 			W.Hotkey("",{key:"CTRL+S",action:function(){
 				var doc_area=app.document_area;
-				var active_document=doc_area[doc_area.active_tab.id];
+				var active_document=doc_area.active_tab_obj;
 				if(active_document&&active_document.body&&active_document.body.Save){
 					active_document.body.Save.call(active_document.body)
 				}
@@ -132,8 +131,7 @@ UI.Application=function(id,attrs){
 	UI.End();
 	//todo
 	if(!g_all_document_windows.length){
-		//g_all_document_windows.push(UI.NewTxtxDocument())
-		g_all_document_windows.push(UI.NewUIEditorDocument())
+		UI.NewUIEditorTab()
 	}
 };
 

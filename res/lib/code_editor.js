@@ -256,33 +256,41 @@ W.subwindow_insertion_bar={
 	}
 };
 var g_template_code=IO.UIReadAll("res/misc/ui_template.js")
-UI.NewUIEditorDocument=function(fname0){
-	var s_data=(IO.ReadAll(fname0)||g_template_code);
-	return {
-		file_name:(fname0||IO.GetNewDocumentName("ui","js","document")),
+UI.NewUIEditorTab=function(fname0){
+	var file_name=fname0||IO.GetNewDocumentName("ui","js","document")
+	return UI.NewTab({
+		file_name:file_name,
+		title:UI.GetMainFileName(file_name),
+		doc:undefined,
 		body:function(){
+			//create and keep, or throw in and continue
+			UI.context_parent.body=this.doc
 			var body=W.UIEditor("body",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
 				'file_name':this.file_name,
 				'bgcolor':0xfff0f0f0,
 			})
-			if(s_data){
-				var code_box=body.doc
-				var ed=code_box.ed;
-				ed.Edit([0,0,s_data],1)
-				var s_code=ed.GetText();
-				var s_widget_key="/*insert here*/";
-				var utf8_offset=nthIndex(s_code,s_widget_key,0)
-				if(utf8_offset>=0){
-					var byte_offset=ed.ConvertUTF8OffsetToBytesize(0,utf8_offset);
-					code_box.sel0.ccnt=byte_offset
-					code_box.sel1.ccnt=byte_offset
-					code_box.OnSelectionChange()
+			if(!this.doc){
+				this.doc=body;
+				var s_data=(IO.ReadAll(fname0)||g_template_code);
+				if(s_data){
+					var code_box=body.doc
+					var ed=code_box.ed;
+					ed.Edit([0,0,s_data],1)
+					var s_code=ed.GetText();
+					var s_widget_key="/*insert here*/";
+					var utf8_offset=nthIndex(s_code,s_widget_key,0)
+					if(utf8_offset>=0){
+						var byte_offset=ed.ConvertUTF8OffsetToBytesize(0,utf8_offset);
+						code_box.sel0.ccnt=byte_offset
+						code_box.sel1.ccnt=byte_offset
+						code_box.OnSelectionChange()
+					}
+					///////////
+					s_data=undefined;
+					UI.Refresh()
 				}
-				///////////
-				s_data=undefined;
-				UI.Refresh()
 			}
 			return body;
 		},
@@ -290,9 +298,9 @@ UI.NewUIEditorDocument=function(fname0){
 			W.subwindow_insertion_bar
 		],
 		color_theme:[0xff5511aa],
-	}
+	})
 };
-LOADER.RegisterLoaderForExtension("js",function(fn){UI.NewTab(UI.NewUIEditorDocument(fn))})
+LOADER.RegisterLoaderForExtension("js",function(fn){UI.NewUIEditorTab(fn)})
 
 W.UIEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"ui_editor");

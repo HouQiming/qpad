@@ -43,9 +43,10 @@ W.TabLabel=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
 	UI.StdStyling(id,obj,attrs, "tab_label",obj.selected?"active":"inactive");
 	if(!attrs.w){
-		obj.text=(obj.title||UI.GetMainFileName(obj.file_name));
+		obj.text=obj.title;
 		obj.w=UI.MeasureIconText(obj).w;
 	}
+	obj.x=obj.x_animated
 	UI.StdAnchoring(id,obj);
 	UI.Begin(obj)
 		if(obj.selected){
@@ -67,36 +68,39 @@ W.TabLabel=function(id,attrs){
 	return obj
 }
 
-var SearchByProperty=function(list,property,value){
-	for(var i=0;i<list.length;i++){
-		if(list[i][property]==value){return i;}
-	}
-	return -1;
-};
 W.TabbedDocument=function(id,attrs){
-	//todo: avoid dup id after window closing
 	var obj=UI.Keep(id,attrs);
 	UI.StdStyling(id,obj,attrs, "tabbed_document");
 	UI.StdAnchoring(id,obj);
-	if((obj.n_tabs_last_checked||0)<obj.items.length){
+	var items=obj.items
+	if((obj.n_tabs_last_checked||0)<items.length){
 		//new tab activating
-		obj.current_tab_id=(obj.items[obj.items.length-1].id||"$"+(obj.items.length-1));
-		obj.n_tabs_last_checked=obj.items.length;
+		obj.current_tab_id=(items.length-1);
+		obj.n_tabs_last_checked=items.length;
 	}
 	UI.Begin(obj)
 		var sel={}
-		var tabid=(obj.current_tab_id||"$0");
+		var tabid=(obj.current_tab_id||0);
 		sel[tabid]=1
-		W.Group("labels",{
-			'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
-			'layout_direction':'right','layout_spacing':0,'layout_align':'left','layout_valign':'fill',
-			x:0,y:0,h:obj.h_caption,
-			item_template:{object_type:W.TabLabel},
-			items:obj.items,
-			selection:sel,
-		})
+		var n=items.length
+		//tabs should not need ids
+		//when closing, should change the "existing" ids for the effect...
+		UI.PushCliprect(obj.x,obj.y,obj.w,obj.h_caption)
+		var x_acc=-(obj.scroll_x||0);//obj.scroll_x_animated;
+		for(var i=0;i<n;i++){
+			var item_i=items[i]
+			var label_i=W.TabLabel(i,{x_animated:x_acc,y:obj.y,h:obj.h_caption,selected:i==tabid, title:item_i.title})
+			x_acc+=label_i.w;
+		}
+		if(n>0){obj.scroll_x=Math.max(Math.min(x_acc-obj.w,obj[tabid].x+(obj[tabid].w-obj.w)*0.5),0)}
+		UI.PopCliprect()
 		obj.h_content=obj.h-(obj.h_caption+obj.h_bar);
-		obj.active_tab=obj.labels[tabid]
+		obj.active_tab=obj.items[tabid]
+		//share the tab wrapper and get rid of it when the tab switches
+		if(obj.prev_tabid!=tabid){
+			obj.prev_tabid=tabid
+			obj.active_tab_obj=undefined
+		}
 		if(obj.active_tab){
 			var tab=obj.active_tab;
 			//theme-colored bar
@@ -108,13 +112,11 @@ W.TabbedDocument=function(id,attrs){
 				x:0,y:obj.h_caption,h:obj.h_bar,
 				color:obj.border_color})
 			UI.SwitchToSubWindow(obj.x,obj.h_caption+obj.h_bar,obj.w,obj.h_content)
-			var obj_tab=UI.Begin(UI.Keep(tabid,W.RoundRect("",{
+			var obj_tab=UI.Begin(UI.Keep("active_tab_obj",W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
-				//x:0,y:obj.h_caption+obj.h_bar,h:obj.h_content,
 				x:0,y:0,h:obj.h_content,
 				color:obj.color
 			})))
-				//use body: object_type==undefined needed for TabLabel
 				tab.body.call(tab)
 			UI.End()
 			UI.SwitchToSubWindow()
@@ -127,18 +129,18 @@ W.TabbedDocument=function(id,attrs){
 		}
 	UI.End()
 	W.Hotkey("",{key:"CTRL+TAB",action:UI.HackCallback(function(){
-		var num_id=SearchByProperty(obj.items,"id",tabid)
+		var num_id=tabid
 		if(num_id<0){return;}
-		num_id++;if(num_id>=obj.items.length){num_id=0;}
-		obj.current_tab_id=obj.items[num_id].id
+		num_id++;if(num_id>=items.length){num_id=0;}
+		obj.current_tab_id=num_id
 		UI.Refresh()
 	})});
 	W.Hotkey("",{key:"CTRL+SHIFT+TAB",action:UI.HackCallback(function(){
-		var num_id=SearchByProperty(obj.items,"id",tabid)
+		var num_id=tabid
 		if(num_id<0){return;}
-		if(!num_id){num_id=obj.items.length;}
+		if(!num_id){num_id=items.length;}
 		num_id--;
-		obj.current_tab_id=obj.items[num_id].id
+		obj.current_tab_id=num_id
 		UI.Refresh()
 	})});
 	return obj

@@ -300,31 +300,52 @@ TxtxEditor_prototype.Save=function(){
 	return ["txtx\n",s_json,"\n",s_text].join("");
 }
 //////////////////////////
-UI.NewTxtxDocument=function(fname0,perm){
+TxtxEditor_prototype.RenderAsObject=function(x,y,w,h){
+	this.ed.Render({x:0,y:0,w:this.wrap_width,h:h, scr_x:x,scr_y:y, scale:1, obj:this})
+}
+//////////////////////////
+UI.NewTxtxEditor=function(wrap_width){
+	if(!TxtxEditor_prototype.hyphenator){
+		//TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
+		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.dfa"));
+	}
+	var ret=Object.create(TxtxEditor_prototype)
+	ret.wrap_width=wrap_width
+	ret.Init()
+	return ret
+}
+
+UI.NewTxtxTab=function(fname0,perm){
+	//could have incremental insertion
+	var doc=UI.NewTxtxEditor(1200);//todo
+	var file_name=(fname0||IO.GetNewDocumentName("doc","txtx","document"));
+	if(perm){
+		var sbody=doc.PastePersistentText(perm)
+		//todo: incremental insertion
+		doc.ed.Edit([0,0,sbody],1)
+		perm=undefined;
+	}
 	//todo: page property window
-	return {
-		file_name:(fname0||IO.GetNewDocumentName("doc","txtx","document")),
+	return UI.NewTab({
+		file_name:file_name,
+		doc:doc,
 		body:function(){
-			var body=W.TxtxEditor("body",{
+			//use attribute to have a "throw-it-back" object
+			var body=W.TxtxTab("body",{
 				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
 				'x':0,'y':0,'w':Math.min(1300,UI.context_parent.w),
 				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
-				'file_name':this.file_name,
+				'file_name':this.file_name,'doc':doc,
 				'scale':1,'bgcolor':0xffffffff,
 			})
-			if(perm){
-				var sbody=body.doc.PastePersistentText(perm)
-				body.doc.ed.Edit([0,0,sbody],1)
-				perm=undefined;
-				UI.Refresh()
-			}
 			return body;
 		},
+		title:UI.GetMainFileName(file_name),
 		property_windows:[
 			W.subwindow_text_properties
 		],
 		color_theme:[0xffcc7733],
-	}
+	})
 };
 LOADER.RegisterZipLoader("png",function(data_list,id,fname){
 	var sdata=data_list[id*2+0];
@@ -346,7 +367,7 @@ LOADER.RegisterZipLoader("txt",function(data_list,id,fname){
 		perm.objects[i].obj=LOADER.LoadObject(data_list,obj_id)
 	}
 	if(id==0){
-		UI.NewTab(UI.NewTxtxDocument(fname,perm));
+		UI.NewTxtxTab(fname,perm);
 	}else{
 		//todo
 		throw new Error("textbox unimplemented")
@@ -407,6 +428,12 @@ TxtxEditor_prototype.additional_hotkeys=[
 		var oid=this.GetRenderer().InsertObject(obj_img,obj_img.w,obj_img.h,obj_img.h)
 		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
 	}},
+	{key:"ALT+J",action:function(){
+		var obj_txtbox=UI.NewTxtxEditor();
+		if(!obj_txtbox){return;}//todo: show error notification
+		var oid=this.GetRenderer().InsertObject(obj_txtbox,obj_txtbox.w,obj_txtbox.h,obj_txtbox.h)
+		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
+	}},
 ];
 /////////////////////////////////////////
 TxtxEditor_prototype.BeginContinuousUndo=function(){
@@ -430,13 +457,6 @@ TxtxEditor_prototype.EndContinuousUndo=function(){
 	this.m_style_count=undefined
 }
 /////////////////////////////////////////
-
-var InitPrototype=function(){
-	if(!TxtxEditor_prototype.hyphenator){
-		//TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
-		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.dfa"));
-	}
-};
 
 //var hyp=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"))
 //IO.CreateFile("test/ushyphmax.dfa",hyp.toString())
@@ -517,7 +537,7 @@ W.subwindow_text_properties={
 	}
 };
 
-W.TxtxEditor=function(id,attrs){
+W.TxtxTab=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"txtx_editor");
 	//UI.StdStyling(id,obj,attrs, "txtx_editor",obj.focus_state||"blur");
 	//UI.StdAnchoring(id,obj);
@@ -537,7 +557,6 @@ W.TxtxEditor=function(id,attrs){
 				w1=obj.w
 			}
 		}
-		InitPrototype();
 		var doc=W.Edit("doc",{
 			'x':obj.x+w0,'y':obj.y,'w':w1+w2,'h':obj.h,
 			'wrap_width':obj.page_width,
@@ -659,6 +678,5 @@ W.TxtxEditor=function(id,attrs){
 		})
 		obj.title=UI.GetMainFileName(obj.file_name)+((obj.saved_point||0)!=obj.doc.ed.GetUndoQueueLength()?" *":"")
 	UI.End()
-	g_active_txtx_editor=obj;
 	return obj;
 };

@@ -308,7 +308,7 @@ class CLayouter_programmer
 				x+=dx_i
 		testOverlay()
 	}
-	GetCharacterHeightAt=function(i64[] a,i64[] pp,string s,iptr ofs){
+	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
 		return charHeight()
 	}
 	GetDefaultFont=function(){
