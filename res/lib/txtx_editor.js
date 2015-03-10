@@ -300,8 +300,93 @@ TxtxEditor_prototype.Save=function(){
 	return ["txtx\n",s_json,"\n",s_text].join("");
 }
 //////////////////////////
-TxtxEditor_prototype.RenderAsObject=function(x,y,w,h){
-	this.ed.Render({x:0,y:0,w:this.wrap_width,h:h, scr_x:x,scr_y:y, scale:1, obj:this})
+TxtxEditor_prototype.AsWidget=function(id,attrs){
+	//there is no anchoring or styling, all coords are assumed to be absolute for performance
+	var obj=UI.Keep(id,attrs)
+	UI.Begin(obj)
+	obj.doc=this;
+	var doc=W.Edit("doc",{
+		'x':obj.x,'y':obj.y,'w':obj.w,'h':obj.h,
+		'read_only':obj.read_only,
+	},TxtxEditor_prototype)
+	var renderer=this.GetRenderer()
+	var embeded_objects=renderer.g_rendered_objects;
+	if(embeded_objects.length){
+		var fanchortransform=UI.HackCallback(function(){
+			var real_obj=renderer.GetObject(this.numerical_id);
+			this.translate_y_original=this.y;
+			this.translate_y_baseline=real_obj.y_baseline;
+			this.baseline_ratio=real_obj.y_baseline/real_obj.h;
+			this.scale_w_original=real_obj.w
+			this.scale_h_original=real_obj.h
+		})
+		var fonchange=UI.HackCallback(function(tr){
+			var real_obj=renderer.GetObject(this.numerical_id);
+			if(tr.translation){
+				real_obj.y_baseline=this.translate_y_baseline-(tr.translation[1]);
+			}else{
+				real_obj.w=this.scale_w_original*tr.scale[0]
+				real_obj.h=this.scale_h_original*tr.scale[1]
+				real_obj.y_baseline=this.baseline_ratio*real_obj.h;
+			}
+			doc.ed.InvalidateStates([this.ccnt,lg_rubber_space])
+			UI.Refresh()
+		})
+		for(var i=0;i<embeded_objects.length;i++){
+			var obj_i=embeded_objects[i];
+			var obj_real=renderer.GetObject(obj_i.numerical_id).obj
+			obj_i.read_only=obj.read_only
+			//UI hierarchy...
+			obj_real.AsWidget(id_i,obj_i)
+			var id_i="$"+obj_i.numerical_id
+			obj_i.id=id_i;
+			obj_i.AnchorTransform=fanchortransform;
+			obj_i.SetTransform=fonchange;
+		}
+		var sel={}
+		if(doc.sync_object_selection_to_boxdoc&&obj.embeded_objects){
+			var ccnt0=doc.sel0.ccnt;
+			var ccnt1=doc.sel1.ccnt;
+			if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
+			for(var i=0;i<embeded_objects.length;i++){
+				var obj_i=embeded_objects[i];
+				if(obj_i.ccnt>=ccnt0&&obj_i.ccnt<ccnt1){
+					sel[obj_i.id]=1;
+				}
+			}
+			obj.embeded_objects.group.selection=sel;
+		}
+		var fOnSelectionChange=UI.HackCallback(function(){
+			var sel=obj.embeded_objects.group.selection;
+			var ccnt0=doc.ed.GetTextSize()
+			var ccnt1=0
+			for(var k in sel){
+				if(sel[k]){
+					var ccnt=obj.embeded_objects.group[k].ccnt
+					ccnt0=Math.min(ccnt0,ccnt)
+					ccnt1=Math.max(ccnt1,ccnt+lg_rubber_space)
+				}
+			}
+			if(ccnt0<ccnt1){
+				doc.sel0.ccnt=ccnt0;
+				doc.sel1.ccnt=ccnt1;
+				UI.Refresh()
+			}
+			doc.sync_object_selection_to_boxdoc=0;
+		})
+		//todo: snapping coords
+		//region-less boxDocument
+		if(!obj.read_only){
+			W.BoxDocument("embeded_objects",{
+				'x':0,'y':0,'w':obj.x+obj.w,'h':obj.y+obj.h,
+				'items':embeded_objects,
+				'disable_region':1,
+				'OnSelectionChange':fOnSelectionChange
+			})
+		}
+	}
+	UI.End(obj)
+	return obj
 }
 //////////////////////////
 UI.NewTxtxEditor=function(wrap_width){
@@ -557,78 +642,8 @@ W.TxtxTab=function(id,attrs){
 				w1=obj.w
 			}
 		}
-		var doc=W.Edit("doc",{
-			'x':obj.x+w0,'y':obj.y,'w':w1+w2,'h':obj.h,
-			'wrap_width':obj.page_width,
-		},TxtxEditor_prototype)
-		var renderer=doc.GetRenderer();
-		var embeded_objects=renderer.g_rendered_objects;
-		if(embeded_objects.length){
-			var fanchortransform=UI.HackCallback(function(){
-				var real_obj=renderer.GetObject(this.numerical_id);
-				this.translate_y_original=this.y;
-				this.translate_y_baseline=real_obj.y_baseline;
-				this.baseline_ratio=real_obj.y_baseline/real_obj.h;
-				this.scale_w_original=real_obj.w
-				this.scale_h_original=real_obj.h
-			})
-			var fonchange=UI.HackCallback(function(tr){
-				var real_obj=renderer.GetObject(this.numerical_id);
-				if(tr.translation){
-					real_obj.y_baseline=this.translate_y_baseline-(tr.translation[1]);
-				}else{
-					real_obj.w=this.scale_w_original*tr.scale[0]
-					real_obj.h=this.scale_h_original*tr.scale[1]
-					real_obj.y_baseline=this.baseline_ratio*real_obj.h;
-				}
-				doc.ed.InvalidateStates([this.ccnt,lg_rubber_space])
-				UI.Refresh()
-			})
-			for(var i=0;i<embeded_objects.length;i++){
-				var obj_i=embeded_objects[i];
-				obj_i.id="$"+obj_i.numerical_id;
-				obj_i.AnchorTransform=fanchortransform;
-				obj_i.SetTransform=fonchange;
-			}
-			if(doc.sync_object_selection_to_boxdoc&&obj.embeded_objects){
-				var sel={}
-				var ccnt0=doc.sel0.ccnt;
-				var ccnt1=doc.sel1.ccnt;
-				if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
-				for(var i=0;i<embeded_objects.length;i++){
-					var obj_i=embeded_objects[i];
-					if(obj_i.ccnt>=ccnt0&&obj_i.ccnt<ccnt1){
-						sel[obj_i.id]=1;
-					}
-				}
-				obj.embeded_objects.group.selection=sel;
-			}
-			var fOnSelectionChange=UI.HackCallback(function(){
-				var sel=obj.embeded_objects.group.selection;
-				var ccnt0=doc.ed.GetTextSize()
-				var ccnt1=0
-				for(var k in sel){
-					if(sel[k]){
-						var ccnt=obj.embeded_objects.group[k].ccnt
-						ccnt0=Math.min(ccnt0,ccnt)
-						ccnt1=Math.max(ccnt1,ccnt+lg_rubber_space)
-					}
-				}
-				if(ccnt0<ccnt1){
-					doc.sel0.ccnt=ccnt0;
-					doc.sel1.ccnt=ccnt1;
-					UI.Refresh()
-				}
-				doc.sync_object_selection_to_boxdoc=0;
-			})
-			//region-less boxDocument
-			W.BoxDocument("embeded_objects",{
-				'x':0,'y':0,'w':obj.x+w0+w1+w2,'h':obj.y+obj.h,
-				'items':embeded_objects,
-				'disable_region':1,
-				'OnSelectionChange':fOnSelectionChange
-			})
-		}
+		var doc=obj.doc;
+		doc.AsWidget("body",{'x':obj.x+w0,'y':obj.y,'w':w1+w2,'h':obj.h})
 		/////////////////////////////////////////////
 		//create the property sheet
 		var cur_state=doc.GetCurrentStyleObject();

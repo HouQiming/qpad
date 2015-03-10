@@ -1,3 +1,4 @@
+import "javascript.jc"
 import "gui2d.jc"
 import "text-box.jc"
 import System.Math.*
@@ -842,7 +843,7 @@ class CLayouter_fancy
 	SetTextStyle=function(JSObject obj){
 		m_bgcolor=int(obj["bgcolor"].or(u32(m_bgcolor)))
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
-		m_tab_width=obj["tab_width"].or(8)
+		//m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width_in_fp=float2fixed(obj["wrap_width"].or(800.f))
 		//m_h_blank_line_in_fp=float2fixed(obj["h_blank_line"].or(0.f))
 		m_hyphenator=obj["hyphenator"].or(g_null_hyphenator)
@@ -1021,7 +1022,7 @@ class CLayouter_fancy
 					rendered_y=projectY(y+y_baseline-m_objects[obj_id].y_baseline)
 					rendered_w=fixed2float(m_objects[obj_id].w)*scaling
 					rendered_h=fixed2float(m_objects[obj_id].h)*scaling
-					js_obj.CallMethod(JSObject,"RenderAsObject",rendered_x,rendered_y,rendered_w,rendered_h)
+					//js_obj.CallMethod(JSObject,"RenderAsObject",rendered_x,rendered_y,rendered_w,rendered_h)
 					auto JS=js_obj.m_jsctx
 					obj_rendered_pos=JS.New()
 					obj_rendered_pos["numerical_id"]=obj_id
@@ -1237,9 +1238,9 @@ class CLayouter_fancy
 			stext32.push(ch)
 		return JS.Return(Unicode32ToUtf8(stext32))
 	}
-	JS_UpdatePermanentStyles=function(JSObject proto){
-		obj=JS.Param(0).as(JSObject)
-		m_tab_width=obj["tab_width"].or(m_tab_width)
+	JS_UpdatePermanentStyles=function(JSContext JS){
+		auto obj=JS.Param(0).as(JSObject)
+		//m_tab_width=obj["tab_width"].or(m_tab_width)
 		m_wrap_width_in_fp=float2fixed(obj["wrap_width"].or(fixed2float(m_wrap_width_in_fp)))
 		m_hyphenator=obj["hyphenator"].or(m_hyphenator)
 		return 0

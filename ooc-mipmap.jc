@@ -247,8 +247,18 @@ class CEmbeddedImage
 	/////////////////////
 	__unique_id=-1.0
 	default_extension="png"
-	JS_RenderAsObject=function(JSContext JS){
-		g_manager.DrawMipmapAt(this,JS.Param(0).or(0.f),JS.Param(1).or(0.f),JS.Param(2).or(1.f),JS.Param(3).or(1.f))
+	//JS_RenderAsObject=function(JSContext JS){
+	//	g_manager.DrawMipmapAt(this,JS.Param(0).or(0.f),JS.Param(1).or(0.f),JS.Param(2).or(1.f),JS.Param(3).or(1.f))
+	//	return 0
+	//}
+	JS_AsWidget=function(JSContext JS){
+		obj=JS.Param(1).as(JSObject)
+		if !obj:return 0
+		auto x=obj["x"].as(float)
+		auto y=obj["y"].as(float)
+		auto w=obj["w"].as(float)
+		auto h=obj["h"].as(float)
+		g_manager.DrawMipmapAt(this,x,y,w,h)
 		return 0
 	}
 	JS_GetReferences=function(JSContext JS){
@@ -265,7 +275,8 @@ class CEmbeddedImage
 		proto.ExportProperty(this,"h")
 		proto.ExportProperty(this,"__unique_id")
 		proto.ExportProperty(this,"default_extension")
-		proto.ExportMethod(this,"RenderAsObject",JS_RenderAsObject)
+		//proto.ExportMethod(this,"RenderAsObject",JS_RenderAsObject)
+		proto.ExportMethod(this,"AsWidget",JS_AsWidget)
 		proto.ExportMethod(this,"GetReferences",JS_GetReferences)
 		proto.ExportMethod(this,"Save",JS_Save)
 	}
