@@ -26,6 +26,10 @@ var g_registered_fonts={
 var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
 TxtxEditor_prototype.wrap_width=1024;
+TxtxEditor_prototype.page_margin_left=0;
+TxtxEditor_prototype.page_margin_right=0;
+TxtxEditor_prototype.page_margin_up=0;
+TxtxEditor_prototype.page_margin_down=0;
 //TxtxEditor_prototype.disable_scrolling_x=1
 ////////////////
 TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
@@ -302,11 +306,21 @@ TxtxEditor_prototype.Save=function(){
 //////////////////////////
 TxtxEditor_prototype.AsWidget=function(id,attrs){
 	//there is no anchoring or styling, all coords are assumed to be absolute for performance
+	if(this.is_text_box){
+		//textbox: sync wrap_width
+		var ww2=attrs.w-this.page_margin_left-this.page_margin_right;
+		if(ww2!=this.wrap_width){
+			this.wrap_width=ww2;
+			this.GetRenderer().Internal_UpdatePermanentStyles(this)
+			this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+		}
+	}
 	var obj=UI.Keep(id,attrs)
 	UI.Begin(obj)
 	obj.doc=this;
 	var doc=W.Edit("doc",{
-		'x':obj.x,'y':obj.y,'w':obj.w,'h':obj.h,
+		'x':obj.x+this.page_margin_left,'y':obj.y+this.page_margin_up,
+		'w':obj.w-this.page_margin_left-this.page_margin_right,'h':obj.h-this.page_margin_up-this.page_margin_down,
 		'read_only':obj.read_only,
 	},TxtxEditor_prototype)
 	var renderer=this.GetRenderer()
@@ -335,10 +349,17 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 		for(var i=0;i<embeded_objects.length;i++){
 			var obj_i=embeded_objects[i];
 			var obj_real=renderer.GetObject(obj_i.numerical_id).obj
-			obj_i.read_only=obj.read_only
-			//UI hierarchy...
-			obj_real.AsWidget(id_i,obj_i)
 			var id_i="$"+obj_i.numerical_id
+			obj_i.read_only=obj.read_only
+			//save the widget regions
+			var uirgs=UI.context_regions
+			var lg0=uirgs.length
+			var widget_regions=[]
+			obj_real.AsWidget(id_i,obj_i)
+			while(uirgs.length>lg0){
+				widget_regions.push(uirgs.pop())
+			}
+			obj_i.widget_regions=widget_regions
 			obj_i.id=id_i;
 			obj_i.AnchorTransform=fanchortransform;
 			obj_i.SetTransform=fonchange;
@@ -374,12 +395,31 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 			}
 			doc.sync_object_selection_to_boxdoc=0;
 		})
-		//todo: snapping coords
-		//region-less boxDocument
+		//snapping coords
+		/*
+		//this is incorrect as the dragging is not in real-coords
+		var sel={}
+		if(obj.embeded_objects){sel=(obj.embeded_objects.group.selection||sel);}
+		var snapping_coords={'x':[],'y':[],'tolerance':UI.IS_MOBILE?8:4}
+		for(var i=0;i<embeded_objects.length;i++){
+			var item_i=embeded_objects[i];
+			if(sel[item_i.id]){
+				//avoid self-snapping
+				continue;
+			}
+			snapping_coords.x.push(UI.SNAP_LEFT,item_i.x);
+			snapping_coords.x.push(UI.SNAP_CENTER,item_i.x+item_i.w*0.5);
+			snapping_coords.x.push(UI.SNAP_RIGHT,item_i.x+item_i.w);
+			snapping_coords.y.push(UI.SNAP_LEFT,item_i.y);
+			snapping_coords.y.push(UI.SNAP_CENTER,item_i.y+item_i.h*0.5);
+			snapping_coords.y.push(UI.SNAP_RIGHT,item_i.y+item_i.h);
+		}
+		*/
 		if(!obj.read_only){
 			W.BoxDocument("embeded_objects",{
 				'x':0,'y':0,'w':obj.x+obj.w,'h':obj.y+obj.h,
 				'items':embeded_objects,
+				//'snapping_coords':snapping_coords,
 				'disable_region':1,
 				'OnSelectionChange':fOnSelectionChange
 			})
@@ -403,6 +443,10 @@ UI.NewTxtxEditor=function(wrap_width){
 UI.NewTxtxTab=function(fname0,perm){
 	//could have incremental insertion
 	var doc=UI.NewTxtxEditor(1200);//todo
+	doc.page_margin_left=50;//todo
+	doc.page_margin_right=50;//todo
+	doc.page_margin_up=0;//todo
+	doc.page_margin_down=0;//todo
 	var file_name=(fname0||IO.GetNewDocumentName("doc","txtx","document"));
 	if(perm){
 		var sbody=doc.PastePersistentText(perm)
@@ -418,8 +462,8 @@ UI.NewTxtxTab=function(fname0,perm){
 			//use attribute to have a "throw-it-back" object
 			var body=W.TxtxTab("body",{
 				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
-				'x':0,'y':0,'w':Math.min(1300,UI.context_parent.w),
-				'page_margin_left':50,'page_margin_right':50,'page_width':1200,
+				'x':0,'y':0,'w':Math.min(doc.page_margin_left+doc.wrap_width+doc.page_margin_right,UI.context_parent.w),
+				'page_margin_left':doc.page_margin_left,'page_margin_right':doc.page_margin_right,'page_width':doc.wrap_width,
 				'file_name':this.file_name,'doc':doc,
 				'scale':1,'bgcolor':0xffffffff,
 			})
@@ -454,7 +498,7 @@ LOADER.RegisterZipLoader("txt",function(data_list,id,fname){
 	if(id==0){
 		UI.NewTxtxTab(fname,perm);
 	}else{
-		//todo
+		//todo: page properties
 		throw new Error("textbox unimplemented")
 	}
 })
@@ -516,6 +560,17 @@ TxtxEditor_prototype.additional_hotkeys=[
 	{key:"ALT+J",action:function(){
 		var obj_txtbox=UI.NewTxtxEditor();
 		if(!obj_txtbox){return;}//todo: show error notification
+		//todo
+		obj_txtbox.w=200
+		obj_txtbox.h=150
+		obj_txtbox.page_margin_left=8
+		obj_txtbox.page_margin_right=8
+		obj_txtbox.page_margin_up=8
+		obj_txtbox.page_margin_down=8
+		//todo
+		obj_txtbox.is_text_box=1;
+		obj_txtbox.disable_scrolling_x=1;
+		obj_txtbox.disable_scrolling_y=1;
 		var oid=this.GetRenderer().InsertObject(obj_txtbox,obj_txtbox.w,obj_txtbox.h,obj_txtbox.h)
 		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
 	}},

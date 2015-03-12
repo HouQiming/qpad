@@ -369,7 +369,7 @@ W.UIEditor=function(id,attrs){
 		//create the boxes
 		if(code_box.document_items){
 			var items=code_box.document_items;
-			var snapping_coords={'x':[],'y':[],'tolerance':4}
+			var snapping_coords={'x':[],'y':[],'tolerance':UI.IS_MOBILE?8:4}
 			for(var i=0;i<items.length;i++){
 				var item_i=items[i];
 				if(obj.controls&&obj.controls.group.selection&&obj.controls.group.selection[item_i.id]){

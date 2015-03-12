@@ -178,6 +178,12 @@ W.BoxDocumentItem=function(id,attrs0){
 	UI.StdStyling(id,obj,attrs0, "box_document_item");
 	obj.mouse_cursor=(obj.selected?"sizeall":undefined)
 	W.Region(id,obj);//this does the anchoring
+	if(obj.widget_regions){
+		var widget_regions=obj.widget_regions
+		while(widget_regions.length>0){
+			UI.context_regions.push(widget_regions.pop())
+		}
+	}
 	obj.parent=UI.context_parent.parent;
 	if(obj.selected){
 		//draw the basic box
