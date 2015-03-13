@@ -122,7 +122,7 @@ UI.Application=function(id,attrs){
 			}});
 			//todo: drag-loading
 			W.Hotkey("",{key:"CTRL+O",action:function(){
-				var fn=IO.DoFileDialog(["Txtx documents (*.txtx)","*.txtx","All File","*.*"]);
+				var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
 				if(!fn){return;}
 				UI.OpenFile(fn);
 				UI.Refresh()

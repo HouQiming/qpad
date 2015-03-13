@@ -329,20 +329,16 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 		var fanchortransform=UI.HackCallback(function(){
 			var real_obj=renderer.GetObject(this.numerical_id);
 			this.translate_y_original=this.y;
-			this.translate_y_baseline=real_obj.y_baseline;
+			//this.translate_y_baseline=real_obj.y_baseline;
 			this.baseline_ratio=real_obj.y_baseline/real_obj.h;
 			this.scale_w_original=real_obj.w
 			this.scale_h_original=real_obj.h
 		})
 		var fonchange=UI.HackCallback(function(tr){
 			var real_obj=renderer.GetObject(this.numerical_id);
-			if(tr.translation){
-				real_obj.y_baseline=this.translate_y_baseline-(tr.translation[1]);
-			}else{
-				real_obj.w=this.scale_w_original*tr.scale[0]
-				real_obj.h=this.scale_h_original*tr.scale[1]
-				real_obj.y_baseline=this.baseline_ratio*real_obj.h;
-			}
+			real_obj.w=this.scale_w_original*(tr.scale?tr.scale[0]:1)
+			real_obj.h=this.scale_h_original*(tr.scale?tr.scale[1]:1)
+			real_obj.y_baseline=this.baseline_ratio*real_obj.h-(tr.translation?tr.translation[1]:0);
 			doc.ed.InvalidateStates([this.ccnt,lg_rubber_space])
 			UI.Refresh()
 		})
