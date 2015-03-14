@@ -111,7 +111,7 @@ W.TabbedDocument=function(id,attrs){
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:obj.h_caption,h:obj.h_bar,
 				color:obj.border_color})
-			UI.SwitchToSubWindow(obj.x,obj.h_caption+obj.h_bar,obj.w,obj.h_content)
+			UI.PushSubWindow(obj.x,obj.h_caption+obj.h_bar,obj.w,obj.h_content)
 			var obj_tab=UI.Begin(UI.Keep("active_tab_obj",W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:0,h:obj.h_content,
@@ -119,7 +119,7 @@ W.TabbedDocument=function(id,attrs){
 			})))
 				tab.body.call(tab)
 			UI.End()
-			UI.SwitchToSubWindow()
+			UI.PopSubWindow()
 			if(obj_tab.body.title){
 				if(tab.title!=obj_tab.body.title){
 					tab.title=obj_tab.body.title

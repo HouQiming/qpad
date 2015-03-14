@@ -4,6 +4,10 @@ require("res/lib/boxdoc");
 require("res/lib/color_picker");
 var LOADER=require("res/lib/objloader");
 
+/*
+switch to a purely style-based interface
+*/
+
 //todo: inserting objects - GUI
 COMMAND_INSERT_OBJECT=0x100000
 COMMAND_RUBBER_SPACE=0x107fff
