@@ -1,6 +1,10 @@
-var UI=require("gui2d/ui");
+ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
+var LOADER=require("res/lib/objloader");
 require("res/lib/boxdoc");
+
+/*editor: UI.Theme_Minimalistic([0xff2858d6])//*/
+/*editor: UI.icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);//*/
 
 /*
 array of {x,y,w,h, obj}
@@ -12,7 +16,7 @@ group: a page-in-page
 var DemoPage_prototype={
 	default_extension:"demo_page",
 	enable_compression:1,
-	page_w:1440,page_h:1080,
+	page_w:1440,page_h:1080,bgcolor:0xffffffff,
 	Init:function(){
 		this.body=[];
 	},
@@ -40,9 +44,36 @@ var DemoPage_prototype={
 		}
 		return s_json=JSON.stringify({body:pod_body,page_w:this.page_w,page_h:this.page_h});
 	},
+	InsertObject:function(obj,w,h){
+		//todo: positioning and sizing: drag for it
+		//fragile UI: unintended interaction breaks it
+		this.body.push({x:8,y:8,w:w,h:h,obj:obj})
+		if(this.pboxdoc){
+			var sel={}
+			sel["$"+(this.body.length-1).toString()]=1
+			this.pboxdoc.group.selection=sel;
+		}
+		UI.Refresh()
+	},
+	InsertImage:function(){
+		var img_name=UI.PickImage();
+		if(!img_name){return;}
+		var s_data=IO.ReadAll(img_name)
+		if(!s_data){return;}//todo: show error notification
+		var obj_img=UI.CreateEmbeddedImageFromFileData(s_data);
+		if(!obj_img){return;}//todo: show error notification
+		this.InsertObject(obj_img,obj_img.w,obj_img.h)
+	},
+	InsertTextBox:function(){
+		var obj=UI.NewTextBox()
+		this.InsertObject(obj,obj.w,obj.h)
+	},
 	AsWidget:function(id,attrs){
+		UI.context_parent[id]=this
+		UI.Begin(UI.Keep(id,attrs))
 		var body=this.body;
 		var n=body.length;
+		UI.RoundRect({x:attrs.x,y:attrs.y,w:attrs.w,h:attrs.h,color:this.bgcolor})
 		var fanchortransform=UI.HackCallback(function(){
 			var real_obj=body[this.numerical_id];
 			this.my_anchor_x=real_obj.x;
@@ -54,16 +85,20 @@ var DemoPage_prototype={
 			var real_obj=body[this.numerical_id];
 			real_obj.w=this.my_anchor_w*(tr.scale?tr.scale[0]:1);
 			real_obj.h=this.my_anchor_h*(tr.scale?tr.scale[1]:1);
-			real_obj.x=this.my_anchor_x;
-			real_obj.y=this.my_anchor_y;
+			real_obj.x=this.my_anchor_x+(tr.translation?tr.translation[0]:0);
+			real_obj.y=this.my_anchor_y+(tr.translation?tr.translation[1]:0);
 			if(tr.scale){
 				real_obj.x+=tr.relative_anchor[0]*this.my_anchor_w;
 				real_obj.y+=tr.relative_anchor[1]*this.my_anchor_h;
-				real_obj.w-=tr.relative_anchor[0]*real_obj.w;
-				real_obj.h-=tr.relative_anchor[1]*real_obj.h;
+				real_obj.x-=tr.relative_anchor[0]*real_obj.w;
+				real_obj.y-=tr.relative_anchor[1]*real_obj.h;
 			}
 			UI.Refresh()
 		})
+		var obj_prev;
+		if(!attrs.read_only){
+			obj_prev=this.pboxdoc
+		}
 		var items=[]
 		for(var i=0;i<body.length;i++){
 			var item_i=body[i];
@@ -71,23 +106,16 @@ var DemoPage_prototype={
 			var obj_real=item_i.obj
 			var id_i="$"+i
 			obj_i.read_only=(attrs.read_only||0)
-			//save the widget regions
-			//todo: arbitrary transformation
-			var uirgs=UI.context_regions
-			var lg0=uirgs.length
-			var widget_regions=[]
-			obj_real.AsWidget(id_i,obj_i)
-			while(uirgs.length>lg0){
-				widget_regions.push(uirgs.pop())
+			if(obj_prev&&obj_prev.group.selection&&!obj_prev.group.selection[id_i]){
+				obj_i.read_only=1
 			}
-			obj_i.widget_regions=widget_regions
-			obj_i.id=id_i;
+			//todo: arbitrary transformation
+			UI.EmbedObjectAndPostponeRegions(id_i,obj_i,obj_real,obj_prev)
 			obj_i.AnchorTransform=fanchortransform;
 			obj_i.SetTransform=fonchange;
 			items.push(obj_i)
 		}
 		if(!attrs.read_only){
-			var obj_prev=UI.GetPreviousState(id)
 			var sel={}
 			if(obj_prev){sel=(obj_prev.group.selection||sel);}
 			var snapping_coords={'x':[],'y':[],'tolerance':UI.IS_MOBILE?8:4}
@@ -104,13 +132,18 @@ var DemoPage_prototype={
 				snapping_coords.y.push(UI.SNAP_CENTER,item_i.y+item_i.h*0.5);
 				snapping_coords.y.push(UI.SNAP_RIGHT,item_i.y+item_i.h);
 			}
-			W.BoxDocument(id,{
-				'x':0,'y':0,'w':attrs.x+attrs.w,'h':attrs.y+attrs.h,
+			W.BoxDocument("pboxdoc",{
+				'x':attrs.x,'y':attrs.y,'w':attrs.w,'h':attrs.h,
 				'items':items,
 				'snapping_coords':snapping_coords,
-				'disable_region':1,
 			})
+			var sheet=UI.document_property_sheet;
+			sheet.insert_image=[0,this.InsertImage.bind(this)]
+			sheet.insert_text=[0,this.InsertTextBox.bind(this)]
 		}
+		UI.End()
+		this.__children=[]
+		return this
 	}
 };
 
@@ -133,21 +166,13 @@ LOADER.RegisterZipLoader("demo_page",function(data_list,id,fname){
 	return ret;
 })
 
-//todo: bgcolor
-var thumbnail_prototype={
-	//todo: page selection... it's like tab labels
-	/*
-		click -> make current
-			this has multi-sel and copy/paste
-		dragging
-	*/
-};
 var DemoDocument_prototype={
 	default_extension:"demo_doc",
 	enable_compression:1,
 	Init:function(){
 		this.pages=[];
 		this.current_page=0
+		this.aspect_ratio=3/2;
 	},
 	GetReferences:function(){
 		return this.pages;
@@ -165,7 +190,6 @@ var DemoDocument_prototype={
 		UI.context_parent[id]=this
 		var obj=UI.StdWidget(id,attrs,"demo_document")
 		UI.Begin(obj)
-		//todo: current page, page list (id and thumbnail)
 		//PushSubWindow for thumbnail and editing panel
 		if(obj.w<obj.h){
 			//phone layout
@@ -177,29 +201,65 @@ var DemoDocument_prototype={
 			var thumbnail_margin=w_thumbnail*(3/32);
 			var pages=this.pages;
 			var n=pages.length;
-			var x=obj.x+thumbnail_margin;
-			var y=thumbnail_margin;
 			var thumbnail_style=obj.thumbnail_style;
-			//todo: scrolling
+			var list_items=[]
 			for(var i=0;i<n;i++){
 				var page_i=pages[i]
 				var w_i=w_thumbnail,scale=w_i/page_i.page_w,h_i=scale*page_i.page_h
-				//todo: additional clipping inside... should be fine if we also clip m_window_foo
-				UI.PushSubWindow(x,y,w_i,h_i,scale)
-				page_i.AsWidget("",{x:0,y:0,w:page_i.page_w,h:page_i.page_h,read_only:1})
-				UI.PopSubWindow()
-				y+=h_i+thumbnail_margin;
-				W.Region("$thumbnail_"+i,{x:x, y:y, w:w_i, h:h_i},thumbnail_prototype)
-				UI.RoundRect({x:x,y:y,w:w_i,h:h_i,
-					color:0,border_color:thumbnail_style.border_color,border_width:thumbnail_style.border_width})
-				var s_i=(i+1).toString();
-				W.Text("",{
-					text:s_i,
-					font:thumbnail_style.font,color:thumbnail_style.text_color,
-					x:x-UI.MeasureIconText({font:thumbnail_style.font,text:s_i})-thumbnail_style.text_padding,y:y})
+				list_items.push({x:thumbnail_margin,w:w_i,h:h_i,numerical_id:i})
 			}
-			var x_main_ui=w_thumbnail+thumbnail_margin*3
-			var w_main_ui=obj.w-x_main_page-thumbnail_margin
+			//new page area
+			var w_i=w_thumbnail,h_i=w_thumbnail/this.aspect_ratio
+			list_items.push({
+				object_type:W.Button,
+				x:thumbnail_margin,y:0,w:w_i,h:h_i,
+				style:obj.new_page_button_style,
+				no_click_selection:1,
+				text:"+",
+				OnClick:function(){
+					var new_page=Object.create(DemoPage_prototype)
+					new_page.Init()
+					obj.pages.push(new_page)
+					UI.Refresh()
+				}
+			})
+			var page_list=W.ListView("page_list",{
+				x:0,y:0,w:w_thumbnail+thumbnail_margin*3,h:obj.h,
+				value:this.current_page,OnChange:function(value){
+					obj.current_page=value
+					UI.Refresh()
+				},
+				layout_spacing:thumbnail_margin,layout_align:'right',layout_valign:'up',
+				items:list_items,
+				item_template:{object_type:function(id,attrs){
+					var obj=UI.Keep(id,attrs)
+					UI.StdAnchoring(id,obj)
+					var page_i=pages[this.numerical_id]
+					var w_i=w_thumbnail,scale=w_i/page_i.page_w,h_i=scale*page_i.page_h
+					var new_subwin=UI.PushSubWindow(obj.x,obj.y,w_i,h_i,scale)
+					if(new_subwin[2]||new_subwin[3]){
+						page_i.AsWidget("",{x:0,y:0,w:page_i.page_w,h:page_i.page_h,read_only:1})
+					}
+					UI.PopSubWindow()
+					//////////
+					if(obj.selected){
+						UI.RoundRect({x:obj.x,y:obj.y,w:w_i,h:h_i,
+							color:0,border_color:thumbnail_style.sel_border_color,border_width:thumbnail_style.sel_border_width})
+					}else{
+						UI.RoundRect({x:obj.x,y:obj.y,w:w_i,h:h_i,
+							color:0,border_color:thumbnail_style.border_color,border_width:thumbnail_style.border_width})
+					}
+					var s_i=(this.numerical_id+1).toString();
+					W.Text("",{
+						anchor_placement:'absolute',
+						text:s_i,
+						font:thumbnail_style.font,color:obj.selected?thumbnail_style.sel_text_color:thumbnail_style.text_color,
+						x:obj.x-UI.MeasureIconText({font:thumbnail_style.font,text:s_i}).w-thumbnail_style.text_padding,y:obj.y})
+					return attrs
+				}},
+			})
+			var x_main_ui=w_thumbnail+thumbnail_margin*4
+			var w_main_ui=obj.w-x_main_ui-thumbnail_margin*2
 			var h_main_ui=obj.h-thumbnail_margin*2
 			var cur_page=this.pages[this.current_page]
 			if(this.current_page!=this.last_current_page){
@@ -215,19 +275,35 @@ var DemoDocument_prototype={
 					color:0,border_color:thumbnail_style.border_color,border_width:thumbnail_style.border_width})
 			}
 		}
-		UI.End(obj)
+		UI.End()
 		return obj
 	}
 };
 
 W.subwindow_insert_stuff={
-	'title':'Insert',h:300,
+	'title':'Insert',h:72,
 };
 W.subwindow_insert_stuff.body=function(id,attrs){
-	/*editor: UI.BeginVirtualWindow(id,{w:480,h:720,bgcolor:0xffffffff})//*/
-	//image, text box, symbol
+	/*editor: UI.BeginVirtualWindow(id,{w:300,h:48,bgcolor:0xffffffff})//*/
 	//put VG creation in the image program?
-	//
+	/*widget*/(W.Button('insert_image',{
+		'x':7.020378442417041,'y':31,'w':32,'h':32,
+		style:UI.default_styles.tool_button,font:UI.icon_font,text:'M',
+		property_name:"insert_image"}));
+	/*widget*/(W.Button('insert_text',{
+		'x':39.02037844241704,'y':31,'w':32,'h':32,
+		style:UI.default_styles.tool_button,font:UI.icon_font,text:'T',
+		property_name:"insert_text"}));
+	/*widget*/(W.Button('insert_sym',{
+		'x':71.02037844241704,'y':31,'w':32,'h':32,
+		style:UI.default_styles.tool_button,font:UI.Font("res/fonts/cmunss.ttf,!",24,100),text:'\u03A3',
+		property_name:"insert_sym"}));
+	/*widget*/(W.Button('insert_video',{
+		'x':103.02037844241704,'y':31,'w':32,'h':32,
+		style:UI.default_styles.tool_button,font:UI.icon_font,text:'V',
+		property_name:"insert_video"}));
+	//todo: sound
+	/*insert here*/
 	/*editor: UI.EndVirtualWindow()//*/
 }
 
@@ -239,18 +315,18 @@ UI.NewDemoTab=function(fname0,pages){
 		file_name:file_name,
 		doc:doc,
 		body:function(){
-			this.doc.AsWidget("body",{
-				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
+			var body=this.doc.AsWidget("body",{
+				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
 				'file_name':this.file_name})
 			return body;
 		},
 		title:UI.GetMainFileName(file_name),
 		property_windows:[
-			//todo
+			W.subwindow_insert_stuff,
 			W.subwindow_text_properties
 		],
-		color_theme:[0xffcc7733],
+		color_theme:[0xff2858d6],
 	})
 }
 
@@ -270,4 +346,3 @@ LOADER.RegisterZipLoader("demo_doc",function(data_list,id,fname){
 
 
 //demo document: multiple pages, widget is the main UI
-//todo: insertion toolbar

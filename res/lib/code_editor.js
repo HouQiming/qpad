@@ -57,7 +57,7 @@ var RerunUserCode=function(code_box){
 	};
 	s_code=s_code.replace(re_widget,ftranslate_widget).replace(re_editor,"");
 	try{
-		g_sandbox.eval(ed.GetText());
+		g_sandbox.eval(ed.GetText().replace(re_editor,""));
 		g_sandbox.eval("UI.top={};UI.Application=function(id,attrs){"+s_code+"};");
 	}catch(err){
 		ParseCodeError(err)
@@ -238,7 +238,7 @@ W.subwindow_insertion_bar={
 			text:(g_sandbox.m_relative_scaling*100).toFixed(0)+"%"})
 		obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'up',x:8,y:64,
 			font:UI.Font("res/fonts/opensans.ttf",24),color:0xff000000,text:"Padding"})
-		W.EditBox("padding_editor",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,w:32,h:28,
+		W.EditBox("padding_editor",{anchor:obj_temp,anchor_placement:'right',anchor_valign:'center',x:8,y:0,w:64,h:28,
 			property_name:'padding'})
 		W.Group("layout",{
 			anchor:'parent',anchor_align:'fill',anchor_valign:'up',

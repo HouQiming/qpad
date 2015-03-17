@@ -331,6 +331,26 @@ W.BoxDocument=function(id,attrs){
 			UI.RoundRect(obj.sel_rect);
 		}
 	UI.End(obj)
+	return obj
 }
 
-//todo: cursor system - UI.SDL_SetSystemCursor(UI.SDL_SYSTEM_CURSOR_IBEAM)
+UI.EmbedObjectAndPostponeRegions=function(id_i,obj_i,obj_real,pboxdoc){
+	var uirgs=UI.context_regions
+	var lg0=uirgs.length
+	var widget_regions=[]
+	//var is_focus=UI.context_focus_is_a_region
+	obj_real.AsWidget(id_i,obj_i)
+	//is_focus=UI.context_focus_is_a_region-is_focus
+	//if(is_focus){
+	//	if(pboxdoc){
+	//		pboxdoc.group.selection={};
+	//		pboxdoc.group.selection[id_i]=1;
+	//	}
+	//}
+	while(uirgs.length>lg0){
+		widget_regions.push(uirgs.pop())
+	}
+	obj_i.widget_regions=widget_regions
+	obj_i.id=id_i;
+	return obj_i
+}

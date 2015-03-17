@@ -312,7 +312,7 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 	//there is no anchoring or styling, all coords are assumed to be absolute for performance
 	if(this.is_text_box){
 		//textbox: sync wrap_width
-		var ww2=attrs.w-this.page_margin_left-this.page_margin_right;
+		var ww2=(attrs.w-this.page_margin_left-this.page_margin_right);
 		if(ww2!=this.wrap_width){
 			this.wrap_width=ww2;
 			this.GetRenderer().Internal_UpdatePermanentStyles(this)
@@ -346,26 +346,22 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 			doc.ed.InvalidateStates([this.ccnt,lg_rubber_space])
 			UI.Refresh()
 		})
+		var pboxdoc=obj.embeded_objects;
 		for(var i=0;i<embeded_objects.length;i++){
 			var obj_i=embeded_objects[i];
+			obj_i.x/=UI.pixels_per_unit//abs to relative
+			obj_i.y/=UI.pixels_per_unit//abs to relative
+			obj_i.w/=UI.pixels_per_unit//abs to relative
+			obj_i.h/=UI.pixels_per_unit//abs to relative
 			var obj_real=renderer.GetObject(obj_i.numerical_id).obj
 			var id_i="$"+obj_i.numerical_id
 			obj_i.read_only=obj.read_only
-			//save the widget regions
-			var uirgs=UI.context_regions
-			var lg0=uirgs.length
-			var widget_regions=[]
-			obj_real.AsWidget(id_i,obj_i)
-			while(uirgs.length>lg0){
-				widget_regions.push(uirgs.pop())
-			}
-			obj_i.widget_regions=widget_regions
-			obj_i.id=id_i;
+			UI.EmbedObjectAndPostponeRegions(id_i,obj_i,obj_real,pboxdoc)
 			obj_i.AnchorTransform=fanchortransform;
 			obj_i.SetTransform=fonchange;
 		}
 		var sel={}
-		if(doc.sync_object_selection_to_boxdoc&&obj.embeded_objects){
+		if(doc.sync_object_selection_to_boxdoc&&pboxdoc){
 			var ccnt0=doc.sel0.ccnt;
 			var ccnt1=doc.sel1.ccnt;
 			if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
@@ -375,7 +371,7 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 					sel[obj_i.id]=1;
 				}
 			}
-			obj.embeded_objects.group.selection=sel;
+			pboxdoc.group.selection=sel;
 		}
 		var fOnSelectionChange=UI.HackCallback(function(){
 			var sel=obj.embeded_objects.group.selection;
@@ -425,6 +421,40 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 			})
 		}
 	}
+	/////////////////////////////////////////////
+	//create the property sheet
+	var cur_state=doc.GetCurrentStyleObject();
+	var sel=doc.GetSelection();
+	var cur_line=doc.GetLC(sel[0])[0]
+	var sheet=UI.document_property_sheet;
+	sheet["font_face"]=[cur_state.font_face,function(value){doc.ModifyTextStyle(function(style){style.font_face=value});}],
+	sheet["font_size"]=[cur_state.font_size,function(value){doc.ModifyTextStyle(function(style){style.font_size=value});}],
+	sheet["underlined"]=[!!(cur_state.flags&STYLE_UNDERLINED),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_UNDERLINED)|(value?STYLE_UNDERLINED:0))});}],
+	//sheet["strike_out"]=[!!(cur_state.flags&STYLE_STRIKE_OUT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_STRIKE_OUT)|(value?STYLE_STRIKE_OUT:0))});}],
+	sheet["superscript"]=[!!(cur_state.flags&STYLE_SUPERSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUPERSCRIPT:0))});}],
+	sheet["subscript"]=[!!(cur_state.flags&STYLE_SUBSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUBSCRIPT:0))});}],
+	sheet["italic"]=[!!(cur_state.flags&STYLE_FONT_ITALIC),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_ITALIC)|(value?STYLE_FONT_ITALIC:0))});}],
+	sheet["bold"]=[!!(cur_state.flags&STYLE_FONT_BOLD),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_BOLD)|(value?STYLE_FONT_BOLD:0))});}],
+	//////
+	sheet["text_color"]=[
+		cur_state.color,
+		function(value,is_continuous){
+			if(is_continuous){
+				doc.PerformContinuousUndo()
+			}
+			doc.ModifyTextStyle(function(style){style.color=value});
+		},
+		function(){doc.BeginContinuousUndo();},
+		function(){doc.EndContinuousUndo();}],
+	sheet["align_l"]=[
+		doc.GetRubberPadding(cur_line)==0,
+		function(value){doc.SetRubberPadding(0)}],
+	sheet["align_c"]=[
+		doc.GetRubberPadding(cur_line)==3,
+		function(value){doc.SetRubberPadding(value?3:0)}],
+	sheet["align_r"]=[
+		doc.GetRubberPadding(cur_line)==1,
+		function(value){doc.SetRubberPadding(value?1:0)}],
 	UI.End(obj)
 	return obj
 }
@@ -438,6 +468,23 @@ UI.NewTxtxEditor=function(wrap_width){
 	ret.wrap_width=wrap_width
 	ret.Init()
 	return ret
+}
+
+UI.NewTextBox=function(){
+	var wrap_width=200
+	var obj_txtbox=UI.NewTxtxEditor(wrap_width);
+	obj_txtbox.is_text_box=1;
+	obj_txtbox.disable_scrolling_x=1;
+	obj_txtbox.disable_scrolling_y=1;
+	//todo
+	obj_txtbox.w=wrap_width
+	obj_txtbox.h=150
+	obj_txtbox.page_margin_left=8
+	obj_txtbox.page_margin_right=8
+	obj_txtbox.page_margin_up=8
+	obj_txtbox.page_margin_down=8
+	//todo
+	return obj_txtbox
 }
 
 UI.NewTxtxTab=function(fname0,perm){
@@ -558,19 +605,7 @@ TxtxEditor_prototype.additional_hotkeys=[
 		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
 	}},
 	{key:"ALT+J",action:function(){
-		var obj_txtbox=UI.NewTxtxEditor();
-		if(!obj_txtbox){return;}//todo: show error notification
-		//todo
-		obj_txtbox.w=200
-		obj_txtbox.h=150
-		obj_txtbox.page_margin_left=8
-		obj_txtbox.page_margin_right=8
-		obj_txtbox.page_margin_up=8
-		obj_txtbox.page_margin_down=8
-		//todo
-		obj_txtbox.is_text_box=1;
-		obj_txtbox.disable_scrolling_x=1;
-		obj_txtbox.disable_scrolling_y=1;
+		var obj_txtbox=UI.NewTextBox();
 		var oid=this.GetRenderer().InsertObject(obj_txtbox,obj_txtbox.w,obj_txtbox.h,obj_txtbox.h)
 		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
 	}},
@@ -615,35 +650,35 @@ W.subwindow_text_properties={
 		var parent=UI.context_parent;
 		/*widget*/(W.Button('bold',{
 			'x':13.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'B',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'B',
 			property_name:"bold"}));
 		/*widget*/(W.Button('italic',{
 			'x':45.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'I',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'I',
 			property_name:"italic"}));
 		/*widget*/(W.Button('underlined',{
 			'x':77.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'U',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'U',
 			property_name:"underlined"}));
 		/*widget*/(W.Button('superscript',{
 			'x':109.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'^',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'^',
 			property_name:"superscript"}));
 		/*widget*/(W.Button('subscript',{
 			'x':141.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'_',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'_',
 			property_name:"subscript"}));
 		/*widget*/(W.Button('align_l',{
 			'x':176.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'1',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'1',
 			property_name:"align_l"}));
 		/*widget*/(W.Button('align_c',{
 			'x':208.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'2',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'2',
 			property_name:"align_c"}));
 		/*widget*/(W.Button('align_r',{
 			'x':240.02037844241704,'y':74,'w':32,'h':32,
-			style:UI.default_styles.check_button,font:g_icon_font,text:'3',
+			style:UI.default_styles.check_button,font:UI.icon_font,text:'3',
 			property_name:"align_r"}));
 		//todo
 		/*widget*/(W.ColorPicker('color_picker',{
@@ -664,14 +699,8 @@ W.subwindow_text_properties={
 			],
 			property_name:"font_face",
 		}));
-		/*widget*/(W.ComboBox("size_box",{
+		/*widget*/(W.EditBox("size_box",{
 			'x':191.0906294148415,'y':36,'w':80.92974902757557,'h':29,
-			items:[
-				{text:"24"},
-				{text:"30"},
-				{text:"44"},
-				{text:"64"},
-			],
 			property_name:"font_size",
 		}));
 	}
@@ -684,6 +713,7 @@ W.TxtxTab=function(id,attrs){
 	UI.RoundRect(obj)
 	UI.Begin(obj)
 		//handle page properties
+		//todo: scrolling?
 		var w0=obj.page_margin_left
 		var w1=obj.page_width
 		var w2=obj.page_margin_right
@@ -698,47 +728,7 @@ W.TxtxTab=function(id,attrs){
 			}
 		}
 		var doc=obj.doc;
-		doc.AsWidget("body",{'x':obj.x+w0,'y':obj.y,'w':w1+w2,'h':obj.h})
-		/////////////////////////////////////////////
-		//create the property sheet
-		var cur_state=doc.GetCurrentStyleObject();
-		var sel=doc.GetSelection();
-		var cur_line=doc.GetLC(sel[0])[0]
-		//todo: smart undo here - avoid style explosion
-		//and restore the style count too
-		//invalidate upon MouseUp
-		//additional callbacks: BeginContinuousChange, EndContinuousChange, extra arg for OnChange
-		//editor method: BeginContinuousUndo, EndContinuousUndo
-		UI.document_property_sheet={
-			"font_face":[cur_state.font_face,function(value){doc.ModifyTextStyle(function(style){style.font_face=value});}],
-			"font_size":[cur_state.font_size,function(value){doc.ModifyTextStyle(function(style){style.font_size=value});}],
-			"underlined":[!!(cur_state.flags&STYLE_UNDERLINED),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_UNDERLINED)|(value?STYLE_UNDERLINED:0))});}],
-			//"strike_out":[!!(cur_state.flags&STYLE_STRIKE_OUT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_STRIKE_OUT)|(value?STYLE_STRIKE_OUT:0))});}],
-			"superscript":[!!(cur_state.flags&STYLE_SUPERSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUPERSCRIPT:0))});}],
-			"subscript":[!!(cur_state.flags&STYLE_SUBSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUBSCRIPT:0))});}],
-			"italic":[!!(cur_state.flags&STYLE_FONT_ITALIC),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_ITALIC)|(value?STYLE_FONT_ITALIC:0))});}],
-			"bold":[!!(cur_state.flags&STYLE_FONT_BOLD),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_BOLD)|(value?STYLE_FONT_BOLD:0))});}],
-			//////
-			"text_color":[
-				cur_state.color,
-				function(value,is_continuous){
-					if(is_continuous){
-						doc.PerformContinuousUndo()
-					}
-					doc.ModifyTextStyle(function(style){style.color=value});
-				},
-				function(){doc.BeginContinuousUndo();},
-				function(){doc.EndContinuousUndo();}],
-			"align_l":[
-				doc.GetRubberPadding(cur_line)==0,
-				function(value){doc.SetRubberPadding(0)}],
-			"align_c":[
-				doc.GetRubberPadding(cur_line)==3,
-				function(value){doc.SetRubberPadding(value?3:0)}],
-			"align_r":[
-				doc.GetRubberPadding(cur_line)==1,
-				function(value){doc.SetRubberPadding(value?1:0)}],
-		}
+		doc.AsWidget("body",{'x':obj.x,'y':obj.y,'w':w0+w1+w2,'h':obj.h})
 		obj.Save=UI.HackCallback(function(){
 			//todo: save as: int osal_DoFileDialogWin(short* buf, short* filter,short* def_ext,int is_save){
 			//we can do without it on phones: save as opens rename in file explorer

@@ -254,10 +254,10 @@ class CEmbeddedImage
 	JS_AsWidget=function(JSContext JS){
 		obj=JS.Param(1).as(JSObject)
 		if !obj:return 0
-		auto x=obj["x"].as(float)
-		auto y=obj["y"].as(float)
-		auto w=obj["w"].as(float)
-		auto h=obj["h"].as(float)
+		auto x=obj["x"].as(float)*g_renderer.m_pixels_per_unit
+		auto y=obj["y"].as(float)*g_renderer.m_pixels_per_unit
+		auto w=obj["w"].as(float)*g_renderer.m_pixels_per_unit
+		auto h=obj["h"].as(float)*g_renderer.m_pixels_per_unit
 		g_manager.DrawMipmapAt(this,x,y,w,h)
 		return 0
 	}

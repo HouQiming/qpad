@@ -582,16 +582,17 @@ class CLayouter_fancy
 				if i>=2:
 					wsum_last+=atoms[i-2].tail_kerning
 				wsum_last+=atoms[i-1].w
-				while wsum_last>w_line:
+				while wsum_last>w_line&&j_min_last<i-1:
 					wsum_last-=atoms[j_min_last].w+atoms[j_min_last].tail_kerning
 					j_min_last++
 				/////////
 				j_min=j_min_last
 				w=wsum_last+w0
+			j_min=min(j_min,i-1)
 			w_tail=w_line-w
 			best_i=1LL<<62
 			blast_i=j_min
-			for j=min(j_min,i-1):i-1
+			for j=j_min:i-1
 				if j==i-1&&(atoms[i-1].flags&FLAG_IS_SPACE):
 					break
 				if w_tail>=0LL:

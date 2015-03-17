@@ -5,11 +5,12 @@ require("gui2d/dockbar");
 require("res/lib/txtx_editor");
 require("res/lib/code_editor");
 require("res/lib/subwin");
+require("res/lib/demo_doc");
 
 UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.Theme_Minimalistic([0xffcc7733])
 UI.SetFontSharpening(1.5)
-var g_icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
+UI.icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
 UI.font_name="res/fonts/opensans.ttf"
 
@@ -110,7 +111,8 @@ UI.Application=function(id,attrs){
 			}
 			//////////////////////////
 			W.Hotkey("",{key:"CTRL+N",action:function(){
-				UI.NewUIEditorTab()
+				//UI.NewUIEditorTab()
+				UI.NewDemoTab()
 				UI.Refresh()
 			}});
 			W.Hotkey("",{key:"CTRL+S",action:function(){
