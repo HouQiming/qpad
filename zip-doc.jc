@@ -35,10 +35,9 @@ auto zip(string s)
 
 inline crc32(string s){return stbiw__crc32(s,s.n)}
 
-auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
+auto SaveZipDocument(System.IO.CFile fzip,JSObject objs)
 	//JS=obj_root.GetContext()
 	//JS.GetGlobal()["UI"]["SaveObject"]
-	g_unique_id=0
 	sz_written=0L
 	sz_data=0L
 	inline writeZip(string s)
@@ -48,28 +47,10 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 			return 0
 		else
 			return 1
-	objs=new JSObject[]
-	idmap=new JSObject[int]
-	auto dfsObject(JSObject obj)
-		id_obj=obj["__unique_id"].or(-1)
-		if id_obj==-1:
-			id_obj=g_unique_id;g_unique_id++
-			obj["__unique_id"]=id_obj
-		if idmap[id_obj]:return
-		idmap[id_obj]=obj
-		objs.push(obj)
-		children=obj.CallMethod(JSObject,"GetReferences")
-		if children:
-			for i=0:children.length()-1
-				obj_i=children[i].as(JSObject)
-				if obj_i:
-					dfsObject(obj_i)
-	dfsObject(obj_root)
 	s_central=new string
-	nfiles=0
-	foreach obj in objs
-		id_obj=obj["__unique_id"].or(-1)
-		//Save accesses __unique_id of dependencies
+	nfiles=objs.length()
+	for id_obj=0:nfiles-1
+		obj=objs[id_obj].as(JSObject)
 		s_save=obj.CallMethod(string,"Save")
 		if !s_save:
 			Writeln('error saving JS object ',id_obj)
@@ -106,11 +87,7 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 		s_central.push('\0')
 		s_central.push([int(plocal)].ConvertToAsBinary(char))
 		s_central.push(fn_zip)
-		nfiles++
 		fdata.discard()
-	//wipe __unique_id for the next save
-	foreach obj in objs
-		obj["__unique_id"]=-1
 	//write the new directory
 	p_central=fzip.Position()
 	s_central.push("PK\x05\x06\x00\x00\x00\x00")
@@ -119,50 +96,65 @@ auto SaveZipDocument(System.IO.CFile fzip,JSObject obj_root)
 	if !writeZip(s_central):return 0
 	return 1
 
+class CLazyLoadedZipDocument
+	m_fnames=new string[int]
+	CZipFile m_zip
+	int n
+	JS_ReadObject=function(JSContext JS){
+		id=JS.Param(0).as(int)
+		fname=m_fnames[id]
+		if !fname:return 0
+		pdot=fname.LastIndexOf('.')
+		sext=fname[pdot+1:]
+		ret=JS.New()
+		ret["data"]=m_zip.ReadAll(fname)
+		ret["ext"]=sext
+		return JS.Return(ret)
+	}
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"n")
+		proto.ExportMethod(this,"ReadObject",JS_ReadObject)
+	}
+	
 auto LoadZipDocument(JSContext JS,string fname)
 	/*
 	native zip reader calls LOADER.ParseObject to get an array
 	then call SetReferences on each object with that array
 	*/
 	sraw=System.IO.ReadAll(fname)
-	if !sraw:return JSObject.NULL
+	if !sraw:return CLazyLoadedZipDocument.NULL
 	zipfile=ParseZip(sraw)
-	if !zipfile:return JSObject.NULL
-	oid_to_sdata=new string[int]
-	oid_to_ext=new string[int]
-	omax=-1
+	if !zipfile:return CLazyLoadedZipDocument.NULL
+	//oid_to_sdata=new string[int]
+	//oid_to_ext=new string[int]
+	ret=new CLazyLoadedZipDocument
+	ret.m_zip=zipfile
+	oid_max=-1
 	foreach fn in zipfile.AllFileNames()
 		pdot=fn.LastIndexOf('.')
-		if pdot<0:return JSObject.NULL
+		if pdot<0:return CLazyLoadedZipDocument.NULL
 		oid=fn[:pdot-1].asHex(int)
-		if oid_to_sdata[oid]:return JSObject.NULL
-		sdata=zipfile.ReadAll(fn)
-		if !sdata:return JSObject.NULL
-		oid_to_sdata[oid]=sdata
-		oid_to_ext[oid]=fn[pdot+1:].ToLower()
-		omax=max(omax,oid)
-	omax++
-	data_list=JS.NewArray()
-	for i=0:omax-1
-		sdata_i=oid_to_sdata[i]
-		if !sdata_i:return JSObject.NULL
-		data_list[i*2+0]=sdata_i
-		data_list[i*2+1]=oid_to_ext[i]
-	return data_list
+		if ret.m_fnames[oid]:return CLazyLoadedZipDocument.NULL
+		ret.m_fnames[oid]=fn
+		oid_max=max(oid_max,oid)
+	ret.n=oid_max+1
+	if ret.n>=1048576:return CLazyLoadedZipDocument.NULL
+	for i=0:ret.n-1
+		if !ret.m_fnames[i]:return CLazyLoadedZipDocument.NULL
+	return ret
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["SaveZipDocument"]=function(JSContext JS){
 		sfile=JS.Param(0).as(string)
-		obj=JS.Param(1).as(JSObject)
-		if !sfile||!obj:return 0
+		objs=JS.Param(1).as(JSObject)
+		if !sfile||!objs:return 0
 		fzip=System.IO.CreateFile(sfile)
 		if !fzip:return 0
-		return JS.Return(SaveZipDocument(fzip,obj))
+		return JS.Return(SaveZipDocument(fzip,objs))
 	}
-	JS_UI["LoadZipDocument"]=function(JSContext JS){
+	JS_UI["_LoadZipDocument"]=function(JSContext JS){
 		fname=JS.Param(0).as(string)
 		if !fname:return 0
-		data_list=LoadZipDocument(JS,fname)
-		return JS.Return(data_list)
+		return JS.Return(LoadZipDocument(JS,fname))
 	}
 })

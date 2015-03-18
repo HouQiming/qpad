@@ -65,8 +65,10 @@ TxtxEditor_prototype.HookedEdit=function(ops){
 			}
 		}
 	}
+	this.m_global_document.ReportEdit(this.m_sub_document_id)
 	ed.Edit(ops);
 };
+//todo: undo hooks
 TxtxEditor_prototype.GetRenderer=function(){
 	var ed=this.ed;
 	return ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
@@ -262,7 +264,7 @@ TxtxEditor_prototype.GetTextAsPersistentForm=function(raw_ccnt0,raw_ccnt1){
 	var perm=renderer.Internal_ConvertTextToPersistentForm(stext,this.GetStyleIDAt(ccnt0))
 	for(var i=0;i<perm.objects.length;i++){
 		var obj_i=renderer.GetObject(perm.objects[i]);
-		perm.objects[i]={obj:obj_i.obj, w:obj_i.w, h:obj_i.h, y_baseline:obj_i.y_baseline}
+		perm.objects[i]={obj:obj_i.obj_id, w:obj_i.w, h:obj_i.h, y_baseline:obj_i.y_baseline}
 	}
 	for(var i=0;i<perm.styles.length;i++){
 		perm.styles[i]=this.CloneStyle(this.styles[perm.styles[i]])
@@ -291,9 +293,17 @@ TxtxEditor_prototype.GetReferences=function(){
 	var n=renderer.GetObjectCount()
 	var objects=[]
 	for(var i=0;i<n;i++){
-		objects.push(renderer.GetObject(i).obj)
+		objects.push(renderer.GetObject(i).obj_id)
 	}
 	return objects
+}
+TxtxEditor_prototype.SetReferences=function(mapping){
+	var renderer=this.GetRenderer()
+	var n=renderer.GetObjectCount()
+	for(var i=0;i<n;i++){
+		var obj_i=renderer.GetObject(i)
+		obj_i.obj_id=mapping[obj_i.obj_id]
+	}
 }
 TxtxEditor_prototype.default_extension="txt";
 TxtxEditor_prototype.enable_compression=1
@@ -353,7 +363,7 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 			obj_i.y/=UI.pixels_per_unit//abs to relative
 			obj_i.w/=UI.pixels_per_unit//abs to relative
 			obj_i.h/=UI.pixels_per_unit//abs to relative
-			var obj_real=renderer.GetObject(obj_i.numerical_id).obj
+			var obj_real=this.m_global_document.GetObject(renderer.GetObject(obj_i.numerical_id).obj_id)
 			var id_i="$"+obj_i.numerical_id
 			obj_i.read_only=obj.read_only
 			UI.EmbedObjectAndPostponeRegions(id_i,obj_i,obj_real,pboxdoc)
@@ -459,7 +469,7 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 	return obj
 }
 //////////////////////////
-UI.NewTxtxEditor=function(wrap_width){
+UI.GlobalDoc_prototype.NewTxtxEditor=function(wrap_width){
 	if(!TxtxEditor_prototype.hyphenator){
 		//TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
 		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.dfa"));
@@ -470,9 +480,9 @@ UI.NewTxtxEditor=function(wrap_width){
 	return ret
 }
 
-UI.NewTextBox=function(){
+UI.GlobalDoc_prototype.NewTextBox=function(){
 	var wrap_width=200
-	var obj_txtbox=UI.NewTxtxEditor(wrap_width);
+	var obj_txtbox=this.NewTxtxEditor(wrap_width);
 	obj_txtbox.is_text_box=1;
 	obj_txtbox.disable_scrolling_x=1;
 	obj_txtbox.disable_scrolling_y=1;
@@ -487,8 +497,10 @@ UI.NewTextBox=function(){
 	return obj_txtbox
 }
 
-UI.NewTxtxTab=function(fname0,perm){
+!? //m_global_document, re-doing the style sheet
+TxtxEditor_prototype.OpenAsTab=function(){
 	//could have incremental insertion
+	!? fname0,perm
 	var doc=UI.NewTxtxEditor(1200);//todo
 	doc.page_margin_left=50;//todo
 	doc.page_margin_right=50;//todo
@@ -523,13 +535,15 @@ UI.NewTxtxTab=function(fname0,perm){
 		color_theme:[0xffcc7733],
 	})
 };
-LOADER.RegisterZipLoader("png",function(data_list,id,fname){
+LOADER.RegisterZipLoader("png",function(sdata){
+	!?
 	var sdata=data_list[id*2+0];
 	var obj_img=UI.CreateEmbeddedImageFromFileData(sdata);
 	if(!obj_img){throw new Error("invalid image")}
 	return obj_img
 })
-LOADER.RegisterZipLoader("txt",function(data_list,id,fname){
+LOADER.RegisterZipLoader("txt",function(sdata){
+	!?
 	var sdata=data_list[id*2+0];
 	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
 	var pline1=sdata.indexOf('\n',pline0+1);if(pline1<0){return;}

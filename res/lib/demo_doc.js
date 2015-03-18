@@ -21,6 +21,7 @@ var DemoPage_prototype={
 		this.body=[];
 	},
 	GetReferences:function(){
+		!?
 		var objects=[];
 		var body=this.body;
 		var n=body.length;
@@ -28,6 +29,9 @@ var DemoPage_prototype={
 			objects.push(body[i])
 		}
 		return objects;
+	},
+	SetReferences:function(mapping){
+		!?
 	},
 	Save:function(){
 		var body=this.body;
@@ -175,7 +179,11 @@ var DemoDocument_prototype={
 		this.aspect_ratio=3/2;
 	},
 	GetReferences:function(){
+		!?
 		return this.pages;
+	},
+	SetReferences:function(mapping){
+		!?
 	},
 	Save:function(){
 		var pages=this.pages;

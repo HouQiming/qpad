@@ -409,7 +409,7 @@ class CStyle
 				ligatures.push(g_utf8_ligatures[i])
 				ligatures.push(g_utf8_ligatures[i+1])
 class CEmbededObject
-	JSObject obj
+	int obj_id
 	i64 w,h,y_baseline
 	///////////
 	JS_get_w=function(JSContext JS){return JS.Return(fixed2double(w))}
@@ -419,7 +419,7 @@ class CEmbededObject
 	JS_set_h=function(JSContext JS){h=double2fixed(JS.Param(0).as(double));return 0}
 	JS_set_y_baseline=function(JSContext JS){y_baseline=double2fixed(JS.Param(0).as(double));return 0}
 	__JS_prototype=function(JSObject proto){
-		proto.ExportProperty(this,"obj")
+		proto.ExportProperty(this,"obj_id")
 		proto.ExportGetterSetter(this,"w",JS_get_w,JS_set_w)
 		proto.ExportGetterSetter(this,"h",JS_get_h,JS_set_h)
 		proto.ExportGetterSetter(this,"y_baseline",JS_get_y_baseline,JS_set_y_baseline)
@@ -797,6 +797,7 @@ class CLayouter_fancy
 	m_caret_overlay=long3(-1LL,-1LL,-1LL)
 	JSObject m_overlay_obj
 	i64 m_caret_offset
+	JSContext m_JS
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
 		if !obj:
 			m_caret_overlay=long3(-1LL,-1LL,-1LL)
@@ -842,6 +843,7 @@ class CLayouter_fancy
 	}
 	//////////////////////////////////////////////
 	SetTextStyle=function(JSObject obj){
+		m_JS=obj.GetContext()
 		m_bgcolor=int(obj["bgcolor"].or(u32(m_bgcolor)))
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		//m_tab_width=obj["tab_width"].or(8)
@@ -1017,16 +1019,13 @@ class CLayouter_fancy
 			else if style_id==-1:
 				//object
 				obj_id=value0
-				js_obj=m_objects[obj_id].obj
 				if mode==MODE_RENDER:
 					rendered_x=projectX(x)
 					rendered_y=projectY(y+y_baseline-m_objects[obj_id].y_baseline)
 					rendered_w=fixed2float(m_objects[obj_id].w)*scaling
 					rendered_h=fixed2float(m_objects[obj_id].h)*scaling
-					//js_obj.CallMethod(JSObject,"RenderAsObject",rendered_x,rendered_y,rendered_w,rendered_h)
-					auto JS=js_obj.m_jsctx
-					obj_rendered_pos=JS.New()
-					obj_rendered_pos["numerical_id"]=obj_id
+					obj_rendered_pos=m_JS.New()
+					obj_rendered_pos["numerical_id"]=obj_id//it's a local id
 					obj_rendered_pos["x"]=rendered_x
 					obj_rendered_pos["y"]=rendered_y
 					obj_rendered_pos["w"]=rendered_w
