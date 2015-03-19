@@ -246,7 +246,8 @@ class CEmbeddedImage
 		return m_mipmap[level]
 	/////////////////////
 	__unique_id=-1.0
-	default_extension="png"
+	//can_keep_when_copied=1
+	//default_extension="png"
 	//JS_RenderAsObject=function(JSContext JS){
 	//	g_manager.DrawMipmapAt(this,JS.Param(0).or(0.f),JS.Param(1).or(0.f),JS.Param(2).or(1.f),JS.Param(3).or(1.f))
 	//	return 0
@@ -274,7 +275,8 @@ class CEmbeddedImage
 		proto.ExportProperty(this,"w")
 		proto.ExportProperty(this,"h")
 		proto.ExportProperty(this,"__unique_id")
-		proto.ExportProperty(this,"default_extension")
+		proto["default_extension"]="png"
+		//proto["share_across_docs"]=1
 		//proto.ExportMethod(this,"RenderAsObject",JS_RenderAsObject)
 		proto.ExportMethod(this,"AsWidget",JS_AsWidget)
 		proto.ExportMethod(this,"GetReferences",JS_GetReferences)

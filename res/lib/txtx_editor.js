@@ -40,16 +40,26 @@ TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
 	var ed=this.ed;
 	return ed.GetStateAt(ed.m_handler_registration["renderer"],ccnt,"ddl")[2];
 };
-TxtxEditor_prototype.GetCurrentStyleObject=function(){
-	var style_id=this.GetStyleIDAt(this.GetSelection()[1]);
-	return this.styles[style_id];
-};
+//TxtxEditor_prototype.GetCurrentStyleObject=function(){
+//	var style_id=this.GetStyleIDAt(this.GetSelection()[1]);
+//	return this.styles[style_id];
+//};
 TxtxEditor_prototype.Init=function(){
 	this.m_style_map={};
-	this.styles=[];
-	this.CreateStyle({"font_face":"Roman","font_size":30,"flags":0,"color":0xff000000,"relative_line_space":0,"relative_paragraph_space":0.8})
+	!? //generate font from pure-JSON styles
+	this.styles=this.m_global_document.GetObject(0).styles;
+	//this.CreateStyle({"font_face":"Roman","font_size":30,"flags":0,"color":0xff000000,"relative_line_space":0,"relative_paragraph_space":0.8})
 	W.Edit_prototype.Init.call(this);
+	this.styles=undefined
 };
+TxtxEditor_prototype.OnStyleChange=function(){
+	var ed=this.ed;
+	if(ed){
+		!? //generate font from pure-JSON styles
+		var handler=ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
+		handler.UpdateStyles(this.styles);
+	}
+}
 TxtxEditor_prototype.HookedEdit=function(ops){
 	var ed=this.ed;
 	for(var i=0;i<ops.length;i+=3){
@@ -87,49 +97,7 @@ TxtxEditor_prototype.GetStyleName=function(params){
 	var pspace=(params.relative_paragraph_space||0.8);
 	return name=[params.font_face,params.font_size,params.flags,params.color,lspace,pspace].join("_")
 }
-TxtxEditor_prototype.CreateStyle=function(params){
-	var lspace=(params.relative_line_space||0.0);
-	var pspace=(params.relative_paragraph_space||0.8);
-	if(!params.font_face){params.font_face="Roman";}
-	if(!params.font_size){params.font_size=30;}
-	if(!params.flags){params.flags=0;}
-	if(params.color==undefined){params.color=0xff000000;}
-	var name=this.GetStyleName(params)
-	if(this.m_style_map[name]){
-		return this.m_style_map[name];
-	}
-	this.m_style_map[name]=this.styles.length;
-	var font_name,size=params.font_size,embolden=0;
-	if(!g_registered_fonts[params.font_face]){
-		//external font
-		font_name=params.font_face;
-		if(params.flags&STYLE_FONT_BOLD){embolden=200;}
-	}else{
-		font_name=g_registered_fonts[params.font_face][(params.flags>>16)&3];
-		if(!font_name){
-			font_name=g_registered_fonts[params.font_face][(params.flags>>16)&1];
-			if(!font_name){
-				font_name=g_registered_fonts[params.font_face][0];
-			}
-			if(params.flags&STYLE_FONT_BOLD){embolden=200;}
-		}
-	}
-	if(params.flags&(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT)){
-		size*=0.75;
-	}
-	params.font=UI.Font(font_name,size,embolden);
-	//space multipliers should ignore super/sub scripts
-	params.line_space=lspace*params.font_size;
-	params.paragraph_space=pspace*params.font_size;
-	this.styles.push(params);
-	var ed=this.ed;
-	if(ed){
-		var handler=ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
-		handler.UpdateStyles(this.styles);
-	}
-	return this.m_style_map[name];
-};
-TxtxEditor_prototype.ModifyTextStyle=function(fcallback,sel){
+TxtxEditor_prototype.ModifyTextStyle=function(ModifyStyle,sel){
 	if(!sel){sel=this.GetSelection();}
 	var ed=this.ed;
 	var sel_side=(this.sel0.ccnt<this.sel1.ccnt);
@@ -137,11 +105,6 @@ TxtxEditor_prototype.ModifyTextStyle=function(fcallback,sel){
 	var new_sel;
 	var obj=this;
 	UI.HackCallback(fcallback)
-	var ModifyStyle=UI.HackCallback(function(sid){
-		var new_style=obj.CloneStyle(obj.styles[sid]);
-		fcallback(new_style)
-		return obj.CreateStyle(new_style)
-	});
 	if(sel[0]<sel[1]){
 		var s_original=ed.GetText(sel[0],sel[1]-sel[0]);
 		var styling_regions=UI.TokenizeByStylingRegions(s_original)
@@ -255,38 +218,6 @@ TxtxEditor_prototype.SetRubberPadding=function(mask,line0,line1){
 		UI.Refresh();
 	}
 }
-TxtxEditor_prototype.GetTextAsPersistentForm=function(raw_ccnt0,raw_ccnt1){
-	var ed=this.ed;
-	var renderer=this.GetRenderer()
-	var ccnt0=(raw_ccnt0||0)
-	var ccnt1=(raw_ccnt1||ed.GetTextSize())
-	var stext=ed.GetText(ccnt0,ccnt1-ccnt0)
-	var perm=renderer.Internal_ConvertTextToPersistentForm(stext,this.GetStyleIDAt(ccnt0))
-	for(var i=0;i<perm.objects.length;i++){
-		var obj_i=renderer.GetObject(perm.objects[i]);
-		perm.objects[i]={obj:obj_i.obj_id, w:obj_i.w, h:obj_i.h, y_baseline:obj_i.y_baseline}
-	}
-	for(var i=0;i<perm.styles.length;i++){
-		perm.styles[i]=this.CloneStyle(this.styles[perm.styles[i]])
-	}
-	return perm
-}
-//add the objects / styles and return a local string for Edit calls
-TxtxEditor_prototype.PastePersistentText=function(perm){
-	var ed=this.ed;
-	var renderer=this.GetRenderer()
-	var objects=[]
-	var styles=[]
-	//can't destroy the original
-	for(var i=0;i<perm.objects.length;i++){
-		var obj_i=perm.objects[i];
-		objects[i]=renderer.InsertObject(obj_i.obj,obj_i.w,obj_i.h,obj_i.y_baseline)
-	}
-	for(var i=0;i<perm.styles.length;i++){
-		styles[i]=this.CreateStyle(this.CloneStyle(perm.styles[i]))
-	}
-	return renderer.Internal_TranslateStylesAndObjects(perm.text,objects,styles)
-}
 //////////////////////////
 TxtxEditor_prototype.GetReferences=function(){
 	var renderer=this.GetRenderer()
@@ -308,6 +239,7 @@ TxtxEditor_prototype.SetReferences=function(mapping){
 TxtxEditor_prototype.default_extension="txt";
 TxtxEditor_prototype.enable_compression=1
 TxtxEditor_prototype.Save=function(){
+	!?
 	var perm=this.GetTextAsPersistentForm()
 	for(var i=0;i<perm.objects.length;i++){
 		perm.objects[i].obj=perm.objects[i].obj.__unique_id
@@ -433,6 +365,7 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 	}
 	/////////////////////////////////////////////
 	//create the property sheet
+	!? var style_id=this.GetStyleIDAt(this.GetSelection()[1]);
 	var cur_state=doc.GetCurrentStyleObject();
 	var sel=doc.GetSelection();
 	var cur_line=doc.GetLC(sel[0])[0]
@@ -475,6 +408,7 @@ UI.GlobalDoc_prototype.NewTxtxEditor=function(wrap_width){
 		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.dfa"));
 	}
 	var ret=Object.create(TxtxEditor_prototype)
+	this.AddObject(ret)
 	ret.wrap_width=wrap_width
 	ret.Init()
 	return ret
@@ -498,6 +432,7 @@ UI.GlobalDoc_prototype.NewTextBox=function(){
 }
 
 !? //m_global_document, re-doing the style sheet
+//a newing function... for the document type. or just a template document
 TxtxEditor_prototype.OpenAsTab=function(){
 	//could have incremental insertion
 	!? fname0,perm
@@ -508,6 +443,7 @@ TxtxEditor_prototype.OpenAsTab=function(){
 	doc.page_margin_down=0;//todo
 	var file_name=(fname0||IO.GetNewDocumentName("doc","txtx","document"));
 	if(perm){
+		!?
 		var sbody=doc.PastePersistentText(perm)
 		//todo: incremental insertion
 		doc.ed.Edit([0,0,sbody],1)
@@ -535,14 +471,14 @@ TxtxEditor_prototype.OpenAsTab=function(){
 		color_theme:[0xffcc7733],
 	})
 };
-LOADER.RegisterZipLoader("png",function(sdata){
+LOADER.RegisterZipLoader("png",function(gdoc,sdata){
 	!?
 	var sdata=data_list[id*2+0];
 	var obj_img=UI.CreateEmbeddedImageFromFileData(sdata);
 	if(!obj_img){throw new Error("invalid image")}
 	return obj_img
 })
-LOADER.RegisterZipLoader("txt",function(sdata){
+LOADER.RegisterZipLoader("txt",function(gdoc,sdata){
 	!?
 	var sdata=data_list[id*2+0];
 	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
@@ -565,22 +501,61 @@ LOADER.RegisterZipLoader("txt",function(sdata){
 })
 
 //////////////////////////
-var g_internal_clipboard_indicator_text=Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT);
-var g_internal_clipboard;
 TxtxEditor_prototype.Copy=function(){
 	var ccnt0=this.sel0.ccnt;
 	var ccnt1=this.sel1.ccnt;
 	var ed=this.ed
 	if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
 	if(ccnt0<ccnt1){
-		g_internal_clipboard=this.GetTextAsPersistentForm(ccnt0,ccnt1)
-		UI.SDL_SetClipboardText(g_internal_clipboard_indicator_text)
+		//add the objects / styles and return a local string for Edit calls
+		var renderer=this.GetRenderer()
+		var stext=ed.GetText(ccnt0,ccnt1-ccnt0)
+		var perm=renderer.Internal_ConvertTextToPersistentForm(stext,this.GetStyleIDAt(ccnt0))
+		var gdoc=this.m_global_document
+		var clip=gdoc.BeginCopy(perm.text);
+		for(var i=0;i<perm.objects.length;i++){
+			var obj_i=renderer.GetObject(perm.objects[i]);
+			gdoc.CopyObject(clip,obj_i.obj_id)
+			perm.objects[i]={obj:obj_i.obj_id, w:obj_i.w, h:obj_i.h, y_baseline:obj_i.y_baseline}
+		}
+		//need this for cross-document paste
+		//style names rather than actual style?
+		//we need a name for each style - use existing same-name style if found, add original style if not
+		var styles=gdoc.GetObject(0).styles
+		for(var i=0;i<perm.styles.length;i++){
+			gdoc.CopyStyle(clip,perm.styles[i])
+		}
+		gdoc.root=perm
+		gdoc.format="txtx"
 	}
 }
 TxtxEditor_prototype.Paste=function(){
-	var stext=UI.SDL_GetClipboardText()
-	if(stext==g_internal_clipboard_indicator_text){
-		stext=this.PastePersistentText(g_internal_clipboard)
+	//test clipboard text and format...
+	var gdoc=this.m_global_document
+	var stext=gdoc.BeginPaste()
+	if(typeof stext=='object'){
+		//stext is actually the clipboard object
+		if(stext.format=='txtx'){
+			var perm=stext.root;
+			var ed=this.ed;
+			var renderer=this.GetRenderer()
+			var objects=[]
+			var styles=[]
+			for(var i=0;i<perm.objects.length;i++){
+				var obj_i=perm.objects[i];
+				objects[i]=gdoc.PasteObject(stext,obj_i)
+			}
+			this.m_style_map={}
+			for(var i=0;i<perm.styles.length;i++){
+				styles[i]=gdoc.PasteStyle(stext,perm.styles[i])
+			}
+			this.m_style_map=undefined;
+			stext=renderer.Internal_TranslateStylesAndObjects(perm.text,objects,styles)
+		}else{
+			throw new Error("please implement the paste function for "+stext)//todo
+		}
+	}else{
+		//do nothing: stext is good as is
 	}
 	this.OnTextInput({"text":stext})
 }
