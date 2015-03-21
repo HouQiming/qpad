@@ -114,7 +114,7 @@ W.TabbedDocument=function(id,attrs){
 			UI.PushSubWindow(obj.x,obj.h_caption+obj.h_bar,obj.w,obj.h_content)
 			var obj_tab=UI.Begin(UI.Keep("active_tab_obj",W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
-				x:0,y:0,h:obj.h_content,
+				x:0,y:0,h:obj.h_content,tab:tab,
 				color:obj.color
 			})))
 				tab.body.call(tab)

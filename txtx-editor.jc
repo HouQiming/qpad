@@ -1151,13 +1151,12 @@ class CLayouter_fancy
 		return 0
 	}
 	JS_InsertObject=function(JSContext JS){
-		obj=JS.Param(0).as(JSObject)
-		if !obj:return 0
+		obj_id=JS.Param(0).or(0)
 		w=double2fixed(JS.Param(1).as(double))
 		h=double2fixed(JS.Param(2).as(double))
 		y_baseline=double2fixed(JS.Param(3).as(double))
 		n0=m_objects.n
-		m_objects.push(CEmbededObject(){obj:obj,w:w,h:h,y_baseline:y_baseline})
+		m_objects.push(CEmbededObject(){obj_id:obj_id,w:w,h:h,y_baseline:y_baseline})
 		return JS.Return(n0)
 	}
 	JS_GetObjectCount=function(JSContext JS){

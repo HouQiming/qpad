@@ -300,7 +300,7 @@ UI.NewUIEditorTab=function(fname0){
 		color_theme:[0xff5511aa],
 	})
 };
-LOADER.RegisterLoaderForExtension("js",function(fn){UI.NewUIEditorTab(fn)})
+UI.RegisterLoaderForExtension("js",function(fn){UI.NewUIEditorTab(fn)})
 
 W.UIEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"ui_editor");

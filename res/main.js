@@ -1,6 +1,5 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
-var LOADER=require("res/lib/objloader");
 require("gui2d/dockbar");
 require("res/lib/txtx_editor");
 require("res/lib/code_editor");
@@ -112,14 +111,15 @@ UI.Application=function(id,attrs){
 			//////////////////////////
 			W.Hotkey("",{key:"CTRL+N",action:function(){
 				//UI.NewUIEditorTab()
-				UI.NewDemoTab()
+				//UI.NewDemoTab()
+				UI.NewFromTemplate("templates/blank_demo.mo")//todo
 				UI.Refresh()
 			}});
 			W.Hotkey("",{key:"CTRL+S",action:function(){
 				var doc_area=app.document_area;
 				var active_document=doc_area.active_tab_obj;
-				if(active_document&&active_document.body&&active_document.body.Save){
-					active_document.body.Save.call(active_document.body)
+				if(active_document&&active_document.tab&&active_document.tab.gdoc.Save){
+					active_document.tab.gdoc.Save()
 				}
 			}});
 			//todo: drag-loading

@@ -1,9 +1,9 @@
 var UI=require("gui2d/ui");
 
 //////////////////////////
-//todo: continuous undo
 var g_regexp_chopdir=new RegExp("(.*)[/\\\\]([^/\\\\]*)");
 var g_regexp_chopext=new RegExp("(.*)\\.([^.\\\\]*)");
+var g_style_core_properties=["name","font_face","font_size","font_embolden","flags","color","relative_line_space","relative_paragraph_space"];
 
 UI.GetMainFileName=function(fname){
 	var ret=fname.match(g_regexp_chopdir);
@@ -55,8 +55,24 @@ var LoadZipObject=function(doc,zip_info){
 UI.LoadZipDocument=function(fname){
 	var ret=UI._LoadZipDocument(fname)
 	if(!ret){return ret}
-	var doc=UI.NewGlobalDoc(fname);
+	var doc=new UI.NewGlobalDoc(fname);
 	doc.m_loaded_file=ret
+	var n=doc.m_loaded_file.n
+	for(var i=0;i<n;i++){
+		doc.m_objects[i]=undefined
+	}
+	var loaded_metadata=UI.m_ui_metadata[fname]
+	if(loaded_metadata){
+		var json_ret=JSON.parse(loaded_metadata)
+		if(json_ret.timestamp!=IO.GetFileTimestamp(fname)){
+			json_ret=undefined;
+		}
+		doc.m_metadata=(json_ret&&json_ret.a||{})
+	}else{
+		for(var i=0;i<n;i++){
+			doc.m_metadata[i]={}
+		}
+	}
 	if(!doc.GetObject(0)){return undefined;}
 	if(!doc.GetObject(1)){return undefined;}
 	doc.GetObject(1).OpenAsTab()
@@ -70,6 +86,7 @@ UI.OpenFile=function(fname){
 	if(parser){
 		return parser(fname)
 	}
+	//todo: mo only?
 	//try zipdoc by default for now
 	return UI.LoadZipDocument(fname)
 }
@@ -78,21 +95,34 @@ UI.OpenFile=function(fname){
 UI.internal_clipboard={}
 UI.NewGlobalDoc=function(fname){
 	this.m_objects=[]
+	this.m_metadata=[]
 	this.m_undo_ids=[]
 	this.m_redo_ids=[]
 	//////////////////
 	//the style sheet document
 	var obj_styles=Object.create(UI.JSONObject_prototype)
 	obj_styles.Init()
-	obj_styles.styles=[];
+	obj_styles.m_data.styles=[];
 	this.AddObject(obj_styles)
 	this.m_file_name=fname
+}
+UI.CloneStyle=function(params){
+	var ret={};
+	for(var i=0;i<g_style_core_properties.length;i++){
+		var id=g_style_core_properties[i];
+		ret[id]=params[id];
+	}
+	return ret;
+}
+UI.GetMetaData=function(obj){
+	return obj.m_global_document.m_metadata[obj.m_sub_document_id]
 }
 UI.NewGlobalDoc.prototype={
 	//documents should insert creation functions here
 	AddObject:function(obj){
 		var ret=this.m_objects.length;
 		this.m_objects.push(obj)
+		this.m_metadata.push({})
 		obj.m_global_document=this
 		obj.m_sub_document_id=ret
 		return ret;
@@ -182,13 +212,59 @@ UI.NewGlobalDoc.prototype={
 		}
 		this.m_objects=new_objs
 		//////////////////////////////////
-		UI.SaveZipDocument(obj.file_name,new_objs)
+		UI.SaveZipDocument(this.m_file_name,new_objs)
+		//save a document timestamp to detect corrupted metadata
+		UI.m_ui_metadata[this.m_file_name]=JSON.stringify({a:this.m_metadata,timestamp:UI.GetFileTimestamp(this.m_file_name)})
 	},
-	///////////////////
+	/////////////////////
+	BeginContinuousUndo:function(){
+		this.m_contundo_point=this.m_undo_ids.length;
+	},
+	PerformContinuousUndo:function(){
+		while(this.m_undo_ids.length>this.m_contundo_point){
+			this.ed.Undo()
+		}
+	},
+	EndContinuousUndo:function(){
+		this.m_contundo_point=undefined
+	},
+	/////////////////////////////////////////
+	SetStyleEditorPropertySheet:function(){
+		var sheet=UI.document_property_sheet;
+		var style_id=sheet["style_id"][0]
+		//style editor
+		var obj_the_style=this.GetObject(0);
+		var cur_state=obj_the_style.m_data.styles[style_id];
+		sheet["font_face"]=[cur_state.font_face,function(value){obj_the_style.BeforeEdit();
+			cur_state.font_face=value;}]
+		sheet["font_size"]=[cur_state.font_size,function(value){obj_the_style.BeforeEdit();
+			cur_state.font_size=Math.max(parseInt(value),4);}]
+		sheet["font_embolden"]=[cur_state.font_size,function(value){obj_the_style.BeforeEdit();
+			cur_state.font_embolden=parseInt(value);}]
+		sheet["underlined"]=[!!(cur_state.flags&STYLE_UNDERLINED),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_UNDERLINED)|(value?STYLE_UNDERLINED:0));}]
+		//sheet["strike_out"]=[!!(cur_state.flags&STYLE_STRIKE_OUT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_STRIKE_OUT)|(value?STYLE_STRIKE_OUT:0));}]
+		sheet["superscript"]=[!!(cur_state.flags&STYLE_SUPERSCRIPT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUPERSCRIPT:0));}]
+		sheet["subscript"]=[!!(cur_state.flags&STYLE_SUBSCRIPT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUBSCRIPT:0));}]
+		sheet["italic"]=[!!(cur_state.flags&STYLE_FONT_ITALIC),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_FONT_ITALIC)|(value?STYLE_FONT_ITALIC:0));}]
+		sheet["bold"]=[!!(cur_state.flags&STYLE_FONT_BOLD),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_FONT_BOLD)|(value?STYLE_FONT_BOLD:0));}]
+		//////
+		sheet["text_color"]=[
+			cur_state.color,
+			function(value,is_continuous){
+				if(is_continuous){
+					doc.PerformContinuousUndo()
+				}
+				obj_the_style.BeforeEdit();
+				cur_state.color=value;
+			},
+			function(){doc.BeginContinuousUndo();},
+			function(){doc.EndContinuousUndo();}]
+	},
+	/////////////////////
 	BeginCopy:function(stext){
 		var ret={};
 		ret.m_objects={};
-		ret.m_objects[0]={styles:{}};
+		ret.GetObject(0)={styles:{}};
 		ret.owner=this;
 		UI.internal_clipboard={data:ret,key:stext}
 		UI.SDL_SetClipboardText(stext)
@@ -200,10 +276,15 @@ UI.NewGlobalDoc.prototype={
 		cobj.m_objects[id]=[obj_i.default_extension,obj_i.Save()]//(obj_i.share_across_docs?obj_i:obj_i.Save())
 	},
 	CopyStyle:function(cobj,id){
-		!?
-		cobj.m_objects[0].styles[id]=this.m_objects[0].styles[id]
+		cobj.GetObject(0).styles[id]=UI.CloneStyle(this.GetObject(0).styles[id])
 	},
 	BeginPaste:function(){
+		var pmystyles=this.GetObject(0).m_data.styles
+		this.m_style_map={}
+		for(var i=0;i<pmystyles.length;i++){
+			var style_i=pmystyles[i]
+			this.m_style_map[style_i.name]=i
+		}
 		var stext=UI.SDL_GetClipboardText();
 		if(UI.internal_clipboard.key==stext){
 			return UI.internal_clipboard.data
@@ -225,15 +306,15 @@ UI.NewGlobalDoc.prototype={
 		return obj//an id here
 	},
 	PasteStyle:function(cobj,id){
-		var pstyles=cobj.m_objects[0].styles;
+		//search by name, populate m_style_map
+		var pstyles=cobj.GetObject(0).styles;
 		var style_obj=pstyles[id]
-		var pmystyles=this.m_objects[0].styles
-		var sstyle=JSON.stringify(style_obj)
-		var ret=this.m_style_map[sstyle]
+		var pmystyles=this.GetObject(0).m_data.styles
+		var ret=this.m_style_map[style_obj.name]
 		if(ret==undefined){
 			ret=pmystyles.length
-			pmystyles.push(JSON.parse(sstyle))
-			this.m_style_map[sstyle]=ret;
+			pmystyles.push(UI.CloneStyle(style_obj))
+			this.m_style_map[style_obj.name]=ret;
 		}
 		return ret;
 	},
@@ -265,3 +346,34 @@ UI.JSONObject_prototype={
 		return JSON.stringify(this.m_data)
 	}
 };
+
+UI.CreateJSONObjectClass=function(proto){
+	Object.setPrototypeOf(proto,UI.JSONObject_prototype);
+	UI.RegisterZipLoader(proto.default_extension,function(gdoc,sdata){
+		var ret=Object.create(proto)
+		ret.Init()
+		ret.m_data=JSON.parse(sdata);
+		return ret;
+	})
+	return proto
+}
+
+UI.RegisterZipLoader("json",function(gdoc,sdata){
+	var ret=Object.create(UI.JSONObject_prototype)
+	ret.Init()
+	ret.m_data=JSON.parse(sdata);
+	return ret;
+})
+
+////////////////////////////////////
+UI.m_ui_metadata={}
+//todo: config file load / save: getstoragepath
+
+UI.NewFromTemplate=function(fn_template,fn_real){
+	var ret=UI.OpenFile(IO.GetExecutablePath()+"/"+fn_template)
+	if(!ret){
+		throw new Error("invalid template "+fn_template)
+	}
+	ret.m_file_name=(fn_real||IO.GetNewDocumentName("doc","mo","document"));
+	return ret;
+}

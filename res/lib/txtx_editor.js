@@ -2,7 +2,7 @@ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
 require("res/lib/color_picker");
-var LOADER=require("res/lib/objloader");
+require("res/lib/global_doc");
 
 /*
 switch to a purely style-based interface
@@ -17,15 +17,15 @@ STYLE_UNDERLINED=1
 STYLE_STRIKE_OUT=2
 STYLE_SUPERSCRIPT=4
 STYLE_SUBSCRIPT=8
-STYLE_FONT_ITALIC=(1<<16)
-STYLE_FONT_BOLD=(1<<17)
+//STYLE_FONT_ITALIC=(1<<16)
+//STYLE_FONT_BOLD=(1<<17)
 ////////////////
 //embolden and potential shear
-var g_registered_fonts={
-	'Roman':      ["res/fonts/cmunrm.ttf","res/fonts/cmunci.ttf","res/fonts/cmunbx.ttf","res/fonts/cmunbi.ttf"],
-	'Sans Serif': ["res/fonts/cmunss.ttf","res/fonts/cmunsi.ttf","res/fonts/cmunsx.ttf","res/fonts/cmunso.ttf"],
-	'Typewriter': ["res/fonts/cmuntt.ttf","res/fonts/cmunit.ttf","res/fonts/cmuntb.ttf","res/fonts/cmuntx.ttf"],
-};
+//var g_registered_fonts={
+//	'Roman':      ["res/fonts/cmunrm.ttf","res/fonts/cmunci.ttf","res/fonts/cmunbx.ttf","res/fonts/cmunbi.ttf"],
+//	'Sans Serif': ["res/fonts/cmunss.ttf","res/fonts/cmunsi.ttf","res/fonts/cmunsx.ttf","res/fonts/cmunso.ttf"],
+//	'Typewriter': ["res/fonts/cmuntt.ttf","res/fonts/cmunit.ttf","res/fonts/cmuntb.ttf","res/fonts/cmuntx.ttf"],
+//};
 ////////////////
 var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
@@ -44,20 +44,45 @@ TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
 //	var style_id=this.GetStyleIDAt(this.GetSelection()[1]);
 //	return this.styles[style_id];
 //};
+UI.CreateFontFromStyle=function(params){
+	var font_name,embolden;
+	if(!g_registered_fonts[params.font_face]){
+		//external font
+		font_name=params.font_face;
+		if(params.flags&STYLE_FONT_BOLD){embolden=200;}
+	}else{
+		font_name=g_registered_fonts[params.font_face][(params.flags>>16)&3];
+		if(!font_name){
+			font_name=g_registered_fonts[params.font_face][(params.flags>>16)&1];
+			if(!font_name){
+				font_name=g_registered_fonts[params.font_face][0];
+			}
+			if(params.flags&STYLE_FONT_BOLD){embolden=200;}
+		}
+	}
+	return UI.Font(params.font_face,params.font_size,params.font_embolden+embolden)
+}
+var CreateStyleArray=function(in_styles){
+	var out_styles=[]
+	for(var i=0;i<in_styles.length;i++){
+		var style_i=UI.CloneStyle(in_styles[i]);
+		style_i.font=UI.CreateFontFromStyle(style_i)
+		out_styles[i]=style_i;
+	}
+	return out_styles;
+};
+
 TxtxEditor_prototype.Init=function(){
 	this.m_style_map={};
-	!? //generate font from pure-JSON styles
-	this.styles=this.m_global_document.GetObject(0).styles;
-	//this.CreateStyle({"font_face":"Roman","font_size":30,"flags":0,"color":0xff000000,"relative_line_space":0,"relative_paragraph_space":0.8})
+	this.styles=CreateStyleArray(this.m_global_document.GetObject(0).m_data.styles);
 	W.Edit_prototype.Init.call(this);
 	this.styles=undefined
 };
 TxtxEditor_prototype.OnStyleChange=function(){
 	var ed=this.ed;
 	if(ed){
-		!? //generate font from pure-JSON styles
 		var handler=ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
-		handler.UpdateStyles(this.styles);
+		handler.UpdateStyles(CreateStyleArray(this.m_global_document.GetObject(0).m_data.styles));
 	}
 }
 TxtxEditor_prototype.HookedEdit=function(ops){
@@ -83,15 +108,6 @@ TxtxEditor_prototype.GetRenderer=function(){
 	var ed=this.ed;
 	return ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
 };
-var g_style_core_properties=["font_face","font_size","flags","color","relative_line_space","relative_paragraph_space"];
-TxtxEditor_prototype.CloneStyle=function(params){
-	var ret={};
-	for(var i=0;i<g_style_core_properties.length;i++){
-		var id=g_style_core_properties[i];
-		ret[id]=params[id];
-	}
-	return ret;
-}
 TxtxEditor_prototype.GetStyleName=function(params){
 	var lspace=(params.relative_line_space||0.0);
 	var pspace=(params.relative_paragraph_space||0.8);
@@ -239,13 +255,17 @@ TxtxEditor_prototype.SetReferences=function(mapping){
 TxtxEditor_prototype.default_extension="txt";
 TxtxEditor_prototype.enable_compression=1
 TxtxEditor_prototype.Save=function(){
-	!?
-	var perm=this.GetTextAsPersistentForm()
+	var ed=this.ed
+	var renderer=this.GetRenderer()
+	var perm=renderer.Internal_ConvertTextToPersistentForm(ed.GetText(),0)
 	for(var i=0;i<perm.objects.length;i++){
 		perm.objects[i].obj=perm.objects[i].obj.__unique_id
 	}
 	var s_text=perm.text;
+	//it does not have to use every style
+	//perm.styles=undefined;
 	perm.text=undefined;
+	perm.wrap_width=this.wrap_width
 	var s_json=JSON.stringify(perm);
 	return ["txtx\n",s_json,"\n",s_text].join("");
 }
@@ -365,30 +385,15 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 	}
 	/////////////////////////////////////////////
 	//create the property sheet
-	!? var style_id=this.GetStyleIDAt(this.GetSelection()[1]);
-	var cur_state=doc.GetCurrentStyleObject();
+	var sheet=UI.document_property_sheet;
 	var sel=doc.GetSelection();
 	var cur_line=doc.GetLC(sel[0])[0]
-	var sheet=UI.document_property_sheet;
-	sheet["font_face"]=[cur_state.font_face,function(value){doc.ModifyTextStyle(function(style){style.font_face=value});}],
-	sheet["font_size"]=[cur_state.font_size,function(value){doc.ModifyTextStyle(function(style){style.font_size=value});}],
-	sheet["underlined"]=[!!(cur_state.flags&STYLE_UNDERLINED),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_UNDERLINED)|(value?STYLE_UNDERLINED:0))});}],
-	//sheet["strike_out"]=[!!(cur_state.flags&STYLE_STRIKE_OUT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_STRIKE_OUT)|(value?STYLE_STRIKE_OUT:0))});}],
-	sheet["superscript"]=[!!(cur_state.flags&STYLE_SUPERSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUPERSCRIPT:0))});}],
-	sheet["subscript"]=[!!(cur_state.flags&STYLE_SUBSCRIPT),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUBSCRIPT:0))});}],
-	sheet["italic"]=[!!(cur_state.flags&STYLE_FONT_ITALIC),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_ITALIC)|(value?STYLE_FONT_ITALIC:0))});}],
-	sheet["bold"]=[!!(cur_state.flags&STYLE_FONT_BOLD),function(value){doc.ModifyTextStyle(function(style){style.flags=((style.flags&~STYLE_FONT_BOLD)|(value?STYLE_FONT_BOLD:0))});}],
-	//////
-	sheet["text_color"]=[
-		cur_state.color,
-		function(value,is_continuous){
-			if(is_continuous){
-				doc.PerformContinuousUndo()
-			}
-			doc.ModifyTextStyle(function(style){style.color=value});
-		},
-		function(){doc.BeginContinuousUndo();},
-		function(){doc.EndContinuousUndo();}],
+	var style_id=this.GetStyleIDAt(sel[1]);
+	var gdoc=this.m_global_document
+	sheet["style"]=[style_id,function(value){
+		doc.ModifyTextStyle(function(){return value})
+	}]
+	sheet["style_gdoc"]=gdoc
 	sheet["align_l"]=[
 		doc.GetRubberPadding(cur_line)==0,
 		function(value){doc.SetRubberPadding(0)}],
@@ -398,89 +403,29 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 	sheet["align_r"]=[
 		doc.GetRubberPadding(cur_line)==1,
 		function(value){doc.SetRubberPadding(value?1:0)}],
+	gdoc.SetStyleEditorPropertySheet()
 	UI.End(obj)
 	return obj
 }
 //////////////////////////
-UI.GlobalDoc_prototype.NewTxtxEditor=function(wrap_width){
+UI.NewTxtxEditor=function(wrap_width){
 	if(!TxtxEditor_prototype.hyphenator){
 		//TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
 		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.dfa"));
 	}
 	var ret=Object.create(TxtxEditor_prototype)
-	this.AddObject(ret)
 	ret.wrap_width=wrap_width
 	ret.Init()
 	return ret
 }
 
-UI.GlobalDoc_prototype.NewTextBox=function(){
-	var wrap_width=200
-	var obj_txtbox=this.NewTxtxEditor(wrap_width);
-	obj_txtbox.is_text_box=1;
-	obj_txtbox.disable_scrolling_x=1;
-	obj_txtbox.disable_scrolling_y=1;
-	//todo
-	obj_txtbox.w=wrap_width
-	obj_txtbox.h=150
-	obj_txtbox.page_margin_left=8
-	obj_txtbox.page_margin_right=8
-	obj_txtbox.page_margin_up=8
-	obj_txtbox.page_margin_down=8
-	//todo
-	return obj_txtbox
-}
-
-!? //m_global_document, re-doing the style sheet
 //a newing function... for the document type. or just a template document
-TxtxEditor_prototype.OpenAsTab=function(){
-	//could have incremental insertion
-	!? fname0,perm
-	var doc=UI.NewTxtxEditor(1200);//todo
-	doc.page_margin_left=50;//todo
-	doc.page_margin_right=50;//todo
-	doc.page_margin_up=0;//todo
-	doc.page_margin_down=0;//todo
-	var file_name=(fname0||IO.GetNewDocumentName("doc","txtx","document"));
-	if(perm){
-		!?
-		var sbody=doc.PastePersistentText(perm)
-		//todo: incremental insertion
-		doc.ed.Edit([0,0,sbody],1)
-		perm=undefined;
-	}
-	//todo: page property window
-	return UI.NewTab({
-		file_name:file_name,
-		doc:doc,
-		body:function(){
-			//use attribute to have a "throw-it-back" object
-			var body=W.TxtxTab("body",{
-				'anchor':'parent','anchor_align':"center",'anchor_valign':"fill",
-				'x':0,'y':0,'w':Math.min(doc.page_margin_left+doc.wrap_width+doc.page_margin_right,UI.context_parent.w),
-				'page_margin_left':doc.page_margin_left,'page_margin_right':doc.page_margin_right,'page_width':doc.wrap_width,
-				'file_name':this.file_name,'doc':doc,
-				'scale':1,'bgcolor':0xffffffff,
-			})
-			return body;
-		},
-		title:UI.GetMainFileName(file_name),
-		property_windows:[
-			W.subwindow_text_properties
-		],
-		color_theme:[0xffcc7733],
-	})
-};
-LOADER.RegisterZipLoader("png",function(gdoc,sdata){
-	!?
-	var sdata=data_list[id*2+0];
+UI.RegisterZipLoader("png",function(gdoc,sdata){
 	var obj_img=UI.CreateEmbeddedImageFromFileData(sdata);
 	if(!obj_img){throw new Error("invalid image")}
 	return obj_img
 })
-LOADER.RegisterZipLoader("txt",function(gdoc,sdata){
-	!?
-	var sdata=data_list[id*2+0];
+UI.RegisterZipLoader("txt",function(gdoc,sdata){
 	var pline0=sdata.indexOf('\n');if(pline0<0){return;}
 	var pline1=sdata.indexOf('\n',pline0+1);if(pline1<0){return;}
 	var perm=JSON.parse(sdata.substr(pline0+1,pline1-pline0-1));
@@ -490,14 +435,9 @@ LOADER.RegisterZipLoader("txt",function(gdoc,sdata){
 		if(!(obj_id*2<data_list.length&&obj_id>=0)){
 			throw new Error("invalid object id '@1'".replace('@1',obj_id));
 		}
-		perm.objects[i].obj=LOADER.LoadObject(data_list,obj_id)
+		perm.objects[i].obj=UI.LoadObject(data_list,obj_id)
 	}
-	if(id==0){
-		UI.NewTxtxTab(fname,perm);
-	}else{
-		//todo: page properties
-		throw new Error("textbox unimplemented")
-	}
+	return UI.NewTxtxEditor(perm.wrap_width);
 })
 
 //////////////////////////
@@ -521,7 +461,6 @@ TxtxEditor_prototype.Copy=function(){
 		//need this for cross-document paste
 		//style names rather than actual style?
 		//we need a name for each style - use existing same-name style if found, add original style if not
-		var styles=gdoc.GetObject(0).styles
 		for(var i=0;i<perm.styles.length;i++){
 			gdoc.CopyStyle(clip,perm.styles[i])
 		}
@@ -563,63 +502,7 @@ TxtxEditor_prototype.Paste=function(){
 TxtxEditor_prototype.OnSelectionChange=function(){
 	this.sync_object_selection_to_boxdoc=1
 }
-TxtxEditor_prototype.additional_hotkeys=[
-	{key:"CTRL+B",action:function(){
-		this.ToggleStyleFlag(STYLE_FONT_BOLD)
-	}},
-	{key:"CTRL+I",action:function(){
-		this.ToggleStyleFlag(STYLE_FONT_ITALIC)
-	}},
-	{key:"CTRL+L",action:function(){
-		var sel=this.GetSelection();
-		this.SetRubberPadding(0,this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1)
-	}},
-	{key:"CTRL+E",action:function(){
-		var sel=this.GetSelection();
-		this.SetRubberPadding(3,this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1)
-	}},
-	{key:"CTRL+R",action:function(){
-		var sel=this.GetSelection();
-		this.SetRubberPadding(1,this.GetLC(sel[0])[0],this.GetLC(sel[1])[0]+1)
-	}},
-	//todo: event-listening plugin: 1. 2. 3. centering and stuff
-	{key:"ALT+I",action:function(){
-		var img_name=UI.PickImage();
-		if(!img_name){return;}
-		var s_data=IO.ReadAll(img_name)
-		if(!s_data){return;}//todo: show error notification
-		var obj_img=UI.CreateEmbeddedImageFromFileData(s_data);
-		if(!obj_img){return;}//todo: show error notification
-		var oid=this.GetRenderer().InsertObject(obj_img,obj_img.w,obj_img.h,obj_img.h)
-		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
-	}},
-	{key:"ALT+J",action:function(){
-		var obj_txtbox=UI.NewTextBox();
-		var oid=this.GetRenderer().InsertObject(obj_txtbox,obj_txtbox.w,obj_txtbox.h,obj_txtbox.h)
-		this.OnTextInput({"text":Duktape.__utf8_fromCharCode(COMMAND_INSERT_OBJECT+oid)})
-	}},
-];
-/////////////////////////////////////////
-TxtxEditor_prototype.BeginContinuousUndo=function(){
-	this.m_contundo_point=this.ed.GetUndoQueueLength();
-	this.m_style_count=this.styles.length;
-}
-TxtxEditor_prototype.PerformContinuousUndo=function(){
-	while(this.ed.GetUndoQueueLength()>this.m_contundo_point){
-		this.ed.Undo()
-	}
-	var n0=this.m_style_count,n1=this.styles.length;
-	for(var i=n0;i<n1;i++){
-		var name=this.GetStyleName(this.styles[i]);
-		this.m_style_map[name]=undefined;
-		this.styles[i]=undefined;
-	}
-	this.styles.length=this.m_style_count;
-}
-TxtxEditor_prototype.EndContinuousUndo=function(){
-	this.m_contundo_point=undefined
-	this.m_style_count=undefined
-}
+TxtxEditor_prototype.additional_hotkeys=[];
 /////////////////////////////////////////
 
 //var hyp=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"))
@@ -669,7 +552,7 @@ W.subwindow_text_properties={
 			'x':240.02037844241704,'y':74,'w':32,'h':32,
 			style:UI.default_styles.check_button,font:UI.icon_font,text:'3',
 			property_name:"align_r"}));
-		//todo
+		//todo: make the color picker more elaborate
 		/*widget*/(W.ColorPicker('color_picker',{
 			'x':13.02037844241704,'y':124,'w':32,'h':32,
 			'mode':'rgb',
@@ -678,7 +561,8 @@ W.subwindow_text_properties={
 			'x':233.02037844241704,'y':124,'w':100,'h':100,
 			color:parent.color_picker.value,
 			border_width:1.5,border_color:0xff444444}));
-		//todo
+		//todo: style renaming, emboldening
+		//and yes, choose between the 3 for now...
 		/*widget*/(W.ComboBox("font_box",{
 			'x':13.02037844241704,'y':36,'w':166.83966387238038,'h':29,
 			items:[
@@ -695,37 +579,58 @@ W.subwindow_text_properties={
 	}
 };
 
-W.TxtxTab=function(id,attrs){
-	var obj=UI.StdWidget(id,attrs,"txtx_editor");
-	//UI.StdStyling(id,obj,attrs, "txtx_editor",obj.focus_state||"blur");
-	//UI.StdAnchoring(id,obj);
-	UI.RoundRect(obj)
-	UI.Begin(obj)
-		//handle page properties
-		//todo: scrolling?
-		var w0=obj.page_margin_left
-		var w1=obj.page_width
-		var w2=obj.page_margin_right
-		if(w0+w1+w2>obj.w){
-			var w_excess=w0+w1+w2-obj.w
-			var ratio0=(w0+w2?w0/(w0+w2):0);
-			w0=Math.max(w0-ratio0*w_excess,0)
-			w2=Math.max(w2-(1-ratio0)*w_excess,0)
-			if(w1>obj.w){
-				//really not wide enough
-				w1=obj.w
-			}
+//todo: hotkeys: # or \
+//post-textInput-triggered-action
+W.subwindow_style_picker={
+	'title':'Styles',h:300,
+	body:function(){
+		var gdoc=UI.document_property_sheet.style_gdoc
+		var styles=gdoc.GetObject(0).m_data.styles
+		var list_items=[]
+		for(var i=0;i<styles.length;i++){
+			style_i=styles[i]
+			list_items.push({x:0,y:0,w:0,h:h_i,
+				font:UI.CreateFontFromStyle(style_i),
+				text:style_i.name,
+				color:style_i.color})
 		}
-		var doc=obj.doc;
-		doc.AsWidget("body",{'x':obj.x,'y':obj.y,'w':w0+w1+w2,'h':obj.h})
-		obj.Save=UI.HackCallback(function(){
-			//todo: save as: int osal_DoFileDialogWin(short* buf, short* filter,short* def_ext,int is_save){
-			//we can do without it on phones: save as opens rename in file explorer
-			UI.SaveZipDocument(obj.file_name,this.doc)
-			obj.saved_point=this.doc.ed.GetUndoQueueLength();
-			UI.Refresh()
+		//
+		list_items.push({
+			object_type:W.Button,
+			x:0,y:0,
+			style:{
+				border_width:0,border_color:0,
+				color:0,
+				$:{
+					over:{
+						text_color:0xff444444
+					},
+					down:{
+						text_color:0xff000000
+					},
+					out:{
+						text_color:0xff7f7f7f
+					},
+				}
+			},
+			font:UI.Font(UI.font_name,24),
+			text:"+ New style",
+			OnClick:function(){
+				//create new style from style 0
+				var new_style=UI.CloneStyle(styles[0])
+				styles.push(new_style)
+				new_style.name="style_"+styles.length
+				UI.Refresh()
+			}
 		})
-		obj.title=UI.GetMainFileName(obj.file_name)+((obj.saved_point||0)!=obj.doc.ed.GetUndoQueueLength()?" *":"")
-	UI.End()
-	return obj;
+		//a ListView of style objects
+		W.ListView("style_list",{
+			anchor:'parent',anchor_valign:'fill',anchor_align:'fill',
+			x:0,y:0,
+			property_name:'style',
+			layout_spacing:thumbnail_margin*2,layout_align:'fill',layout_valign:'up',
+			items:list_items,
+			item_template:{object_type:W.Text},
+		})
+	}
 };
