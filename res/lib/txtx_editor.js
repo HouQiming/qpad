@@ -9,23 +9,23 @@ switch to a purely style-based interface
 */
 
 //todo: inserting objects - GUI
-COMMAND_INSERT_OBJECT=0x100000
-COMMAND_RUBBER_SPACE=0x107fff
-COMMAND_SET_STYLE=0x108000
-COMMAND_END=0x110000
-STYLE_UNDERLINED=1
-STYLE_STRIKE_OUT=2
-STYLE_SUPERSCRIPT=4
-STYLE_SUBSCRIPT=8
-//STYLE_FONT_ITALIC=(1<<16)
-//STYLE_FONT_BOLD=(1<<17)
+UI.COMMAND_INSERT_OBJECT=0x100000
+UI.COMMAND_RUBBER_SPACE=0x107fff
+UI.COMMAND_SET_STYLE=0x108000
+UI.COMMAND_END=0x110000
+UI.STYLE_UNDERLINED=1
+UI.STYLE_STRIKE_OUT=2
+UI.STYLE_SUPERSCRIPT=4
+UI.STYLE_SUBSCRIPT=8
+UI.STYLE_FONT_ITALIC=(1<<16)
+UI.STYLE_FONT_BOLD=(1<<17)
 ////////////////
 //embolden and potential shear
-//var g_registered_fonts={
-//	'Roman':      ["res/fonts/cmunrm.ttf","res/fonts/cmunci.ttf","res/fonts/cmunbx.ttf","res/fonts/cmunbi.ttf"],
-//	'Sans Serif': ["res/fonts/cmunss.ttf","res/fonts/cmunsi.ttf","res/fonts/cmunsx.ttf","res/fonts/cmunso.ttf"],
-//	'Typewriter': ["res/fonts/cmuntt.ttf","res/fonts/cmunit.ttf","res/fonts/cmuntb.ttf","res/fonts/cmuntx.ttf"],
-//};
+var g_registered_fonts={
+	'Roman':      ["res/fonts/cmunrm.ttf","res/fonts/cmunci.ttf","res/fonts/cmunbx.ttf","res/fonts/cmunbi.ttf"],
+	'Sans':       ["res/fonts/cmunss.ttf","res/fonts/cmunsi.ttf","res/fonts/cmunsx.ttf","res/fonts/cmunso.ttf"],
+	'Typewriter': ["res/fonts/cmuntt.ttf","res/fonts/cmunit.ttf","res/fonts/cmuntb.ttf","res/fonts/cmuntx.ttf"],
+};
 ////////////////
 var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
@@ -45,11 +45,11 @@ TxtxEditor_prototype.GetStyleIDAt=function(ccnt){
 //	return this.styles[style_id];
 //};
 UI.CreateFontFromStyle=function(params){
-	var font_name,embolden;
+	var font_name,embolden=0;
 	if(!g_registered_fonts[params.font_face]){
 		//external font
 		font_name=params.font_face;
-		if(params.flags&STYLE_FONT_BOLD){embolden=200;}
+		if(params.flags&UI.STYLE_FONT_BOLD){embolden=200;}
 	}else{
 		font_name=g_registered_fonts[params.font_face][(params.flags>>16)&3];
 		if(!font_name){
@@ -57,10 +57,10 @@ UI.CreateFontFromStyle=function(params){
 			if(!font_name){
 				font_name=g_registered_fonts[params.font_face][0];
 			}
-			if(params.flags&STYLE_FONT_BOLD){embolden=200;}
+			if(params.flags&UI.STYLE_FONT_BOLD){embolden=200;}
 		}
 	}
-	return UI.Font(params.font_face,params.font_size,params.font_embolden+embolden)
+	return UI.Font(font_name,params.font_size,params.font_embolden+embolden)
 }
 var CreateStyleArray=function(in_styles){
 	var out_styles=[]
@@ -74,15 +74,15 @@ var CreateStyleArray=function(in_styles){
 
 TxtxEditor_prototype.Init=function(){
 	this.m_style_map={};
-	this.styles=CreateStyleArray(this.m_global_document.GetObject(0).m_data.styles);
 	W.Edit_prototype.Init.call(this);
-	this.styles=undefined
 };
 TxtxEditor_prototype.OnStyleChange=function(){
 	var ed=this.ed;
 	if(ed){
 		var handler=ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
 		handler.UpdateStyles(CreateStyleArray(this.m_global_document.GetObject(0).m_data.styles));
+		ed.InvalidateStates([0,ed.GetTextSize()])
+		UI.Refresh()
 	}
 }
 TxtxEditor_prototype.HookedEdit=function(ops){
@@ -93,15 +93,16 @@ TxtxEditor_prototype.HookedEdit=function(ops){
 			var s_original=ed.GetText(ops[i+0],ops[i+1]);
 			for(var j=s_original.length-1;j>=0;j--){
 				var ch=s_original.charCodeAt(j);
-				if(ch>=COMMAND_SET_STYLE&&ch<COMMAND_END){
+				if(ch>=UI.COMMAND_SET_STYLE&&ch<UI.COMMAND_END){
 					ops[i+2]=Duktape.__utf8_fromCharCode(ch)+(ops[i+2]||"");
 					break;
 				}
 			}
 		}
 	}
-	this.m_global_document.ReportEdit(this.m_sub_document_id)
+	this.m_global_document.BeforeEdit(this.m_sub_document_id)
 	ed.Edit(ops);
+	this.m_global_document.OnObjectChange(this.m_sub_document_id)
 };
 //todo: undo hooks
 TxtxEditor_prototype.GetRenderer=function(){
@@ -129,13 +130,13 @@ TxtxEditor_prototype.ModifyTextStyle=function(ModifyStyle,sel){
 		}
 		for(var i=0;i<styling_regions.length;i+=2){
 			//map all the styles and re-join them
-			styling_regions[i]=Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+ModifyStyle(styling_regions[i]));
+			styling_regions[i]=Duktape.__utf8_fromCharCode(UI.COMMAND_SET_STYLE+ModifyStyle(styling_regions[i]));
 		}
-		styling_regions.push(Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+this.GetStyleIDAt(sel[1])))
+		styling_regions.push(Duktape.__utf8_fromCharCode(UI.COMMAND_SET_STYLE+this.GetStyleIDAt(sel[1])))
 		ops=[sel[0],sel[1]-sel[0],styling_regions.join("")];
 		new_sel=[sel[0],sel[0]+Duktape.__byte_length(ops[2])]
 	}else{
-		var s_style=Duktape.__utf8_fromCharCode(COMMAND_SET_STYLE+ModifyStyle(this.GetStyleIDAt(sel[0])));
+		var s_style=Duktape.__utf8_fromCharCode(UI.COMMAND_SET_STYLE+ModifyStyle(this.GetStyleIDAt(sel[0])));
 		ops=[sel[0],0,s_style];
 		new_sel=[sel[0]+Duktape.__byte_length(s_style),sel[0]+Duktape.__byte_length(s_style)]
 	}
@@ -149,7 +150,7 @@ TxtxEditor_prototype.ModifyTextStyle=function(ModifyStyle,sel){
 	}
 	UI.Refresh()
 };
-var s_rubber_space=Duktape.__utf8_fromCharCode(COMMAND_RUBBER_SPACE);
+var s_rubber_space=Duktape.__utf8_fromCharCode(UI.COMMAND_RUBBER_SPACE);
 var lg_rubber_space=Duktape.__byte_length(s_rubber_space);
 TxtxEditor_prototype.GetEnhancedHome=function(ccnt0){
 	var ed=this.ed;
@@ -272,15 +273,15 @@ TxtxEditor_prototype.Save=function(){
 //////////////////////////
 TxtxEditor_prototype.AsWidget=function(id,attrs){
 	//there is no anchoring or styling, all coords are assumed to be absolute for performance
-	if(this.is_text_box){
-		//textbox: sync wrap_width
-		var ww2=(attrs.w-this.page_margin_left-this.page_margin_right);
-		if(ww2!=this.wrap_width){
-			this.wrap_width=ww2;
-			this.GetRenderer().Internal_UpdatePermanentStyles(this)
-			this.ed.InvalidateStates([0,this.ed.GetTextSize()])
-		}
+	//if(this.is_text_box){
+	//textbox: sync wrap_width
+	var ww2=(attrs.w-this.page_margin_left-this.page_margin_right);
+	if(ww2!=this.wrap_width){
+		this.wrap_width=ww2;
+		this.GetRenderer().Internal_UpdatePermanentStyles(this)
+		this.ed.InvalidateStates([0,this.ed.GetTextSize()])
 	}
+	//}
 	var obj=UI.Keep(id,attrs)
 	UI.Begin(obj)
 	obj.doc=this;
@@ -408,14 +409,16 @@ TxtxEditor_prototype.AsWidget=function(id,attrs){
 	return obj
 }
 //////////////////////////
-UI.NewTxtxEditor=function(wrap_width){
+UI.NewTxtxEditor=function(wrap_width,gdoc){
 	if(!TxtxEditor_prototype.hyphenator){
 		//TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"));
 		TxtxEditor_prototype.hyphenator=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.dfa"));
 	}
 	var ret=Object.create(TxtxEditor_prototype)
 	ret.wrap_width=wrap_width
+	ret.styles=CreateStyleArray(gdoc.GetObject(0).m_data.styles)
 	ret.Init()
+	this.styles=undefined
 	return ret
 }
 
@@ -437,7 +440,7 @@ UI.RegisterZipLoader("txt",function(gdoc,sdata){
 		}
 		perm.objects[i].obj=UI.LoadObject(data_list,obj_id)
 	}
-	return UI.NewTxtxEditor(perm.wrap_width);
+	return UI.NewTxtxEditor(perm.wrap_width,gdoc);
 })
 
 //////////////////////////
@@ -472,7 +475,7 @@ TxtxEditor_prototype.Paste=function(){
 	//test clipboard text and format...
 	var gdoc=this.m_global_document
 	var stext=gdoc.BeginPaste()
-	if(typeof stext=='object'){
+	if((typeof stext)=='object'){
 		//stext is actually the clipboard object
 		if(stext.format=='txtx'){
 			var perm=stext.root;
@@ -491,7 +494,7 @@ TxtxEditor_prototype.Paste=function(){
 			this.m_style_map=undefined;
 			stext=renderer.Internal_TranslateStylesAndObjects(perm.text,objects,styles)
 		}else{
-			throw new Error("please implement the paste function for "+stext)//todo
+			throw new Error("please implement the paste function for "+stext.format)//todo
 		}
 	}else{
 		//do nothing: stext is good as is
@@ -567,7 +570,7 @@ W.subwindow_text_properties={
 			'x':13.02037844241704,'y':36,'w':166.83966387238038,'h':29,
 			items:[
 				{text:"Roman"},
-				{text:"Sans Serif"},
+				{text:"Sans"},
 				{text:"Typewriter"},
 			],
 			property_name:"font_face",

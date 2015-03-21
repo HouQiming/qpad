@@ -127,9 +127,12 @@ UI.NewGlobalDoc.prototype={
 		obj.m_sub_document_id=ret
 		return ret;
 	},
-	ReportEdit:function(id){
+	BeforeEdit:function(id){
 		this.m_redo_ids=[]
 		this.m_undo_ids.push(id)
+	},
+	OnObjectChange:function(id){
+		//the change should be reported AFTER edit... and at undos
 		if(!id){
 			var objs=this.m_objects;
 			for(var i=0;i<objs.length;i++){
@@ -145,11 +148,13 @@ UI.NewGlobalDoc.prototype={
 		var id=this.m_undo_ids.pop();
 		this.m_objects[id].Undo()
 		this.m_redo_ids.push(id)
+		this.OnObjectChange(id)
 	},
 	Redo:function(){
 		var id=this.m_redo_ids.pop();
 		this.m_objects[id].Redo()
 		this.m_undo_ids.push(id)
+		this.OnObjectChange(id)
 	},
 	//////////////////////////////////////
 	GetObject:function(id){
@@ -222,7 +227,7 @@ UI.NewGlobalDoc.prototype={
 	},
 	PerformContinuousUndo:function(){
 		while(this.m_undo_ids.length>this.m_contundo_point){
-			this.ed.Undo()
+			this.Undo()
 		}
 	},
 	EndContinuousUndo:function(){
@@ -231,34 +236,47 @@ UI.NewGlobalDoc.prototype={
 	/////////////////////////////////////////
 	SetStyleEditorPropertySheet:function(){
 		var sheet=UI.document_property_sheet;
-		var style_id=sheet["style_id"][0]
+		var style_id=sheet["style"][0]
 		//style editor
 		var obj_the_style=this.GetObject(0);
 		var cur_state=obj_the_style.m_data.styles[style_id];
-		sheet["font_face"]=[cur_state.font_face,function(value){obj_the_style.BeforeEdit();
-			cur_state.font_face=value;}]
-		sheet["font_size"]=[cur_state.font_size,function(value){obj_the_style.BeforeEdit();
-			cur_state.font_size=Math.max(parseInt(value),4);}]
-		sheet["font_embolden"]=[cur_state.font_size,function(value){obj_the_style.BeforeEdit();
-			cur_state.font_embolden=parseInt(value);}]
-		sheet["underlined"]=[!!(cur_state.flags&STYLE_UNDERLINED),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_UNDERLINED)|(value?STYLE_UNDERLINED:0));}]
-		//sheet["strike_out"]=[!!(cur_state.flags&STYLE_STRIKE_OUT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_STRIKE_OUT)|(value?STYLE_STRIKE_OUT:0));}]
-		sheet["superscript"]=[!!(cur_state.flags&STYLE_SUPERSCRIPT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUPERSCRIPT:0));}]
-		sheet["subscript"]=[!!(cur_state.flags&STYLE_SUBSCRIPT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~(STYLE_SUPERSCRIPT|STYLE_SUBSCRIPT))|(value?STYLE_SUBSCRIPT:0));}]
-		sheet["italic"]=[!!(cur_state.flags&STYLE_FONT_ITALIC),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_FONT_ITALIC)|(value?STYLE_FONT_ITALIC:0));}]
-		sheet["bold"]=[!!(cur_state.flags&STYLE_FONT_BOLD),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~STYLE_FONT_BOLD)|(value?STYLE_FONT_BOLD:0));}]
+		sheet["font_face"]=[cur_state.font_face,function(value){
+			obj_the_style.BeforeEdit();
+			cur_state.font_face=value;
+			obj_the_style.AfterEdit();
+		}]
+		sheet["font_size"]=[cur_state.font_size,function(value){
+			obj_the_style.BeforeEdit();
+			cur_state.font_size=Math.max(parseInt(value),4);
+			obj_the_style.AfterEdit();
+		}]
+		sheet["font_embolden"]=[cur_state.font_size,function(value){
+			obj_the_style.BeforeEdit();
+			cur_state.font_embolden=parseInt(value);
+			obj_the_style.AfterEdit();
+		}]
+		sheet["underlined"]=[!!(cur_state.flags&UI.STYLE_UNDERLINED),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~UI.STYLE_UNDERLINED)|(value?UI.STYLE_UNDERLINED:0));obj_the_style.AfterEdit();}]
+		//sheet["strike_out"]=[!!(cur_state.flags&UI.STYLE_STRIKE_OUT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~UI.STYLE_STRIKE_OUT)|(value?UI.STYLE_STRIKE_OUT:0));obj_the_style.AfterEdit();}]
+		sheet["superscript"]=[!!(cur_state.flags&UI.STYLE_SUPERSCRIPT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~(UI.STYLE_SUPERSCRIPT|UI.STYLE_SUBSCRIPT))|(value?UI.STYLE_SUPERSCRIPT:0));obj_the_style.AfterEdit();}]
+		sheet["subscript"]=[!!(cur_state.flags&UI.STYLE_SUBSCRIPT),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~(UI.STYLE_SUPERSCRIPT|UI.STYLE_SUBSCRIPT))|(value?UI.STYLE_SUBSCRIPT:0));obj_the_style.AfterEdit();}]
+		sheet["italic"]=[!!(cur_state.flags&UI.STYLE_FONT_ITALIC),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~UI.STYLE_FONT_ITALIC)|(value?UI.STYLE_FONT_ITALIC:0));obj_the_style.AfterEdit();}]
+		sheet["bold"]=[!!(cur_state.flags&UI.STYLE_FONT_BOLD),function(value){obj_the_style.BeforeEdit();cur_state.flags=((cur_state.flags&~UI.STYLE_FONT_BOLD)|(value?UI.STYLE_FONT_BOLD:0));obj_the_style.AfterEdit();}]
 		//////
+		var gdoc=this
 		sheet["text_color"]=[
 			cur_state.color,
 			function(value,is_continuous){
 				if(is_continuous){
-					doc.PerformContinuousUndo()
+					gdoc.PerformContinuousUndo()
 				}
+				var cur_state=obj_the_style.m_data.styles[style_id];
+				//cur_state has changed after undo
 				obj_the_style.BeforeEdit();
 				cur_state.color=value;
+				obj_the_style.AfterEdit();
 			},
-			function(){doc.BeginContinuousUndo();},
-			function(){doc.EndContinuousUndo();}]
+			function(){gdoc.BeginContinuousUndo();},
+			function(){gdoc.EndContinuousUndo();}]
 	},
 	/////////////////////
 	BeginCopy:function(stext){
@@ -285,7 +303,7 @@ UI.NewGlobalDoc.prototype={
 			var style_i=pmystyles[i]
 			this.m_style_map[style_i.name]=i
 		}
-		var stext=UI.SDL_GetClipboardText();
+		var stext=UI.SDL_GetClipboardText().toString();
 		if(UI.internal_clipboard.key==stext){
 			return UI.internal_clipboard.data
 		}
@@ -332,7 +350,10 @@ UI.JSONObject_prototype={
 	BeforeEdit:function(){
 		this.m_redo_queue=[]
 		this.m_undo_queue.push(JSON.stringify(this.m_data))
-		this.m_global_document.ReportEdit(this.m_sub_document_id)
+		this.m_global_document.BeforeEdit(this.m_sub_document_id)
+	},
+	AfterEdit:function(){
+		this.m_global_document.OnObjectChange(this.m_sub_document_id)
 	},
 	Undo:function(){
 		this.m_redo_queue.push(JSON.stringify(this.m_data))

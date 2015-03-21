@@ -63,8 +63,9 @@ var DemoPage_prototype=UI.CreateJSONObjectClass({
 		},obj_img.w,obj_img.h,1)
 	},
 	InsertTextBox:function(){
+		var gdoc=this.m_global_document
 		this.DragInsert(function(w,h){
-			return UI.NewTxtxEditor(w)
+			return UI.NewTxtxEditor(w,gdoc)
 		},200,32)
 	},
 	AsWidget:function(id,attrs){
@@ -148,6 +149,7 @@ var DemoPage_prototype=UI.CreateJSONObjectClass({
 });
 
 var ActiveInsertion_prototype={
+	//todo: snapping, shift, ...
 	min_dragging_initiation:8,
 	OnMouseDown:function(event){
 		this.drag_x_base=event.x
@@ -184,32 +186,39 @@ var ActiveInsertion_prototype={
 		var desc=this.desc
 		var x=this.drag_x_base,w=this.drag_x1-x;if(w<0){x+=w;w=-w;}
 		var y=this.drag_y_base,h=this.drag_y1-y;if(h<0){y+=h;h=-h;}
+		x-=this.x;
+		y-=this.y;
+		x/=this.scale;
+		y/=this.scale;
+		w/=this.scale;
+		h/=this.scale;
 		//insert in the original size if tiny
 		if(!w){w=desc.w_intrinsic}
 		if(!h){h=desc.h_intrinsic}
-		var obj=desc.action()
+		var obj=desc.action(w,h)
 		var obj_id=desc.gdoc.AddObject(obj)
 		var body=this.cur_page.m_data.body
 		body.push({x:x,y:y,w:w,h:h,obj_id:obj_id})
-		var pboxdoc=this.parent.pboxdoc
+		var pboxdoc=this.parent.cur_tab.pboxdoc
 		if(pboxdoc){
 			var sel={}
 			sel["$"+(body.length-1).toString()]=1
 			pboxdoc.group.selection=sel;
 		}
 		//remove the temp dragging UI
-		this.parent.active_drag_insertion=undefined
-		this.parent=undefined
+		this.cur_page.active_drag_insertion=undefined
+		this.cur_page=undefined
 		UI.Refresh()
 	},
 	Render:function(){
 		var x=this.drag_x_base,w=this.drag_x1-x;if(w<0){x+=w;w=-w;}
 		var y=this.drag_y_base,h=this.drag_y1-y;if(h<0){y+=h;h=-h;}
-		var pboxdoc=this.parent.pboxdoc
+		//todo: mouse cursor and insertion indication
+		var pboxdoc=this.parent.cur_tab.pboxdoc
 		if(w&&h){
 			UI.RoundRect({x:x,y:y,w:w,h:h,
-				border_color:pboxdoc.border_color,border_width:pboxdoc.border_width,
-				color:pboxdoc.color})
+				border_color:pboxdoc.border_color&0xff000000,border_width:pboxdoc.border_width,
+				color:(pboxdoc.color>>1)&0xff000000})
 		}
 	},
 };
@@ -275,7 +284,7 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 		var fnewpage=function(){
 			var new_page=Object.create(DemoPage_prototype)
 			new_page.Init()
-			obj.pages.push(new_page)
+			obj.m_data.pages.push(gdoc.AddObject(new_page))
 			UI.Refresh()
 		}
 		var thumbnail_margin;
@@ -366,9 +375,11 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 			UI.RoundRect({x:x_main_ui,y:thumbnail_margin,w:cpage_w*scale,h:cpage_h*scale,
 				color:0,border_color:thumbnail_style.border_color,border_width:thumbnail_style.border_width})
 			//the active insertion
-			if(this.active_drag_insertion){
-				var active_ins=W.Region("active_ins",{x:x_main_ui,y:thumbnail_margin,w:w_main_ui,h:h_main_ui, 
-					desc:this.active_drag_insertion,
+			if(cur_page.active_drag_insertion){
+				var active_ins=W.Region("active_ins",{
+					x:x_main_ui,y:thumbnail_margin,w:w_main_ui,h:h_main_ui,
+					scale:scale,
+					desc:cur_page.active_drag_insertion,
 					cur_page:cur_page,
 					parent:obj},ActiveInsertion_prototype)
 				active_ins.Render()
