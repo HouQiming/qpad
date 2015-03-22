@@ -279,9 +279,10 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 				text:s_i,
 				font:thumbnail_style.font,color:obj.selected?thumbnail_style.sel_text_color:thumbnail_style.text_color,
 				x:obj.x-UI.MeasureIconText({font:thumbnail_style.font,text:s_i}).w-thumbnail_style.text_padding,y:obj.y})
-			return attrs
+			return obj
 		}}
 		var fnewpage=function(){
+			!? //load from a template, hidden pages
 			var new_page=Object.create(DemoPage_prototype)
 			new_page.Init()
 			obj.m_data.pages.push(gdoc.AddObject(new_page))
@@ -289,77 +290,41 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 		}
 		var thumbnail_margin;
 		var current_page_id=(UI.GetMetaData(this).current_page||0)
-		if(obj.w<obj.h){
-			//phone layout
-			var h_thumbnail=(3/32)*obj.h
-			thumbnail_margin=h_thumbnail*(3/32);
-			for(var i=0;i<n;i++){
-				var page_i=gdoc.GetObject(pages[this.numerical_id])
-				var page_w=page_i.m_data.page_w
-				var page_h=page_i.m_data.page_h
-				var h_i=h_thumbnail,scale=h_i/page_h,w_i=scale*page_w
-				list_items.push({x:thumbnail_margin,w:w_i,h:h_i,numerical_id:i})
-			}
-			var h_i=h_thumbnail,w_i=w_thumbnail*this.m_data.aspect_ratio
-			list_items.push({
-				object_type:W.Button,
-				x:0,y:0,w:w_i,h:h_i,
-				style:obj.new_page_button_style,
-				no_click_selection:1,
-				text:"+",
-				OnClick:fnewpage
-			})
-			page_list=W.ListView("page_list",{
-				anchor:'parent',anchor_valign:'down',anchor_align:'fill',
-				x:0,y:0,h:h_thumbnail+thumbnail_margin,
-				value:current_page_id,OnChange:function(value){
-					obj.current_page=value
-					UI.Refresh()
-				},
-				layout_spacing:thumbnail_margin*2,layout_align:'right',layout_valign:'up',
-				items:list_items,
-				item_template:obj_template,
-			})
-			x_main_ui=0
-			w_main_ui=obj.w-thumbnail_margin*2
-			h_main_ui=obj.h-h_thumbnail-thumbnail_margin*2
-		}else{
-			//PC layout
-			var w_thumbnail=(3/32)*obj.w
-			thumbnail_margin=w_thumbnail*(3/32);
-			for(var i=0;i<n;i++){
-				var page_i=gdoc.GetObject(pages[this.numerical_id])
-				var page_w=page_i.m_data.page_w
-				var page_h=page_i.m_data.page_h
-				var w_i=w_thumbnail,scale=w_i/page_w,h_i=scale*page_h
-				list_items.push({x:thumbnail_margin,w:w_i,h:h_i,numerical_id:i})
-			}
-			//new page area
-			var w_i=w_thumbnail,h_i=w_thumbnail/this.m_data.aspect_ratio
-			list_items.push({
-				object_type:W.Button,
-				x:thumbnail_margin,y:0,w:w_i,h:h_i,
-				style:obj.new_page_button_style,
-				no_click_selection:1,
-				text:"+",
-				OnClick:fnewpage
-			})
-			page_list=W.ListView("page_list",{
-				x:0,y:0,w:w_thumbnail+thumbnail_margin*3,h:obj.h,
-				value:current_page_id,OnChange:function(value){
-					obj.current_page=value
-					UI.Refresh()
-				},
-				layout_spacing:thumbnail_margin,layout_align:'right',layout_valign:'up',
-				items:list_items,
-				item_template:obj_template,
-			})
-			x_main_ui=w_thumbnail+thumbnail_margin*4
-			w_main_ui=obj.w-x_main_ui-thumbnail_margin*2
-			h_main_ui=obj.h-thumbnail_margin*2
+		//PC layout
+		var w_thumbnail=(3/32)*obj.w
+		thumbnail_margin=w_thumbnail*(3/32);
+		for(var i=0;i<n;i++){
+			var page_i=gdoc.GetObject(pages[i])
+			var page_w=page_i.m_data.page_w
+			var page_h=page_i.m_data.page_h
+			var w_i=w_thumbnail,scale=w_i/page_w,h_i=scale*page_h
+			list_items.push({x:thumbnail_margin,w:w_i,h:h_i,numerical_id:i})
 		}
-		var cur_page=gdoc.GetObject(pages[current_page_id])
+		//new page area
+		var w_i=w_thumbnail,h_i=w_thumbnail/this.m_data.aspect_ratio
+		list_items.push({
+			object_type:W.Button,
+			x:thumbnail_margin,y:0,w:w_i,h:h_i,
+			style:obj.new_page_button_style,
+			no_click_selection:1,
+			text:"+",
+			OnClick:fnewpage
+		})
+		page_list=W.ListView("page_list",{
+			x:0,y:0,w:w_thumbnail+thumbnail_margin*3,h:obj.h,
+			value:current_page_id,OnChange:function(value){
+				obj.current_page=value
+				UI.Refresh()
+			},
+			layout_spacing:thumbnail_margin,layout_align:'right',layout_valign:'up',
+			items:list_items,
+			item_template:obj_template,
+		})
+		x_main_ui=w_thumbnail+thumbnail_margin*4
+		w_main_ui=obj.w-x_main_ui-thumbnail_margin*2
+		h_main_ui=obj.h-thumbnail_margin*2
 		//last_current_page is not even metadata - it's purely transient
+		var cur_page=gdoc.GetObject(pages[current_page_id])
 		if(current_page_id!=this.last_current_page){
 			this.last_current_page=current_page_id
 			obj.cur_tab=undefined;
@@ -369,7 +334,7 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 			var cpage_h=cur_page.m_data.page_h
 			var scale=Math.min(w_main_ui/cpage_w,h_main_ui/cpage_h)
 			x_main_ui+=Math.max((obj.w-x_main_ui-thumbnail_margin*2-cpage_w*scale)*0.5,0)
-			UI.PushSubWindow(x_main_ui,thumbnail_margin,w_main_ui,h_main_ui,scale)
+			UI.PushSubWindow(x_main_ui,thumbnail_margin,cpage_w*scale,cpage_h*scale,scale)
 			cur_page.AsWidget("cur_tab",{x:0,y:0,w:cpage_w,h:cpage_h})
 			UI.PopSubWindow()
 			UI.RoundRect({x:x_main_ui,y:thumbnail_margin,w:cpage_w*scale,h:cpage_h*scale,
