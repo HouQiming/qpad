@@ -282,7 +282,7 @@ UI.NewGlobalDoc.prototype={
 	BeginCopy:function(stext){
 		var ret={};
 		ret.m_objects={};
-		ret.GetObject(0)={styles:{}};
+		ret.m_objects[0]={styles:{}};
 		ret.owner=this;
 		UI.internal_clipboard={data:ret,key:stext}
 		UI.SDL_SetClipboardText(stext)
@@ -294,7 +294,7 @@ UI.NewGlobalDoc.prototype={
 		cobj.m_objects[id]=[obj_i.default_extension,obj_i.Save()]//(obj_i.share_across_docs?obj_i:obj_i.Save())
 	},
 	CopyStyle:function(cobj,id){
-		cobj.GetObject(0).styles[id]=UI.CloneStyle(this.GetObject(0).styles[id])
+		cobj.m_objects[0].styles[id]=UI.CloneStyle(this.GetObject(0).styles[id])
 	},
 	BeginPaste:function(){
 		var pmystyles=this.GetObject(0).m_data.styles
@@ -325,7 +325,7 @@ UI.NewGlobalDoc.prototype={
 	},
 	PasteStyle:function(cobj,id){
 		//search by name, populate m_style_map
-		var pstyles=cobj.GetObject(0).styles;
+		var pstyles=cobj.m_objects[0].styles;
 		var style_obj=pstyles[id]
 		var pmystyles=this.GetObject(0).m_data.styles
 		var ret=this.m_style_map[style_obj.name]

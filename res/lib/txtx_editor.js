@@ -67,6 +67,8 @@ var CreateStyleArray=function(in_styles){
 	for(var i=0;i<in_styles.length;i++){
 		var style_i=UI.CloneStyle(in_styles[i]);
 		style_i.font=UI.CreateFontFromStyle(style_i)
+		style_i.line_space=style_i.relative_line_space*style_i.font_size;
+		style_i.paragraph_space=style_i.relative_paragraph_space*style_i.font_size;
 		out_styles[i]=style_i;
 	}
 	return out_styles;
@@ -109,11 +111,6 @@ TxtxEditor_prototype.GetRenderer=function(){
 	var ed=this.ed;
 	return ed.GetHandlerByID(ed.m_handler_registration["renderer"]);
 };
-TxtxEditor_prototype.GetStyleName=function(params){
-	var lspace=(params.relative_line_space||0.0);
-	var pspace=(params.relative_paragraph_space||0.8);
-	return name=[params.font_face,params.font_size,params.flags,params.color,lspace,pspace].join("_")
-}
 TxtxEditor_prototype.ModifyTextStyle=function(ModifyStyle,sel){
 	if(!sel){sel=this.GetSelection();}
 	var ed=this.ed;
@@ -121,7 +118,7 @@ TxtxEditor_prototype.ModifyTextStyle=function(ModifyStyle,sel){
 	var ops;
 	var new_sel;
 	var obj=this;
-	UI.HackCallback(fcallback)
+	UI.HackCallback(ModifyStyle)
 	if(sel[0]<sel[1]){
 		var s_original=ed.GetText(sel[0],sel[1]-sel[0]);
 		var styling_regions=UI.TokenizeByStylingRegions(s_original)
@@ -582,20 +579,41 @@ W.subwindow_text_properties={
 	}
 };
 
+W.StyleItem=function(id,attrs){
+	var obj=UI.Keep(id,attrs)
+	UI.StdStyling(id,obj,attrs,"style_item",obj.selected?"focus":"blur")
+	var padding=obj.padding
+	if(!attrs.__layout){UI.LayoutText(attrs);}
+	attrs.w=(attrs.w_text+padding*2);
+	attrs.h=(attrs.h_text+padding*2);
+	obj.w=attrs.w
+	obj.h=attrs.h
+	UI.StdAnchoring(id,obj);
+	UI.RoundRect(obj)
+	UI.DrawTextControl(attrs,obj.x+padding,obj.y+padding,obj.text_color||0xffffffff)
+	return obj
+}
+
 //todo: hotkeys: # or \
 //post-textInput-triggered-action
 W.subwindow_style_picker={
 	'title':'Styles',h:300,
 	body:function(){
+		if(!UI.document_property_sheet){return;}
 		var gdoc=UI.document_property_sheet.style_gdoc
+		if(!gdoc){return;}
 		var styles=gdoc.GetObject(0).m_data.styles
 		var list_items=[]
+		var scale=24/styles[0].font_size
+		//list_items.push({object_type:function(id,attrs){UI.StdAnchoring(id,attrs);return attrs;},w:1,h:24,no_click_selection:1})
 		for(var i=0;i<styles.length;i++){
-			style_i=styles[i]
-			list_items.push({x:0,y:0,w:0,h:h_i,
+			var style_i=UI.CloneStyle(styles[i])
+			style_i.font_size*=scale
+			//todo: selected... a StyleItem class
+			list_items.push({x:0,y:0,
 				font:UI.CreateFontFromStyle(style_i),
 				text:style_i.name,
-				color:style_i.color})
+				text_color:style_i.color})
 		}
 		//
 		list_items.push({
@@ -616,24 +634,25 @@ W.subwindow_style_picker={
 					},
 				}
 			},
+			no_click_selection:1,
 			font:UI.Font(UI.font_name,24),
 			text:"+ New style",
 			OnClick:function(){
 				//create new style from style 0
 				var new_style=UI.CloneStyle(styles[0])
 				styles.push(new_style)
-				new_style.name="style_"+styles.length
+				new_style.name="style_"+styles.length.toString()
 				UI.Refresh()
 			}
 		})
 		//a ListView of style objects
 		W.ListView("style_list",{
-			anchor:'parent',anchor_valign:'fill',anchor_align:'fill',
-			x:0,y:0,
+			anchor:'parent',anchor_valign:'up',anchor_align:'fill',
+			x:4,y:24,h:UI.context_parent.h-24,
 			property_name:'style',
-			layout_spacing:thumbnail_margin*2,layout_align:'fill',layout_valign:'up',
+			layout_spacing:4,layout_align:'left',layout_valign:'up',
 			items:list_items,
-			item_template:{object_type:W.Text},
+			item_template:{object_type:W.StyleItem},
 		})
 	}
 };

@@ -282,7 +282,7 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 			return obj
 		}}
 		var fnewpage=function(){
-			!? //load from a template, hidden pages
+			//todo: load from a template, hidden pages
 			var new_page=Object.create(DemoPage_prototype)
 			new_page.Init()
 			obj.m_data.pages.push(gdoc.AddObject(new_page))
@@ -364,12 +364,14 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 					'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 					'x':0,'y':0,
 					'file_name':this.m_file_name})
+				this.title=UI.GetMainFileName(this.gdoc.m_file_name)
 				return body;
 			},
 			title:UI.GetMainFileName(gdoc.m_file_name),
 			property_windows:[
 				W.subwindow_insert_stuff,
-				W.subwindow_text_properties
+				W.subwindow_text_properties,
+				W.subwindow_style_picker,
 			],
 			color_theme:[0xffb4771f],
 		})

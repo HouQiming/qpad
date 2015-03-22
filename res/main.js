@@ -7,8 +7,134 @@ require("res/lib/subwin");
 require("res/lib/demo_doc");
 
 UI.ChooseScalingFactor({designated_screen_size:1080})
+UI.SetFontSharpening(1)
+UI.Theme_CustomWidget=function(C){
+	var C_dark=UI.lerp_rgba(C[0],0xff000000,0.15)
+	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.75)
+	var custom_styles={
+		sub_window:{
+			transition_dt:0.1,
+			round:0,border_width:2,
+			padding:4,h_caption:24,
+			/////////////////
+			layout_direction:"inside",layout_align:'left',layout_valign:'up',
+			/////////////////
+			font:UI.Font(UI.font_name,20,100),
+			color:0xffffffff,border_color:C[0],border_width:2,
+			caption_color:C[0],text_color:0xffdddddd,
+			button_style:{
+				transition_dt:0.1,
+				round:0,border_width:2,padding:8,
+				border_width:0,color:0,
+				text_color:0xffdddddd,
+				font:UI.Font(UI.font_name,20,100),
+				$:{
+					out:{
+						text_color:0xffdddddd
+					},
+					over:{
+						text_color:0xffffffff,
+					},
+					down:{
+						text_color:0xffffffff,
+					},
+				}
+			},
+		},
+		tab_label:{
+			transition_dt:0.1,
+			shadow_size:8,
+			font:UI.Font(UI.font_name,24), padding:16,
+			$:{
+				active:{
+					text_color:0xffffffff,
+					color:C[0],
+					shadow_color:0xaa000000,
+				},
+				inactive:{
+					text_color:0xff444444,
+					color:C[0]&0x00f0f0f0,
+					shadow_color:0x00000000, 
+				},
+			}
+		},
+		tabbed_document:{
+			transition_dt:0.1,
+			h_caption:32, h_bar:4, color:0xffbbbbbb, border_color:C[0]
+		},
+		box_document:{
+			border_color:(0xccffffff&C[0]),border_width:2,w_snapping_line:2,
+			color:(0x44ffffff&C[0]),
+		},
+		txtx_editor:{
+			border_color:0xff000000,border_width:2,
+			color:0xffffffff,
+		},
+		color_picker:{
+			w_text:16,w_slider:128,w_edit:54,
+			h_slider:12,
+			h_edit:32,
+			h_space:24,
+			padding:8,
+			border_width:1.5,
+			border_color:0xff444444,
+			text_color:0xff000000,
+			font:UI.Font(UI.font_name,24),
+		},
+		demo_document:{
+			thumbnail_style:{
+				border_color:0xff000000,
+				border_width:1.5,
+				text_color:0xff000000,
+				sel_border_color:C[0],
+				sel_border_width:3,
+				sel_text_color:C[0],
+				font:UI.Font(UI.font_name,24),
+				text_padding:4,
+			},
+			new_page_button_style:{
+				transition_dt:0.1,
+				round:0,border_width:3,padding:0,color:0,
+				font:UI.Font(UI.font_name,72,-50),
+				$:{
+					out:{
+						border_color:0x80000000,
+						icon_color:0x80000000,
+						text_color:0x80000000,
+					},
+					over:{
+						border_color:0xaa000000,
+						icon_color:0xaa000000,
+						text_color:0xaa000000,
+					},
+					down:{
+						border_color:0xaa000000,
+						icon_color:0xaa000000,
+						text_color:0xaa000000,
+					},
+				},
+			},
+		},
+		style_item:{
+			border_color:0,border_width:0,
+			color:0x00000000,
+			padding:4,
+			$:{
+				focus:{
+					color:C_sel,
+				},
+				blur:{
+					color:0x00000000,
+				}
+			}
+		},
+	};
+	var s0=UI.default_styles;
+	for(var key in custom_styles){
+		s0[key]=custom_styles[key]
+	}
+}
 UI.Theme_Minimalistic([0xffcc7733])
-UI.SetFontSharpening(1.5)
 UI.icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
 UI.font_name="res/fonts/opensans.ttf"
