@@ -128,6 +128,20 @@ UI.Theme_CustomWidget=function(C){
 				}
 			}
 		},
+		code_editor:{
+			editor_style:{
+				font:UI.Font("res/fonts/inconsolata.ttf",24),
+				color:0xff000000,
+				color_overlay:0xff000000,
+				color_string:0xff1c1aa3,
+				color_number:0xff1c1aa3,
+				color_comment:0xff2ca033,
+				color_keyword:0xffb4771f,
+				color_type:0xffbc470f,
+				color_symbol:0xff7f7f7f,
+				tab_width:4,
+			},
+		},
 	};
 	var s0=UI.default_styles;
 	for(var key in custom_styles){
@@ -238,7 +252,8 @@ UI.Application=function(id,attrs){
 			W.Hotkey("",{key:"CTRL+N",action:function(){
 				//UI.NewUIEditorTab()
 				//UI.NewDemoTab()
-				UI.NewFromTemplate("templates/blank_demo.mo")//todo
+				//UI.NewFromTemplate("templates/blank_demo.mo")
+				UI.NewCodeEditorTab()//todo
 				UI.Refresh()
 			}});
 			W.Hotkey("",{key:"CTRL+S",action:function(){

@@ -6,10 +6,9 @@ var LanguageDefinition=function(){
 	this.m_bracket_types=[];
 	this.m_entry_states=[];
 	this.m_coloring_rules=[];
-	this.m_keywords=[];
-	this.m_word_openers=[];
-	this.m_word_color_default="color";
 	this.m_color_default="color";
+	this.m_keyword_sets=[];
+	this.m_word_dfa_initial_state=[-1];
 };
 var REAL_TYPE_MOV=0;
 var REAL_TYPE_XOR=1;
@@ -60,6 +59,7 @@ LanguageDefinition.prototype={
 			throw new Error("bad delimiter id");
 		}
 		this.m_coloring_rules.push({bid:bid,color_name:color_name});
+		this.m_word_dfa_initial_state.push(-1)
 	},
 	ColoredDelimiter:function(type,stok0,stok1,color_name){
 		var bid=this.DefineDelimiter(type,stok0,stok1)
@@ -93,20 +93,26 @@ LanguageDefinition.prototype={
 		}
 	},
 	/////////////////
-	DefineKeywords:function(s_color,keywords){
-		for(var i=0;i<keywords.length;i++){
-			var s=keywords[i];
-			this.m_keywords.push(s)
-			this.m_keywords.push(s_color)
+	DefineKeywordSet:function(s_for_color){
+		var ret=new KeywordSet()
+		this.m_keyword_sets.push(ret)
+		var id=-1;
+		if(s_for_color==this.m_color_default){
+			id=0
+		}else{
+			for(var i=0;i<this.m_coloring_rules.length;i++){
+				if(s_for_color==this.m_coloring_rules[i].color_name){
+					id=i+1;
+					break;
+				}
+			}
 		}
+		if(id<0){throw new Error("please define color @1 in a rule before defining its keyword set".replace("@1",s_for_color));}
+		if(this.m_word_dfa_initial_state[id]!=-1){throw new Error("color @1 already has a keyword set".replace("@1",s_for_color));}
+		this.m_word_dfa_initial_state[id]=this.m_keyword_sets.length-1;
+		return ret;
 	},
-	DefineWordType:function(s_color,s_charset){
-		this.m_word_openers.push(s_charset,s_color)
-	},
-	DefineWordColor:function(s_color){
-		this.m_word_color_default=s_color;
-	},
-	DefineSymbolColor:function(s_color){
+	DefineDefaultColor:function(s_color){
 		this.m_color_default=s_color;
 	},
 	/////////////////
@@ -193,3 +199,24 @@ Edit_prototype.FindBracket=function(n_brackets,ccnt,direction){
 Edit_prototype.FindOuterBracket=function(ccnt,direction){
 	return this.FindBracket(this.GetBracketLevel(ccnt)-1,ccnt,direction);
 };
+
+var KeywordSet=function(){
+	this.m_keywords=[];
+	this.m_word_openers=[];
+	this.m_word_color_default="color";
+}
+KeywordSet.prototype={
+	DefineKeywords:function(s_color,keywords){
+		for(var i=0;i<keywords.length;i++){
+			var s=keywords[i];
+			this.m_keywords.push(s)
+			this.m_keywords.push(s_color)
+		}
+	},
+	DefineWordType:function(s_color,s_charset){
+		this.m_word_openers.push(s_charset,s_color)
+	},
+	DefineWordColor:function(s_color){
+		this.m_word_color_default=s_color;
+	},
+}

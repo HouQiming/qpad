@@ -28,6 +28,7 @@ var g_registered_fonts={
 };
 ////////////////
 var TxtxEditor_prototype=Object.create(W.Edit_prototype)
+TxtxEditor_prototype.plugin_class='txtx_editor',
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
 TxtxEditor_prototype.wrap_width=1024;
 TxtxEditor_prototype.page_margin_left=0;
@@ -103,7 +104,7 @@ TxtxEditor_prototype.HookedEdit=function(ops){
 		}
 	}
 	this.m_global_document.BeforeEdit(this.m_sub_document_id)
-	ed.Edit(ops);
+	W.Edit_prototype.HookedEdit.call(ed,ops);
 	this.m_global_document.OnObjectChange(this.m_sub_document_id)
 };
 //todo: undo hooks
@@ -496,13 +497,12 @@ TxtxEditor_prototype.Paste=function(){
 	}else{
 		//do nothing: stext is good as is
 	}
-	this.OnTextInput({"text":stext})
+	this.OnTextInput({"text":stext,"is_paste":1})
 }
 //////////////////////////
 TxtxEditor_prototype.OnSelectionChange=function(){
 	this.sync_object_selection_to_boxdoc=1
 }
-TxtxEditor_prototype.additional_hotkeys=[];
 /////////////////////////////////////////
 
 //var hyp=UI.ParseHyphenator(IO.UIReadAll("res/misc/ushyphmax.tex"))

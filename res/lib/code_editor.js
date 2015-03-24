@@ -13,6 +13,7 @@ g_sandbox.m_relative_scaling=1;//0.5;
 var g_params={padding:12};
 var g_initial_code=IO.ReadAll("mo\\test\\uiediting.js");
 var g_language_C=Language.Define(function(lang){
+	lang.DefineDefaultColor("color_symbol")
 	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
 	var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
@@ -22,11 +23,11 @@ var g_language_C=Language.Define(function(lang){
 	lang.DefineToken("\\'")
 	lang.DefineToken('\\"')
 	lang.DefineToken('\\\n')
-	lang.DefineKeywords("color_keyword",['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'])
-	lang.DefineKeywords("color_type",['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t'])
-	lang.DefineSymbolColor("color_symbol")
-	lang.DefineWordColor("color")
-	lang.DefineWordType("color_number","0-9")
+	var kwset=lang.DefineKeywordSet("color_symbol");
+	kwset.DefineKeywords("color_keyword",['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'])
+	kwset.DefineKeywords("color_type",['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t'])
+	kwset.DefineWordColor("color")
+	kwset.DefineWordType("color_number","0-9")
 	return (function(lang){
 		lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2]);
 		if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)){
@@ -36,30 +37,6 @@ var g_language_C=Language.Define(function(lang){
 		}
 	});
 });
-
-////////////////////////////////////////
-//the code editor
-//load the color theme somewhere... just eval: it's trusted script
-//give a default coloring here
-var CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
-	state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode"],
-	////////////////////
-	//the theme portion
-	color:0xff000000,
-	color_string:0xff1c1aa3,
-	color_number:0xff1c1aa3,
-	color_comment:0xff2ca033,
-	color_keyword:0xffb4771f,
-	color_type:0xffbc470f,
-	tab_width:4,
-	font:UI.Font("res/fonts/inconsolata.ttf",24),
-	////////////////////
-	//per-language portion
-	language:g_language_C,
-	////////////////////
-	//overloaded methods
-	//todo: plugins...
-})
 
 ////////////////////////////////////////
 //the UI editor
@@ -324,7 +301,7 @@ UI.NewUIEditorTab=function(fname0){
 		property_windows:[
 			W.subwindow_ui_insertion_bar
 		],
-		color_theme:[0xff5511aa],
+		color_theme:[0xff9a3d6a],
 	})
 };
 UI.RegisterLoaderForExtension("js",function(fn){return UI.NewUIEditorTab(fn)})
@@ -548,4 +525,114 @@ W.UIEditor=function(id,attrs){
 	//print("DrawUserFrame:",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
 	UI.End();
 	return obj
+};
+
+///////////////////////////////////////////////////////
+//the code editor
+W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
+	plugin_class:'code_editor',
+	state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
+	////////////////////
+	//per-language portion
+	language:g_language_C,
+	////////////////////
+	//overloaded methods
+	//todo: plugins...
+	LoadNext:function(){
+		if(this.ed.hfile_loading){
+			UI.NextTick(function(){
+				this.ed.hfile_loading=UI.EDLoader_Read(this.ed,this.ed.hfile_loading)
+				this.LoadNext();
+			})
+		}
+	},
+	StartLoading:function(fn){
+		this.ed.hfile_loading=UI.EDLoader_Open(this.ed,fn)
+		this.LoadNext()
+	},
+})
+
+W.CodeEditorWidget_prototype={
+	Save:function(){
+		var doc=this.doc
+		if(doc.ed.hfile_loading){
+			//todo: error notification
+			return
+		}
+		var ctx=UI.EDSaver_Open(doc.ed,this.file_name)
+		if(!ctx){
+			//todo: error notification
+			return
+		}
+		doc.ed.saving_context=ctx
+		var fsave=UI.HackCallback(function(){
+			var ret=ctx.EDSaver_Write()
+			if(ret=="done"){
+				doc.ed.saving_context=undefined
+			}else if(ret=="continue"){
+				UI.NextTick(fsave)
+			}else{
+				doc.ed.saving_context=undefined
+				//todo: error notification
+			}
+		})
+		fsave();
+	}
+}
+W.CodeEditor=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
+	UI.Begin(obj)
+		UI.RoundRect({color:obj.bgcolor,x:obj.x,y:obj.y,w:obj.w,h:obj.h})
+		//main code area
+		var doc=obj.doc
+		var h_top_hint=0
+		if(doc){
+			//top hint in a separate area
+			//todo: h_top_hint
+			//todo: a (shadowed) separation bar
+			//put shadow on top? it's an underlay, not an overlay... should work both ways
+		}
+		if(doc&&doc.ed.saving_context){
+			//todo: draw a progress bar with no interaction
+			obj.__children.push(doc)
+		}else{
+			W.Edit("doc",{
+				///////////////
+				language:g_language_C,//todo
+				style:UI.default_styles.code_editor.editor_style,
+				///////////////
+				x:0,y:0,w:obj.w,h:obj.h,
+			},W.CodeEditor_prototype);
+			if(!doc){
+				//initiate progressive loading
+				doc=obj.doc
+				doc.StartLoading(obj.file_name)
+			}
+			//line number area
+			//todo
+			//minimap / scroll bar
+			//todo
+		}
+	UI.End()
+	return obj
+}
+
+UI.NewCodeEditorTab=function(fname0){
+	var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
+	return UI.NewTab({
+		file_name:file_name,
+		title:UI.GetMainFileName(file_name),
+		body:function(){
+			//use styling for editor themes
+			//todo: load a style object
+			var body=W.CodeEditor("body",{
+				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
+				'x':0,'y':0,
+				'file_name':this.file_name,
+			})
+			return body;
+		},
+		property_windows:[],
+		color_theme:[0xff9a3d6a],
+	})
 };
