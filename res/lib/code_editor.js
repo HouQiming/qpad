@@ -3,10 +3,6 @@ var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
 var Language=require("res/lib/langdef");
 
-//todo: smartification - make rubber controls auto-resize when faced with dimension changes
-//rubber-control > space
-//or scale-to-fit-some-edge
-
 function parent(){return UI.context_parent;}
 
 var g_sandbox=UI.CreateSandbox();
@@ -26,6 +22,11 @@ var g_language_C=Language.Define(function(lang){
 	lang.DefineToken("\\'")
 	lang.DefineToken('\\"')
 	lang.DefineToken('\\\n')
+	lang.DefineKeywords("color_keyword",['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'])
+	lang.DefineKeywords("color_type",['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t'])
+	lang.DefineSymbolColor("color_symbol")
+	lang.DefineWordColor("color")
+	lang.DefineWordType("color_number","0-9")
 	return (function(lang){
 		lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2]);
 		if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)){
@@ -36,6 +37,32 @@ var g_language_C=Language.Define(function(lang){
 	});
 });
 
+////////////////////////////////////////
+//the code editor
+//load the color theme somewhere... just eval: it's trusted script
+//give a default coloring here
+var CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
+	state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode"],
+	////////////////////
+	//the theme portion
+	color:0xff000000,
+	color_string:0xff1c1aa3,
+	color_number:0xff1c1aa3,
+	color_comment:0xff2ca033,
+	color_keyword:0xffb4771f,
+	color_type:0xffbc470f,
+	tab_width:4,
+	font:UI.Font("res/fonts/inconsolata.ttf",24),
+	////////////////////
+	//per-language portion
+	language:g_language_C,
+	////////////////////
+	//overloaded methods
+	//todo: plugins...
+})
+
+////////////////////////////////////////
+//the UI editor
 var ParseCodeError=function(err){
 	//todo
 	print(err.stack)
@@ -227,7 +254,7 @@ var nthIndex=function(str,pat,n){
 	return i>=L?-1:i;
 }
 
-W.subwindow_insertion_bar={
+W.subwindow_ui_insertion_bar={
 	'title':'Insert widgets',h:500,
 	body:function(){
 		var obj_temp=W.Text("-",{anchor:'parent',anchor_align:'left',anchor_valign:'up',x:8,y:32,
@@ -295,12 +322,13 @@ UI.NewUIEditorTab=function(fname0){
 			return body;
 		},
 		property_windows:[
-			W.subwindow_insertion_bar
+			W.subwindow_ui_insertion_bar
 		],
 		color_theme:[0xff5511aa],
 	})
 };
-UI.RegisterLoaderForExtension("js",function(fn){UI.NewUIEditorTab(fn)})
+UI.RegisterLoaderForExtension("js",function(fn){return UI.NewUIEditorTab(fn)})
+UI.RegisterLoaderForExtension("*",function(fn){return UI.NewCodeEditorTab(fn)})
 
 W.UIEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"ui_editor");
@@ -320,8 +348,12 @@ W.UIEditor=function(id,attrs){
 			///////////////
 			state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode"],
 			language:g_language_C,
-			color_string:0xff0055aa,
-			color_comment:0xff008000,
+			color_string:0xff1c1aa3,
+			color_number:0xff000080,
+			color_comment:0xff2ca033,
+			color_keyword:0xffb4771f,
+			color_type:0xffbc470f,
+			color_symbol:0xff7f7f7f,
 			///////////////
 			OnSelectionChange:function(){
 				var code_box=obj.doc;
@@ -359,7 +391,6 @@ W.UIEditor=function(id,attrs){
 		var w_sandbox_area=obj.w-ed_rect.w-24
 		//print("code_box:",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
 		//the sandbox is effectively a GLwidget
-		//todo: scrolling / clipping - use a transformation hack and a smaller viewport
 		UI.GLWidget(function(){
 			//var tick0=Duktape.__ui_get_tick();
 			//todo: scrolling

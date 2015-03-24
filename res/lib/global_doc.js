@@ -82,14 +82,11 @@ UI.LoadZipDocument=function(fname){
 UI.OpenFile=function(fname){
 	//todo: consult history for loader preference
 	var ext=UI.GetFileNameExtension(fname).toLowerCase()
-	var parser=UI.m_ext_loaders[ext]
-	if(parser){
-		return parser(fname)
-	}
-	//todo: mo only?
-	//try zipdoc by default for now
-	return UI.LoadZipDocument(fname)
+	var parser=(UI.m_ext_loaders[ext]||UI.m_ext_loaders["*"])
+	return parser(fname)
 }
+
+UI.RegisterLoaderForExtension("mo",function(fname){return UI.LoadZipDocument(fname)})
 
 //////////////////////////
 UI.internal_clipboard={}

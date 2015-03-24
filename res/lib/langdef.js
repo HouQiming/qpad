@@ -6,6 +6,10 @@ var LanguageDefinition=function(){
 	this.m_bracket_types=[];
 	this.m_entry_states=[];
 	this.m_coloring_rules=[];
+	this.m_keywords=[];
+	this.m_word_openers=[];
+	this.m_word_color_default="color";
+	this.m_color_default="color";
 };
 var REAL_TYPE_MOV=0;
 var REAL_TYPE_XOR=1;
@@ -87,6 +91,23 @@ LanguageDefinition.prototype={
 				break;
 			}
 		}
+	},
+	/////////////////
+	DefineKeywords:function(s_color,keywords){
+		for(var i=0;i<keywords.length;i++){
+			var s=keywords[i];
+			this.m_keywords.push(s)
+			this.m_keywords.push(s_color)
+		}
+	},
+	DefineWordType:function(s_color,s_charset){
+		this.m_word_openers.push(s_charset,s_color)
+	},
+	DefineWordColor:function(s_color){
+		this.m_word_color_default=s_color;
+	},
+	DefineSymbolColor:function(s_color){
+		this.m_color_default=s_color;
 	},
 	/////////////////
 	Finalize:function(fenabler){

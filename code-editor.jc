@@ -14,11 +14,16 @@ import TextBox.detail.*
 or-ing tokens
 	<
 	<script
+failure case:
+	a lot of \\ \"
+	token ambiguity cross the boundary
+	ignore
 */
 REAL_TYPE_MOV=0;
 REAL_TYPE_XOR=1;
 REAL_TYPE_ADD=2;
 DEFAULT_WRAP_WIDTH_IN_CHARS=2048LL
+GRACEFUL_WORD_SIZE=256
 
 struct TBracketType
 	int type
@@ -37,7 +42,11 @@ struct TColorRule
 	//int extend_0,extend_1
 	int bmask
 	int extend_before
-		
+
+struct TKeyword
+	string s
+	string color_name
+
 class CLanguageDescription
 	//int[] m_enabled_from_inside
 	int[] m_all_key_states
@@ -55,6 +64,12 @@ class CLanguageDescription
 	//TBracketType[] m_bracket_types
 	TBDFATransition[] m_bracket_dfa
 	TColorRule[] m_coloring_rules
+	/////////
+	string m_default_color_name
+	string[] m_word_color_names
+	int[] m_word_dfa
+	u8[] m_word_char_map
+	int m_n_word_char_types
 
 class CLayouter_programmer
 	FLAG_HAS_TAB=1
@@ -71,6 +86,7 @@ class CLayouter_programmer
 	JSObject m_style
 	CLanguageDescription m_lang
 	int[] m_cached_colors
+	int m_cached_colors_p_word_part
 	//todo: easy color change...
 	/////////////////
 	charWidth=inline(ch){
@@ -209,10 +225,13 @@ class CLayouter_programmer
 		else
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
 		////////////
-		m_cached_colors=new int[m_lang.m_coloring_rules.n+1]
-		m_cached_colors[0]=obj["color"].or(0xff000000)
+		m_cached_colors_p_word_part=m_lang.m_coloring_rules.n+1
+		m_cached_colors=new int[m_cached_colors_p_word_part+m_lang.m_word_color_names.n]
+		m_cached_colors[0]=obj[m_lang.m_default_color_name].or(0xff000000)
 		foreach crule,I in m_lang.m_coloring_rules
 			m_cached_colors[I+1]=obj[crule.color_name].or(0xff000000)
+		foreach color_name,I in m_lang.m_word_color_names
+			m_cached_colors[m_cached_colors_p_word_part+I]=obj[color_name].or(0xff000000)
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
 	}
@@ -231,8 +250,58 @@ class CLayouter_programmer
 	GetCaretOffset=function(){
 		return m_caret_offset
 	}
-	RenderText=function(i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
-		//todo: keywords
+	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+		//word coloring - update color_ids
+		//get a GRACEFUL_WORD_SIZE context on each side - do it per-char
+		word_dfa=m_lang.m_word_dfa
+		word_char_map=m_lang.m_word_char_map
+		n_word_char_types=m_lang.m_n_word_char_types
+		//start from word_ccnt0, do per-char enum until we go out of block
+		word_ccnt0=ccnt_base
+		budget=GRACEFUL_WORD_SIZE
+		foreach ch,I in ed.enumUtf8Backward(ccnt_base)
+			if !isWordChar(ch):break
+			word_ccnt0=I
+			budget--
+			if budget<0:break
+		ccnt_block_end=ccnt_base+i64(s.n)
+		for(;;)
+			//Writeln(word_ccnt0)
+			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
+				word_ccnt0=I
+				if isWordChar(ch):
+					break
+				word_ccnt0=I2
+				if word_ccnt0>=ccnt_block_end:
+					break
+			if word_ccnt0>=ccnt_block_end:break
+			//now we know we have a word
+			//non-word chars should immediately terminate the DFA
+			color_id=0
+			st=0
+			foreach ch,I in ed.enumCharsForward(word_ccnt0)//it's 8-bit here, not UTF8!
+				chi=int(ch)
+				st=word_dfa[st+int(word_char_map[chi])]
+				if st<0:
+					color_id=~st
+					break
+			if st>=0:
+				st=word_dfa[st+0]
+				if st<0:
+					color_id=~st
+					break
+			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
+				word_ccnt0=I
+				if isWordChar(ch):
+					ofs=iptr(word_ccnt0-ccnt_base)
+					if uptr(ofs)<uptr(color_ids.n):
+						color_ids[ofs]=m_cached_colors_p_word_part+color_id
+				else
+					break
+				word_ccnt0=I2
+				if word_ccnt0>=ccnt_block_end:
+					break
+		///////
 		fnt_scaled=m_font
 		fnt_scaled.h*=scaling
 		//smart emboldening for SRGB
@@ -304,7 +373,8 @@ class CLayouter_programmer
 			else
 				dx_i=charWidth(ch)
 				prj_x=projectXY(x)
-				g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids?int(color_ids[I]):0], ch)
+				//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids?int(color_ids[I]):0], ch)
+				g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 				x+=dx_i
 		testOverlay()
 	}
@@ -717,6 +787,75 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		/////////
 		//1 bitmask + 1 counter for each nested + 1 min
 		ret.m_total_state_size=3*m_all_key_states.n
+		/////////
+		//the word colorer, which is stand-alone
+		//we have keywords and starting chars
+		//[word,color, ...]
+		keywords=obj["m_keywords"].as(JSObject)
+		//[MakeCharSet,color, ...]
+		word_openers=obj["m_word_openers"].as(JSObject)
+		ret.m_default_color_name=obj["m_color_default"].as(string)
+		ret.m_word_color_names=new string[]
+		ret.m_word_color_names.push(obj["m_word_color_default"].as(string))
+		///////
+		clunky_dfa=new int[256]
+		word_char_map=new u8[256]
+		n_word_char_types=1
+		word_color_id_map=new int[string]
+		for i=0:255
+			clunky_dfa[i]=~0
+		for i=0:2:keywords.length()-2
+			s_word=keywords[i+0].as(string)
+			s_color=keywords[i+1].as(string)
+			color_id=word_color_id_map[s_color]
+			if !color_id:
+				color_id=int(ret.m_word_color_names.n)
+				ret.m_word_color_names.push(s_color)
+				word_color_id_map[s_color]=color_id
+			//DFA insertion
+			st=0
+			foreach ch,I in s_word
+				//all keyword chars are unique
+				chi=int(u8(ch))
+				if !word_char_map[chi]:
+					word_char_map[chi]=n_word_char_types
+					n_word_char_types++
+				if clunky_dfa[st*256+chi]<0:
+					n0=int(clunky_dfa.n)
+					clunky_dfa[st*256+chi]=(n0>>8)
+					clunky_dfa.resize(n0+256)
+					for j=0:255
+						clunky_dfa[n0+j]=~0
+				st=clunky_dfa[st*256+chi]
+			clunky_dfa[st*256+0]=(~color_id)
+		for i=0:2:word_openers.length()-2
+			cset=MakeCharSet(word_openers[i+0].as(string))
+			s_color=word_openers[i+1].as(string)
+			color_id=word_color_id_map[s_color]
+			if !color_id:
+				color_id=int(ret.m_word_color_names.n)
+				ret.m_word_color_names.push(s_color)
+				word_color_id_map[s_color]=color_id
+			for ch=0:255
+				if isInCharSet(cset,ch):
+					if !word_char_map[ch]:
+						word_char_map[ch]=n_word_char_types
+					clunky_dfa[ch]=~color_id
+			n_word_char_types++
+		ret.m_word_char_map=word_char_map
+		ret.m_n_word_char_types=n_word_char_types
+		//compact the clunky_dfa
+		word_char_representatives=new int[n_word_char_types]
+		for ch=255:-1:0
+			word_char_representatives[word_char_map[ch]]=ch
+		word_dfa=new int[(clunky_dfa.n>>8)*n_word_char_types]
+		for sti=0:256:clunky_dfa.n-1
+			st_final=(sti>>8)*n_word_char_types
+			for i=0:n_word_char_types-1
+				tran_i=clunky_dfa[sti+word_char_representatives[i]]
+				if tran_i>=0:tran_i*=n_word_char_types
+				word_dfa[st_final+i]=tran_i
+		ret.m_word_dfa=word_dfa
 		return JS.Return(ret)
 	}
 })
