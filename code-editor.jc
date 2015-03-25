@@ -9,8 +9,6 @@ import Javascript.*
 import TextBox.*
 import TextBox.detail.*
 
-//todo: indentation handler, line / column handler
-
 /*
 or-ing tokens
 	<
@@ -202,9 +200,26 @@ class CLayouter_programmer
 	Compare=function(i64[] a,i64[] b){
 		return __C_compare(GetFlatX(a),XYToX(b[0],b[1]))
 	}
-	SeekInBlock=function(i64[] a,i64[] unused,string s,i64[] b){
+	SeekInBlock=function(i64 ccnt_base,i64[] a,i64[] unused,string s,i64[] b){
 		x_goal=XYToX(b[0],b[1])
 		x=GetFlatX(a)
+		if b.n>2:
+			//hint
+			x_last_known=XYToX(b[2],b[3])
+			ccnt_last_known=b[4]
+			if u64(ccnt_last_known-ccnt_base)<u64(s.n):
+				p=iptr(ccnt_last_known-ccnt_base)
+				x=x_last_known
+				foreach ch,I in Utf8Chars(s[p:])
+					if x>=x_goal:return I+p
+					if ch=='\t':
+						x=(x/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+					else if ch=='\n':
+						x=(x/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+					else if ch!='\r':
+						dx=charWidth(ch)
+						x+=dx
+				return s.n
 		foreach ch,I in Utf8Chars(s)
 			if x>=x_goal:return I
 			if ch=='\t':
@@ -300,12 +315,14 @@ class CLayouter_programmer
 			if st>=0:
 				budget=GRACEFUL_WORD_SIZE
 				foreach ch,I in ed.enumCharsForward(word_ccnt0)//it's 8-bit here, not UTF8!
-					chi=int(ch)
+					//and ch is signed
+					//non-word chars would inevitably terminate the DFA
+					chi=int(u8(ch))
 					st=word_dfa[st+int(word_char_map[chi])]
 					if st<0:break
 					budget--
 					if budget<0:break
-			if st>=0:st=word_dfa[st+0]
+			if st>=0:st=word_dfa[st+1]
 			color_id=~st
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
@@ -812,7 +829,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		///////
 		clunky_dfa=new int[]
 		word_char_map=new u8[256]
-		n_word_char_types=1
+		for ch=0:255
+			if !(ch<128&&isWordChar(ch)):
+				word_char_map[ch]=1
+		n_word_char_types=2
 		word_color_id_map=new int[string]
 		/////////////
 		ret.m_word_color_names=new string[]
@@ -942,7 +962,7 @@ class CSeeker_indentation
 	/////////
 	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
 		ind_min=int(a[0])+MAX_ALLOWED_INDENTATION
-		foreach ind,I in EnumLineIndentation(s_context,s)
+		foreach ind,I in EnumLineIndentation(s_context,s[:ofs-1])
 			if ind_min>ind:
 				ind_min=ind
 		a[0]=i64(ind_min-MAX_ALLOWED_INDENTATION)

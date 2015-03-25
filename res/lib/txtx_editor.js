@@ -31,6 +31,7 @@ var TxtxEditor_prototype=Object.create(W.Edit_prototype)
 TxtxEditor_prototype.plugin_class='txtx_editor',
 TxtxEditor_prototype.state_handlers=["renderer_fancy","line_column_unicode"];
 TxtxEditor_prototype.wrap_width=1024;
+TxtxEditor_prototype.tab_is_char=1;
 TxtxEditor_prototype.page_margin_left=0;
 TxtxEditor_prototype.page_margin_right=0;
 TxtxEditor_prototype.page_margin_up=0;
@@ -197,10 +198,7 @@ TxtxEditor_prototype.SetRubberPadding=function(mask,line0,line1){
 		line0=this.GetLC(sel[0])[0];
 		line1=this.GetLC(sel[1])[0]+1;
 	}
-	var line_ccnts=[];
-	for(var i=line0;i<=line1;i++){
-		line_ccnts.push(this.SeekLC(i,0));
-	}
+	var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
 	var ed=this.ed;
 	var ops=[];
 	for(var i=0;i<line_ccnts.length-1;i++){

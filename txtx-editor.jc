@@ -790,7 +790,7 @@ class CLayouter_fancy
 		if ret==0:ret=__C_compare(a[0],b[0])
 		return ret
 	}
-	SeekInBlock=function(i64[] a,i64[] pp,string s,i64[] b){
+	SeekInBlock=function(i64 ccnt_base,i64[] a,i64[] pp,string s,i64[] b){
 		return iptr(_RenderText(MODE_SEEK,0LL,a,pp,s,s.n, b[0],b[1],0.f,0.f,0.f).w)
 	}
 	/////////////////

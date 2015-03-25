@@ -5,6 +5,17 @@ var g_regexp_chopdir=new RegExp("(.*)[/\\\\]([^/\\\\]*)");
 var g_regexp_chopext=new RegExp("(.*)\\.([^.\\\\]*)");
 var g_style_core_properties=["name","font_face","font_size","font_embolden","flags","color","relative_line_space","relative_paragraph_space"];
 
+UI.RemovePath=function(fname){
+	var ret=fname.match(g_regexp_chopdir);
+	var main_name=null;
+	if(!ret){
+		main_name=fname;
+	}else{
+		main_name=ret[2];
+	}
+	return main_name;
+}
+
 UI.GetMainFileName=function(fname){
 	var ret=fname.match(g_regexp_chopdir);
 	var main_name=null;

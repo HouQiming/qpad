@@ -1,6 +1,7 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
+require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
 
 function parent(){return UI.context_parent;}
@@ -530,6 +531,7 @@ W.UIEditor=function(id,attrs){
 ///////////////////////////////////////////////////////
 //the code editor
 W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
+	tab_is_char:1,
 	plugin_class:'code_editor',
 	state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
 	////////////////////
@@ -538,17 +540,20 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	////////////////////
 	//overloaded methods
 	//todo: plugins...
-	LoadNext:function(){
-		if(this.ed.hfile_loading){
-			UI.NextTick(function(){
-				this.ed.hfile_loading=UI.EDLoader_Read(this.ed,this.ed.hfile_loading)
-				this.LoadNext();
-			})
-		}
-	},
 	StartLoading:function(fn){
-		this.ed.hfile_loading=UI.EDLoader_Open(this.ed,fn)
-		this.LoadNext()
+		var ed=this.ed;
+		ed.hfile_loading=UI.EDLoader_Open(ed,fn)
+		var floadNext=function(){
+			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading)
+			if(ed.hfile_loading){
+				UI.NextTick(floadNext);
+			}
+			UI.Refresh()
+		}
+		if(ed.hfile_loading){
+			floadNext()
+		}
+		UI.Refresh()
 	},
 })
 
@@ -568,6 +573,7 @@ W.CodeEditorWidget_prototype={
 		var fsave=UI.HackCallback(function(){
 			var ret=ctx.EDSaver_Write()
 			if(ret=="done"){
+				doc.saved_point=doc.ed.GetUndoQueueLength()
 				doc.ed.saving_context=undefined
 			}else if(ret=="continue"){
 				UI.NextTick(fsave)
@@ -582,16 +588,36 @@ W.CodeEditorWidget_prototype={
 W.CodeEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
 	UI.Begin(obj)
-		UI.RoundRect({color:obj.bgcolor,x:obj.x,y:obj.y,w:obj.w,h:obj.h})
 		//main code area
 		var doc=obj.doc
-		var h_top_hint=0
+		var h_top_hint=0,w_line_numbers=0
+		var editor_style=UI.default_styles.code_editor.editor_style
 		if(doc){
 			//top hint in a separate area
 			//todo: h_top_hint
 			//todo: a (shadowed) separation bar
 			//put shadow on top? it's an underlay, not an overlay... should work both ways
+			if(!doc.cur_line_hl){
+				doc.cur_line_p0=doc.ed.CreateLocator(0,-1);doc.cur_line_p0.undo_tracked=0;
+				doc.cur_line_p1=doc.ed.CreateLocator(0,-1);doc.cur_line_p1.undo_tracked=0;
+				doc.cur_line_hl=doc.ed.CreateHighlight(doc.cur_line_p0,doc.cur_line_p1);
+				doc.cur_line_hl.color=obj.color_cur_line_highlight;
+				doc.cur_line_hl.invertible=0;
+			}
+			var line_current=doc.GetLC(doc.sel1.ccnt)[0]
+			var line_ccnts=doc.SeekAllLinesBetween(line_current,line_current+2)
+			doc.cur_line_p0.ccnt=line_ccnts[0];
+			doc.cur_line_p1.ccnt=line_ccnts[1];
 		}
+		//hopefully 8 is the widest char
+		if(obj.show_line_numbers){
+			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
+			w_line_numbers=lmax.toString().length*UI.GetCharacterAdvance(obj.line_number_font,56);
+		}
+		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)
+		w_line_numbers+=obj.padding+w_bookmark;
+		UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:obj.h})
+		UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:obj.w-w_line_numbers,h:obj.h})
 		if(doc&&doc.ed.saving_context){
 			//todo: draw a progress bar with no interaction
 			obj.__children.push(doc)
@@ -599,16 +625,36 @@ W.CodeEditor=function(id,attrs){
 			W.Edit("doc",{
 				///////////////
 				language:g_language_C,//todo
-				style:UI.default_styles.code_editor.editor_style,
+				style:editor_style,
 				///////////////
-				x:0,y:0,w:obj.w,h:obj.h,
+				x:obj.x+w_line_numbers+obj.padding,y:obj.y,w:obj.w-w_line_numbers-obj.padding,h:obj.h,
 			},W.CodeEditor_prototype);
 			if(!doc){
 				//initiate progressive loading
 				doc=obj.doc
 				doc.StartLoading(obj.file_name)
 			}
-			//line number area
+			var rendering_ccnt0=doc.SeekXY(doc.scroll_x,doc.scroll_y)
+			var rendering_ccnt1=doc.SeekXY(doc.scroll_x+doc.w,doc.scroll_y+doc.h)
+			if(obj.show_line_numbers){
+				var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
+				var line0=doc.GetLC(rendering_ccnt0)[0];
+				var line1=doc.GetLC(rendering_ccnt1)[0];
+				var line_current=doc.GetLC(doc.sel1.ccnt)[0]
+				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1);
+				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
+				for(var i=0;i<line_ccnts.length;i++){
+					if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
+					var s_line_number=(line0+i+1).toString();
+					var y=line_xys[i*2+1]-doc.scroll_y+dy_line_number
+					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
+					var x=w_line_numbers-text_dim.w-obj.padding
+					W.Text("",{x:obj.x+x,y:obj.y+y, font:obj.line_number_font,text:s_line_number,color:line0+i==line_current?obj.line_number_color_focus:obj.line_number_color})
+					//todo: current line
+				}
+			}
+			//todo: a separate file for plugins
+			//bookmarks
 			//todo
 			//minimap / scroll bar
 			//todo
@@ -621,18 +667,28 @@ UI.NewCodeEditorTab=function(fname0){
 	var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
 	return UI.NewTab({
 		file_name:file_name,
-		title:UI.GetMainFileName(file_name),
+		title:UI.RemovePath(file_name),
 		body:function(){
 			//use styling for editor themes
 			//todo: load a style object
 			var body=W.CodeEditor("body",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
-				'x':0,'y':0,
+				'x':0,'y':0,'doc':this.doc,
 				'file_name':this.file_name,
 			})
+			if(!this.doc){
+				this.doc=body.doc;
+			}
+			var doc=this.doc;
+			body.title=UI.RemovePath(this.file_name)
+			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
+				body.title=body.title+'*'
+			}
 			return body;
 		},
 		property_windows:[],
-		color_theme:[0xff9a3d6a],
+		color_theme:[0xffb4771f],
 	})
 };
+
+UI.RegisterLoaderForExtension("*",function(fname){return UI.NewCodeEditorTab(fname)})

@@ -141,6 +141,15 @@ UI.Theme_CustomWidget=function(C){
 				color_symbol:0xff7f7f7f,
 				tab_width:4,
 			},
+			show_line_numbers:1,
+			line_number_font:UI.Font("res/fonts/opensans.ttf",14,-50),
+			line_number_bgcolor:0xffd0d0d0,
+			line_number_color:0xff7f7f7f,
+			line_number_color_focus:0xff000000,
+			color_cur_line_highlight:0xfff0f0f0,
+			bgcolor:0xffe8e8e8,
+			bookmark_font:UI.Font("res/fonts/opensans.ttf",12),
+			padding:6,
 		},
 	};
 	var s0=UI.default_styles;
@@ -274,7 +283,8 @@ UI.Application=function(id,attrs){
 	UI.End();
 	//todo
 	if(!g_all_document_windows.length){
-		UI.NewUIEditorTab()
+		//UI.NewUIEditorTab()
+		UI.NewCodeEditorTab()//todo
 	}
 };
 
