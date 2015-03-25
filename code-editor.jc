@@ -971,7 +971,7 @@ class CSeeker_indentation
 		a[0]=min(a[0],b[0])
 	}
 	hasValidResult=function(i64[] a,i64[] da, i64[] b){
-		return da[0]<=b[0]
+		return da[0]+i64(MAX_ALLOWED_INDENTATION)<=b[0]
 	}
 	QueryPerCharValidity=function(i64[] a,i64[] pp,string s_context,string s, i64[] b){
 		ret=new i8[s.n]

@@ -57,4 +57,65 @@ UI.RegisterEditorPlugin(function(){
 	})
 })
 
+UI.RegisterEditorPlugin(function(){
+	//alt+pgup/pgdn
+	if(this.plugin_class!="code_editor"){return;}
+	this.m_outer_scope_queue=[]
+	this.AddEventHandler('ALT+PGUP',function(){
+		var ed=this.ed;
+		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
+		if(ccnt_new>=0){
+			this.m_outer_scope_queue.push(this.sel1.ccnt)
+			this.sel0.ccnt=ccnt_new
+			this.sel1.ccnt=ccnt_new
+			this.AutoScroll("center_if_hidden");
+			UI.Refresh()
+			return 0;
+		}
+		return 1;
+	})
+	this.AddEventHandler('ALT+PGDN',function(){
+		if(this.m_outer_scope_queue.length){
+			var ccnt_new=this.m_outer_scope_queue.pop()
+			this.sel0.ccnt=ccnt_new
+			this.sel1.ccnt=ccnt_new
+			this.AutoScroll("center_if_hidden");
+			UI.Refresh()
+			return 0;
+		}
+	})
+	this.AddEventHandler('selectionChange',function(){
+		this.m_outer_scope_queue=[];
+	})
+	//alt+up/down
+	this.AddEventHandler('ALT+UP',function(){
+		var ed=this.ed;
+		var id_indent=ed.m_handler_registration["seeker_indentation"]
+		var my_level=this.GetIndentLevel(this.sel1.ccnt);
+		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",this.SeekLC(Math.max(this.GetLC(this.sel1.ccnt)[0]-1,0)),-1);
+		if(ccnt_new>=0){
+			this.sel0.ccnt=ccnt_new
+			this.sel1.ccnt=ccnt_new
+			this.AutoScroll("center_if_hidden");
+			UI.Refresh()
+			return 0;
+		}
+		return 1
+	})
+	this.AddEventHandler('ALT+DOWN',function(){
+		var ed=this.ed;
+		var id_indent=ed.m_handler_registration["seeker_indentation"]
+		var my_level=this.GetIndentLevel(this.sel1.ccnt);
+		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",this.SeekLC(this.GetLC(this.sel1.ccnt)[0]+1),1);
+		if(ccnt_new>=0){
+			this.sel0.ccnt=ccnt_new
+			this.sel1.ccnt=ccnt_new
+			this.AutoScroll("center_if_hidden");
+			UI.Refresh()
+			return 0;
+		}
+		return 1
+	})
+});
+
 //todo: from deferred

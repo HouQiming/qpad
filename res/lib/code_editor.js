@@ -337,8 +337,8 @@ W.UIEditor=function(id,attrs){
 				var code_box=obj.doc;
 				var ed=code_box.ed;
 				var ccnt_sel=code_box.sel1.ccnt;
-				var range_0=code_box.FindBracket(0,ccnt_sel,-1);
-				var range_1=code_box.FindBracket(0,ccnt_sel,1);
+				var range_0=code_box.FindBracketSafe(0,ccnt_sel,-1);
+				var range_1=code_box.FindBracketSafe(0,ccnt_sel,1);
 				var working_range=code_box.working_range;
 				if(!working_range){
 					working_range={};
@@ -539,7 +539,6 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	language:g_language_C,
 	////////////////////
 	//overloaded methods
-	//todo: plugins...
 	StartLoading:function(fn){
 		var ed=this.ed;
 		ed.hfile_loading=UI.EDLoader_Open(ed,fn)
@@ -555,6 +554,46 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		UI.Refresh()
 	},
+	//always go left
+	GetBracketLevel:function(ccnt){
+		var ed=this.ed;
+		return ed.GetStateAt(ed.m_handler_registration["colorer"],ccnt,"lll")[1];
+	},
+	FindBracket:function(n_brackets,ccnt,direction){
+		var ed=this.ed;
+		var ret=ed.FindNearest(ed.m_handler_registration["colorer"],[0,n_brackets],"ll",ccnt,direction);
+		return ret;
+	},
+	FindBracketSafe:function(n_brackets,ccnt,direction){
+		var ret=this.FindBracket(n_brackets,ccnt,direction)
+		if(ret==-1){
+			if(direction<0){
+				return 0;
+			}else{
+				return ed.GetTextSize();
+			}
+		}
+		return ret;
+	},
+	FindOuterBracket:function(ccnt,direction){
+		return this.FindBracket(this.GetBracketLevel(ccnt)-1,ccnt,direction);
+	},
+	///////////////////////////////
+	GetIndentLevel:function(ccnt){
+		return this.GetLC(Math.min(this.GetEnhancedHome(ccnt),ccnt))[1];
+	},
+	FindOuterIndentation:function(ccnt){
+		var ed=this.ed;
+		var id_indent=ed.m_handler_registration["seeker_indentation"]
+		var my_level=this.GetIndentLevel(ccnt);
+		return ed.FindNearest(id_indent,[my_level-1],"l",ccnt,-1);
+	},
+	///////////////////////////////
+	FindOuterLevel:function(ccnt){
+		var ret=Math.max(this.FindOuterBracket(ccnt,-1),this.FindOuterIndentation(ccnt))
+		if(ret>=ccnt){ret=-1;}
+		return ret
+	}
 })
 
 W.CodeEditorWidget_prototype={
@@ -585,6 +624,7 @@ W.CodeEditorWidget_prototype={
 		fsave();
 	}
 }
+
 W.CodeEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
 	UI.Begin(obj)

@@ -284,7 +284,8 @@ UI.Application=function(id,attrs){
 	//todo
 	if(!g_all_document_windows.length){
 		//UI.NewUIEditorTab()
-		UI.NewCodeEditorTab()//todo
+		//UI.NewCodeEditorTab()
+		UI.OpenFile("c:/tp/kara/ide/edcore.spap")
 	}
 };
 

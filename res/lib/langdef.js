@@ -179,27 +179,6 @@ exports.Define=function(frules,fenabler){
 };
 
 ///////////////////////////////////
-var Edit_prototype=W.Edit_prototype;
-Edit_prototype.GetBracketLevel=function(ccnt){
-	var ed=this.ed;
-	return ed.GetStateAt(ed.m_handler_registration["colorer"],ccnt,"lll")[1];
-};
-Edit_prototype.FindBracket=function(n_brackets,ccnt,direction){
-	var ed=this.ed;
-	var ret=ed.FindNearest(ed.m_handler_registration["colorer"],[0,n_brackets],"ll",ccnt,direction);
-	if(ret==-1){
-		if(direction<0){
-			return 0;
-		}else{
-			return ed.GetTextSize();
-		}
-	}
-	return ret;
-};
-Edit_prototype.FindOuterBracket=function(ccnt,direction){
-	return this.FindBracket(this.GetBracketLevel(ccnt)-1,ccnt,direction);
-};
-
 var KeywordSet=function(){
 	this.m_keywords=[];
 	this.m_word_openers=[];
