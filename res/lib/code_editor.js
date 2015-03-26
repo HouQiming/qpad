@@ -630,13 +630,69 @@ W.CodeEditor=function(id,attrs){
 	UI.Begin(obj)
 		//main code area
 		var doc=obj.doc
-		var h_top_hint=0,w_line_numbers=0
+		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,y_top_hint_scroll=0;
 		var editor_style=UI.default_styles.code_editor.editor_style
+		var top_hint_bbs=[]
 		if(doc){
 			//top hint in a separate area
-			//todo: h_top_hint
-			//todo: a (shadowed) separation bar
-			//put shadow on top? it's an underlay, not an overlay... should work both ways
+			if(obj.show_top_hint){
+				var top_hints=[];
+				var rendering_ccnt0=doc.SeekXY(doc.scroll_x,doc.scroll_y)
+				var ccnt=doc.GetEnhancedHome(doc.sel1.ccnt)
+				//prev_h_top_hint
+				for(;;){
+					var ccnti=ccnt
+					ccnt=doc.FindOuterLevel(ccnti)
+					if(ccnt<0||ccnt>=ccnti){break}
+					if(ccnt<rendering_ccnt0){
+						top_hints.push(ccnt)
+					}
+					if(top_hints.length>=obj.top_hint_max_levels){break;}
+				}
+				if(top_hints.length){
+					//convert to bbs
+					var top_hint_inv=[];
+					for(var i=top_hints.length-1;i>=0;i--){
+						top_hint_inv.push(top_hints[i]);
+					}
+					var line_xys=doc.ed.GetXYEnMasse(top_hint_inv)
+					var hc=UI.GetCharacterHeight(doc.font)
+					var eps=hc/16;
+					var cur_bb_y0=line_xys[1];
+					var cur_bb_y1=cur_bb_y0+hc;
+					h_top_hint=hc
+					for(var i=2;i<line_xys.length;i+=2){
+						var y=line_xys[i+1];
+						if(Math.abs(y-cur_bb_y1)<eps){
+							cur_bb_y1=y+hc;
+							h_top_hint+=hc
+						}else if(y<cur_bb_y1){
+							continue
+						}else{
+							top_hint_bbs.push(cur_bb_y0,cur_bb_y1)
+							cur_bb_y0=y;
+							cur_bb_y1=y+hc;
+							h_top_hint+=hc
+						}
+					}
+					if(h_top_hint>hc*obj.top_hint_max_lines-eps){
+						y_top_hint_scroll=hc*obj.top_hint_max_lines-h_top_hint;
+						h_top_hint=hc*obj.top_hint_max_lines;
+					}
+					top_hint_bbs.push(cur_bb_y0,cur_bb_y1)
+				}
+			}
+			if(Math.abs(h_top_hint-prev_h_top_hint)>4){
+				h_top_hint=(h_top_hint*0.5+prev_h_top_hint*0.5);
+				UI.Refresh()
+			}
+			obj.h_top_hint=h_top_hint
+			if(h_top_hint-prev_h_top_hint){
+				doc.scroll_y+=h_top_hint-prev_h_top_hint
+				doc.h=obj.h-h_top_hint
+				doc.AutoScroll("show")
+			}
+			//current line highlight
 			if(!doc.cur_line_hl){
 				doc.cur_line_p0=doc.ed.CreateLocator(0,-1);doc.cur_line_p0.undo_tracked=0;
 				doc.cur_line_p1=doc.ed.CreateLocator(0,-1);doc.cur_line_p1.undo_tracked=0;
@@ -667,7 +723,7 @@ W.CodeEditor=function(id,attrs){
 				language:g_language_C,//todo
 				style:editor_style,
 				///////////////
-				x:obj.x+w_line_numbers+obj.padding,y:obj.y,w:obj.w-w_line_numbers-obj.padding,h:obj.h,
+				x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint,w:obj.w-w_line_numbers-obj.padding,h:obj.h-h_top_hint,
 			},W.CodeEditor_prototype);
 			if(!doc){
 				//initiate progressive loading
@@ -683,15 +739,62 @@ W.CodeEditor=function(id,attrs){
 				var line_current=doc.GetLC(doc.sel1.ccnt)[0]
 				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1);
 				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
+				UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w,obj.h-h_top_hint)
 				for(var i=0;i<line_ccnts.length;i++){
 					if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
 					var s_line_number=(line0+i+1).toString();
-					var y=line_xys[i*2+1]-doc.scroll_y+dy_line_number
+					var y=line_xys[i*2+1]-doc.scroll_y+dy_line_number+h_top_hint
 					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
 					var x=w_line_numbers-text_dim.w-obj.padding
 					W.Text("",{x:obj.x+x,y:obj.y+y, font:obj.line_number_font,text:s_line_number,color:line0+i==line_current?obj.line_number_color_focus:obj.line_number_color})
-					//todo: current line
 				}
+				UI.PopCliprect()
+			}
+			//the top hint
+			if(top_hint_bbs.length){
+				var y_top_hint=y_top_hint_scroll;
+				for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
+					var y0=top_hint_bbs[bbi]
+					var y1=top_hint_bbs[bbi+1]
+					var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
+					if(hh>=0){
+						doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers,h:hh,
+							scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:1, obj:doc});
+						//also draw the line numbers
+						if(obj.show_line_numbers){
+							var rendering_ccnt0=doc.SeekXY(0,y0)
+							var rendering_ccnt1=doc.SeekXY(1,y1)
+							var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
+							var line0=doc.GetLC(rendering_ccnt0)[0];
+							var line1=doc.GetLC(rendering_ccnt1)[0];
+							var line_current=doc.GetLC(doc.sel1.ccnt)[0]
+							var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1);
+							var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
+							UI.PushCliprect(obj.x,obj.y+y_top_hint,obj.w,hh)
+							for(var i=0;i<line_ccnts.length;i++){
+								if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
+								var s_line_number=(line0+i+1).toString();
+								var y=line_xys[i*2+1]-y0+dy_line_number+y_top_hint
+								var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
+								var x=w_line_numbers-text_dim.w-obj.padding
+								W.Text("",{x:obj.x+x,y:obj.y+y, font:obj.line_number_font,text:s_line_number,color:line0+i==line_current?obj.line_number_color_focus:obj.line_number_color})
+							}
+							UI.PopCliprect()
+						}
+					}
+					y_top_hint+=y1-y0;
+				}
+				UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w,obj.h-h_top_hint)
+				//a (shadowed) separation bar
+				UI.RoundRect({
+					x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+					round:obj.top_hint_shadow_size,
+					border_width:-obj.top_hint_shadow_size,
+					color:obj.top_hint_shadow_color})
+				UI.RoundRect({
+					x:obj.x, y:obj.y+h_top_hint, w:obj.w, h:obj.top_hint_border_width,
+					color:obj.top_hint_border_color})
+				UI.PopCliprect()
 			}
 			//todo: a separate file for plugins
 			//bookmarks

@@ -92,7 +92,7 @@ UI.RegisterEditorPlugin(function(){
 		var ed=this.ed;
 		var id_indent=ed.m_handler_registration["seeker_indentation"]
 		var my_level=this.GetIndentLevel(this.sel1.ccnt);
-		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",this.SeekLC(Math.max(this.GetLC(this.sel1.ccnt)[0]-1,0)),-1);
+		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",Math.max(this.sel1.ccnt-1-this.GetLC(this.sel1.ccnt)[1],0),-1);
 		if(ccnt_new>=0){
 			this.sel0.ccnt=ccnt_new
 			this.sel1.ccnt=ccnt_new
