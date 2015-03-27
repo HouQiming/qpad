@@ -41,9 +41,9 @@
      showgrid="true"
      showguides="true"
      inkscape:guide-bbox="true"
-     inkscape:zoom="0.16051324"
-     inkscape:cx="1415.7616"
-     inkscape:cy="-874.04803"
+     inkscape:zoom="0.227"
+     inkscape:cx="522.25939"
+     inkscape:cy="363.52942"
      inkscape:window-x="1911"
      inkscape:window-y="-9"
      inkscape:current-layer="svg5496"
@@ -146,6 +146,11 @@
          id="glyph4081"
          unicode="V"
          d="m 72.53125,743.625 0,-439.25 614.96875,0 0,162.4375 239.96875,-67.84375 0,250.0625 L 687.5,581.1875 l 0,162.4375 -614.96875,0 z" />
+      <glyph
+         glyph-name="bookmark"
+         id="glyph3841"
+         unicode="b"
+         d="m 225.94292,524 -212.028539,162.02854 650.142699,0 L 986.08562,524 664.05708,361.97146 l -650.142699,0 z" />
     </font>
     <radialGradient
        gradientUnits="userSpaceOnUse"
@@ -570,4 +575,16 @@
      d="m 3649.4302,463.2905 265.3327,-75.02319 0,250.07613 -265.3327,-75.02296 z"
      id="path4176"
      inkscape:connector-curvature="0" />
+  <path
+     style="fill:#000000;fill-opacity:1;stroke:none"
+     d="M 225.94292,500 13.914381,337.97146 l 650.142699,0 L 986.08562,500 664.05708,662.02854 l -650.142699,0 z"
+     id="path3071"
+     inkscape:connector-curvature="0"
+     sodipodi:nodetypes="ccccccc" />
+  <path
+     sodipodi:nodetypes="ccccccc"
+     inkscape:connector-curvature="0"
+     id="path3843"
+     d="m 2159.8636,-544.05286 -212.0285,-162.02854 650.1427,0 322.0285,162.02854 -322.0285,162.02854 -650.1427,0 z"
+     style="fill:#000000;fill-opacity:1;stroke:none" />
 </svg>

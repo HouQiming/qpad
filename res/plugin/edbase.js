@@ -118,4 +118,97 @@ UI.RegisterEditorPlugin(function(){
 	})
 });
 
+//control up/down
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class=="widget"){return;}
+	//ctrl+up/down
+	this.AddEventHandler('CTRL+UP',function(){
+		this.scroll_y-=this.GetCharacterHeightAtCaret();
+		if(!(this.scroll_y>0)){
+			this.scroll_y=0;
+		}
+		UI.Refresh();
+		return 0
+	})
+	this.AddEventHandler('CTRL+DOWN',function(){
+		var ed=this.ed
+		var ccnt_tot=ed.GetTextSize();
+		var ytot=ed.XYFromCcnt(ccnt_tot).y+ed.GetCharacterHeightAt(ccnt_tot);
+		var hc=this.GetCharacterHeightAtCaret();
+		var page_height=this.h;
+		this.scroll_y=Math.min(this.scroll_y+hc,ytot-page_height);
+		UI.Refresh();
+		return 0
+	})
+});
+
+//bookmarking
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	//the numbered guys
+	for(var i=0;i<10;i++){
+		(function(i){
+			this.AddEventHandler('CTRL+SHIFT+'+i.toString(),function(){
+				var ed=this.ed;
+				var ccnt=this.sel1.ccnt;
+				if(!this.m_bookmarks[i]){
+					this.m_bookmarks[i]=ed.CreateLocator(ccnt,-1)
+				}else{
+					if(this.m_bookmarks[i].ccnt==ccnt){
+						this.m_bookmarks[i].discard();
+						this.m_bookmarks[i]=undefined;
+					}else{
+						this.m_bookmarks[i].ccnt=ccnt
+					}
+				}
+				UI.Refresh()
+				return 0;
+			});
+			this.AddEventHandler('CTRL+'+i.toString(),function(){
+				var ed=this.ed;
+				var ccnt=this.sel1.ccnt;
+				if(this.m_bookmarks[i]){
+					this.sel0.ccnt=this.m_bookmarks[i].ccnt
+					this.sel1.ccnt=this.m_bookmarks[i].ccnt
+					this.AutoScroll("center_if_hidden");
+					UI.Refresh()
+					return 0
+				}
+				return 1;
+			});
+		}).call(this,i)
+	}
+	//the unmarked guys
+	this.AddEventHandler('CTRL+SHIFT+Q',function(){
+		var ed=this.ed;
+		var ccnt=this.sel1.ccnt;
+		var bm0=this.FindNearestBookmark(ccnt,1)
+		if(bm0&&bm0.ccnt==ccnt){
+			this.DeleteBookmark(bm0)
+		}else{
+			this.m_unkeyed_bookmarks.push(ed.CreateLocator(ccnt,-1))
+		}
+		UI.Refresh()
+		return 0;
+	});
+	this.AddEventHandler('F2',function(){
+		var bm=this.FindNearestBookmark(ccnt+1,1)
+		if(!bm){return 1;}
+		this.sel0.ccnt=bm.ccnt
+		this.sel1.ccnt=bm.ccnt
+		this.AutoScroll("center_if_hidden");
+		UI.Refresh()
+		return 0;
+	})
+	this.AddEventHandler('SHIFT+F2',function(){
+		var bm=this.FindNearestBookmark(ccnt-1,-1)
+		if(!bm){return 1;}
+		this.sel0.ccnt=bm.ccnt
+		this.sel1.ccnt=bm.ccnt
+		this.AutoScroll("center_if_hidden");
+		UI.Refresh()
+		return 0;
+	})
+});
+
 //todo: from deferred

@@ -68,15 +68,83 @@ W.TabLabel=function(id,attrs){
 	return obj
 }
 
+W.TabbedDocument_prototype={
+	//closer -> class: OnClose notification and stuff
+	CloseTab:function(tabid,forced){
+		var tab=this.items[tabid]
+		if(tab.need_save&&!forced){
+			this.current_tab_id=tabid
+			//dialog box
+			tab.in_save_dialog=1
+			UI.Refresh()
+			return;
+		}
+		//close it
+		if(!tab.need_save){
+			tab.SaveMetaData();
+			UI.SaveMetaData();
+		}
+		var window_list=this.items
+		var n2=tabid;
+		for(var i=tabid+1;i<window_list.length;i++){
+			window_list[n2++]=window_list[i]
+		}
+		window_list.pop()
+		if(this.current_tab_id>tabid){this.current_tab_id--}
+		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
+		if(this.current_tab_id<0){this.current_tab_id=0;}
+		UI.Refresh()
+	},
+	SaveTab:function(tabid){
+		var active_document=this.items[tabid];
+		active_document.Save()
+		return !active_document.need_save
+	},
+	SaveCurrent:function(){
+		var active_document=this.active_tab;
+		active_document.Save()
+		return !active_document.need_save
+	},
+	OnClose:function(){
+		var ret=0
+		for(var i=0;i<this.items.length;i++){
+			var tab_i=this.items[i]
+			if(tab_i.need_save){
+				this.current_tab_id=i
+				tab_i.in_save_dialog=1
+				ret=1
+			}else{
+				tab_i.SaveMetaData()
+			}
+		}
+		var window_list=this.items
+		var n2=0;
+		for(var i=0;i<window_list.length;i++){
+			var tab_i=window_list[i]
+			if(tab_i.need_save){window_list[n2++]=tab_i;}else{if(this.current_tab_id>i){this.current_tab_id--}}
+		}
+		while(window_list.length>n2){window_list.pop();}
+		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
+		if(this.current_tab_id<0){this.current_tab_id=0;}
+		UI.SaveMetaData()
+		UI.Refresh()
+		this.m_is_close_pending=1
+		return ret
+	}
+}
 W.TabbedDocument=function(id,attrs){
-	var obj=UI.Keep(id,attrs);
+	var obj=UI.Keep(id,attrs,W.TabbedDocument_prototype);
 	UI.StdStyling(id,obj,attrs, "tabbed_document");
 	UI.StdAnchoring(id,obj);
 	var items=obj.items
 	if((obj.n_tabs_last_checked||0)<items.length){
 		//new tab activating
 		obj.current_tab_id=(items.length-1);
-		obj.n_tabs_last_checked=items.length;
+	}
+	obj.n_tabs_last_checked=items.length;
+	if(!items.length&&obj.m_is_close_pending){
+		obj.Close();
+		return;
 	}
 	UI.Begin(obj)
 		var sel={}
@@ -126,22 +194,100 @@ W.TabbedDocument=function(id,attrs){
 					UI.Refresh()
 				}
 			}
+			W.SaveDialog("savedlg",{x:obj.x,y:obj.h_caption+obj.h_bar,w:obj.w,h:obj.h_content,value:(obj.active_tab.in_save_dialog||0),tabid:tabid,parent:obj})
 		}
 	UI.End()
-	W.Hotkey("",{key:"CTRL+TAB",action:UI.HackCallback(function(){
+	if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
+		W.Hotkey("",{key:"CTRL+F4",action:function(){
+			var num_id=tabid
+			if(num_id<0){return;}
+			obj.CloseTab(num_id)
+		}});
+	}
+	W.Hotkey("",{key:"CTRL+W",action:function(){
+		var num_id=tabid
+		if(num_id<0){return;}
+		obj.CloseTab(num_id)
+	}});
+	W.Hotkey("",{key:"CTRL+TAB",action:function(){
 		var num_id=tabid
 		if(num_id<0){return;}
 		num_id++;if(num_id>=items.length){num_id=0;}
 		obj.current_tab_id=num_id
 		UI.Refresh()
-	})});
-	W.Hotkey("",{key:"CTRL+SHIFT+TAB",action:UI.HackCallback(function(){
+	}});
+	W.Hotkey("",{key:"CTRL+SHIFT+TAB",action:function(){
 		var num_id=tabid
 		if(num_id<0){return;}
 		if(!num_id){num_id=items.length;}
 		num_id--;
 		obj.current_tab_id=num_id
 		UI.Refresh()
-	})});
+	}});
 	return obj
+}
+
+W.SaveDialog_prototype={
+	GetSubStyle:function(){
+		return this.value?"active":"inactive"
+	},
+};
+W.SaveDialog=function(id,attrs){
+	//value: enabled-ness
+	var obj=UI.StdWidget(id,attrs,"save_dialog",W.SaveDialog_prototype)
+	UI.RoundRect(obj)
+	UI.Begin(obj)
+		//coulddo: use blur instead
+		if(obj.value){
+			var region=W.Region("savedlg_region",{x:obj.x,y:obj.y,w:obj.w,h:obj.h})
+			UI.SetFocus(region)
+			var s_text0="It's not saved yet, do you want to..."
+			var s_text_y="Save"
+			var s_text_n="Don't save"
+			var s_text_c="Cancel"
+			var sz_text=UI.MeasureText(obj.font_text,s_text0)
+			var sz_buttons=UI.MeasureText(obj.font_buttons,s_text_y)
+			sz_buttons.w+=UI.MeasureText(obj.font_buttons,s_text_n).w
+			sz_buttons.w+=UI.MeasureText(obj.font_buttons,s_text_c).w
+			sz_buttons.w+=obj.space_button*2+obj.good_button_style.padding*2
+			var h_content=obj.space_middle+sz_text.h+obj.h_button
+			var y_text=obj.y+(obj.h-h_content)*0.5
+			var y_buttons=y_text+sz_text.h+obj.space_middle
+			var x_buttons=obj.x+(obj.w-sz_buttons.w)*0.5
+			var w_dlg_rect=Math.max(sz_text.w,sz_buttons.w)+obj.space_dlg_rect*2
+			var h_dlg_rect=h_content+obj.space_dlg_rect*2
+			UI.RoundRect({x:obj.x+(obj.w-w_dlg_rect)*0.5,y:obj.y+(obj.h-h_dlg_rect)*0.5,w:w_dlg_rect,h:h_dlg_rect,
+				round:obj.round_dlg_rect,border_width:-obj.round_dlg_rect,color:obj.color_dlg_rect
+			})
+			W.Text("",{x:obj.x+(obj.w-sz_text.w)*0.5,y:y_text, font:obj.font_text,text:s_text0,color:obj.text_color})
+			var fyes=function(){
+				obj.parent.SaveTab(obj.tabid)
+				obj.parent.CloseTab(obj.tabid)
+				obj.parent=undefined
+				UI.Refresh()
+			}
+			var fno=function(){
+				obj.parent.CloseTab(obj.tabid,"forced")
+				obj.parent=undefined
+				UI.Refresh()
+			}
+			var fcancel=function(){
+				obj.parent.items[obj.tabid].in_save_dialog=0
+				obj.parent.m_is_close_pending=0
+				obj.parent=undefined
+				UI.Refresh()
+			}
+			W.Button("btn_y",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_y,style:obj.good_button_style,OnClick:fyes});
+			x_buttons+=UI.MeasureText(obj.font_buttons,s_text_y).w+obj.space_button
+			W.Button("btn_n",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_n,style:obj.bad_button_style,OnClick:fno});
+			x_buttons+=UI.MeasureText(obj.font_buttons,s_text_n).w+obj.space_button
+			W.Button("btn_c",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_c,style:obj.bad_button_style,OnClick:fcancel});
+			W.Hotkey("",{key:"Y",action:fyes});W.Hotkey("",{key:"RETURN",action:fyes})
+			W.Hotkey("",{key:"N",action:fno})
+			W.Hotkey("",{key:"ESC",action:fcancel})
+			/////////////////
+			//disable the side window as well
+			UI.document_property_sheet={};
+		}
+	UI.End(obj)
 }

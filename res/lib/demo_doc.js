@@ -365,7 +365,16 @@ var DemoDocument_prototype=UI.CreateJSONObjectClass({
 					'x':0,'y':0,
 					'file_name':this.m_file_name})
 				this.title=UI.GetMainFileName(this.gdoc.m_file_name)
+				this.need_save=(this.save_point!=this.gdoc.m_undo_ids.length)
 				return body;
+			},
+			Save:function(){
+				this.gdoc.Save();//todo: failure detection
+				this.save_point=this.gdoc.m_undo_ids.length
+				this.need_save=0
+			},
+			SaveMetaData:function(){
+				this.gdoc.SaveMetaData();
 			},
 			title:UI.GetMainFileName(gdoc.m_file_name),
 			property_windows:[

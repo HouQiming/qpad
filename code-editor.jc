@@ -1009,7 +1009,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		hf=System.IO.OpenFile(fn)
 		if !hf:return 0
 		s=hf.Read(INITIAL_READ_SIZE)
-		ed.RawEdit([TEditop(){s:s}])
+		if s.n:
+			ed.RawEdit([TEditop(){s:s}])
 		if s.n<INITIAL_READ_SIZE:
 			hf.Close()
 			return JS.Return(0)
@@ -1019,7 +1020,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ed=JS.Param(0).as(CEditableText)
 		hf=JS.Param(1).as(System.IO.CFile)
 		s=hf.Read(NEXT_READ_SIZE)
-		ed.Edit([TEditop(){ccnt:ed.GetTextSize(),s:s}])
+		if s.n:
+			ed.Edit([TEditop(){ccnt:ed.GetTextSize(),s:s}])
 		if s.n<NEXT_READ_SIZE:
 			hf.Close()
 			return JS.Return(0)
@@ -1031,6 +1033,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ret=new CSavingContext
 		ret.fn=fn
 		ret.hf=System.IO.CreateFile(fn+".$$$")
+		ret.ed=ed
 		if !ret.hf:return 0
 		return JS.Return(ret)
 	}
@@ -1047,7 +1050,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ret.ofs+=i64(szwrite)
 		if ret.ofs>=szmax:
 			ret.hf.Close()
-			if !System.IO.DeleteFile(ret.fn):
+			if !System.IO.DeleteFile(ret.fn)&&System.IO.FileExists(ret.fn):
 				return JS.Return("failed")
 			if !System.IO.MoveFile(ret.fn+".$$$",ret.fn):
 				return JS.Return("failed")

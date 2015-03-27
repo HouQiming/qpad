@@ -227,6 +227,10 @@ UI.NewGlobalDoc.prototype={
 		//////////////////////////////////
 		UI.SaveZipDocument(this.m_file_name,new_objs)
 		//save a document timestamp to detect corrupted metadata
+		this.SaveMetaData()
+		UI.SaveMetaData()
+	},
+	SaveMetaData:function(){
 		UI.m_ui_metadata[this.m_file_name]=JSON.stringify({a:this.m_metadata,timestamp:UI.GetFileTimestamp(this.m_file_name)})
 	},
 	/////////////////////
@@ -395,8 +399,16 @@ UI.RegisterZipLoader("json",function(gdoc,sdata){
 })
 
 ////////////////////////////////////
-UI.m_ui_metadata={}
-//todo: config file load / save: getstoragepath
+UI.m_ui_metadata={};
+(function(){
+	var s_json=IO.ReadAll(IO.GetStoragePath()+"/metadata.json")
+	if(s_json){
+		UI.m_ui_metadata=JSON.parse(s_json)
+	}
+})();
+UI.SaveMetaData=function(){
+	IO.CreateFile(IO.GetStoragePath()+"/metadata.json",JSON.stringify(UI.m_ui_metadata))
+}
 
 UI.NewFromTemplate=function(fn_template,fn_real){
 	var ret=UI.OpenFile(IO.GetExecutablePath()+"/"+fn_template)

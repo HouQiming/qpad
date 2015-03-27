@@ -537,6 +537,50 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	////////////////////
 	//per-language portion
 	language:g_language_C,
+	Init:function(){
+		W.Edit_prototype.Init.call(this);
+		//these are locators when set
+		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
+		this.m_unkeyed_bookmarks=[];
+	},
+	FindNearestBookmark:function(ccnt,direction){
+		//just do a sequential search
+		var best=undefined,best_bm=undefined;
+		for(var i=0;i<10;i++){
+			var bm=this.m_bookmarks[i]
+			if(!bm){continue;}
+			var dist=(bm.ccnt-ccnt)*direction;
+			if(dist>=0&&!(best<dist)){
+				best=dist
+				best_bm=bm;
+			}
+		}
+		for(var i=0;i<this.m_unkeyed_bookmarks.length;i++){
+			var bm=this.m_unkeyed_bookmarks[i];
+			var dist=(bm.ccnt-ccnt)*direction;
+			if(dist>=0&&!(best<dist)){
+				best=dist
+				best_bm=bm;
+			}
+		}
+		return best_bm;
+	},
+	DeleteBookmark:function(bm){
+		//just do a sequential search
+		bm.discard()
+		for(var i=0;i<10;i++){
+			if(bm==this.m_bookmarks[i]){
+				this.m_bookmarks[i]=undefined;
+				return;
+			}
+		}
+		for(var i=0;i<this.m_unkeyed_bookmarks.length;i++){
+			if(bm==this.m_unkeyed_bookmarks[i]){
+				this.m_unkeyed_bookmarks[i]=undefined;
+				return;
+			}
+		}
+	},
 	////////////////////
 	//overloaded methods
 	StartLoading:function(fn){
@@ -546,11 +590,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading)
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
+			}else{
+				this.OnLoad()
 			}
 			UI.Refresh()
 		}
 		if(ed.hfile_loading){
 			floadNext()
+		}else{
+			this.OnLoad()
 		}
 		UI.Refresh()
 	},
@@ -597,6 +645,48 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 })
 
 W.CodeEditorWidget_prototype={
+	OnLoad:function(){
+		var loaded_metadata=(UI.m_ui_metadata[this.file_name]||{})
+		var doc=this.doc
+		if(loaded_metadata.m_bookmarks){
+			for(var i=0;i<10;i++){
+				if(loaded_metadata.m_bookmarks[i]!='n/a'&&!doc.m_bookmarks[i]){
+					doc.m_bookmarks[i]=doc.ed.CreateLocator(Math.max(Math.min(loaded_metadata.m_bookmarks[i],doc.ed.GetTextSize()),0))
+				}
+			}
+		}
+		if(loaded_metadata.m_unkeyed_bookmarks){
+			var bm=loaded_metadata.m_unkeyed_bookmarks
+			for(var i=0;i<bm.length;i++){
+				doc.m_unkeyed_bookmarks.push(doc.ed.CreateLocator(Math.max(Math.min(bm[i],doc.ed.GetTextSize()),0)))
+			}
+		}
+		if(loaded_metadata.sel0){doc.sel0.ccnt=Math.max(Math.min(loaded_metadata.sel0,doc.ed.GetTextSize()),0);}
+		if(loaded_metadata.sel1){doc.sel1.ccnt=Math.max(Math.min(loaded_metadata.sel1,doc.ed.GetTextSize()),0);}
+		doc.AutoScroll("center")
+		UI.Refresh()
+	},
+	SaveMetaData:function(){
+		var new_metadata={m_bookmarks:[],m_unkeyed_bookmarks:[]}
+		var doc=this.doc
+		for(var i=0;i<10;i++){
+			var bm=doc.m_bookmarks[i]
+			new_metadata.m_bookmarks[i]=(bm?bm.ccnt:'n/a')
+		}
+		for(var i=0;i<doc.m_unkeyed_bookmarks.length;i++){
+			var bm=doc.m_unkeyed_bookmarks[i]
+			if(bm){
+				new_metadata.m_unkeyed_bookmarks.push(bm.ccnt)
+			}
+		}
+		new_metadata.sel0=doc.sel0.ccnt
+		new_metadata.sel1=doc.sel1.ccnt
+		UI.m_ui_metadata[this.file_name]=new_metadata
+	},
+	OnSave:function(){
+		this.SaveMetaData();
+		UI.SaveMetaData();
+	},
 	Save:function(){
 		var doc=this.doc
 		if(doc.ed.hfile_loading){
@@ -610,17 +700,19 @@ W.CodeEditorWidget_prototype={
 		}
 		doc.ed.saving_context=ctx
 		var fsave=UI.HackCallback(function(){
-			var ret=ctx.EDSaver_Write()
+			var ret=UI.EDSaver_Write(ctx)
 			if(ret=="done"){
 				doc.saved_point=doc.ed.GetUndoQueueLength()
 				doc.ed.saving_context=undefined
+				this.OnSave();
+				UI.Refresh()
 			}else if(ret=="continue"){
 				UI.NextTick(fsave)
 			}else{
 				doc.ed.saving_context=undefined
 				//todo: error notification
 			}
-		})
+		}).bind(this)
 		fsave();
 	}
 }
@@ -710,7 +802,7 @@ W.CodeEditor=function(id,attrs){
 			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
 			w_line_numbers=lmax.toString().length*UI.GetCharacterAdvance(obj.line_number_font,56);
 		}
-		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)
+		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4
 		w_line_numbers+=obj.padding+w_bookmark;
 		UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:obj.h})
 		UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:obj.w-w_line_numbers,h:obj.h})
@@ -728,8 +820,57 @@ W.CodeEditor=function(id,attrs){
 			if(!doc){
 				//initiate progressive loading
 				doc=obj.doc
+				doc.OnLoad=obj.OnLoad.bind(obj)
 				doc.StartLoading(obj.file_name)
 			}
+			//bookmarks - they appear under line numbers
+			var bm_ccnts=[]
+			for(var i=0;i<doc.m_bookmarks.length;i++){
+				var bm=doc.m_bookmarks[i];
+				if(bm){
+					bm_ccnts.push([i,bm.ccnt])
+				}
+			}
+			var bm_filtered=[];
+			for(var i=0;i<doc.m_unkeyed_bookmarks.length;i++){
+				var bm=doc.m_unkeyed_bookmarks[i];
+				if(bm){
+					bm_ccnts.push([-1,bm.ccnt])
+					bm_filtered.push(bm)
+				}
+			}
+			this.m_unkeyed_bookmarks=bm_filtered;
+			if(bm_ccnts.length){
+				bm_ccnts.sort(function(a,b){return (a[1]*10+a[0])-(b[1]*10+b[0]);});
+				var bm_xys=doc.ed.GetXYEnMasse(bm_ccnts.map(function(a){return a[1]}))
+				var hc=UI.GetCharacterHeight(doc.font)
+				//var bookmark_fnt_scale=2;
+				//var bookmark_fnt=UI.Font('res/fonts/iconfnt.ttf,!',UI.GetCharacterHeight(obj.line_number_font)*bookmark_fnt_scale)
+				//var dy_bookmark=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(bookmark_fnt))*0.5
+				//var x_bookmark=w_line_numbers-UI.GetCharacterAdvance(bookmark_fnt,'b'.charCodeAt(0))
+				UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w,obj.h-h_top_hint)
+				for(var i=0;i<bm_ccnts.length;i++){
+					var y=bm_xys[i*2+1]-doc.scroll_y+doc.y
+					var id=bm_ccnts[i][0]
+					//UI.DrawChar(bookmark_fnt,x_bookmark,y+dy_bookmark,obj.bookmark_color,'b'.charCodeAt(0))
+					//UI.RoundRect({x:0,y:y+4,w:w_line_numbers,h:hc-4,
+					//	color:obj.bookmark_shadow,
+					//	border_width:-6,
+					//	round:6})
+					UI.RoundRect({x:2,y:y+4,w:w_line_numbers-4,h:hc-8,
+						color:obj.bookmark_color,
+						border_color:obj.bookmark_border_color,
+						border_width:Math.min(hc/8,2),
+						round:4})
+					if(id>=0){
+						UI.DrawChar(obj.bookmark_font,4,y+4,obj.bookmark_text_color,48+id)
+					}
+				}
+				UI.PopCliprect()
+				//put under an arrow could be more consistent with the scroll bar thingy 'b'
+				//todo: at-scrollbar, potentially numbered marks
+			}
+			//line numbers
 			var rendering_ccnt0=doc.SeekXY(doc.scroll_x,doc.scroll_y)
 			var rendering_ccnt1=doc.SeekXY(doc.scroll_x+doc.w,doc.scroll_y+doc.h)
 			if(obj.show_line_numbers){
@@ -796,9 +937,6 @@ W.CodeEditor=function(id,attrs){
 					color:obj.top_hint_border_color})
 				UI.PopCliprect()
 			}
-			//todo: a separate file for plugins
-			//bookmarks
-			//todo
 			//minimap / scroll bar
 			//todo
 		}
@@ -814,20 +952,34 @@ UI.NewCodeEditorTab=function(fname0){
 		body:function(){
 			//use styling for editor themes
 			//todo: load a style object
+			UI.context_parent.body=this.doc;
 			var body=W.CodeEditor("body",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
-				'x':0,'y':0,'doc':this.doc,
+				'x':0,'y':0,
 				'file_name':this.file_name,
 			})
 			if(!this.doc){
-				this.doc=body.doc;
+				this.doc=body;
 			}
-			var doc=this.doc;
+			var doc=body.doc;
 			body.title=UI.RemovePath(this.file_name)
+			this.need_save=0
 			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
 				body.title=body.title+'*'
+				this.need_save=1
 			}
 			return body;
+		},
+		Save:function(){
+			this.doc.Save();
+			var doc=this.doc.doc;
+			this.need_save=0
+			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
+				this.need_save=1
+			}
+		},
+		SaveMetaData:function(){
+			this.doc.SaveMetaData();
 		},
 		property_windows:[],
 		color_theme:[0xffb4771f],

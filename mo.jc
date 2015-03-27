@@ -97,6 +97,9 @@ __generate_json("include_js","build/make_new_docs.js")
 	jsio["GetExecutablePath"]=function(JSContext JS){
 		return JS.Return(System.Env.GetExecutablePath())
 	}
+	jsio["GetStoragePath"]=function(JSContext JS){
+		return JS.Return(System.Env.GetStoragePath())
+	}
 	/////////////
 	if Platform.IS_WINDOWS:
 		osal_DoFileDialogWin=__c_function(int,"osal_DoFileDialogWin","filedlg.h","c_files","filedlg.c")

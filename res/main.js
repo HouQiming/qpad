@@ -44,7 +44,7 @@ UI.Theme_CustomWidget=function(C){
 		tab_label:{
 			transition_dt:0.1,
 			shadow_size:8,
-			font:UI.Font(UI.font_name,24), padding:16,
+			font:UI.Font(UI.font_name,24,-150), padding:16,
 			$:{
 				active:{
 					text_color:0xffffffff,
@@ -52,7 +52,7 @@ UI.Theme_CustomWidget=function(C){
 					shadow_color:0xaa000000,
 				},
 				inactive:{
-					text_color:0xff444444,
+					text_color:0xff000000,
 					color:C[0]&0x00f0f0f0,
 					shadow_color:0x00000000, 
 				},
@@ -61,6 +61,70 @@ UI.Theme_CustomWidget=function(C){
 		tabbed_document:{
 			transition_dt:0.1,
 			h_caption:32, h_bar:4, color:0xffbbbbbb, border_color:C[0]
+		},
+		save_dialog:{
+			transition_dt:0.1,
+			color:0x00d0d0d0,
+			$:{
+				active:{
+					color:0x7fffffff,
+				},
+				inactive:{
+					color:0x00ffffff,
+				},
+			},
+			///////////
+			space_dlg_rect:48,
+			round_dlg_rect:32,
+			color_dlg_rect:0xf0ffffff,
+			font_text:UI.Font(UI.font_name,48,-100),
+			text_color:0xff000000,
+			font_buttons:UI.Font(UI.font_name,34,-100),
+			space_middle:64,
+			space_button:128,
+			h_button:44,
+			good_button_style:{
+				transition_dt:0.1,
+				round:32,border_width:0,padding:24,
+				$:{
+					out:{
+						color:[{x:0,y:0,color:UI.lerp_rgba(C[0],0xffffffff,0.2)},{x:0,y:1,color:UI.lerp_rgba(C[0],0xff000000,0.1)}],
+						icon_color:0xfff0f0f0,
+						text_color:0xfff0f0f0,
+					},
+					over:{
+						color:[{x:0,y:0,color:UI.lerp_rgba(C[0],0xffffffff,0.4)},{x:0,y:1,color:UI.lerp_rgba(C[0],0xffffffff,0.1)}],
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					down:{
+						color:[{x:0,y:0,color:UI.lerp_rgba(C[0],0xffffffff,0.1)},{x:0,y:1,color:UI.lerp_rgba(C[0],0xff000000,0.2)}],
+						icon_color:0xfff0f0f0,
+						text_color:0xfff0f0f0,
+					},
+				}
+			},
+			bad_button_style:{
+				transition_dt:0.1,
+				round:32,border_width:0,padding:24,
+				$:{
+					out:{
+						color:[{x:0,y:0,color:0xff999999},{x:0,y:1,color:0xff666666}],
+						icon_color:0xfff0f0f0,
+						text_color:0xfff0f0f0,
+					},
+					over:{
+						color:[{x:0,y:0,color:0xffaaaaaa},{x:0,y:1,color:0xff7f7f7f}],
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					down:{
+						color:[{x:0,y:0,color:0xff888888},{x:0,y:1,color:0xff555555}],
+						icon_color:0xfff0f0f0,
+						text_color:0xfff0f0f0,
+					},
+				}
+			},
 		},
 		box_document:{
 			border_color:(0xccffffff&C[0]),border_width:2,w_snapping_line:2,
@@ -155,7 +219,11 @@ UI.Theme_CustomWidget=function(C){
 			line_number_color_focus:0xff000000,
 			color_cur_line_highlight:0xfff0f0f0,
 			bgcolor:0xffe8e8e8,
-			bookmark_font:UI.Font("res/fonts/opensans.ttf",12),
+			bookmark_font:UI.Font("res/fonts/opensans.ttf",12,200),
+			bookmark_color:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
+			bookmark_text_color:C[0],
+			//bookmark_shadow:0xff000000,
+			bookmark_border_color:C[0],
 			padding:6,
 		},
 	};
@@ -183,14 +251,18 @@ UI.Application=function(id,attrs){
 		var app=UI.Begin(W.Window('app',{
 				title:'UI Editor',w:1280,h:720,bgcolor:0xfff0f0f0,
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
-				is_main_window:1}));
+				is_main_window:1,
+				OnClose:function(){
+					return this.document_area.OnClose();
+				}}));
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
-				W.Hotkey("",{key:"ALT+F4",action:function(){UI.DestroyWindow(app)}});
+				W.Hotkey("",{key:"ALT+F4",action:function(){if(!app.OnClose()){UI.DestroyWindow(app)}}});
 			}
 			var w_property_bar=320;
 			//UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):
 			var obj_panel=W.AutoHidePanel("property_panel",{
 				x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:w_property_bar,
+				max_velocity:16000,acceleration:10000,velocity_to_target_threshold:0.005,
 				anchor_placement:(app.w<app.h?'down':'right'),
 				knob_size:UI.IS_MOBILE?40:16,
 			});
@@ -202,12 +274,14 @@ UI.Application=function(id,attrs){
 					'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 					'x':0,'y':0,'h':obj_panel.y,
 					items:g_all_document_windows,
+					Close:function(){UI.DestroyWindow(app)},
 				})
 			}else{
 				W.TabbedDocument("document_area",{
 					'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
 					'x':0,'y':0,'w':obj_panel.x,
 					items:g_all_document_windows,
+					Close:function(){UI.DestroyWindow(app)},
 				})
 			}
 			var property_windows=[]
@@ -273,17 +347,13 @@ UI.Application=function(id,attrs){
 				UI.Refresh()
 			}});
 			W.Hotkey("",{key:"CTRL+S",action:function(){
-				var doc_area=app.document_area;
-				var active_document=doc_area.active_tab_obj;
-				if(active_document&&active_document.tab&&active_document.tab.gdoc.Save){
-					active_document.tab.gdoc.Save()
-				}
+				app.document_area.SaveCurrent();
 			}});
 			//todo: drag-loading
 			W.Hotkey("",{key:"CTRL+O",action:function(){
 				var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
 				if(!fn){return;}
-				UI.OpenFile(fn);
+				UI.OpenFile(fn.replace(new RegExp("\\\\","g"),"/"));
 				UI.Refresh()
 			}});
 		UI.End();
