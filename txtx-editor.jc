@@ -1131,7 +1131,7 @@ class CLayouter_fancy
 		else
 			return long4(x,y,i64(current_style_id),h_line)
 	}
-	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scaling){
 		_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n,scroll_x,scroll_y,screen_x,screen_y,scaling)
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){

@@ -238,7 +238,6 @@ class CLayouter_programmer
 	SetTextStyle=function(JSObject obj){
 		m_lang=obj["language"].as(CLanguageDescription)
 		m_font=obj["font"].as(TFont)
-		m_font.h/=g_renderer.m_pixels_per_unit
 		m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width=obj["wrap_width"].or(0.f)
 		m_tab_width_in_fp=i64(m_tab_width)*charWidth(int(' '))
@@ -283,7 +282,7 @@ class CLayouter_programmer
 	GetCaretOffset=function(){
 		return m_caret_offset
 	}
-	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,float screen_x,float screen_y,float scaling){
+	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scaling){
 		//word coloring - update color_ids
 		//get a GRACEFUL_WORD_SIZE context on each side - do it per-char
 		word_dfa=m_lang.m_word_dfa
@@ -358,7 +357,7 @@ class CLayouter_programmer
 		auto testOverlay()
 			if m_overlay_obj&&x==m_caret_overlay.x:
 				s_overlay=m_overlay_obj["text"].as(string)
-				prj_x=projectXY(x)
+				auto prj_x=projectXY(x)
 				if s_overlay:
 					overlay_sel0=m_overlay_obj["start"].or(0L)
 					overlay_sel1=overlay_sel0+m_overlay_obj["length"].or(0L)
@@ -394,23 +393,39 @@ class CLayouter_programmer
 					y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
 					g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.y)*scaling,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
 				x+=m_caret_overlay.y
+		x_right_clip=scroll_x+clip_w
+		iy=x/wrap_width
+		ix=x-iy*wrap_width
 		for ch,I in Utf8Chars(s)
 			testOverlay()
 			if ch=='\n':
 				x=(x/wrap_width+1LL)*wrap_width
+				iy=x/wrap_width
+				ix=x-iy*wrap_width
 			else if ch=='\r':
 				//nothing
 				continue
 			else if ch==' ':
-				x+=charWidth(ch)
+				dx_i=charWidth(ch)
+				x+=dx_i
+				ix+=dx_i
+				if ix>=wrap_width:
+					ix-=wrap_width
+					iy++
 			else if ch=='\t':
 				x=(x/tab_width+1LL)*tab_width
+				iy=x/wrap_width
+				ix=x-iy*wrap_width
 			else
 				dx_i=charWidth(ch)
-				prj_x=projectXY(x)
-				//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids?int(color_ids[I]):0], ch)
-				g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
+				if ix<x_right_clip:
+					prj_x=float2(fixed2float(ix-scroll_x)*scaling+screen_x,fixed2float(iy*hc-scroll_y)*scaling+screen_y)
+					g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 				x+=dx_i
+				ix+=dx_i
+				if ix>=wrap_width:
+					ix-=wrap_width
+					iy++
 		testOverlay()
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
@@ -534,13 +549,7 @@ class CColorer_programmer
 			i8 rule_id
 			i8 direction
 		coloring_events=new TColoringEvent[]
-		foreach tok,I,lg_token in EnumTokens(s_context,s)
-			//ignore nest-only brackets
-			tran=bdfa[bst+tok]
-			//Writeln(I,' ',bst/ld.m_n_tokens,' ',tok,' ',tran,' ',mask)
-			bst=int(tran.m_next_state)
-			mask&=tran.m_and
-			mask^=tran.m_xor
+		inline testEvent(I,lg_token)
 			if mask!=mask0:
 				//test color rules sequentially - they are only tested at color *changes*
 				for i=crules.n-1:-1:0
@@ -556,6 +565,15 @@ class CColorer_programmer
 							evt.direction=i8(0)
 						coloring_events.push(evt)
 				mask0=mask
+		testEvent(0,0)
+		foreach tok,I,lg_token in EnumTokens(s_context,s)
+			//ignore nest-only brackets
+			tran=bdfa[bst+tok]
+			//Writeln(I,' ',bst/ld.m_n_tokens,' ',tok,' ',tran,' ',mask)
+			bst=int(tran.m_next_state)
+			mask&=tran.m_and
+			mask^=tran.m_xor
+			testEvent(I,lg_token)
 		coloring_events.Sortby(inline(evt){return evt.ofs})
 		crule_activation=new i8[crules.n]
 		ret=new u8[s.n]

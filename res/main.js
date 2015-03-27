@@ -74,15 +74,15 @@ UI.Theme_CustomWidget=function(C){
 				},
 			},
 			///////////
-			space_dlg_rect:48,
+			space_dlg_rect:56,
 			round_dlg_rect:32,
 			color_dlg_rect:0xf0ffffff,
-			font_text:UI.Font(UI.font_name,48,-100),
+			font_text:UI.Font(UI.font_name,40,-100),
 			text_color:0xff000000,
-			font_buttons:UI.Font(UI.font_name,34,-100),
-			space_middle:64,
-			space_button:128,
-			h_button:44,
+			font_buttons:UI.Font(UI.font_name,24,-100),
+			space_middle:40,
+			space_button:96,
+			h_button:32,
 			good_button_style:{
 				transition_dt:0.1,
 				round:32,border_width:0,padding:24,
@@ -203,8 +203,13 @@ UI.Theme_CustomWidget=function(C){
 				color_keyword:0xffb4771f,
 				color_type:0xffbc470f,
 				color_symbol:0xff7f7f7f,
+				bgcolor_selection:C_sel&0xaaffffff,
 				tab_width:4,
 			},
+			bgcolor:0xffe8e8e8,
+			padding:6,
+			separator_color:0xff999999,
+			///////
 			show_top_hint:1,
 			top_hint_shadow_color:0x7f000000,
 			top_hint_shadow_size:8,
@@ -212,19 +217,45 @@ UI.Theme_CustomWidget=function(C){
 			top_hint_border_color:0xffaaaaaa,
 			top_hint_max_lines:5,
 			top_hint_max_levels:20,
+			///////
 			show_line_numbers:1,
 			line_number_font:UI.Font("res/fonts/opensans.ttf",14,-50),
 			line_number_bgcolor:0xffd0d0d0,
 			line_number_color:0xff7f7f7f,
 			line_number_color_focus:0xff000000,
-			color_cur_line_highlight:0xfff0f0f0,
-			bgcolor:0xffe8e8e8,
+			color_cur_line_highlight:0x55ffffff,
+			///////
 			bookmark_font:UI.Font("res/fonts/opensans.ttf",12,200),
 			bookmark_color:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
 			bookmark_text_color:C[0],
 			//bookmark_shadow:0xff000000,
 			bookmark_border_color:C[0],
-			padding:6,
+			///////
+			show_minimap:1,
+			minimap_font_height:5,
+			minimap_page_shadow:0x1f000000,
+			minimap_page_border_width:2,
+			minimap_page_border_color:0xffaaaaaa,
+			w_minimap:128,
+			///////
+			w_scroll_bar:20,
+			scroll_bar_style:{
+				transition_dt:0.1,
+				//bgcolor:0xffd0d0d0,
+				round:0,
+				padding:0,
+				szbar_min:32,
+				middle_bar:{
+					w:12,h:12,
+					round:6,
+					color:[{x:0,y:0,color:0xff999999},{x:1,y:1,color:0xff666666}],
+					border_color:0,
+				},
+				$:{
+					out:{},
+					over:{},
+				},
+			},
 		},
 	};
 	var s0=UI.default_styles;
@@ -264,7 +295,7 @@ UI.Application=function(id,attrs){
 				x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:w_property_bar,
 				max_velocity:16000,acceleration:10000,velocity_to_target_threshold:0.005,
 				anchor_placement:(app.w<app.h?'down':'right'),
-				knob_size:UI.IS_MOBILE?40:16,
+				knob_size:UI.IS_MOBILE?40:4,
 			});
 			var reg_panel=UI.context_regions.pop()
 			var panel_placement=obj_panel.anchor_placement
@@ -363,6 +394,7 @@ UI.Application=function(id,attrs){
 		//UI.NewUIEditorTab()
 		//UI.NewCodeEditorTab()
 		UI.OpenFile("c:/tp/kara/ide/edcore.spap")
+		//c:\tp\pure\mo\pm_tmp\win32\mo\s7main.c
 	}
 };
 

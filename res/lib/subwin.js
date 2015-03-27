@@ -241,7 +241,7 @@ W.SaveDialog=function(id,attrs){
 		if(obj.value){
 			var region=W.Region("savedlg_region",{x:obj.x,y:obj.y,w:obj.w,h:obj.h})
 			UI.SetFocus(region)
-			var s_text0="It's not saved yet, do you want to..."
+			var s_text0="It's not saved yet, so..."
 			var s_text_y="Save"
 			var s_text_n="Don't save"
 			var s_text_c="Cancel"
@@ -282,9 +282,9 @@ W.SaveDialog=function(id,attrs){
 			W.Button("btn_n",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_n,style:obj.bad_button_style,OnClick:fno});
 			x_buttons+=UI.MeasureText(obj.font_buttons,s_text_n).w+obj.space_button
 			W.Button("btn_c",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_c,style:obj.bad_button_style,OnClick:fcancel});
-			W.Hotkey("",{key:"Y",action:fyes});W.Hotkey("",{key:"RETURN",action:fyes})
-			W.Hotkey("",{key:"N",action:fno})
-			W.Hotkey("",{key:"ESC",action:fcancel})
+			W.Hotkey("",{key:"Y",action:fyes});W.Hotkey("",{key:"S",action:fyes});W.Hotkey("",{key:"RETURN",action:fyes})
+			W.Hotkey("",{key:"N",action:fno});W.Hotkey("",{key:"D",action:fno})
+			W.Hotkey("",{key:"ESC",action:fcancel});W.Hotkey("",{key:"C",action:fcancel})
 			/////////////////
 			//disable the side window as well
 			UI.document_property_sheet={};

@@ -586,7 +586,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	StartLoading:function(fn){
 		var ed=this.ed;
 		ed.hfile_loading=UI.EDLoader_Open(ed,fn)
-		var floadNext=function(){
+		var floadNext=(function(){
 			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading)
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
@@ -594,7 +594,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				this.OnLoad()
 			}
 			UI.Refresh()
-		}
+		}).bind(this)
 		if(ed.hfile_loading){
 			floadNext()
 		}else{
@@ -717,15 +717,48 @@ W.CodeEditorWidget_prototype={
 	}
 }
 
+W.MinimapThingy_prototype={
+	dimension:'y',
+	OnMouseDown:function(event){
+		this.anchored_value=this.value
+		this.anchored_xy=event.y
+		UI.CaptureMouse(this)
+	},
+	OnMouseUp:function(event){
+		UI.ReleaseMouse(this)
+		this.anchored_value=undefined
+		UI.Refresh()
+	},
+	OnMouseMove:function(event){
+		if(this.anchored_value==undefined){return;}
+		this.OnChange(Math.min(Math.max(this.anchored_value+(event.y-this.anchored_xy)/this.factor,0),1))
+	},
+}
+
 W.CodeEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
 	UI.Begin(obj)
 		//main code area
 		var doc=obj.doc
-		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,y_top_hint_scroll=0;
+		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,w_scrolling_area=0,y_top_hint_scroll=0;
 		var editor_style=UI.default_styles.code_editor.editor_style
 		var top_hint_bbs=[]
 		if(doc){
+			//scrolling and stuff
+			var ccnt_tot=doc.ed.GetTextSize()
+			var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
+			if(obj.h<ytot){
+				w_scrolling_area=obj.w_scroll_bar+4
+				if(obj.show_minimap){
+					w_scrolling_area+=obj.w_minimap+obj.padding
+				}
+			}
+			if(obj.w<=w_line_numbers+w_scrolling_area){
+				w_scrolling_area=0
+				if(obj.w<=w_line_numbers){
+					w_line_numbers=obj.w*0.5
+				}
+			}
 			//top hint in a separate area
 			if(obj.show_top_hint){
 				var top_hints=[];
@@ -774,7 +807,10 @@ W.CodeEditor=function(id,attrs){
 					top_hint_bbs.push(cur_bb_y0,cur_bb_y1)
 				}
 			}
-			if(Math.abs(h_top_hint-prev_h_top_hint)>4){
+			//if(UI.nd_captured){
+			//	h_top_hint=prev_h_top_hint;//don't change it while scrolling
+			//}
+			if(Math.abs(h_top_hint-prev_h_top_hint)>4&&h_top_hint>0&&!UI.nd_captured){
 				h_top_hint=(h_top_hint*0.5+prev_h_top_hint*0.5);
 				UI.Refresh()
 			}
@@ -782,7 +818,7 @@ W.CodeEditor=function(id,attrs){
 			if(h_top_hint-prev_h_top_hint){
 				doc.scroll_y+=h_top_hint-prev_h_top_hint
 				doc.h=obj.h-h_top_hint
-				doc.AutoScroll("show")
+				if(!UI.nd_captured){doc.AutoScroll("show");}
 			}
 			//current line highlight
 			if(!doc.cur_line_hl){
@@ -806,6 +842,7 @@ W.CodeEditor=function(id,attrs){
 		w_line_numbers+=obj.padding+w_bookmark;
 		UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:obj.h})
 		UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:obj.w-w_line_numbers,h:obj.h})
+		//todo: loading progress - notification system
 		if(doc&&doc.ed.saving_context){
 			//todo: draw a progress bar with no interaction
 			obj.__children.push(doc)
@@ -815,7 +852,7 @@ W.CodeEditor=function(id,attrs){
 				language:g_language_C,//todo
 				style:editor_style,
 				///////////////
-				x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint,w:obj.w-w_line_numbers-obj.padding,h:obj.h-h_top_hint,
+				x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint,w:obj.w-w_line_numbers-obj.padding-w_scrolling_area,h:obj.h-h_top_hint,
 			},W.CodeEditor_prototype);
 			if(!doc){
 				//initiate progressive loading
@@ -869,6 +906,7 @@ W.CodeEditor=function(id,attrs){
 				UI.PopCliprect()
 				//put under an arrow could be more consistent with the scroll bar thingy 'b'
 				//todo: at-scrollbar, potentially numbered marks
+				//general annotation system after find - f3 / shift-f3
 			}
 			//line numbers
 			var rendering_ccnt0=doc.SeekXY(doc.scroll_x,doc.scroll_y)
@@ -899,8 +937,8 @@ W.CodeEditor=function(id,attrs){
 					var y1=top_hint_bbs[bbi+1]
 					var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
 					if(hh>=0){
-						doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers,h:hh,
-							scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:1, obj:doc});
+						doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers-w_scrolling_area,h:hh,
+							scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
 						//also draw the line numbers
 						if(obj.show_line_numbers){
 							var rendering_ccnt0=doc.SeekXY(0,y0)
@@ -925,20 +963,72 @@ W.CodeEditor=function(id,attrs){
 					}
 					y_top_hint+=y1-y0;
 				}
-				UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w,obj.h-h_top_hint)
+				UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w-w_scrolling_area,obj.h-h_top_hint)
 				//a (shadowed) separation bar
 				UI.RoundRect({
-					x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+					x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
 					round:obj.top_hint_shadow_size,
 					border_width:-obj.top_hint_shadow_size,
 					color:obj.top_hint_shadow_color})
 				UI.RoundRect({
-					x:obj.x, y:obj.y+h_top_hint, w:obj.w, h:obj.top_hint_border_width,
+					x:obj.x, y:obj.y+h_top_hint, w:obj.w-w_scrolling_area, h:obj.top_hint_border_width,
 					color:obj.top_hint_border_color})
 				UI.PopCliprect()
 			}
 			//minimap / scroll bar
-			//todo
+			if(w_scrolling_area>0){
+				var sbar_value=Math.max(Math.min(doc.scroll_y/(ytot-obj.h),1),0)
+				if(obj.show_minimap){
+					var x_minimap=obj.x+obj.w-w_scrolling_area+obj.padding*0.5
+					var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
+					var h_minimap=obj.h/minimap_scale
+					var scroll_y_minimap=sbar_value*Math.max(ytot-h_minimap,0)
+					UI.PushSubWindow(x_minimap,obj.y,obj.w_minimap,obj.h,minimap_scale)
+						doc.ed.Render({x:0,y:scroll_y_minimap,w:obj.w_minimap/minimap_scale,h:h_minimap,
+							scr_x:0,scr_y:0, scale:UI.pixels_per_unit, obj:doc});
+					UI.PopSubWindow()
+					var minimap_page_y0=(doc.scroll_y-scroll_y_minimap)*minimap_scale
+					var minimap_page_y1=(doc.scroll_y+obj.h-scroll_y_minimap)*minimap_scale
+					UI.RoundRect({
+						x:x_minimap-obj.padding*0.5, y:obj.y+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
+						color:obj.minimap_page_shadow})
+					UI.RoundRect({
+						x:x_minimap-obj.padding*0.5, y:obj.y+minimap_page_y0, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
+						color:obj.minimap_page_border_color})
+					UI.RoundRect({
+						x:x_minimap-obj.padding*0.5, y:obj.y+minimap_page_y1-obj.minimap_page_border_width, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
+						color:obj.minimap_page_border_color})
+					if((minimap_page_y1-minimap_page_y0)<h_minimap){
+						W.Region('minimap_page',{
+							x:x_minimap-obj.padding*0.5, y:obj.y+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
+							value:sbar_value,
+							factor:obj.h-(minimap_page_y1-minimap_page_y0),
+							OnChange:function(value){
+								doc.scroll_y=value*(ytot-obj.h)
+								UI.Refresh()
+							},
+						},W.MinimapThingy_prototype)
+					}
+				}
+				UI.RoundRect({x:obj.x+obj.w-obj.w_scroll_bar-4, y:obj.y, w:obj.w_scroll_bar+4, h:obj.h,
+					color:obj.line_number_bgcolor
+				})
+				W.ScrollBar("sbar",{x:obj.x+obj.w-obj.w_scroll_bar-4, y:obj.y+4, w:obj.w_scroll_bar, h:obj.h-8, dimension:'y',
+					page_size:obj.h, total_size:ytot, value:sbar_value,
+					OnChange:function(value){
+						doc.scroll_y=value*(this.total_size-this.page_size)
+						UI.Refresh()
+					},
+					style:obj.scroll_bar_style
+				})
+				//separators
+				UI.RoundRect({
+					x:obj.x+obj.w-w_scrolling_area, y:obj.y, w:1, h:obj.h,
+					color:obj.separator_color})
+			}
+			//UI.RoundRect({
+			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:obj.h,
+			//	color:obj.separator_color})
 		}
 	UI.End()
 	return obj
@@ -951,7 +1041,7 @@ UI.NewCodeEditorTab=function(fname0){
 		title:UI.RemovePath(file_name),
 		body:function(){
 			//use styling for editor themes
-			//todo: load a style object
+			//todo: load a style object from some user-defined file
 			UI.context_parent.body=this.doc;
 			var body=W.CodeEditor("body",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
