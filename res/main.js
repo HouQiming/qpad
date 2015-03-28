@@ -203,7 +203,7 @@ UI.Theme_CustomWidget=function(C){
 				color_keyword:0xffb4771f,
 				color_type:0xffbc470f,
 				color_symbol:0xff7f7f7f,
-				bgcolor_selection:C_sel&0xaaffffff,
+				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
 			},
 			bgcolor:0xffe8e8e8,
@@ -238,6 +238,30 @@ UI.Theme_CustomWidget=function(C){
 			minimap_page_border_color:0xffaaaaaa,
 			w_minimap:128,
 			///////
+			h_find_bar:32,
+			find_bar_bgcolor:0xffffffff,
+			find_bar_color:0xffe8e8e8,
+			find_bar_round:8,
+			find_bar_padding:4,
+			find_bar_hint_color:0xff7f7f7f,
+			find_bar_shadow_color:0x7f000000,
+			find_bar_shadow_size:8,
+			find_bar_hint_font:UI.Font("res/fonts/opensans.ttf",20,-50),
+			find_bar_button_size:28,
+			find_bar_editor_style:{
+				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				color:0xff000000,
+				color_overlay:0xff000000,
+				color_string:0xff1c1aa3,
+				color_number:0xff1c1aa3,
+				color_comment:0xff2ca033,
+				color_keyword:0xffb4771f,
+				color_type:0xffbc470f,
+				color_symbol:0xff7f7f7f,
+				bgcolor_selection:C[0]&0x3fffffff,
+				tab_width:4,
+			},
+			///////
 			w_scroll_bar:20,
 			scroll_bar_style:{
 				transition_dt:0.1,
@@ -265,6 +289,7 @@ UI.Theme_CustomWidget=function(C){
 }
 UI.Theme_Minimalistic([0xffcc7733])
 UI.icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
+UI.icon_font_20=UI.Font('res/fonts/iconfnt.ttf,!',20);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
 UI.font_name="res/fonts/opensans.ttf"
 

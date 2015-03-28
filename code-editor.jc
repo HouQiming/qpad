@@ -1004,6 +1004,7 @@ registerStateHandler("renderer_programmer",CLayouter_programmer)
 registerStateHandler("colorer_programmer",CColorer_programmer)
 registerStateHandler("seeker_indentation",CSeeker_indentation)
 
+///////////////////////////////////////////
 NEXT_READ_SIZE=1048576
 INITIAL_READ_SIZE=2097152
 WRITE_BATCH=4194304
@@ -1018,7 +1019,75 @@ class CSavingContext
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"progress")
 	}
+
+///////////////////////////////////////////
+inline chrequi(ch0,chw0)
+	ch=int(ch0)
+	chw=int(chw0)
+	return ch0==chw0||(ch^chw)==0x20&&u32((ch|0x20)-int('a'))<26u
+
+auto KmpBuildTable(string s,int ocase)
+	if !s.n:return [-1]
+	next=new int[s.n+1]
+	next[0]=-1
+	for i=1:s.n
+		i0=next[i-1]
+		ch=s[i-1]
+		while i0>=0:
+			if s[i0]==ch||!ocase&&chrequi(s[i0],ch):
+				break
+			i0=next[i0]
+		next[i]=i0+1
+	for i=1:s.n-1
+		x=next[i]
+		while x>0&&(s[x]==s[i]||!ocase&&chrequi(s[x],s[i])):
+			x=next[x]
+		next[i]=x
+	//use next[s.n] for match denial
+	return next
+
+auto SearchPlainText(CEditableText ed,i64 ccnt_starting,const direction, string s,int ocase,function(i64,i64):int ReportMatch, int budget)
+	//use KMP: two-part is not worth it here
+	sfind=(direction>0?s:[ch for ch in s.ReverseOrder()])
+	if ocase:
+		sfind2=sfind
+	else
+		sfind2=sfind.ToLower()
+		sfind=sfind.ToUpper()
+	lg=sfind.n
+	fnext=KmpBuildTable(sfind,ocase)
+	pbudget=budget
+	w=0
+	for ch,ccnt in direction>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
+		for(;;)
+			if ch==int(u8(sfind[w])):break
+			if ch==int(u8(sfind2[w])):break
+			w=fnext[w]
+			if w<0:break
+		w++
+		if w>=lg:
+			//got match
+			if direction<0:
+				ccnt0=ccnt
+				ccnt1=ccnt+lg
+			else
+				ccnt1=ccnt+1
+				ccnt0=ccnt1-lg
+			ReportMatch(ccnt0,ccnt1)
+		pbudget--
+		if pbudget<=0:
+			//we are out of budget, exit
+			return ccnt+(w-1)*i64(-direction)
+	return -1LL
+
+SEARCH_FLAG_CASE_SENSITIVE=1
+SEARCH_FLAG_WHOLE_WORD=2
+SEARCH_FLAG_REGEXP=4
+auto SearchRegexp(CEditableText ed,i64 ccnt, string sregexp,int flags,function(i64,i64):int ReportMatch, int budget)
+	//todo: use the old regexp code - duk code too complicated
+	return -1LL
 	
+///////////////////////////////////////////
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
 		//initial read, which is a raw edit
@@ -1075,5 +1144,32 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return JS.Return("done")
 		ret.progress=f32(ret.ofs)/f32(szmax)
 		return JS.Return("continue")
+	}
+	JS_UI["ED_Search"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		ccnt0=JS.Param(1).as(i64)
+		direction=JS.Param(2).or(1)
+		s=JS.Param(3).as(string)
+		flags=JS.Param(4).as(int)
+		budget=JS.Param(5).as(int)
+		js_callback=JS.Param(6).as(JSObject)
+		/////////////
+		ocase=(flags&SEARCH_FLAG_CASE_SENSITIVE)
+		ReportMatch=function(i64 ccnt0,i64 ccnt1){
+			if flags&SEARCH_FLAG_WHOLE_WORD:
+				(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
+				if isWordChar(ch0)==isWordChar(ch1):return 0
+				(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
+				if isWordChar(ch0)==isWordChar(ch1):return 0
+			return js_callback.Call(int,ccnt0,ccnt1)
+		}
+		if flags&SEARCH_FLAG_REGEXP:
+			ret=SearchRegexp(ed,ccnt0, s,flags,ReportMatch, budget)
+		else
+			if direction>0:
+				ret=SearchPlainText(ed,ccnt0,1, s,ocase,ReportMatch, budget)
+			else
+				ret=SearchPlainText(ed,ccnt0,-1, s,ocase,ReportMatch, budget)
+		return JS.Return(ret)
 	}
 })
