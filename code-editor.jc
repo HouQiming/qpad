@@ -1060,8 +1060,8 @@ auto SearchPlainText(CEditableText ed,i64 ccnt_starting,const direction, string 
 	w=0
 	for ch,ccnt in direction>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
 		for(;;)
-			if ch==int(u8(sfind[w])):break
-			if ch==int(u8(sfind2[w])):break
+			if ch==sfind[w]:break
+			if ch==sfind2[w]:break
 			w=fnext[w]
 			if w<0:break
 		w++
@@ -1073,11 +1073,12 @@ auto SearchPlainText(CEditableText ed,i64 ccnt_starting,const direction, string 
 			else
 				ccnt1=ccnt+1
 				ccnt0=ccnt1-lg
-			ReportMatch(ccnt0,ccnt1)
+			pbudget-=ReportMatch(ccnt0,ccnt1)
+			w=0
 		pbudget--
 		if pbudget<=0:
 			//we are out of budget, exit
-			return ccnt+(w-1)*i64(-direction)
+			return ccnt+w*i64(-direction)
 	return -1LL
 
 SEARCH_FLAG_CASE_SENSITIVE=1
@@ -1153,6 +1154,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		flags=JS.Param(4).as(int)
 		budget=JS.Param(5).as(int)
 		js_callback=JS.Param(6).as(JSObject)
+		js_this=JS.Param(7).as(JSObject)
 		/////////////
 		ocase=(flags&SEARCH_FLAG_CASE_SENSITIVE)
 		ReportMatch=function(i64 ccnt0,i64 ccnt1){
@@ -1161,7 +1163,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				if isWordChar(ch0)==isWordChar(ch1):return 0
 				(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
 				if isWordChar(ch0)==isWordChar(ch1):return 0
-			return js_callback.Call(int,ccnt0,ccnt1)
+			return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
 		}
 		if flags&SEARCH_FLAG_REGEXP:
 			ret=SearchRegexp(ed,ccnt0, s,flags,ReportMatch, budget)

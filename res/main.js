@@ -261,6 +261,14 @@ UI.Theme_CustomWidget=function(C){
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
 			},
+			find_item_space_percentage:0.7,
+			find_item_separation:6,
+			find_item_border_width:0,
+			find_item_border_color:0xff444444,
+			find_item_shadow_color:0x7f000000,
+			find_item_shadow_size:4,
+			find_mode_bgcolor:0xffc0c0c0,
+			find_item_highlight_color:0x55007fff,
 			///////
 			w_scroll_bar:20,
 			scroll_bar_style:{
@@ -397,7 +405,6 @@ UI.Application=function(id,attrs){
 			//////////////////////////
 			W.Hotkey("",{key:"CTRL+N",action:function(){
 				//UI.NewUIEditorTab()
-				//UI.NewDemoTab()
 				//UI.NewFromTemplate("templates/blank_demo.mo")
 				UI.NewCodeEditorTab()//todo
 				UI.Refresh()
