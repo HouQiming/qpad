@@ -825,6 +825,26 @@ var ffindbar_plugin=function(){
 		var obj=this.owner
 		obj.StartFinding(obj.doc.sel1.ccnt,this.ed.GetText(),obj.find_flags)
 	})
+	this.AddEventHandler('UP',function(){
+		var obj=this.owner
+		if(obj.m_current_find_context){
+			var ctx=obj.m_current_find_context
+			if(ctx.m_current_point>-ctx.m_backward_matches.length+1){
+				ctx.m_current_point--
+				UI.Refresh()
+			}
+		}
+	})
+	this.AddEventHandler('DOWN',function(){
+		var obj=this.owner
+		if(obj.m_current_find_context){
+			var ctx=obj.m_current_find_context
+			if(ctx.m_current_point<ctx.m_forward_matches.length-1){
+				ctx.m_current_point++
+				UI.Refresh()
+			}
+		}
+	})
 	//todo: main editor onchange should invalidate the find context
 }
 
@@ -838,10 +858,11 @@ W.CodeEditor=function(id,attrs){
 		var editor_style=UI.default_styles.code_editor.editor_style
 		var top_hint_bbs=[]
 		var current_find_context=obj.m_current_find_context
+		var ytot
 		if(doc){
 			//scrolling and stuff
 			var ccnt_tot=doc.ed.GetTextSize()
-			var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
+			ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 			if(obj.h<ytot){
 				w_scrolling_area=obj.w_scroll_bar+4
 				if(obj.show_minimap){
@@ -954,11 +975,15 @@ W.CodeEditor=function(id,attrs){
 			}
 			//individual lines, each with a box and a little shadow for separation
 			var h_max_find_items_per_side=(obj.h-obj.h_find_bar)*obj.find_item_space_percentage*0.5
-			var find_ranges_back=undefined;
-			var find_ranges_forward=undefined;
+			var h_find_item_middle=obj.h-obj.h_find_bar-h_max_find_items_per_side*2
+			//var find_ranges_back=undefined;
+			//var find_ranges_forward=undefined;
+			var find_item_scroll_x=undefined
+			var find_ranges_to_draw=undefined
+			var w_document=obj.w-w_scrolling_area-w_line_numbers
 			var DrawFindItemBox=function(y,h){
 				UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:y,w:w_line_numbers,h:h})
-				UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:y,w:obj.w-w_scrolling_area-w_line_numbers,h:h})
+				UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:y,w:w_document,h:h})
 				UI.RoundRect({x:obj.x,y:y,w:obj.w-w_scrolling_area,h:h,
 					color:0,border_color:obj.find_item_border_color,border_width:obj.find_item_border_width})
 				UI.PushCliprect(obj.x,y+h,obj.w-w_scrolling_area,obj.find_item_separation)
@@ -971,16 +996,16 @@ W.CodeEditor=function(id,attrs){
 			if(obj.show_find_bar&&current_find_context){
 				//assert(!!doc)
 				//grab the find result centered at current_find_context.m_current_point, test y at starting point
-				var GetFindItemCcnt=function(id){
+				var GetFindItemCcnt=function(id,side){
 					if(id==0){
 						return current_find_context.m_starting_ccnt;
 					}else if(id<0){
-						var ofs=id*(-2)
+						var ofs=id*(-2)+side
 						if(ofs<current_find_context.m_backward_matches.length){
 							return current_find_context.m_backward_matches[ofs]
 						}
 					}else{
-						var ofs=id*2
+						var ofs=id*2+side
 						if(ofs<current_find_context.m_forward_matches.length){
 							return current_find_context.m_forward_matches[ofs]
 						}
@@ -988,84 +1013,157 @@ W.CodeEditor=function(id,attrs){
 					return undefined
 				}
 				//todo: show some context, up/down navigation, widget animation, don't show main as doc
+				//virtual animation widgets
 				//boundary fade instead of separation? current tophint is awkward too
-				//autoscroll
+				//animate the separation lines instead? the absorption problem.. per-widget is ok if we don't show merged
 				var hc=UI.GetCharacterHeight(doc.font)
 				var eps=hc/16;
 				var h_back_tot=0,h_forward_tot=0;
-				find_ranges_back=[]
-				find_ranges_forward=[]
-				var ccnt_merged_anyway=doc.ed.SeekXY(doc.scroll_x,doc.scroll_y)
-				var current_y0=undefined,current_y1=undefined
+				//find_ranges_back=[]
+				//find_ranges_forward=[]
+				///////////////////////////////////////
+				//the middle view
+				var ccnt_middle=GetFindItemCcnt(current_find_context.m_current_point,1)
+				var xy_middle=doc.ed.XYFromCcnt(ccnt_middle)
+				var middle_scroll_x=Math.max(xy_middle.x-w_document,0);
+				var middle_scroll_y=Math.max(Math.min(xy_middle.y+hc*0.5-h_find_item_middle*0.5,ytot-h_find_item_middle),0);
+				var middle_item=W.AnimationNode("find_item_"+current_find_context.m_current_point.toString(),{
+					scroll_y:middle_scroll_y,
+					scr_y0:obj.y+obj.h_find_bar+(obj.h-obj.h_find_bar)*0.5-h_find_item_middle*0.5,
+					shared_h:h_find_item_middle,
+				})
+				find_item_scroll_x=middle_scroll_x
+				find_ranges_to_draw=[middle_item]
+				//todo: animate h, compute y?
+				///////////////////////////////////////
+				//the backward part
+				var ccnt_merged_anyway=doc.ed.SeekXY(middle_item.scroll_x,middle_item.scroll_y)
+				var current_y0=undefined,current_y1=undefined,current_id=undefined;
+				var h_max=middle_item.scr_y0
+				var find_ranges_temp=[]
+				var end_reached=0;
 				for(var id=current_find_context.m_current_point-1;;id--){
-					var ccnt_id=GetFindItemCcnt(id)
-					if(ccnt_id==undefined){break;}
+					var ccnt_id=GetFindItemCcnt(id,0)
+					if(ccnt_id==undefined){end_reached=1;break;}
 					if(ccnt_id>=ccnt_merged_anyway){continue;}
 					var y_id=doc.ed.XYFromCcnt(ccnt_id).y
-					if(current_y0!=undefined&&y_id>current_y0-hc-eps){
+					var y_id0=Math.max(y_id-hc,0),y_id1=Math.min(y_id+hc*2,ytot)
+					if(current_y0!=undefined&&y_id1>current_y0-eps){
 						//merge
-						h_back_tot+=current_y0-y_id;
-						current_y0=y_id
+						h_back_tot+=current_y0-y_id0;
+						current_y0=y_id0
 					}else{
 						if(current_y0!=undefined){
-							find_ranges_back.push(current_y0,current_y1)
+							find_ranges_temp.push(current_id,current_y0,current_y1)
 							h_back_tot+=obj.find_item_separation;
 						}
-						current_y0=y_id
-						current_y1=y_id+hc
-						h_back_tot+=hc;
+						current_id=id
+						current_y0=y_id0
+						current_y1=y_id1
+						h_back_tot+=(y_id1-y_id0);
 					}
-					if(h_back_tot+obj.find_item_separation>=h_max_find_items_per_side){
+					if(h_back_tot+obj.find_item_separation>=h_max){
 						break;
 					}
 					ccnt_merged_anyway=doc.ed.SeekXY(0,y_id)
 				}
 				if(current_y0!=undefined){
-					find_ranges_back.push(current_y0,current_y1)
+					find_ranges_temp.push(current_id,current_y0,current_y1)
 					h_back_tot+=obj.find_item_separation;
 				}
-				//forward
-				ccnt_merged_anyway=doc.ed.SeekXY(doc.scroll_x+doc.w,doc.scroll_y+doc.h)
-				current_y0=undefined
-				current_y1=undefined
+				var find_item_y=middle_item.scr_y0
+				for(var i=0;i<find_ranges_temp.length;i+=3){
+					var id=find_ranges_temp[i]
+					var y0=find_ranges_temp[i+1]
+					var y1=find_ranges_temp[i+2]
+					var find_item_i=W.AnimationNode("find_item_"+id.toString(),{
+						scroll_y:y0,
+						scr_y0:find_item_y,
+						shared_h:y1-y0,
+					})
+					find_item_y-=find_item_i.shared_h+obj.find_item_separation
+					find_ranges_to_draw.push(find_item_i)
+				}
+				if(end_reached){
+					if(current_find_context.m_backward_frontier<0){
+						//todo: BOF
+					}else{
+						//todo: in-progress
+					}
+				}
+				///////////////////////////////////////
+				//the forward part
+				var ccnt_merged_anyway=doc.ed.SeekXY(middle_item.scroll_x+w_document,middle_item.scroll_y+middle_item.shared_h)
+				current_y0=undefined;current_y1=undefined;current_id=undefined;
+				h_max=(obj.y+obj.h-(middle_item.scr_y0+middle_item.shared_h))
+				find_ranges_temp=[]
+				end_reached=0;
 				for(var id=current_find_context.m_current_point+1;;id++){
-					var ccnt_id=GetFindItemCcnt(id)
-					if(ccnt_id==undefined){break;}
+					var ccnt_id=GetFindItemCcnt(id,0)
+					if(ccnt_id==undefined){end_reached=1;break;}
 					if(ccnt_id<=ccnt_merged_anyway){continue;}
 					var y_id=doc.ed.XYFromCcnt(ccnt_id).y
-					if(current_y1!=undefined&&y_id<current_y1+eps){
+					var y_id0=Math.max(y_id-hc,0),y_id1=Math.min(y_id+hc*2,ytot)
+					if(current_y0!=undefined&&y_id0<current_y1+eps){
 						//merge
-						h_forward_tot+=y_id+hc-current_y1;
-						current_y1=y_id+hc
+						h_forward_tot+=y_id1-current_y1;
+						current_y1=y_id1
 					}else{
 						if(current_y0!=undefined){
-							find_ranges_forward.push(current_y0,current_y1)
+							find_ranges_temp.push(current_id,current_y0,current_y1)
 							h_forward_tot+=obj.find_item_separation;
 						}
-						current_y0=y_id
-						current_y1=y_id+hc
-						h_forward_tot+=hc;
+						current_id=id
+						current_y0=y_id0
+						current_y1=y_id1
+						h_forward_tot+=(y_id1-y_id0);
 					}
-					if(h_forward_tot+obj.find_item_separation>h_max_find_items_per_side){
+					if(h_forward_tot+obj.find_item_separation>=h_max){
 						break;
 					}
 					ccnt_merged_anyway=doc.ed.SeekXY(1e17,y_id)
 				}
 				if(current_y0!=undefined){
-					find_ranges_forward.push(current_y0,current_y1)
+					find_ranges_temp.push(current_id,current_y0,current_y1)
 					h_forward_tot+=obj.find_item_separation;
 				}
+				find_item_y=middle_item.scr_y0+middle_item.shared_h
+				for(var i=0;i<find_ranges_temp.length;i+=3){
+					var id=find_ranges_temp[i]
+					var y0=find_ranges_temp[i+1]
+					var y1=find_ranges_temp[i+2]
+					find_item_y+=obj.find_item_separation
+					var find_item_i=W.AnimationNode("find_item_"+id.toString(),{
+						scroll_y:y0,
+						scr_y0:find_item_y,
+						shared_h:y1-y0,
+					})
+					find_ranges_to_draw.push(find_item_i)
+					find_item_y+=find_item_i.shared_h
+				}
+				if(end_reached){
+					if(current_find_context.m_forward_frontier<0){
+						//todo: EOF
+					}else{
+						//todo: in-progress
+					}
+				}
+				find_ranges_temp=undefined
+				/////////////////////////////
 				h_top_find+=h_back_tot
 				h_bottom_find+=h_forward_tot
-				DrawFindItemBox(obj.y+h_top_hint+h_top_find,obj.h-h_top_hint-h_top_find-h_bottom_find)
 			}
-			W.Edit("doc",{
-				///////////////
-				language:g_language_C,//todo
-				style:editor_style,
-				///////////////
-				x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:obj.w-w_line_numbers-obj.padding-w_scrolling_area,h:obj.h-h_top_hint-h_top_find-h_bottom_find,
-			},W.CodeEditor_prototype);
+			if(obj.show_find_bar&&current_find_context){
+				obj.__children.push(doc)
+			}else{
+				W.Edit("doc",{
+					///////////////
+					language:g_language_C,//todo
+					style:editor_style,
+					///////////////
+					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:obj.w-w_line_numbers-obj.padding-w_scrolling_area,h:obj.h-h_top_hint-h_top_find-h_bottom_find,
+				},W.CodeEditor_prototype);
+			}
 			if(!doc){
 				//initiate progressive loading
 				doc=obj.doc
@@ -1138,26 +1236,13 @@ W.CodeEditor=function(id,attrs){
 			}
 			//the find bar and stuff
 			if(obj.show_find_bar&&current_find_context){
-				var y=doc.y;
-				for(var i=0;i<find_ranges_back.length;i+=2){
-					var find_item_y0=find_ranges_back[i]
-					var find_item_y1=find_ranges_back[i+1]
-					y-=find_item_y1-find_item_y0+obj.find_item_separation
-					DrawFindItemBox(y,find_item_y1-find_item_y0)
-					doc.ed.Render({x:doc.scroll_x,y:find_item_y0,w:obj.w-w_line_numbers-w_scrolling_area,h:find_item_y1-find_item_y0,
-						scr_x:obj.x+w_line_numbers,scr_y:y, scale:UI.pixels_per_unit, obj:doc});
-					DrawLineNumbers(doc.scroll_x,find_item_y0,doc.w,y,find_item_y1-find_item_y0);
-				}
-				y=doc.y+doc.h
-				for(var i=0;i<find_ranges_forward.length;i+=2){
-					var find_item_y0=find_ranges_forward[i]
-					var find_item_y1=find_ranges_forward[i+1]
-					y+=obj.find_item_separation
-					DrawFindItemBox(y,find_item_y1-find_item_y0)
-					doc.ed.Render({x:doc.scroll_x,y:find_item_y0,w:obj.w-w_line_numbers-w_scrolling_area,h:find_item_y1-find_item_y0,
-						scr_x:obj.x+w_line_numbers,scr_y:y, scale:UI.pixels_per_unit, obj:doc});
-					DrawLineNumbers(doc.scroll_x,find_item_y0,doc.w,y,find_item_y1-find_item_y0);
-					y+=find_item_y1-find_item_y0
+				find_ranges_to_draw.sort(function(a,b){return a.scr_y0-b.scr_y0})
+				for(var i=0;i<find_ranges_to_draw.length;i++){
+					var find_item_i=find_ranges_to_draw[i]
+					DrawFindItemBox(find_item_i.scr_y0,find_item_i.shared_h)
+					doc.ed.Render({x:find_item_scroll_x,y:find_item_i.scroll_y,w:w_document,h:find_item_i.shared_h,
+						scr_x:obj.x+w_line_numbers,scr_y:find_item_i.scr_y0, scale:UI.pixels_per_unit, obj:doc});
+					DrawLineNumbers(find_item_scroll_x,find_item_i.scroll_y,doc.w,find_item_i.scr_y0,find_item_i.shared_h);
 				}
 			}
 			if(obj.show_find_bar){
@@ -1213,34 +1298,37 @@ W.CodeEditor=function(id,attrs){
 						text:"Search"})
 				}
 			}
-			//line numbers
-			DrawLineNumbers(doc.scroll_x,doc.scroll_y,doc.w,doc.y,doc.h);
-			//the top hint
-			if(top_hint_bbs.length){
-				var y_top_hint=y_top_hint_scroll;
-				for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
-					var y0=top_hint_bbs[bbi]
-					var y1=top_hint_bbs[bbi+1]
-					var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
-					if(hh>=0){
-						doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers-w_scrolling_area,h:hh,
-							scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
-						//also draw the line numbers
-						DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
+			if(obj.show_find_bar&&current_find_context){
+			}else{
+				//line numbers
+				DrawLineNumbers(doc.scroll_x,doc.scroll_y,doc.w,doc.y,doc.h);
+				//the top hint
+				if(top_hint_bbs.length){
+					var y_top_hint=y_top_hint_scroll;
+					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
+						var y0=top_hint_bbs[bbi]
+						var y1=top_hint_bbs[bbi+1]
+						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
+						if(hh>=0){
+							doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers-w_scrolling_area,h:hh,
+								scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
+							//also draw the line numbers
+							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
+						}
+						y_top_hint+=y1-y0;
 					}
-					y_top_hint+=y1-y0;
+					UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w-w_scrolling_area,obj.h-h_top_hint)
+					//a (shadowed) separation bar
+					UI.RoundRect({
+						x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+						round:obj.top_hint_shadow_size,
+						border_width:-obj.top_hint_shadow_size,
+						color:obj.top_hint_shadow_color})
+					UI.RoundRect({
+						x:obj.x, y:obj.y+h_top_hint, w:obj.w-w_scrolling_area, h:obj.top_hint_border_width,
+						color:obj.top_hint_border_color})
+					UI.PopCliprect()
 				}
-				UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w-w_scrolling_area,obj.h-h_top_hint)
-				//a (shadowed) separation bar
-				UI.RoundRect({
-					x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
-					round:obj.top_hint_shadow_size,
-					border_width:-obj.top_hint_shadow_size,
-					color:obj.top_hint_shadow_color})
-				UI.RoundRect({
-					x:obj.x, y:obj.y+h_top_hint, w:obj.w-w_scrolling_area, h:obj.top_hint_border_width,
-					color:obj.top_hint_border_color})
-				UI.PopCliprect()
 			}
 			//minimap / scroll bar
 			if(w_scrolling_area>0){
@@ -1298,11 +1386,11 @@ W.CodeEditor=function(id,attrs){
 			//UI.RoundRect({
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:obj.h,
 			//	color:obj.separator_color})
+			W.Hotkey("",{key:"CTRL+F",action:function(){
+				obj.show_find_bar=1
+				UI.Refresh()
+			}})
 		}
-		W.Hotkey("",{key:"CTRL+F",action:function(){
-			obj.show_find_bar=1
-			UI.Refresh()
-		}})
 	UI.End()
 	return obj
 }
