@@ -261,7 +261,9 @@ UI.Theme_CustomWidget=function(C){
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
 			},
-			find_item_space_percentage:0.5,
+			//find_item_space_percentage:0.5,
+			find_item_scale:0.8,
+			find_item_expand_current:2,//in lines
 			find_item_separation:6,
 			find_item_border_width:0,
 			find_item_border_color:0xff444444,
