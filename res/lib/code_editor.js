@@ -745,16 +745,22 @@ W.CodeEditorWidget_prototype={
 	//todo: GetFindResult, scroll_x
 	//the virtual document doesn't include middle expansion
 	//middle-expand with fixed additional size to make it possible
-	ResetFindingContext:function(ccnt,sneedle,flags){
+	ResetFindingContext:function(sneedle,flags, force_ccnt){
+		var doc=this.doc
+		var ccnt=(force_ccnt==undefined?doc.sel1.ccnt:force_ccnt)
 		if(this.m_current_find_context){
+			if(force_ccnt&&force_ccnt==this.m_current_find_context.m_starting_ccnt0){
+				return;
+			}
 			this.m_current_find_context.Cancel()
 			this.m_current_find_context=undefined
 		}
 		if(!sneedle.length){
 			this.m_current_find_context=undefined
+			this.m_current_needle=undefined
 			return;
 		}
-		var doc=this.doc
+		this.m_current_needle=sneedle
 		var hc=UI.GetCharacterHeight(doc.font)
 		var ccnt_tot=doc.ed.GetTextSize()
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
@@ -767,7 +773,8 @@ W.CodeEditorWidget_prototype={
 			m_highlight_ranges:[],
 			m_locators:[],
 			m_owner:this,
-			m_starting_ccnt:ccnt,
+			m_starting_ccnt0:force_ccnt==undefined?doc.sel0.ccnt:ccnt,
+			m_starting_ccnt1:force_ccnt==undefined?doc.sel1.ccnt:ccnt,
 			m_current_point:0,
 			m_needle:sneedle,
 			m_flags:flags,
@@ -822,7 +829,10 @@ W.CodeEditorWidget_prototype={
 		ctx.m_mergable_ccnt_forward=doc.ed.SeekXY(1e17,y_id)
 		ctx.m_y_extent_backward=-hc
 		ctx.m_y_extent_forward=hc*2
-		this.AutoScrollFindItems();
+		if(force_ccnt==undefined){
+			this.AutoScrollFindItems();
+			UI.InvalidateCurrentFrame();
+		}
 	},
 	GetFindItem:function(id){
 		var ctx=this.m_current_find_context
@@ -835,7 +845,7 @@ W.CodeEditorWidget_prototype={
 			arr=ctx.m_merged_y_windows_forward
 		}
 		ofs<<=2
-		return {id:arr[ofs+0],doc_y:arr[ofs+1],scroll_y:arr[ofs+2],shared_h:arr[ofs+3]}
+		return {id:arr[ofs+0],visual_y:arr[ofs+1],scroll_y:arr[ofs+2],shared_h:arr[ofs+3]}
 	},
 	BisectFindItems:function(y){
 		var ctx=this.m_current_find_context
@@ -845,7 +855,7 @@ W.CodeEditorWidget_prototype={
 		while(l<=r){
 			var m=(l+r)>>1
 			var fitem=this.GetFindItem(m)
-			if(fitem.doc_y<=y){
+			if(fitem.visual_y<=y){
 				l=m+1;
 			}else{
 				r=m-1;
@@ -856,7 +866,7 @@ W.CodeEditorWidget_prototype={
 	GetMatchCcnt:function(id,side){
 		var ctx=this.m_current_find_context
 		if(id==0){
-			return ctx.m_starting_ccnt;
+			return side==0?ctx.m_starting_ccnt0:ctx.m_starting_ccnt1;
 		}else if(id<0){
 			var ofs=(id+1)*(-2)+side
 			if(ofs<ctx.m_backward_matches.length){
@@ -889,7 +899,7 @@ W.CodeEditorWidget_prototype={
 		if(r<l0){r=l0;}
 		var fitem_current=this.GetFindItem(r)
 		ctx.m_current_merged_item=r
-		ctx.m_current_visual_y=doc.ed.XYFromCcnt(this.GetMatchCcnt(id,0)).y-fitem_current.scroll_y+fitem_current.doc_y
+		ctx.m_current_visual_y=doc.ed.XYFromCcnt(this.GetMatchCcnt(id,0)).y-fitem_current.scroll_y+fitem_current.visual_y
 		////////////////////
 		var hc=UI.GetCharacterHeight(doc.font)
 		var find_shared_h=(this.h-this.h_find_bar)/this.find_item_scale-this.find_item_expand_current*hc
@@ -898,7 +908,7 @@ W.CodeEditorWidget_prototype={
 		doc.sel0.ccnt=this.GetMatchCcnt(id,0)
 		doc.sel1.ccnt=this.GetMatchCcnt(id,1)
 		doc.AutoScroll("show")
-		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,fitem_current.doc_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),fitem_current.doc_y-h_bof_eof_message_with_sep)
+		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,fitem_current.visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),fitem_current.visual_y-h_bof_eof_message_with_sep)
 		ctx.m_find_scroll_visual_y=Math.max(Math.min(ctx.m_find_scroll_visual_y,ctx.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),ctx.m_y_extent_backward-h_bof_eof_message_with_sep)
 	},
 	//visual y -> bsearch -> scroll_y -> ccnt -> bsearch -> match id
@@ -913,7 +923,7 @@ W.CodeEditorWidget_prototype={
 		while(l<=r){
 			var m=(l+r)>>1
 			var fitem=this.GetFindItem(m)
-			if(fitem.doc_y<=visual_y){
+			if(fitem.visual_y<=visual_y){
 				l=m+1;
 			}else{
 				r=m-1;
@@ -922,7 +932,7 @@ W.CodeEditorWidget_prototype={
 		if(r<l0){r=l0;}
 		//scroll_y -> ccnt
 		var fitem=this.GetFindItem(r)
-		var scroll_y=visual_y-fitem.doc_y+fitem.scroll_y
+		var scroll_y=visual_y-fitem.visual_y+fitem.scroll_y
 		var ccnt=doc.ed.SeekXY(scroll_x,scroll_y)
 		//ccnt -> bsearch -> match id
 		l0=-(ctx.m_backward_matches.length>>1)
@@ -940,7 +950,7 @@ W.CodeEditorWidget_prototype={
 		if(r<l0){r=l0;}
 		ctx.m_current_point=r
 	},
-	RenderVisibleFindItems:function(w_find_items,h_find_items, DrawItem){
+	RenderVisibleFindItems:function(w_line_numbers,w_find_items,h_find_items, DrawItem){
 		this.AutoScrollFindItems()
 		//do it here and now
 		var ctx=this.m_current_find_context
@@ -950,7 +960,7 @@ W.CodeEditorWidget_prototype={
 		var eps=hc/16;
 		var ccnt_middle=this.GetMatchCcnt(ctx.m_current_point,1)
 		var xy_middle=doc.ed.XYFromCcnt(ccnt_middle)
-		var find_scroll_x=Math.max(xy_middle.x-w_find_items,0)
+		var find_scroll_x=Math.max(xy_middle.x-(w_find_items-w_line_numbers),0)
 		var find_scroll_y=ctx.m_find_scroll_visual_y
 		var anim_node=W.AnimationNode("find_item_scrolling",{
 			scroll_x:find_scroll_x,
@@ -974,35 +984,35 @@ W.CodeEditorWidget_prototype={
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_backward
 			var current_y1=ctx.m_merged_y_windows_backward.pop()
 			var current_y0=ctx.m_merged_y_windows_backward.pop()
-			var current_doc_y=ctx.m_merged_y_windows_backward.pop()
+			var current_visual_y=ctx.m_merged_y_windows_backward.pop()
 			var current_id=ctx.m_merged_y_windows_backward.pop()
 			current_y1+=current_y0
 			for(var pmatch=p0;pmatch<ctx.m_backward_matches.length;pmatch+=2){
 				var ccnt_id=ctx.m_backward_matches[pmatch]
-				if(ccnt_id>=ccnt_merged_anyway){continue;}
+				if(ccnt_id>=ccnt_merged_anyway){current_id=-1-(pmatch>>1);continue;}
 				var y_id=doc.ed.XYFromCcnt(ccnt_id).y
 				var y_id0=Math.max(y_id-hc,0),y_id1=Math.min(y_id+hc*2,ytot)
 				if(y_id1>current_y0-eps){
 					//merge
-					current_doc_y-=Math.max(current_y0-y_id0,0)
+					current_visual_y-=Math.max(current_y0-y_id0,0)
 					current_id=-1-(pmatch>>1)
 					current_y0=y_id0
 				}else{
-					ctx.m_merged_y_windows_backward.push(current_id,current_doc_y,current_y0,current_y1-current_y0)
+					ctx.m_merged_y_windows_backward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
 					current_id=-1-(pmatch>>1)
 					current_y0=y_id0
 					current_y1=y_id1
-					current_doc_y-=y_id1-y_id0+this.find_item_separation
+					current_visual_y-=y_id1-y_id0+this.find_item_separation
 				}
 				ccnt_merged_anyway=doc.ed.SeekXY(0,y_id)
 			}
-			ctx.m_merged_y_windows_backward.push(current_id,current_doc_y,current_y0,current_y1-current_y0)
+			ctx.m_merged_y_windows_backward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
 			ctx.m_mergable_ccnt_backward=ccnt_merged_anyway
 			ctx.m_merged_y_windows_forward[0]=ctx.m_merged_y_windows_backward[0]
 			ctx.m_merged_y_windows_forward[1]=ctx.m_merged_y_windows_backward[1]
 			ctx.m_merged_y_windows_forward[2]=ctx.m_merged_y_windows_backward[2]
 			ctx.m_merged_y_windows_forward[3]=ctx.m_merged_y_windows_backward[3]
-			ctx.m_y_extent_backward=current_doc_y
+			ctx.m_y_extent_backward=current_visual_y
 			if(ctx.m_home_end=='home'){
 				ctx.m_current_point=-(ctx.m_backward_matches.length>>1)
 			}
@@ -1014,7 +1024,7 @@ W.CodeEditorWidget_prototype={
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_forward
 			var current_y1=ctx.m_merged_y_windows_forward.pop()
 			var current_y0=ctx.m_merged_y_windows_forward.pop()
-			var current_doc_y=ctx.m_merged_y_windows_forward.pop()
+			var current_visual_y=ctx.m_merged_y_windows_forward.pop()
 			var current_id=ctx.m_merged_y_windows_forward.pop()
 			current_y1+=current_y0
 			for(var pmatch=p0;pmatch<ctx.m_forward_matches.length;pmatch+=2){
@@ -1026,21 +1036,21 @@ W.CodeEditorWidget_prototype={
 					//merge
 					current_y1=y_id1
 				}else{
-					ctx.m_merged_y_windows_forward.push(current_id,current_doc_y,current_y0,current_y1-current_y0)
-					current_doc_y+=current_y1-current_y0+this.find_item_separation
+					ctx.m_merged_y_windows_forward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
+					current_visual_y+=current_y1-current_y0+this.find_item_separation
 					current_id=(pmatch>>1)+1
 					current_y0=y_id0
 					current_y1=y_id1
 				}
 				ccnt_merged_anyway=doc.ed.SeekXY(1e17,y_id)
 			}
-			ctx.m_merged_y_windows_forward.push(current_id,current_doc_y,current_y0,current_y1-current_y0)
+			ctx.m_merged_y_windows_forward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
 			ctx.m_mergable_ccnt_forward=ccnt_merged_anyway
 			ctx.m_merged_y_windows_backward[0]=ctx.m_merged_y_windows_forward[0]
 			ctx.m_merged_y_windows_backward[1]=ctx.m_merged_y_windows_forward[1]
 			ctx.m_merged_y_windows_backward[2]=ctx.m_merged_y_windows_forward[2]
 			ctx.m_merged_y_windows_backward[3]=ctx.m_merged_y_windows_forward[3]
-			ctx.m_y_extent_forward=current_doc_y+current_y1-current_y0
+			ctx.m_y_extent_forward=current_visual_y+current_y1-current_y0
 			if(ctx.m_home_end=='end'){
 				ctx.m_current_point=(ctx.m_forward_matches.length>>1)
 			}
@@ -1116,7 +1126,9 @@ var ffindbar_plugin=function(){
 	})
 	this.AddEventHandler('change',function(){
 		var obj=this.owner
-		obj.ResetFindingContext(obj.doc.sel1.ccnt,this.ed.GetText(),obj.find_flags)
+		obj.doc.sel0.ccnt=obj.m_sel0_before_find
+		obj.doc.sel1.ccnt=obj.m_sel1_before_find
+		obj.ResetFindingContext(this.ed.GetText(),obj.find_flags)
 	})
 	this.AddEventHandler('UP',function(){
 		var obj=this.owner
@@ -1298,6 +1310,34 @@ W.CodeEditor=function(id,attrs){
 			var line_ccnts=doc.SeekAllLinesBetween(line_current,line_current+2)
 			doc.cur_line_p0.ccnt=line_ccnts[0];
 			doc.cur_line_p1.ccnt=line_ccnts[1];
+			//find highlight
+			if(!obj.show_find_bar&&obj.m_current_needle){
+				//repeat the animation to get correct the correct scrolling information
+				UI.Begin(doc)
+					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
+						scroll_x:doc.scroll_x,
+						scroll_y:doc.scroll_y})
+				UI.End("temp")
+				doc.visible_scroll_x=anim.scroll_x
+				doc.visible_scroll_y=anim.scroll_y
+				var scroll_x=doc.visible_scroll_x;
+				var scroll_y=doc.visible_scroll_y;
+				var area_w=doc.w
+				var area_h=doc.h
+				var rendering_ccnt0=doc.SeekXY(scroll_x,scroll_y)
+				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,scroll_y+area_h)
+				obj.ResetFindingContext(obj.m_current_needle,obj.find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
+				var ctx=obj.m_current_find_context
+				current_find_context=ctx
+				if(ctx.m_backward_frontier>=0&&ctx.m_backward_frontier>rendering_ccnt0){
+					ctx.m_backward_frontier=UI.ED_Search(doc.ed,ctx.m_backward_frontier,-1,ctx.m_needle,ctx.m_flags,65536,ctx.ReportMatchBackward,ctx)
+					UI.Refresh()
+				}
+				if(ctx.m_forward_frontier>=0&&ctx.m_forward_frontier<rendering_ccnt1){
+					ctx.m_forward_frontier=UI.ED_Search(doc.ed,ctx.m_forward_frontier,1,ctx.m_needle,ctx.m_flags,65536,ctx.ReportMatchForward,ctx);
+					UI.Refresh()
+				}
+			}
 		}
 		//hopefully 8 is the widest char
 		if(obj.show_line_numbers){
@@ -1329,8 +1369,8 @@ W.CodeEditor=function(id,attrs){
 			var find_item_scroll_x=undefined
 			var w_document=obj.w-w_scrolling_area-w_line_numbers
 			var DrawFindItemBox=function(y,h){
-				UI.RoundRect({color:obj.line_number_bgcolor,x:0,y:y,w:w_line_numbers/obj.find_item_scale,h:h})
-				UI.RoundRect({color:obj.bgcolor,x:0+w_line_numbers/obj.find_item_scale,y:y,w:w_document/obj.find_item_scale,h:h})
+				UI.RoundRect({color:obj.line_number_bgcolor,x:0,y:y,w:w_line_numbers,h:h})
+				UI.RoundRect({color:obj.bgcolor,x:0+w_line_numbers,y:y,w:(obj.w-w_scrolling_area)/obj.find_item_scale,h:h})
 				UI.RoundRect({x:0,y:y,w:(obj.w-w_scrolling_area)/obj.find_item_scale,h:h,
 					color:0,border_color:obj.find_item_border_color,border_width:obj.find_item_border_width})
 				UI.PushCliprect(0,y+h,(obj.w-w_scrolling_area)/obj.find_item_scale,obj.find_item_separation)
@@ -1354,6 +1394,9 @@ W.CodeEditor=function(id,attrs){
 				doc.visible_scroll_x=anim.scroll_x
 				doc.visible_scroll_y=anim.scroll_y
 			}else{
+				//if(!?){
+				//	!? //this.m_current_needle
+				//}
 				W.Edit("doc",{
 					///////////////
 					language:g_language_C,//todo
@@ -1367,6 +1410,7 @@ W.CodeEditor=function(id,attrs){
 				doc=obj.doc
 				doc.OnLoad=obj.OnLoad.bind(obj)
 				doc.StartLoading(obj.file_name)
+				UI.InvalidateCurrentFrame()
 			}
 			//prepare bookmarks - they appear under line numbers
 			var bm_ccnts=[]
@@ -1440,20 +1484,20 @@ W.CodeEditor=function(id,attrs){
 				var h_expand_max=hc*obj.find_item_expand_current
 				var render_secs=0,ln_secs=0;
 				//DrawItem
-				obj.RenderVisibleFindItems(w_find_items,h_find_items,function(find_item_i,find_scroll_x,find_scroll_y,h_expand){
+				obj.RenderVisibleFindItems(w_line_numbers+obj.padding,w_find_items,h_find_items,function(find_item_i,find_scroll_x,find_scroll_y,h_expand){
 					var doc_h=find_item_i.shared_h+h_expand
 					var doc_scroll_y=Math.max(Math.min(find_item_i.scroll_y-h_expand*0.5,ytot-doc_h),0)
-					DrawFindItemBox(find_item_i.doc_y-find_scroll_y-h_expand*0.5,doc_h)
+					DrawFindItemBox(find_item_i.visual_y-find_scroll_y-h_expand*0.5,doc_h)
 					var tick0=Duktape.__ui_get_tick()
 					doc.ed.Render({x:find_scroll_x,y:doc_scroll_y,w:w_find_items,h:doc_h,
-						scr_x:w_line_numbers*UI.pixels_per_unit/obj.find_item_scale,scr_y:(find_item_i.doc_y-find_scroll_y-h_expand*0.5)*UI.pixels_per_unit, scale:UI.pixels_per_unit, obj:doc});
+						scr_x:(w_line_numbers+obj.padding)*UI.pixels_per_unit,scr_y:(find_item_i.visual_y-find_scroll_y-h_expand*0.5)*UI.pixels_per_unit, scale:UI.pixels_per_unit, obj:doc});
 					var tick1=Duktape.__ui_get_tick()
 					DrawLineNumbers(find_scroll_x,doc_scroll_y,
-						doc.w,find_item_i.doc_y-find_scroll_y-h_expand*0.5,doc_h);
+						doc.w,find_item_i.visual_y-find_scroll_y-h_expand*0.5,doc_h);
 					var tick2=Duktape.__ui_get_tick()
 					render_secs+=Duktape.__ui_seconds_between_ticks(tick0,tick1)
 					ln_secs+=Duktape.__ui_seconds_between_ticks(tick1,tick2)
-					DrawFindItemHighlight(find_item_i.doc_y-find_scroll_y-h_expand*0.5,doc_h,h_expand/h_expand_max)
+					DrawFindItemHighlight(find_item_i.visual_y-find_scroll_y-h_expand*0.5,doc_h,h_expand/h_expand_max)
 				})
 				//print(render_secs*1000,ln_secs*1000)
 				UI.PopSubWindow()
@@ -1513,7 +1557,7 @@ W.CodeEditor=function(id,attrs){
 					value:(obj.find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
-						obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.find_bar_edit.ed.GetText(),obj.find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.find_flags)
 					}})
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_word",{style:UI.default_styles.check_button,
@@ -1522,7 +1566,7 @@ W.CodeEditor=function(id,attrs){
 					value:(obj.find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
-						obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.find_bar_edit.ed.GetText(),obj.find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.find_flags)
 					}})
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_regexp",{style:UI.default_styles.check_button,
@@ -1531,19 +1575,30 @@ W.CodeEditor=function(id,attrs){
 					value:(obj.find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
-						obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.find_bar_edit.ed.GetText(),obj.find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.find_flags)
 					}})
 				var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
 				var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
+				var previous_edit=obj.find_bar_edit
 				W.Edit("find_bar_edit",{language:doc.language,style:obj.find_bar_editor_style,
 					x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 					owner:obj,
 					plugins:[ffindbar_plugin]
 				},W.CodeEditor_prototype);
-				if(UI.nd_focus==doc){
+				if(!previous_edit){
+					if(obj.m_current_needle){
+						obj.find_bar_edit.ed.Edit([0,0,obj.m_current_needle],1)
+						obj.find_bar_edit.sel0.ccnt=0
+						obj.find_bar_edit.sel1.ccnt=obj.find_bar_edit.ed.GetTextSize()
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.find_flags)
+					}
 					UI.SetFocus(obj.find_bar_edit);
 					UI.Refresh()
 				}
+				//if(UI.nd_focus==doc){
+				//	UI.SetFocus(obj.find_bar_edit);
+				//	UI.Refresh()
+				//}
 				if(!obj.find_bar_edit.ed.GetTextSize()){
 					W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 						font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
@@ -1628,12 +1683,16 @@ W.CodeEditor=function(id,attrs){
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:obj.h,
 			//	color:obj.separator_color})
 			W.Hotkey("",{key:"CTRL+F",action:function(){
+				var sel=obj.doc.GetSelection()
 				obj.show_find_bar=1
 				obj.m_sel0_before_find=obj.doc.sel0.ccnt
 				obj.m_sel1_before_find=obj.doc.sel1.ccnt
-				if(obj.m_current_find_context){
-					obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.m_current_find_context.m_needle,obj.find_flags)
+				if(sel[0]<sel[1]){
+					obj.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
 				}
+				//if(obj.m_current_find_context){
+				//	obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.m_current_find_context.m_needle,obj.find_flags)
+				//}
 				UI.Refresh()
 			}})
 		}

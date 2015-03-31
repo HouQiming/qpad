@@ -404,6 +404,7 @@ class CLayouter_programmer
 				x=(x/wrap_width+1LL)*wrap_width
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
+				if iy*hc-scroll_y>=clip_h:break
 			else if ch=='\r':
 				//nothing
 				continue
@@ -428,6 +429,7 @@ class CLayouter_programmer
 				if ix>=wrap_width:
 					ix-=wrap_width
 					iy++
+					if iy*hc-scroll_y>=clip_h:break
 		testOverlay()
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
