@@ -51,7 +51,7 @@ W.TabLabel=function(id,attrs){
 	UI.Begin(obj)
 		if(obj.selected){
 			UI.RoundRect({
-				x:obj.x-obj.shadow_size,y:obj.y-obj.shadow_size,w:obj.w+obj.shadow_size*2,h:obj.h+obj.shadow_size*2,
+				x:obj.x,y:obj.y-obj.shadow_size*0.5,w:obj.w+obj.shadow_size,h:obj.h+obj.shadow_size*1.5,
 				color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size,
 			})
 			UI.RoundRect({
@@ -241,10 +241,10 @@ W.SaveDialog=function(id,attrs){
 		if(obj.value){
 			var region=W.Region("savedlg_region",{x:obj.x,y:obj.y,w:obj.w,h:obj.h})
 			UI.SetFocus(region)
-			var s_text0="It's not saved yet, so..."
-			var s_text_y="Save"
-			var s_text_n="Don't save"
-			var s_text_c="Cancel"
+			var s_text0=UI._("It's not saved yet, so...")
+			var s_text_y=UI._("Save")
+			var s_text_n=UI._("Don't save")
+			var s_text_c=UI._("Cancel")
 			var sz_text=UI.MeasureText(obj.font_text,s_text0)
 			var sz_buttons=UI.MeasureText(obj.font_buttons,s_text_y)
 			sz_buttons.w+=UI.MeasureText(obj.font_buttons,s_text_n).w

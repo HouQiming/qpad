@@ -19,6 +19,7 @@ var g_language_C=Language.Define(function(lang){
 	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
 	var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 	var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
+	var bid_preprocessor=lang.ColoredDelimiter("key","#","\n","color_meta");
 	var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
 	lang.DefineToken("\\\\")
 	lang.DefineToken("\\'")
@@ -30,8 +31,8 @@ var g_language_C=Language.Define(function(lang){
 	kwset.DefineWordColor("color")
 	kwset.DefineWordType("color_number","0-9")
 	return (function(lang){
-		lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2]);
-		if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)){
+		lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2,bid_preprocessor]);
+		if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)||lang.isInside(bid_preprocessor)){
 			lang.Disable(bid_bracket);
 		}else{
 			lang.Enable(bid_bracket);
@@ -332,6 +333,7 @@ W.UIEditor=function(id,attrs){
 			color_keyword:0xffb4771f,
 			color_type:0xffbc470f,
 			color_symbol:0xff7f7f7f,
+			color_meta:0xff9a3d6a,
 			///////////////
 			OnSelectionChange:function(){
 				var code_box=obj.doc;
@@ -557,6 +559,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		for(var i=0;i<this.m_unkeyed_bookmarks.length;i++){
 			var bm=this.m_unkeyed_bookmarks[i];
+			if(!bm){continue;}
 			var dist=(bm.ccnt-ccnt)*direction;
 			if(dist>=0&&!(best<dist)){
 				best=dist
@@ -686,6 +689,7 @@ W.CodeEditorWidget_prototype={
 		if(loaded_metadata.sel0){doc.sel0.ccnt=Math.max(Math.min(loaded_metadata.sel0,doc.ed.GetTextSize()),0);}
 		if(loaded_metadata.sel1){doc.sel1.ccnt=Math.max(Math.min(loaded_metadata.sel1,doc.ed.GetTextSize()),0);}
 		doc.AutoScroll("center")
+		doc.scrolling_animation=undefined
 		UI.Refresh()
 	},
 	SaveMetaData:function(){
@@ -746,11 +750,16 @@ W.CodeEditorWidget_prototype={
 			this.m_current_find_context.Cancel()
 			this.m_current_find_context=undefined
 		}
+		if(!sneedle.length){
+			this.m_current_find_context=undefined
+			return;
+		}
 		var doc=this.doc
 		var hc=UI.GetCharacterHeight(doc.font)
 		var ccnt_tot=doc.ed.GetTextSize()
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 		var ctx={
+			m_is_just_reset:1,
 			m_forward_matches:[],
 			m_forward_frontier:ccnt,
 			m_backward_matches:[],
@@ -762,7 +771,7 @@ W.CodeEditorWidget_prototype={
 			m_current_point:0,
 			m_needle:sneedle,
 			m_flags:flags,
-			m_find_scrolling_y:-(this.h/this.find_item_scale-this.find_item_expand_current*hc)*0.5,
+			m_find_scroll_visual_y:-(this.h/this.find_item_scale-this.find_item_expand_current*hc)*0.5,
 			///////////////////////////////
 			m_merged_y_windows_backward:[],
 			m_merged_y_windows_forward:[],
@@ -813,6 +822,7 @@ W.CodeEditorWidget_prototype={
 		ctx.m_mergable_ccnt_forward=doc.ed.SeekXY(1e17,y_id)
 		ctx.m_y_extent_backward=-hc
 		ctx.m_y_extent_forward=hc*2
+		this.AutoScrollFindItems();
 	},
 	GetFindItem:function(id){
 		var ctx=this.m_current_find_context
@@ -829,7 +839,8 @@ W.CodeEditorWidget_prototype={
 	},
 	BisectFindItems:function(y){
 		var ctx=this.m_current_find_context
-		var l=-((ctx.m_merged_y_windows_backward.length>>2)-1)
+		var l0=-((ctx.m_merged_y_windows_backward.length>>2)-1);
+		var l=l0;
 		var r=(ctx.m_merged_y_windows_forward.length>>2)-1
 		while(l<=r){
 			var m=(l+r)>>1
@@ -840,32 +851,7 @@ W.CodeEditorWidget_prototype={
 				r=m-1;
 			}
 		}
-		return r;
-	},
-	AutoScrollFindItems:function(){
-		var ctx=this.m_current_find_context
-		var l=-((ctx.m_merged_y_windows_backward.length>>2)-1)
-		var r=(ctx.m_merged_y_windows_forward.length>>2)-1
-		var id=ctx.m_current_point
-		while(l<=r){
-			var m=(l+r)>>1
-			var fitem=this.GetFindItem(m)
-			if(fitem.id<=id){
-				l=m+1;
-			}else{
-				r=m-1;
-			}
-		}
-		ctx.m_current_merged_item=r
-		var fitem_current=this.GetFindItem(r)
-		////////////////////
-		var doc=this.doc
-		var hc=UI.GetCharacterHeight(doc.font)
-		var find_shared_h=(this.h-this.h_find_bar)/this.find_item_scale-this.find_item_expand_current*hc
-		doc.sel0.ccnt=this.GetMatchCcnt(id,0)
-		doc.sel1.ccnt=this.GetMatchCcnt(id,1)
-		ctx.m_find_scrolling_y=Math.min(Math.max(ctx.m_find_scrolling_y,fitem_current.doc_y+fitem_current.shared_h-find_shared_h),fitem_current.doc_y)
-		///////////
+		return Math.max(r,l0);
 	},
 	GetMatchCcnt:function(id,side){
 		var ctx=this.m_current_find_context
@@ -884,28 +870,105 @@ W.CodeEditorWidget_prototype={
 		}
 		return undefined
 	},
+	AutoScrollFindItems:function(){
+		var doc=this.doc
+		var ctx=this.m_current_find_context
+		var l0=-((ctx.m_merged_y_windows_backward.length>>2)-1)
+		var l=l0
+		var r=(ctx.m_merged_y_windows_forward.length>>2)-1
+		var id=ctx.m_current_point
+		while(l<=r){
+			var m=(l+r)>>1
+			var fitem=this.GetFindItem(m)
+			if(fitem.id<=id){
+				l=m+1;
+			}else{
+				r=m-1;
+			}
+		}
+		if(r<l0){r=l0;}
+		var fitem_current=this.GetFindItem(r)
+		ctx.m_current_merged_item=r
+		ctx.m_current_visual_y=doc.ed.XYFromCcnt(this.GetMatchCcnt(id,0)).y-fitem_current.scroll_y+fitem_current.doc_y
+		////////////////////
+		var hc=UI.GetCharacterHeight(doc.font)
+		var find_shared_h=(this.h-this.h_find_bar)/this.find_item_scale-this.find_item_expand_current*hc
+		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(this.find_message_font)+this.find_item_separation*2
+		ctx.m_current_visual_h=find_shared_h
+		doc.sel0.ccnt=this.GetMatchCcnt(id,0)
+		doc.sel1.ccnt=this.GetMatchCcnt(id,1)
+		doc.AutoScroll("show")
+		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,fitem_current.doc_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),fitem_current.doc_y-h_bof_eof_message_with_sep)
+		ctx.m_find_scroll_visual_y=Math.max(Math.min(ctx.m_find_scroll_visual_y,ctx.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),ctx.m_y_extent_backward-h_bof_eof_message_with_sep)
+	},
+	//visual y -> bsearch -> scroll_y -> ccnt -> bsearch -> match id
+	SeekFindItemByVisualY:function(visual_y,scroll_x){
+		var ctx=this.m_current_find_context
+		var doc=this.doc
+		//visual y -> bsearch -> scroll_y
+		var l0=-((ctx.m_merged_y_windows_backward.length>>2)-1);
+		var l=l0;
+		var r=(ctx.m_merged_y_windows_forward.length>>2)-1
+		var id=ctx.m_current_point
+		while(l<=r){
+			var m=(l+r)>>1
+			var fitem=this.GetFindItem(m)
+			if(fitem.doc_y<=visual_y){
+				l=m+1;
+			}else{
+				r=m-1;
+			}
+		}
+		if(r<l0){r=l0;}
+		//scroll_y -> ccnt
+		var fitem=this.GetFindItem(r)
+		var scroll_y=visual_y-fitem.doc_y+fitem.scroll_y
+		var ccnt=doc.ed.SeekXY(scroll_x,scroll_y)
+		//ccnt -> bsearch -> match id
+		l0=-(ctx.m_backward_matches.length>>1)
+		l=l0
+		r=(ctx.m_forward_matches.length>>1)
+		while(l<=r){
+			var m=(l+r)>>1
+			var ccnt_m=this.GetMatchCcnt(m,0)
+			if(ccnt_m<=ccnt){
+				l=m+1;
+			}else{
+				r=m-1;
+			}
+		}
+		if(r<l0){r=l0;}
+		ctx.m_current_point=r
+	},
 	RenderVisibleFindItems:function(w_find_items,h_find_items, DrawItem){
 		this.AutoScrollFindItems()
 		//do it here and now
 		var ctx=this.m_current_find_context
 		var doc=this.doc
 		var hc=UI.GetCharacterHeight(doc.font)
+		var h_bof_eof_message=UI.GetCharacterHeight(this.find_message_font)+this.find_item_separation
 		var eps=hc/16;
 		var ccnt_middle=this.GetMatchCcnt(ctx.m_current_point,1)
 		var xy_middle=doc.ed.XYFromCcnt(ccnt_middle)
 		var find_scroll_x=Math.max(xy_middle.x-w_find_items,0)
-		var find_scroll_y=ctx.m_find_scrolling_y
+		var find_scroll_y=ctx.m_find_scroll_visual_y
 		var anim_node=W.AnimationNode("find_item_scrolling",{
 			scroll_x:find_scroll_x,
 			scroll_y:find_scroll_y,
 		})
 		find_scroll_x=anim_node.scroll_x
 		find_scroll_y=anim_node.scroll_y
+		if(ctx.m_is_just_reset){
+			//don't animate the first round
+			ctx.m_is_just_reset=0;
+			this.find_item_scrolling=undefined;
+		}
 		var find_shared_h=h_find_items
 		var ccnt_tot=doc.ed.GetTextSize()
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
-		var h_safety=hc*this.find_item_expand_current
-		if(find_scroll_y<ctx.m_y_extent_backward+h_safety&&ctx.m_backward_frontier>=0){
+		var h_safety=hc*this.find_item_expand_current;
+		var h_safety_internal=h_safety+h_find_items//for page up/down
+		if(find_scroll_y<ctx.m_y_extent_backward+h_safety_internal&&ctx.m_backward_frontier>=0){
 			var p0=ctx.m_backward_matches.length
 			ctx.m_backward_frontier=UI.ED_Search(doc.ed,ctx.m_backward_frontier,-1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchBackward,ctx)
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_backward
@@ -921,7 +984,7 @@ W.CodeEditorWidget_prototype={
 				var y_id0=Math.max(y_id-hc,0),y_id1=Math.min(y_id+hc*2,ytot)
 				if(y_id1>current_y0-eps){
 					//merge
-					current_doc_y+=y_id0-current_y0
+					current_doc_y-=Math.max(current_y0-y_id0,0)
 					current_id=-1-(pmatch>>1)
 					current_y0=y_id0
 				}else{
@@ -940,9 +1003,12 @@ W.CodeEditorWidget_prototype={
 			ctx.m_merged_y_windows_forward[2]=ctx.m_merged_y_windows_backward[2]
 			ctx.m_merged_y_windows_forward[3]=ctx.m_merged_y_windows_backward[3]
 			ctx.m_y_extent_backward=current_doc_y
+			if(ctx.m_home_end=='home'){
+				ctx.m_current_point=-(ctx.m_backward_matches.length>>1)
+			}
 			UI.Refresh()
 		}
-		if(find_scroll_y+find_shared_h>ctx.m_y_extent_forward-h_safety&&ctx.m_forward_frontier>=0){
+		if(find_scroll_y+find_shared_h>ctx.m_y_extent_forward-h_safety_internal&&ctx.m_forward_frontier>=0){
 			var p0=ctx.m_forward_matches.length
 			ctx.m_forward_frontier=UI.ED_Search(doc.ed,ctx.m_forward_frontier,1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchForward,ctx);
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_forward
@@ -975,10 +1041,29 @@ W.CodeEditorWidget_prototype={
 			ctx.m_merged_y_windows_backward[2]=ctx.m_merged_y_windows_forward[2]
 			ctx.m_merged_y_windows_backward[3]=ctx.m_merged_y_windows_forward[3]
 			ctx.m_y_extent_forward=current_doc_y+current_y1-current_y0
+			if(ctx.m_home_end=='end'){
+				ctx.m_current_point=(ctx.m_forward_matches.length>>1)
+			}
+			UI.Refresh()
 		}
 		var p0=this.BisectFindItems(find_scroll_y-h_safety)
 		var p1=this.BisectFindItems(find_scroll_y+find_shared_h+h_safety)
 		var ret=[]
+		if(p0==-((ctx.m_merged_y_windows_backward.length>>2)-1)){
+			//BOF
+			var s_bof_message;
+			if(ctx.m_backward_frontier>=0){
+				s_bof_message=UI._("Searching @1%").replace("@1",((1-ctx.m_backward_frontier/ccnt_tot)*100).toFixed(0))
+			}else{
+				s_bof_message=UI._("No more matches above")
+			}
+			var text_dim=UI.MeasureText(this.find_message_font,s_bof_message)
+			var y=ctx.m_y_extent_backward-find_scroll_y-h_bof_eof_message
+			W.Text("",{
+				x:(w_find_items-text_dim.w)*0.5,y:y,
+				font:this.find_message_font,color:this.find_message_color,
+				text:s_bof_message})
+		}
 		for(var i=p0;i<=p1;i++){
 			var find_item_i=this.GetFindItem(i)
 			var h_expand=0
@@ -993,6 +1078,21 @@ W.CodeEditorWidget_prototype={
 			DrawItem(find_item_i, find_scroll_x,find_scroll_y,h_expand)
 			find_scroll_y-=h_expand*0.5
 		}
+		if(p1==(ctx.m_merged_y_windows_forward.length>>2)-1){
+			//EOF
+			var s_eof_message;
+			if(ctx.m_forward_frontier>=0){
+				s_eof_message=UI._("Searching @1%").replace("@1",((ctx.m_forward_frontier/ccnt_tot)*100).toFixed(0))
+			}else{
+				s_eof_message=UI._("No more matches below")
+			}
+			var text_dim=UI.MeasureText(this.find_message_font,s_eof_message)
+			var y=ctx.m_y_extent_forward-find_scroll_y+this.find_item_separation
+			W.Text("",{
+				x:(w_find_items-text_dim.w)*0.5,y:y,
+				font:this.find_message_font,color:this.find_message_color,
+				text:s_eof_message})
+		}
 		return ret
 	},
 }
@@ -1001,6 +1101,17 @@ var ffindbar_plugin=function(){
 	this.AddEventHandler('ESC',function(){
 		var obj=this.owner
 		obj.show_find_bar=0;
+		obj.doc.sel0.ccnt=obj.m_sel0_before_find
+		obj.doc.sel1.ccnt=obj.m_sel1_before_find
+		obj.doc.AutoScroll('center')
+		obj.doc.scrolling_animation=undefined
+		UI.Refresh()
+	})
+	this.AddEventHandler('RETURN',function(){
+		var obj=this.owner
+		obj.show_find_bar=0;
+		obj.doc.AutoScroll('center')
+		obj.doc.scrolling_animation=undefined
 		UI.Refresh()
 	})
 	this.AddEventHandler('change',function(){
@@ -1011,6 +1122,7 @@ var ffindbar_plugin=function(){
 		var obj=this.owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
+			ctx.m_home_end=undefined;
 			if(ctx.m_current_point>-((ctx.m_backward_matches.length>>1))){
 				ctx.m_current_point--
 				obj.AutoScrollFindItems()
@@ -1022,6 +1134,7 @@ var ffindbar_plugin=function(){
 		var obj=this.owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
+			ctx.m_home_end=undefined;
 			if(ctx.m_current_point<(ctx.m_forward_matches.length>>1)){
 				ctx.m_current_point++
 				obj.AutoScrollFindItems()
@@ -1029,6 +1142,50 @@ var ffindbar_plugin=function(){
 			}
 		}
 	})
+	//////////////////////////////////////////////////
+	this.AddEventHandler('PGUP',function(){
+		var obj=this.owner
+		if(obj.m_current_find_context){
+			var ctx=obj.m_current_find_context
+			ctx.m_find_scroll_visual_y-=ctx.m_current_visual_h
+			obj.SeekFindItemByVisualY(ctx.m_current_visual_y-ctx.m_current_visual_h,1e17)
+			ctx.m_home_end=undefined;
+			obj.AutoScrollFindItems()
+			UI.Refresh()
+		}
+	})
+	this.AddEventHandler('PGDN',function(){
+		var obj=this.owner
+		if(obj.m_current_find_context){
+			var ctx=obj.m_current_find_context
+			ctx.m_find_scroll_visual_y+=ctx.m_current_visual_h
+			obj.SeekFindItemByVisualY(ctx.m_current_visual_y+ctx.m_current_visual_h,0)
+			ctx.m_home_end=undefined;
+			obj.AutoScrollFindItems()
+			UI.Refresh()
+		}
+	})
+	this.AddEventHandler('CTRL+HOME',function(){
+		var obj=this.owner
+		if(obj.m_current_find_context){
+			var ctx=obj.m_current_find_context
+			obj.SeekFindItemByVisualY(ctx.m_y_extent_backward,0)
+			ctx.m_home_end='home';
+			obj.AutoScrollFindItems()
+			UI.Refresh()
+		}
+	})
+	this.AddEventHandler('CTRL+END',function(){
+		var obj=this.owner
+		if(obj.m_current_find_context){
+			var ctx=obj.m_current_find_context
+			obj.SeekFindItemByVisualY(ctx.m_y_extent_forward,1e17)
+			ctx.m_home_end='end';
+			obj.AutoScrollFindItems()
+			UI.Refresh()
+		}
+	})
+	//ctx.m_current_visual_y
 	//todo: main editor onchange should invalidate the find context
 }
 
@@ -1038,6 +1195,7 @@ W.CodeEditor=function(id,attrs){
 		//main code area
 		var doc=obj.doc
 		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,w_scrolling_area=0,y_top_hint_scroll=0;
+		var h_scrolling_area=obj.h
 		var h_top_find=0,h_bottom_find=0
 		var editor_style=UI.default_styles.code_editor.editor_style
 		var top_hint_bbs=[]
@@ -1118,6 +1276,12 @@ W.CodeEditor=function(id,attrs){
 			}
 			obj.h_top_hint=h_top_hint
 			if(h_top_hint-prev_h_top_hint){
+				if(doc.scrolling_animation){
+					var anim=doc.scrolling_animation
+					if(anim.transition_current_frame){anim.transition_current_frame.scroll_y+=h_top_hint-prev_h_top_hint;}
+					if(anim.transition_frame0){anim.transition_frame0.scroll_y+=h_top_hint-prev_h_top_hint;}
+					if(anim.transition_frame1){anim.transition_frame1.scroll_y+=h_top_hint-prev_h_top_hint;}
+				}
 				doc.scroll_y+=h_top_hint-prev_h_top_hint
 				doc.h=obj.h-h_top_hint
 				if(!UI.nd_captured){doc.AutoScroll("show");}
@@ -1170,7 +1334,7 @@ W.CodeEditor=function(id,attrs){
 				UI.RoundRect({x:0,y:y,w:(obj.w-w_scrolling_area)/obj.find_item_scale,h:h,
 					color:0,border_color:obj.find_item_border_color,border_width:obj.find_item_border_width})
 				UI.PushCliprect(0,y+h,(obj.w-w_scrolling_area)/obj.find_item_scale,obj.find_item_separation)
-					UI.RoundRect({x:0-obj.find_item_shadow_size,y:y+h-obj.find_item_shadow_size,w:obj.w-w_scrolling_area+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
+					UI.RoundRect({x:0-obj.find_item_shadow_size,y:y+h-obj.find_item_shadow_size,w:(obj.w-w_scrolling_area)/obj.find_item_scale+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
 						color:obj.find_item_shadow_color,
 						round:obj.find_item_shadow_size,
 						border_width:-obj.find_item_shadow_size})
@@ -1182,6 +1346,13 @@ W.CodeEditor=function(id,attrs){
 			}
 			if(obj.show_find_bar&&current_find_context){
 				obj.__children.push(doc)
+				UI.Begin(doc)
+					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
+						scroll_x:doc.scroll_x,
+						scroll_y:doc.scroll_y})
+				UI.End()
+				doc.visible_scroll_x=anim.scroll_x
+				doc.visible_scroll_y=anim.scroll_y
 			}else{
 				W.Edit("doc",{
 					///////////////
@@ -1219,7 +1390,6 @@ W.CodeEditor=function(id,attrs){
 				bm_ccnts.sort(function(a,b){return (a[1]*10+a[0])-(b[1]*10+b[0]);});
 				bm_xys=doc.ed.GetXYEnMasse(bm_ccnts.map(function(a){return a[1]}))
 			}
-			//todo: at-scrollbar, potentially numbered marks 'b'
 			//general annotation system after find - f3 / shift-f3
 			//generic drawing function
 			var line_current=doc.GetLC(doc.sel1.ccnt)[0]
@@ -1262,6 +1432,62 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//the find bar and stuff
+			if(obj.show_find_bar&&current_find_context){
+				//draw the find items
+				UI.PushSubWindow(obj.x,obj.y+obj.h_find_bar,obj.w-w_scrolling_area,obj.h-obj.h_find_bar,obj.find_item_scale)
+				var hc=UI.GetCharacterHeight(doc.font)
+				var w_find_items=(obj.w-w_scrolling_area)/obj.find_item_scale, h_find_items=(obj.h-obj.h_find_bar)/obj.find_item_scale-obj.find_item_expand_current*hc;
+				var h_expand_max=hc*obj.find_item_expand_current
+				var render_secs=0,ln_secs=0;
+				//DrawItem
+				obj.RenderVisibleFindItems(w_find_items,h_find_items,function(find_item_i,find_scroll_x,find_scroll_y,h_expand){
+					var doc_h=find_item_i.shared_h+h_expand
+					var doc_scroll_y=Math.max(Math.min(find_item_i.scroll_y-h_expand*0.5,ytot-doc_h),0)
+					DrawFindItemBox(find_item_i.doc_y-find_scroll_y-h_expand*0.5,doc_h)
+					var tick0=Duktape.__ui_get_tick()
+					doc.ed.Render({x:find_scroll_x,y:doc_scroll_y,w:w_find_items,h:doc_h,
+						scr_x:w_line_numbers*UI.pixels_per_unit/obj.find_item_scale,scr_y:(find_item_i.doc_y-find_scroll_y-h_expand*0.5)*UI.pixels_per_unit, scale:UI.pixels_per_unit, obj:doc});
+					var tick1=Duktape.__ui_get_tick()
+					DrawLineNumbers(find_scroll_x,doc_scroll_y,
+						doc.w,find_item_i.doc_y-find_scroll_y-h_expand*0.5,doc_h);
+					var tick2=Duktape.__ui_get_tick()
+					render_secs+=Duktape.__ui_seconds_between_ticks(tick0,tick1)
+					ln_secs+=Duktape.__ui_seconds_between_ticks(tick1,tick2)
+					DrawFindItemHighlight(find_item_i.doc_y-find_scroll_y-h_expand*0.5,doc_h,h_expand/h_expand_max)
+				})
+				//print(render_secs*1000,ln_secs*1000)
+				UI.PopSubWindow()
+			}else{
+				//line numbers
+				DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h);
+				//the top hint
+				if(top_hint_bbs.length){
+					var y_top_hint=y_top_hint_scroll;
+					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
+						var y0=top_hint_bbs[bbi]
+						var y1=top_hint_bbs[bbi+1]
+						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
+						if(hh>=0){
+							doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers-w_scrolling_area,h:hh,
+								scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
+							//also draw the line numbers
+							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
+						}
+						y_top_hint+=y1-y0;
+					}
+					UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w-w_scrolling_area,obj.h-h_top_hint)
+					//a (shadowed) separation bar
+					UI.RoundRect({
+						x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+						round:obj.top_hint_shadow_size,
+						border_width:-obj.top_hint_shadow_size,
+						color:obj.top_hint_shadow_color})
+					UI.RoundRect({
+						x:obj.x, y:obj.y+h_top_hint, w:obj.w-w_scrolling_area, h:obj.top_hint_border_width,
+						color:obj.top_hint_border_color})
+					UI.PopCliprect()
+				}
+			}
 			if(obj.show_find_bar){
 				//the find bar
 				UI.PushCliprect(obj.x,obj.y,obj.w-w_scrolling_area,obj.h)
@@ -1324,58 +1550,11 @@ W.CodeEditor=function(id,attrs){
 						text:"Search"})
 				}
 			}
-			if(obj.show_find_bar&&current_find_context){
-				//var find_scroll_y=obj.m_current_find_context.m_find_scrolling_y
-				UI.PushSubWindow(obj.x,obj.y+obj.h_find_bar,obj.w-w_scrolling_area,obj.h-obj.h_find_bar,obj.find_item_scale)
-				var hc=UI.GetCharacterHeight(doc.font)
-				var w_find_items=(obj.w-w_scrolling_area)/obj.find_item_scale, h_find_items=(obj.h-obj.h_find_bar)/obj.find_item_scale-obj.find_item_expand_current*hc;
-				var h_expand_max=hc*obj.find_item_expand_current
-				//DrawItem
-				obj.RenderVisibleFindItems(w_find_items,h_find_items,function(find_item_i,find_scroll_x,find_scroll_y,h_expand){
-					DrawFindItemBox(find_item_i.doc_y-find_scroll_y-h_expand*0.5,find_item_i.shared_h+h_expand)
-					doc.ed.Render({x:find_scroll_x,y:find_item_i.scroll_y-h_expand*0.5,w:w_find_items,h:find_item_i.shared_h+h_expand,
-						scr_x:w_line_numbers*UI.pixels_per_unit/obj.find_item_scale,scr_y:(find_item_i.doc_y-find_scroll_y-h_expand*0.5)*UI.pixels_per_unit, scale:UI.pixels_per_unit, obj:doc});
-					DrawLineNumbers(find_scroll_x,find_item_i.scroll_y-h_expand*0.5,
-						doc.w,find_item_i.doc_y-find_scroll_y-h_expand*0.5,find_item_i.shared_h+h_expand);
-					DrawFindItemHighlight(find_item_i.doc_y-find_scroll_y-h_expand*0.5,find_item_i.shared_h+h_expand,h_expand/h_expand_max)
-				})
-				UI.PopSubWindow()
-			}else{
-				//line numbers
-				DrawLineNumbers(doc.scroll_x,doc.scroll_y,doc.w,doc.y,doc.h);
-				//the top hint
-				if(top_hint_bbs.length){
-					var y_top_hint=y_top_hint_scroll;
-					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
-						var y0=top_hint_bbs[bbi]
-						var y1=top_hint_bbs[bbi+1]
-						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
-						if(hh>=0){
-							doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers-w_scrolling_area,h:hh,
-								scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
-							//also draw the line numbers
-							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
-						}
-						y_top_hint+=y1-y0;
-					}
-					UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w-w_scrolling_area,obj.h-h_top_hint)
-					//a (shadowed) separation bar
-					UI.RoundRect({
-						x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
-						round:obj.top_hint_shadow_size,
-						border_width:-obj.top_hint_shadow_size,
-						color:obj.top_hint_shadow_color})
-					UI.RoundRect({
-						x:obj.x, y:obj.y+h_top_hint, w:obj.w-w_scrolling_area, h:obj.top_hint_border_width,
-						color:obj.top_hint_border_color})
-					UI.PopCliprect()
-				}
-			}
 			//minimap / scroll bar
 			if(w_scrolling_area>0){
 				var y_scrolling_area=obj.y
-				var h_scrolling_area=obj.h
-				var sbar_value=Math.max(Math.min(doc.scroll_y/(ytot-h_scrolling_area),1),0)
+				var effective_scroll_y=doc.visible_scroll_y-h_top_hint
+				var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
 				if(obj.show_minimap){
 					var x_minimap=obj.x+obj.w-w_scrolling_area+obj.padding*0.5
 					var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
@@ -1385,8 +1564,8 @@ W.CodeEditor=function(id,attrs){
 						doc.ed.Render({x:0,y:scroll_y_minimap,w:obj.w_minimap/minimap_scale,h:h_minimap,
 							scr_x:0,scr_y:0, scale:UI.pixels_per_unit, obj:doc});
 					UI.PopSubWindow()
-					var minimap_page_y0=(doc.scroll_y-scroll_y_minimap)*minimap_scale
-					var minimap_page_y1=(doc.scroll_y+h_scrolling_area-scroll_y_minimap)*minimap_scale
+					var minimap_page_y0=(effective_scroll_y-scroll_y_minimap)*minimap_scale
+					var minimap_page_y1=(effective_scroll_y+h_scrolling_area-scroll_y_minimap)*minimap_scale
 					UI.RoundRect({
 						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
 						color:obj.minimap_page_shadow})
@@ -1403,18 +1582,39 @@ W.CodeEditor=function(id,attrs){
 							factor:h_scrolling_area-(minimap_page_y1-minimap_page_y0),
 							OnChange:function(value){
 								doc.scroll_y=value*(ytot-h_scrolling_area)
+								doc.scrolling_animation=undefined
 								UI.Refresh()
 							},
 						},W.MinimapThingy_prototype)
 					}
 				}
-				UI.RoundRect({x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area, w:obj.w_scroll_bar+4, h:h_scrolling_area,
+				//scrollbar background
+				var sbar=UI.RoundRect({x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area, w:obj.w_scroll_bar+4, h:h_scrolling_area,
 					color:obj.line_number_bgcolor
 				})
+				//at-scrollbar bookmark marker
+				var hc_bookmark=UI.GetCharacterHeight(obj.bookmark_font)
+				if(bm_ccnts.length){
+					for(var i=0;i<bm_ccnts.length;i++){
+						var y=Math.max(Math.min(bm_xys[i*2+1]/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
+						var id=bm_ccnts[i][0]
+						UI.RoundRect({
+							x:sbar.x, w:sbar.w,
+							y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
+							color:obj.bookmark_text_color})
+						if(id>=0){
+							UI.DrawChar(obj.bookmark_font,sbar.x+2,
+								y-sbar.y>hc_bookmark?y-obj.bookmark_scroll_bar_marker_size*0.5-hc_bookmark:y+obj.bookmark_scroll_bar_marker_size*0.5,
+								obj.bookmark_text_color,48+id)
+						}
+					}
+				}
+				//the actual bar
 				W.ScrollBar("sbar",{x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area+4, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
 					page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
 					OnChange:function(value){
 						doc.scroll_y=value*(this.total_size-this.page_size)
+						doc.scrolling_animation=undefined
 						UI.Refresh()
 					},
 					style:obj.scroll_bar_style
@@ -1429,6 +1629,11 @@ W.CodeEditor=function(id,attrs){
 			//	color:obj.separator_color})
 			W.Hotkey("",{key:"CTRL+F",action:function(){
 				obj.show_find_bar=1
+				obj.m_sel0_before_find=obj.doc.sel0.ccnt
+				obj.m_sel1_before_find=obj.doc.sel1.ccnt
+				if(obj.m_current_find_context){
+					obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.m_current_find_context.m_needle,obj.find_flags)
+				}
 				UI.Refresh()
 			}})
 		}

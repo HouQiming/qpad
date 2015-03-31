@@ -349,6 +349,8 @@ class CLayouter_programmer
 			x+=m_caret_overlay.y
 		tab_width=m_tab_width_in_fp
 		wrap_width=m_wrap_width_in_fp
+		iy=x/wrap_width
+		ix=x-iy*wrap_width
 		inline projectXY(i64 x0)
 			auto y=x0/wrap_width
 			auto x=x0-y*wrap_width
@@ -393,9 +395,9 @@ class CLayouter_programmer
 					y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
 					g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.y)*scaling,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
 				x+=m_caret_overlay.y
+				iy=x/wrap_width
+				ix=x-iy*wrap_width
 		x_right_clip=scroll_x+clip_w
-		iy=x/wrap_width
-		ix=x-iy*wrap_width
 		for ch,I in Utf8Chars(s)
 			testOverlay()
 			if ch=='\n':

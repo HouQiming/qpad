@@ -192,6 +192,7 @@ UI.RegisterEditorPlugin(function(){
 		return 0;
 	});
 	this.AddEventHandler('F2',function(){
+		var ccnt=this.sel1.ccnt;
 		var bm=this.FindNearestBookmark(ccnt+1,1)
 		if(!bm){return 1;}
 		this.sel0.ccnt=bm.ccnt
@@ -201,6 +202,7 @@ UI.RegisterEditorPlugin(function(){
 		return 0;
 	})
 	this.AddEventHandler('SHIFT+F2',function(){
+		var ccnt=this.sel1.ccnt;
 		var bm=this.FindNearestBookmark(ccnt-1,-1)
 		if(!bm){return 1;}
 		this.sel0.ccnt=bm.ccnt

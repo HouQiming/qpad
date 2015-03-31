@@ -203,8 +203,10 @@ UI.Theme_CustomWidget=function(C){
 				color_keyword:0xffb4771f,
 				color_type:0xffbc470f,
 				color_symbol:0xff7f7f7f,
+				color_meta:0xff9a3d6a,
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
+				scroll_transition_dt:0.075,
 			},
 			bgcolor:0xffe8e8e8,
 			padding:6,
@@ -230,6 +232,7 @@ UI.Theme_CustomWidget=function(C){
 			bookmark_text_color:C[0],
 			//bookmark_shadow:0xff000000,
 			bookmark_border_color:C[0],
+			bookmark_scroll_bar_marker_size:2,
 			///////
 			show_minimap:1,
 			minimap_font_height:5,
@@ -261,9 +264,8 @@ UI.Theme_CustomWidget=function(C){
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
 			},
-			//find_item_space_percentage:0.5,
 			find_item_scale:0.8,
-			find_item_expand_current:2,//in lines
+			find_item_expand_current:4,//in lines
 			find_item_separation:6,
 			find_item_border_width:0,
 			find_item_border_color:0xff444444,
@@ -271,6 +273,8 @@ UI.Theme_CustomWidget=function(C){
 			find_item_shadow_size:4,
 			find_mode_bgcolor:0xffc0c0c0,
 			find_item_highlight_color:0x55007fff,
+			find_message_font:UI.Font("res/fonts/opensans.ttf",32,-50),
+			find_message_color:0xff444444,
 			///////
 			w_scroll_bar:20,
 			scroll_bar_style:{
@@ -428,6 +432,7 @@ UI.Application=function(id,attrs){
 		//UI.NewUIEditorTab()
 		//UI.NewCodeEditorTab()
 		UI.OpenFile("c:/tp/kara/ide/edcore.spap")
+		//UI.NewFromTemplate("templates/blank_demo.mo")
 		//c:\tp\pure\mo\pm_tmp\win32\mo\s7main.c
 	}
 };

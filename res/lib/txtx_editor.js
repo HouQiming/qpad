@@ -105,7 +105,7 @@ TxtxEditor_prototype.HookedEdit=function(ops){
 		}
 	}
 	this.m_global_document.BeforeEdit(this.m_sub_document_id)
-	W.Edit_prototype.HookedEdit.call(ed,ops);
+	W.Edit_prototype.HookedEdit.call(this,ops);
 	this.m_global_document.OnObjectChange(this.m_sub_document_id)
 };
 //todo: undo hooks
