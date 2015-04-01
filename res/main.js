@@ -60,7 +60,33 @@ UI.Theme_CustomWidget=function(C){
 		},
 		tabbed_document:{
 			transition_dt:0.1,
-			h_caption:32, h_bar:4, color:0xffbbbbbb, border_color:C[0]
+			h_caption:32, h_bar:4, color:0xffbbbbbb, border_color:C[0],
+			h_menu_area:28,
+			w_menu_button:28,
+			h_menu_button:28,
+			padding:12,
+			menu_button_style:{
+				transition_dt:0.1,
+				round:4,padding:0,
+				border_width:2,text_color:0xff444444,
+				$:{
+					out:{
+						color:[{x:0,y:0,color:0x00f0f0f0},{x:0,y:1,color:0x00f0f0f0}],
+						border_color:0x007f7f7f,
+						text_color:0xff444444,
+					},
+					over:{
+						color:[{x:0,y:0,color:0xffe0e0e0},{x:0,y:1,color:0xffd0d0d0}],
+						border_color:0xff7f7f7f,
+						text_color:0xff454545,
+					},
+					down:{
+						color:[{x:0,y:0,color:0xffc0c0c0},{x:0,y:1,color:0xffb0b0b0}],
+						border_color:0xff7f7f7f,
+						text_color:0xff434343,
+					},
+				}
+			},
 		},
 		save_dialog:{
 			transition_dt:0.1,
@@ -295,6 +321,28 @@ UI.Theme_CustomWidget=function(C){
 				},
 			},
 		},
+		top_menu:{
+			color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffd0d0d0}],
+			border_width:1,
+			border_color:0xff444444,
+		},
+		top_menu_item:{
+			font:UI.Font("res/fonts/opensans.ttf",22,-100),
+			padding:8,
+			$:{
+				active:{
+					color:C[0],
+					text_color:0xffffffff,
+				},
+				inactive:{
+					color:0,
+					text_color:0xff444444,
+				},
+			},
+		},
+		fancy_menu:{
+			text_color:0xff444444,
+		},
 	};
 	var s0=UI.default_styles;
 	for(var key in custom_styles){
@@ -331,7 +379,7 @@ UI.Application=function(id,attrs){
 			var w_property_bar=320;
 			//UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):
 			var obj_panel=W.AutoHidePanel("property_panel",{
-				x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:w_property_bar,
+				x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:0,
 				max_velocity:16000,acceleration:10000,velocity_to_target_threshold:0.005,
 				anchor_placement:(app.w<app.h?'down':'right'),
 				knob_size:UI.IS_MOBILE?40:4,
@@ -409,12 +457,13 @@ UI.Application=function(id,attrs){
 				})
 			}
 			//////////////////////////
-			W.Hotkey("",{key:"CTRL+N",action:function(){
+			UI.BigMenu("&File").AddNormalItem({text:"&New",key:"CTRL+N",enable_hotkey:1,action:function(){
 				//UI.NewUIEditorTab()
 				//UI.NewFromTemplate("templates/blank_demo.mo")
 				UI.NewCodeEditorTab()//todo
 				UI.Refresh()
-			}});
+			}})
+			//todo
 			W.Hotkey("",{key:"CTRL+S",action:function(){
 				app.document_area.SaveCurrent();
 			}});
@@ -425,6 +474,7 @@ UI.Application=function(id,attrs){
 				UI.OpenFile(fn.replace(new RegExp("\\\\","g"),"/"));
 				UI.Refresh()
 			}});
+			//todo: print("⌥⌘C".replace(new RegExp("⇧＾⌥⌘","g"),function(smatch){return smath+"+"}))
 		UI.End();
 	UI.End();
 	//todo

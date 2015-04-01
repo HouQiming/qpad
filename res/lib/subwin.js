@@ -151,18 +151,41 @@ W.TabbedDocument=function(id,attrs){
 		var tabid=(obj.current_tab_id||0);
 		sel[tabid]=1
 		var n=items.length
+		var y_label_area=obj.y
+		var w_label_area=obj.w
+		//the big menu
+		UI.m_global_menu=new W.CFancyMenuDesc()
+		if(obj.m_is_in_menu){
+			y_label_area+=obj.h_menu_area
+			W.TopMenuBar("main_menu",{x:obj.x,y:obj.y,w:obj.w,h:obj.h_menu_area})
+		}else{
+			w_label_area-=obj.w_menu_button+obj.padding
+			W.Button("main_menu_button",{
+				x:obj.x+w_label_area,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
+				style:obj.menu_button_style,
+				font:UI.icon_font,text:"单",OnClick:function(){
+					obj.m_is_in_menu=1
+					UI.m_frozen_global_menu=UI.m_global_menu
+				}})
+		}
 		//tabs should not need ids
 		//when closing, should change the "existing" ids for the effect...
-		UI.PushCliprect(obj.x,obj.y,obj.w,obj.h_caption)
-		var x_acc=-(obj.scroll_x||0);//obj.scroll_x_animated;
+		UI.PushCliprect(obj.x,y_label_area,w_label_area,obj.h_caption)
+		var x_acc=-(obj.scroll_x||0);
+		var x_acc_abs=0,x_acc_abs_tabid=0;
 		for(var i=0;i<n;i++){
 			var item_i=items[i]
-			var label_i=W.TabLabel(i,{x_animated:x_acc,y:obj.y,h:obj.h_caption,selected:i==tabid, title:item_i.title})
+			var label_i=W.TabLabel(i,{x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid, title:item_i.title})
 			x_acc+=label_i.w;
+			if(i==tabid){x_acc_abs_tabid=x_acc_abs;}
+			x_acc_abs+=label_i.w
 		}
-		if(n>0){obj.scroll_x=Math.max(Math.min(x_acc-obj.w,obj[tabid].x+(obj[tabid].w-obj.w)*0.5),0)}
+		if(n>0){obj.scroll_x=Math.max(Math.min(
+			x_acc_abs-w_label_area+8,
+			x_acc_abs_tabid+(obj[tabid].w-w_label_area)*0.5),0)}
 		UI.PopCliprect()
 		obj.h_content=obj.h-(obj.h_caption+obj.h_bar);
+		if(obj.m_is_in_menu){obj.h_content-=obj.h_menu_area;}
 		obj.active_tab=obj.items[tabid]
 		//share the tab wrapper and get rid of it when the tab switches
 		if(obj.prev_tabid!=tabid){
@@ -177,9 +200,9 @@ W.TabbedDocument=function(id,attrs){
 			}
 			W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
-				x:0,y:obj.h_caption,h:obj.h_bar,
+				x:0,y:y_label_area+obj.h_caption,h:obj.h_bar,
 				color:obj.border_color})
-			UI.PushSubWindow(obj.x,obj.h_caption+obj.h_bar,obj.w,obj.h_content)
+			UI.PushSubWindow(obj.x,y_label_area+obj.h_caption+obj.h_bar,obj.w,obj.h_content)
 			var obj_tab=UI.Begin(UI.Keep("active_tab_obj",W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:0,h:obj.h_content,tab:tab,
@@ -227,6 +250,7 @@ W.TabbedDocument=function(id,attrs){
 	return obj
 }
 
+////////////////////////////////////////////////////////
 W.SaveDialog_prototype={
 	GetSubStyle:function(){
 		return this.value?"active":"inactive"
@@ -291,3 +315,113 @@ W.SaveDialog=function(id,attrs){
 		}
 	UI.End(obj)
 }
+
+////////////////////////////////////////////////////////
+//text (colored), rubber, button, newline (with optional line-wide event)
+W.CFancyMenuDesc=function(){
+	this.$=[];
+}
+W.CFancyMenuDesc.prototype={
+	AddNormalItem:function(attrs){
+		var style=UI.default_styles['fancy_menu']
+		var children=this.$
+		children.push({type:'text',text:attrs.text,color:style.text_color})
+		var p_and=attrs.text.indexOf('&')
+		if(p_and>=0){
+			//underlined hotkey
+			children.push(
+				{type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
+		}
+		if(attrs.key){
+			children.push(
+				{type:'rubber'},
+				{type:'text',text:UI.LocalizeKeyName(attrs.key),color:style.hotkey_color})
+			if(attrs.enable_hotkey){W.Hotkey("",{key:attrs.key,action:attrs.action})}
+		}
+		children.push({type:'newline',action:attrs.action})
+	},
+	AddButtonRow:function(s_text,buttons){
+		var style=UI.default_styles['fancy_menu']
+		var children=this.$
+		children.push({type:'text',text:s_text,color:style.text_color},{type:'rubber'})
+		for(var i=0;i<buttons.length;i++){
+			var button_i=buttons[i]
+			button_i.type='button';
+			children.push(button_i);
+		}
+		children.push({type:'newline'})
+	},
+	AddSeparator:function(){
+		children.push({type:'separator'})
+	}
+}
+
+UI.BigMenu=function(){
+	var menu=UI.m_global_menu;
+	var style=UI.default_styles['fancy_menu']
+	for(var i=0;i<arguments.length;i++){
+		var name=arguments[i]
+		if(!menu[name]){
+			//if(menu==UI.m_global_menu){
+			//}else{
+			//	menu.$.push(
+			//		{type:'text',text:name,color:style.text_color},
+			//		{type:'rubber'},
+			//		{type:'text',text:'\u25B6',color:style.text_color},
+			//		{type:'newline',action:function(){
+			//			//todo: where do we open submenus... left-down
+			//			//need to think over how to do the "popup"
+			//		}},
+			//	)
+			//}
+			menu[name]=new W.CFancyMenuDesc()
+			menu.$.push(
+				{'type':'submenu','text':name,'menu':menu[name]}
+			)
+		}
+		menu=menu[name];
+	}
+	return menu
+}
+
+//make the top menu horizontal and disable nested child menus? with scrollable menus... it should work
+W.TopMenuItem=function(id,attrs){
+	var obj=UI.Keep(id,attrs);
+	UI.StdStyling(id,obj,attrs, "top_menu_item",obj.selected?"active":"inactive");
+	var text_attrs={font:obj.font,text:obj.text,color:obj.text_color,flags:8}
+	if(!text_attrs.__layout){UI.LayoutText(text_attrs);}
+	obj.w=(obj.w||text_attrs.w_text+obj.padding*2);
+	obj.h=(obj.h||text_attrs.h_text);
+	UI.StdAnchoring(id,obj);
+	UI.RoundRect(obj)
+	UI.Begin(obj)
+		text_attrs.x=obj.x+obj.padding
+		text_attrs.y=obj.y+0.5*(obj.h-text_attrs.h_text)
+		W.Text("",text_attrs)
+	UI.End()
+	var parent=obj.owner.list_view
+	//todo: hotkey, menu popup, search - listview selection setting
+	return obj;
+}
+
+W.TopMenuBar=function(id,attrs){
+	var obj=UI.Keep(id,attrs);
+	UI.StdStyling(id,obj,attrs, "top_menu");
+	UI.StdAnchoring(id,obj);
+	var desc=UI.m_frozen_global_menu
+	//var lv_items=[]
+	//for(var i=0;i<desc.$.length;i++){
+	//	var submenu_i=desc.$[i];
+	//	if(submenu_i.object_type!='submenu'){throw new Error('only submenus allows at the top level')}
+	//	lv_items[i]={'text':submenu_i.text}
+	//}
+	UI.RoundRect(obj)
+	UI.Begin(obj)
+		W.ListView('list_view',{x:obj.x,y:obj.y+2,w:obj.w,h:obj.h-4,
+			 dimension:'x',layout_spacing:16,
+			 item_template:{object_type:W.TopMenuItem,owner:obj},items:desc.$})
+	UI.End()
+	return obj;
+}
+
+//todo: notification system
