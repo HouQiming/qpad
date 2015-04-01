@@ -46,7 +46,7 @@ W.TabLabel=function(id,attrs){
 		obj.text=obj.title;
 		obj.w=UI.MeasureIconText(obj).w;
 	}
-	obj.x=obj.x_animated
+	obj.x+=obj.x_animated
 	UI.StdAnchoring(id,obj);
 	UI.Begin(obj)
 		if(obj.selected){
@@ -153,39 +153,60 @@ W.TabbedDocument=function(id,attrs){
 		var n=items.length
 		var y_label_area=obj.y
 		var w_label_area=obj.w
+		var w_menu=0;
 		//the big menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
+		w_label_area-=obj.w_menu_button+obj.padding*2
 		if(obj.m_is_in_menu){
-			y_label_area+=obj.h_menu_area
-			W.TopMenuBar("main_menu",{x:obj.x,y:obj.y,w:obj.w,h:obj.h_menu_area})
-		}else{
-			w_label_area-=obj.w_menu_button+obj.padding
-			W.Button("main_menu_button",{
-				x:obj.x+w_label_area,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
-				style:obj.menu_button_style,
-				font:UI.icon_font,text:"单",OnClick:function(){
-					obj.m_is_in_menu=1
-					UI.m_frozen_global_menu=UI.m_global_menu
-				}})
+			w_menu=w_label_area-(obj.w_current_tab_label_width||0)
 		}
+		var anim=W.AnimationNode("menu_animation",{transition_dt:0.15,w_menu:w_menu})
+		w_label_area-=anim.w_menu
+		UI.RoundRect({
+			x:obj.x,y:obj.y,w:obj.w-w_label_area,h:obj.h_caption,
+			color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffd0d0d0}],
+			border_width:1,
+			border_color:0xff444444,
+		})
+		if(obj.m_is_in_menu){
+			W.TopMenuBar("main_menu_bar",{x:obj.x+obj.w_menu_button+obj.padding*2,w:anim.w_menu,y:obj.y,h:obj.h_caption})
+		}
+		W.Button("main_menu_button",{
+			x:obj.x+obj.padding,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
+			style:obj.menu_button_style,
+			font:UI.icon_font,text:"单",
+			value:obj.m_is_in_menu,
+			OnChange:function(value){
+				obj.m_is_in_menu=value
+				if(obj.m_is_in_menu){
+					UI.m_frozen_global_menu=UI.m_global_menu
+				}else{
+					UI.m_frozen_global_menu=undefined
+				}
+			}})
+		var x_label_area=obj.x+obj.w-w_label_area
 		//tabs should not need ids
 		//when closing, should change the "existing" ids for the effect...
-		UI.PushCliprect(obj.x,y_label_area,w_label_area,obj.h_caption)
+		UI.PushCliprect(x_label_area,y_label_area,w_label_area,obj.h_caption)
 		var x_acc=-(obj.scroll_x||0);
 		var x_acc_abs=0,x_acc_abs_tabid=0;
 		for(var i=0;i<n;i++){
 			var item_i=items[i]
-			var label_i=W.TabLabel(i,{x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid, title:item_i.title})
+			var label_i=W.TabLabel(i,{x:x_label_area,x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid, title:item_i.title})
 			x_acc+=label_i.w;
 			if(i==tabid){x_acc_abs_tabid=x_acc_abs;}
 			x_acc_abs+=label_i.w
 		}
-		if(n>0){obj.scroll_x=Math.max(Math.min(
-			x_acc_abs-w_label_area+8,
-			x_acc_abs_tabid+(obj[tabid].w-w_label_area)*0.5),0)}
+		if(n>0){
+			obj.scroll_x=Math.max(Math.min(
+				x_acc_abs-w_label_area+8,
+				x_acc_abs_tabid+(obj[tabid].w-w_label_area)*0.5),0)
+			obj.w_current_tab_label_width=obj[tabid].w
+		}else{
+			obj.w_current_tab_label_width=0;
+		}
 		UI.PopCliprect()
 		obj.h_content=obj.h-(obj.h_caption+obj.h_bar);
-		if(obj.m_is_in_menu){obj.h_content-=obj.h_menu_area;}
 		obj.active_tab=obj.items[tabid]
 		//share the tab wrapper and get rid of it when the tab switches
 		if(obj.prev_tabid!=tabid){
@@ -415,10 +436,10 @@ W.TopMenuBar=function(id,attrs){
 	//	if(submenu_i.object_type!='submenu'){throw new Error('only submenus allows at the top level')}
 	//	lv_items[i]={'text':submenu_i.text}
 	//}
-	UI.RoundRect(obj)
+	//UI.RoundRect(obj)
 	UI.Begin(obj)
 		W.ListView('list_view',{x:obj.x,y:obj.y+2,w:obj.w,h:obj.h-4,
-			 dimension:'x',layout_spacing:16,
+			 dimension:'x',layout_spacing:8,
 			 item_template:{object_type:W.TopMenuItem,owner:obj},items:desc.$})
 	UI.End()
 	return obj;

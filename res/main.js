@@ -61,29 +61,31 @@ UI.Theme_CustomWidget=function(C){
 		tabbed_document:{
 			transition_dt:0.1,
 			h_caption:32, h_bar:4, color:0xffbbbbbb, border_color:C[0],
-			h_menu_area:28,
-			w_menu_button:28,
-			h_menu_button:28,
-			padding:12,
+			w_menu_button:26,
+			h_menu_button:26,
+			padding:4,
 			menu_button_style:{
 				transition_dt:0.1,
-				round:4,padding:0,
-				border_width:2,text_color:0xff444444,
+				round:0,padding:0,
+				color:0,
 				$:{
 					out:{
-						color:[{x:0,y:0,color:0x00f0f0f0},{x:0,y:1,color:0x00f0f0f0}],
-						border_color:0x007f7f7f,
-						text_color:0xff444444,
+						text_color:0xffaaaaaa,
 					},
 					over:{
-						color:[{x:0,y:0,color:0xffe0e0e0},{x:0,y:1,color:0xffd0d0d0}],
-						border_color:0xff7f7f7f,
-						text_color:0xff454545,
+						text_color:C[0],
 					},
 					down:{
-						color:[{x:0,y:0,color:0xffc0c0c0},{x:0,y:1,color:0xffb0b0b0}],
-						border_color:0xff7f7f7f,
-						text_color:0xff434343,
+						text_color:UI.lerp_rgba(C[0],0xff000000,0.2),
+					},
+					checked_out:{
+						text_color:C[0],
+					},
+					checked_over:{
+						text_color:C[0],
+					},
+					checked_down:{
+						text_color:UI.lerp_rgba(C[0],0xff000000,0.2),
 					},
 				}
 			},
@@ -322,12 +324,10 @@ UI.Theme_CustomWidget=function(C){
 			},
 		},
 		top_menu:{
-			color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffd0d0d0}],
-			border_width:1,
-			border_color:0xff444444,
+			//nothing
 		},
 		top_menu_item:{
-			font:UI.Font("res/fonts/opensans.ttf",22,-100),
+			font:UI.Font("res/fonts/opensans.ttf",24,-150),
 			padding:8,
 			$:{
 				active:{
