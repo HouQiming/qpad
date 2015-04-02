@@ -64,8 +64,9 @@ UI.Theme_CustomWidget=function(C){
 			w_menu_button:26,
 			h_menu_button:26,
 			padding:4,
+			menu_bar_color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe0e0e0}],
 			menu_button_style:{
-				transition_dt:0.1,
+				transition_dt:0.25,
 				round:0,padding:0,
 				color:0,
 				$:{
@@ -327,7 +328,7 @@ UI.Theme_CustomWidget=function(C){
 			//nothing
 		},
 		top_menu_item:{
-			font:UI.Font("res/fonts/opensans.ttf",24,-150),
+			font:UI.Font(UI.font_name,22,-150),
 			padding:8,
 			$:{
 				active:{
@@ -336,12 +337,53 @@ UI.Theme_CustomWidget=function(C){
 				},
 				inactive:{
 					color:0,
-					text_color:0xff444444,
+					text_color:0xff000000,
 				},
 			},
 		},
 		fancy_menu:{
-			text_color:0xff444444,
+			color:0xfff0f0f0,
+			border_color:0xff444444,
+			border_width:1,round:1,
+			shadow_color:0xaa000000,
+			shadow_size:12,
+			///////////
+			font:UI.Font(UI.font_name,22,-100),
+			text_color:0xff000000,
+			hotkey_color:0xff7f7f7f,
+			///////////
+			vertical_padding:4,
+			side_padding:8,
+			column_padding:32,
+			button_padding:4,
+			///////////
+			h_separator:8,
+			h_separator_fill:1,
+			separator_color:0xffd0d0d0,
+			h_menu_line:32,
+			w_icon:24,
+			button_style:{
+				transition_dt:0.1,
+				round:0.1,border_width:1,padding:0,
+				font:UI.Font(UI.font_name,24,-150),
+				$:{
+					out:{
+						border_color:C[0],color:0xffffffff,
+						icon_color:C[0],
+						text_color:C[0],
+					},
+					over:{
+						border_color:C[0],color:C[0],
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					down:{
+						border_color:C_dark,color:C_dark,
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+				}
+			},
 		},
 	};
 	var s0=UI.default_styles;
@@ -457,24 +499,28 @@ UI.Application=function(id,attrs){
 				})
 			}
 			//////////////////////////
-			UI.BigMenu("&File").AddNormalItem({text:"&New",key:"CTRL+N",enable_hotkey:1,action:function(){
+			var menu_file=UI.BigMenu("&File")
+			menu_file.AddNormalItem({text:"&New",key:"CTRL+N",enable_hotkey:1,action:function(){
 				//UI.NewUIEditorTab()
 				//UI.NewFromTemplate("templates/blank_demo.mo")
 				UI.NewCodeEditorTab()//todo
 				UI.Refresh()
 			}})
-			//todo
-			W.Hotkey("",{key:"CTRL+S",action:function(){
-				app.document_area.SaveCurrent();
-			}});
-			//todo: drag-loading
-			W.Hotkey("",{key:"CTRL+O",action:function(){
+			menu_file.AddNormalItem({text:"&Open",key:"CTRL+O",enable_hotkey:1,action:function(){
+				//todo
 				var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
 				if(!fn){return;}
 				UI.OpenFile(fn.replace(new RegExp("\\\\","g"),"/"));
 				UI.Refresh()
 			}});
-			//todo: print("⌥⌘C".replace(new RegExp("⇧＾⌥⌘","g"),function(smatch){return smath+"+"}))
+			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",enable_hotkey:1,action:function(){
+				app.document_area.SaveCurrent();
+			}});
+			//todo: drag-loading
+			menu_file.AddSeparator();
+			menu_file.AddNormalItem({text:"E&xit",action:function(){
+				if(!app.OnClose()){UI.DestroyWindow(app)}
+			}});
 		UI.End();
 	UI.End();
 	//todo

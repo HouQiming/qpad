@@ -164,12 +164,16 @@ W.TabbedDocument=function(id,attrs){
 		w_label_area-=anim.w_menu
 		UI.RoundRect({
 			x:obj.x,y:obj.y,w:obj.w-w_label_area,h:obj.h_caption,
-			color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffd0d0d0}],
+			color:obj.menu_bar_color,
 			border_width:1,
 			border_color:0xff444444,
 		})
 		if(obj.m_is_in_menu){
+			//var is_1st=!obj.main_menu_bar;
 			W.TopMenuBar("main_menu_bar",{x:obj.x+obj.w_menu_button+obj.padding*2,w:anim.w_menu,y:obj.y,h:obj.h_caption})
+			//if(is_1st){
+			//	UI.SetFocus(obj.main_menu_bar)
+			//}
 		}
 		W.Button("main_menu_button",{
 			x:obj.x+obj.padding,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
@@ -346,7 +350,7 @@ W.CFancyMenuDesc.prototype={
 	AddNormalItem:function(attrs){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',text:attrs.text,color:style.text_color})
+		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color})
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0){
 			//underlined hotkey
@@ -361,10 +365,11 @@ W.CFancyMenuDesc.prototype={
 		}
 		children.push({type:'newline',action:attrs.action})
 	},
-	AddButtonRow:function(s_text,buttons){
+	//todo: selection widget
+	AddButtonRow:function(attrs,buttons){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',text:s_text,color:style.text_color},{type:'rubber'})
+		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color},{type:'rubber'})
 		for(var i=0;i<buttons.length;i++){
 			var button_i=buttons[i]
 			button_i.type='button';
@@ -373,6 +378,7 @@ W.CFancyMenuDesc.prototype={
 		children.push({type:'newline'})
 	},
 	AddSeparator:function(){
+		var children=this.$
 		children.push({type:'separator'})
 	}
 }
@@ -390,7 +396,7 @@ UI.BigMenu=function(){
 			//		{type:'rubber'},
 			//		{type:'text',text:'\u25B6',color:style.text_color},
 			//		{type:'newline',action:function(){
-			//			//todo: where do we open submenus... left-down
+			//			//where do we open submenus... left-down
 			//			//need to think over how to do the "popup"
 			//		}},
 			//	)
@@ -419,9 +425,24 @@ W.TopMenuItem=function(id,attrs){
 		text_attrs.x=obj.x+obj.padding
 		text_attrs.y=obj.y+0.5*(obj.h-text_attrs.h_text)
 		W.Text("",text_attrs)
+		var owner=obj.owner
+		var parent=owner.list_view
+		var p_and=attrs.text.indexOf('&')
+		if(p_and>=0){
+			//hotkey - listview selection setting
+			W.Hotkey("",{key:attrs.text.substr(p_and+1,1).toUpperCase(),action:parent.OnChange(parseInt(obj.id.substr(1)))})
+		}
+		//the submenu
+		if(obj.selected){
+			//placement... leftmost left, other right
+			UI.TopMostWidget(function(){
+				W.FancyMenu("sub_menu_"+id,{
+					x:id=='$0'?0:obj.x-4,y:owner.y+owner.h,
+					desc:obj.menu
+				})
+			})
+		}
 	UI.End()
-	var parent=obj.owner.list_view
-	//todo: hotkey, menu popup, search - listview selection setting
 	return obj;
 }
 
@@ -430,6 +451,7 @@ W.TopMenuBar=function(id,attrs){
 	UI.StdStyling(id,obj,attrs, "top_menu");
 	UI.StdAnchoring(id,obj);
 	var desc=UI.m_frozen_global_menu
+	//todo: search
 	//var lv_items=[]
 	//for(var i=0;i<desc.$.length;i++){
 	//	var submenu_i=desc.$[i];
@@ -438,11 +460,133 @@ W.TopMenuBar=function(id,attrs){
 	//}
 	//UI.RoundRect(obj)
 	UI.Begin(obj)
+		UI.PushCliprect(obj.x,obj.y+2,obj.w,obj.h-4)
 		W.ListView('list_view',{x:obj.x,y:obj.y+2,w:obj.w,h:obj.h-4,
-			 dimension:'x',layout_spacing:8,
-			 item_template:{object_type:W.TopMenuItem,owner:obj},items:desc.$})
+			dimension:'x',layout_spacing:8,
+			item_template:{object_type:W.TopMenuItem,owner:obj},items:desc.$})
+		UI.PopCliprect()
 	UI.End()
 	return obj;
 }
 
+W.FancyMenu=function(id,attrs){
+	var obj=UI.Keep(id,attrs);
+	UI.StdStyling(id,obj,attrs, "fancy_menu");
+	var items=obj.desc.$
+	var w_icon=obj.w_icon
+	var x_icon=obj.side_padding
+	if(!obj.w){
+		//measure w,h, create rendering aid for the items... write in place
+		var per_part_w=[]
+		var part_id=0,w_acc=0,h_acc=0;
+		for(var i=0;i<items.length;i++){
+			var item_i=items[i]
+			var s_type=item_i.type
+			var dx=0;
+			if(s_type=='text'){
+				w_acc+=UI.MeasureText(obj.font,item_i.text.replace('&','')).w
+			}else if(s_type=='button'){
+				w_acc+=UI.MeasureText(obj.font,item_i.text).w
+				w_acc+=obj.button_padding*2
+			}else if(s_type=='rubber'){
+				per_part_w[part_id]=Math.max(per_part_w[part_id]||0,w_acc)
+				part_id++
+				w_acc=0
+			}else if(s_type=='separator'){
+				h_acc+=obj.h_separator
+			}else if(s_type=='newline'){
+				per_part_w[part_id]=Math.max(per_part_w[part_id]||0,w_acc)
+				part_id=0
+				w_acc=0
+				h_acc+=obj.h_menu_line
+			}
+			//ignore 'hotkey'
+		}
+		var w_needed=obj.side_padding+w_icon
+		for(var i=0;i<per_part_w.length;i++){
+			w_needed+=per_part_w[i]+obj.column_padding
+			per_part_w[i]=w_needed
+		}
+		w_needed+=obj.side_padding-obj.column_padding
+		obj.w=w_needed
+		obj.h=h_acc+obj.vertical_padding*2
+		//compute x y w h everywhere, assign icon with text and draw it at 0,y
+		part_id=0;w_acc=obj.side_padding+w_icon;h_acc=obj.vertical_padding;
+		for(var i=0;i<items.length;i++){
+			var item_i=items[i]
+			var s_type=item_i.type
+			var dx=0;
+			if(s_type=='text'){
+				item_i.x=w_acc
+				item_i.y=h_acc
+				w_acc+=UI.MeasureText(obj.font,item_i.text.replace('&','')).w
+			}else if(s_type=='button'){
+				item_i.x=w_acc
+				item_i.y=h_acc
+				w_acc+=obj.button_padding
+				w_acc+=UI.MeasureText(obj.font,item_i.text).w
+				w_acc+=obj.button_padding
+				item_i.w=w_acc-item_i.x
+				item_i.h=obj.h_menu_line
+			}else if(s_type=='rubber'){
+				w_acc=per_part_w[part_id]
+				part_id++
+			}else if(s_type=='separator'){
+				item_i.x=obj.side_padding;
+				item_i.y=h_acc+(obj.h_separator-obj.h_separator_fill)*0.5
+				item_i.w=w_needed-obj.side_padding*2;
+				h_acc+=obj.h_separator
+				w_acc=obj.side_padding+w_icon;
+			}else if(s_type=='newline'){
+				item_i.x=obj.side_padding
+				item_i.y=h_acc
+				item_i.w=w_needed-obj.side_padding*2
+				item_i.h=obj.h_menu_line
+				part_id=0;
+				w_acc=obj.side_padding+w_icon;
+				h_acc+=obj.h_menu_line
+			}
+			//again ignore 'hotkey'
+		}
+	}
+	/////////////////
+	UI.StdAnchoring(id,obj);
+	UI.RoundRect({x:obj.x,y:obj.y,w:obj.w+obj.shadow_size,h:obj.h+obj.shadow_size,
+		color:obj.shadow_color,
+		border_width:-obj.shadow_size,round:obj.shadow_size})
+	UI.RoundRect(obj)
+	var hc=UI.GetCharacterHeight(obj.font)
+	var hc_icon=UI.GetCharacterHeight(UI.icon_font)
+	for(var i=0;i<items.length;i++){
+		var item_i=items[i]
+		var s_type=item_i.type
+		var dx=0;
+		if(s_type=='text'){
+			W.Text("",{x:obj.x+item_i.x,y:obj.y+item_i.y+(obj.h_menu_line-hc)*0.5,font:obj.font,text:item_i.text,color:item_i.color,flags:8})
+			if(item_i.icon){
+				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font,text:item_i.icon,color:item_i.color})
+			}
+		}else if(s_type=='button'){
+			W.Button(item_i.text,{x:obj.x+x_icon,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,
+				font:UI.icon_font,text:item_i.text,OnClick:item_i.action,
+				style:obj.button_style})
+		}else if(s_type=='separator'){
+			UI.RoundRect({x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:obj.h_separator_fill,
+				color:obj.separator_color,
+			})
+		}else if(s_type=='newline'){
+			//the most complicated - action -> region -> listview-like element
+			//todo: and active text... and active button / select
+			//todo: leave the listview logic to the menu-level region
+			if(item_i.action){
+				//!?
+			}
+		}else if(s_type=='hotkey'){
+			W.Hotkey("",{key:item_i.key,action:item_i.action})
+		}
+	}
+	return obj
+}
+
+//todo: search support
 //todo: notification system
