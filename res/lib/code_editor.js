@@ -1553,7 +1553,7 @@ W.CodeEditor=function(id,attrs){
 				var x_button_right=rect_bar.x+rect_bar.w+obj.find_bar_padding
 				W.Button("find_button_case",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"写",
+					font:UI.icon_font,text:"写",tooltip:"Case sensitive",
 					value:(obj.find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
@@ -1562,7 +1562,7 @@ W.CodeEditor=function(id,attrs){
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_word",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"字",
+					font:UI.icon_font,text:"字",tooltip:"Word wrap",
 					value:(obj.find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
@@ -1571,7 +1571,7 @@ W.CodeEditor=function(id,attrs){
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_regexp",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"正",
+					font:UI.icon_font,text:"正",tooltip:"Regular Expression",
 					value:(obj.find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
@@ -1593,12 +1593,13 @@ W.CodeEditor=function(id,attrs){
 						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.find_flags)
 					}
 					UI.SetFocus(obj.find_bar_edit);
+					UI.InvalidateCurrentFrame();
+					UI.Refresh()
+				}else if(UI.nd_focus==doc){
+					UI.SetFocus(obj.find_bar_edit);
+					UI.InvalidateCurrentFrame();
 					UI.Refresh()
 				}
-				//if(UI.nd_focus==doc){
-				//	UI.SetFocus(obj.find_bar_edit);
-				//	UI.Refresh()
-				//}
 				if(!obj.find_bar_edit.ed.GetTextSize()){
 					W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 						font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
@@ -1697,6 +1698,12 @@ W.CodeEditor=function(id,attrs){
 					//}
 					UI.Refresh()
 				}})
+				menu_search.AddButtonRow({text:"Find "},[
+					{key:"CTRL+G F3",text:"&previous",action:function(){
+						//todo
+					}},{key:"SHIFT+CTRL+G SHIFT+F3",text:"&next",action:function(){
+						//todo
+					}}])
 			}
 		}
 	UI.End()

@@ -12,6 +12,20 @@ UI.Theme_CustomWidget=function(C){
 	var C_dark=UI.lerp_rgba(C[0],0xff000000,0.15)
 	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.75)
 	var custom_styles={
+		tooltip:{
+			font:UI.Font(UI.font_name,24,-150),
+			padding:8,
+			spacing:8,
+			color:0xffffffff,
+			round:8,
+			border_color:0xff000000,
+			border_width:1,
+			text_color:0xff000000,
+			shadow_size:6,
+			shadow_color:0xaa000000,
+			triangle_font:UI.Font(UI.font_name,32,0),
+			triangle_font2:UI.Font(UI.font_name,32,250),
+		},
 		sub_window:{
 			transition_dt:0.1,
 			round:0,border_width:2,
@@ -65,6 +79,8 @@ UI.Theme_CustomWidget=function(C){
 			h_menu_button:26,
 			padding:4,
 			menu_bar_color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe0e0e0}],
+			menu_bar_border_width:1,
+			menu_bar_border_color:0xffaaaaaa,
 			menu_button_style:{
 				transition_dt:0.25,
 				round:0,padding:0,
@@ -352,7 +368,7 @@ UI.Theme_CustomWidget=function(C){
 			text_color:0xff000000,
 			text_sel_color:0xffffffff,
 			hotkey_color:0xff7f7f7f,
-			hotkey_sel_color:0xff7f7f7f,
+			hotkey_sel_color:0xffaaaaaa,
 			sel_bgcolor:C[0],
 			///////////
 			vertical_padding:4,
@@ -364,6 +380,7 @@ UI.Theme_CustomWidget=function(C){
 			h_separator_fill:1,
 			separator_color:0xffd0d0d0,
 			h_menu_line:32,
+			h_button:28,
 			w_icon:24,
 			button_style:{
 				transition_dt:0.1,
@@ -371,9 +388,9 @@ UI.Theme_CustomWidget=function(C){
 				font:UI.Font(UI.font_name,24,-150),
 				$:{
 					out:{
-						border_color:C[0],color:0xffffffff,
-						icon_color:C[0],
-						text_color:C[0],
+						border_color:0xff444444,color:0xffffffff,
+						icon_color:0xff000000,
+						text_color:0xff000000,
 					},
 					over:{
 						border_color:C[0],color:C[0],
@@ -382,6 +399,21 @@ UI.Theme_CustomWidget=function(C){
 					},
 					down:{
 						border_color:C_dark,color:C_dark,
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					checked_out:{
+						border_color:C[0],color:C[0],
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					checked_over:{
+						border_color:C[0],color:C[0],
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					checked_down:{
+						border_color:C[0],color:C[0],
 						icon_color:0xffffffff,
 						text_color:0xffffffff,
 					},
@@ -415,6 +447,12 @@ UI.Application=function(id,attrs){
 				title:'UI Editor',w:1280,h:720,bgcolor:0xfff0f0f0,
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1,
+				OnWindowBlur:function(){
+					this.document_area.OnWindowBlur();
+				},
+				OnMenu:function(){
+					this.document_area.OnMenu();
+				},
 				OnClose:function(){
 					return this.document_area.OnClose();
 				}}));

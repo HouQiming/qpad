@@ -130,7 +130,18 @@ W.TabbedDocument_prototype={
 		UI.Refresh()
 		this.m_is_close_pending=1
 		return ret
-	}
+	},
+	OnMenu:function(){
+		this.m_is_in_menu=!this.m_is_in_menu;
+		if(this.m_is_in_menu){
+			UI.m_frozen_global_menu=UI.m_global_menu
+		}
+		UI.Refresh()
+	},
+	OnWindowBlur:function(){
+		this.m_is_in_menu=0;
+		UI.Refresh()
+	},
 }
 W.TabbedDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabbedDocument_prototype);
@@ -156,6 +167,7 @@ W.TabbedDocument=function(id,attrs){
 		var w_label_area=obj.w
 		var w_menu=0;
 		//the big menu
+		var bk_menu=UI.m_global_menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
 		UI.BigMenu("&File")
 		w_label_area-=obj.w_menu_button+obj.padding*2
@@ -167,28 +179,47 @@ W.TabbedDocument=function(id,attrs){
 		UI.RoundRect({
 			x:obj.x,y:obj.y,w:obj.w-w_label_area,h:obj.h_caption,
 			color:obj.menu_bar_color,
-			border_width:1,
-			border_color:0xff444444,
+			border_width:obj.menu_bar_border_width,
+			border_color:obj.menu_bar_border_color,
 		})
 		if(obj.m_is_in_menu){
 			//var is_1st=!obj.main_menu_bar;
 			W.TopMenuBar("main_menu_bar",{x:obj.x+obj.w_menu_button+obj.padding*2,w:anim.w_menu,y:obj.y,h:obj.h_caption,
+				default_value:obj.m_menu_preselect,
 				owner:obj})
 			//if(is_1st){
 			//	UI.SetFocus(obj.main_menu_bar)
 			//}
+		}else{
+			UI.m_frozen_global_menu=undefined
+			obj.m_menu_preselect=undefined
+			if(bk_menu){
+				for(var i=0;i<bk_menu.$.length;i++){(function(i){
+					var s_text=bk_menu.$[i].text
+					if(s_text){
+						var p_and=s_text.indexOf('&')
+						if(p_and>=0){
+							W.Hotkey("",{key:"ALT+"+s_text.substr(p_and+1,1).toUpperCase(),action:function(){
+								obj.m_is_in_menu=1;
+								obj.m_menu_preselect=i
+								UI.m_frozen_global_menu=UI.m_global_menu
+								UI.Refresh()
+							}})
+						}
+					}
+				})(i)}
+			}
 		}
 		W.Button("main_menu_button",{
 			x:obj.x+obj.padding,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
 			style:obj.menu_button_style,
+			tooltip:'Menu',
 			font:UI.icon_font,text:"单",
 			value:obj.m_is_in_menu,
 			OnChange:function(value){
 				obj.m_is_in_menu=value
 				if(obj.m_is_in_menu){
 					UI.m_frozen_global_menu=UI.m_global_menu
-				}else{
-					UI.m_frozen_global_menu=undefined
 				}
 			}})
 		var x_label_area=obj.x+obj.w-w_label_area
@@ -231,6 +262,7 @@ W.TabbedDocument=function(id,attrs){
 				x:0,y:y_label_area+obj.h_caption,h:obj.h_bar,
 				color:obj.border_color})
 			UI.PushSubWindow(obj.x,y_label_area+obj.h_caption+obj.h_bar,obj.w,obj.h_content)
+			var n0_topmost=UI.RecordTopMostContext()
 			var obj_tab=UI.Begin(UI.Keep("active_tab_obj",W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:0,h:obj.h_content,tab:tab,
@@ -238,6 +270,7 @@ W.TabbedDocument=function(id,attrs){
 			})))
 				tab.body.call(tab)
 			UI.End()
+			UI.FlushTopMostContext(n0_topmost)
 			UI.PopSubWindow()
 			if(obj_tab.body.title){
 				if(tab.title!=obj_tab.body.title){
@@ -248,33 +281,41 @@ W.TabbedDocument=function(id,attrs){
 			W.SaveDialog("savedlg",{x:obj.x,y:obj.h_caption+obj.h_bar,w:obj.w,h:obj.h_content,value:(obj.active_tab.in_save_dialog||0),tabid:tabid,parent:obj})
 		}
 	UI.End()
-	if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
-		W.Hotkey("",{key:"CTRL+F4",action:function(){
+	if(!obj.m_is_in_menu){
+		if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
+			W.Hotkey("",{key:"CTRL+F4",action:function(){
+				var num_id=tabid
+				if(num_id<0){return;}
+				obj.CloseTab(num_id)
+			}});
+		}
+		W.Hotkey("",{key:"CTRL+W",action:function(){
 			var num_id=tabid
 			if(num_id<0){return;}
 			obj.CloseTab(num_id)
 		}});
+		W.Hotkey("",{key:"CTRL+TAB",action:function(){
+			var num_id=tabid
+			if(num_id<0){return;}
+			num_id++;if(num_id>=items.length){num_id=0;}
+			obj.current_tab_id=num_id
+			UI.Refresh()
+		}});
+		W.Hotkey("",{key:"CTRL+SHIFT+TAB",action:function(){
+			var num_id=tabid
+			if(num_id<0){return;}
+			if(!num_id){num_id=items.length;}
+			num_id--;
+			obj.current_tab_id=num_id
+			UI.Refresh()
+		}});
+		for(var i=0;i<items.length&&i<10;i++){(function(i){
+			W.Hotkey("",{key:"ALT+"+String.fromCharCode(48+(i+1)%10),action:function(){
+				obj.current_tab_id=i
+				UI.Refresh()
+			}})
+		})(i)}
 	}
-	W.Hotkey("",{key:"CTRL+W",action:function(){
-		var num_id=tabid
-		if(num_id<0){return;}
-		obj.CloseTab(num_id)
-	}});
-	W.Hotkey("",{key:"CTRL+TAB",action:function(){
-		var num_id=tabid
-		if(num_id<0){return;}
-		num_id++;if(num_id>=items.length){num_id=0;}
-		obj.current_tab_id=num_id
-		UI.Refresh()
-	}});
-	W.Hotkey("",{key:"CTRL+SHIFT+TAB",action:function(){
-		var num_id=tabid
-		if(num_id<0){return;}
-		if(!num_id){num_id=items.length;}
-		num_id--;
-		obj.current_tab_id=num_id
-		UI.Refresh()
-	}});
 	return obj
 }
 
@@ -370,7 +411,7 @@ W.CFancyMenuDesc.prototype={
 		if(attrs.key){
 			children.push(
 				{type:'rubber'},
-				{type:'text',text:UI.LocalizeKeyName(attrs.key),color:style.hotkey_color,color:style.hotkey_sel_color})
+				{type:'text',text:UI.LocalizeKeyName(attrs.key),color:style.hotkey_color,sel_color:style.hotkey_sel_color})
 			if(attrs.enable_hotkey){W.Hotkey("",{key:attrs.key,action:attrs.action})}
 		}
 		children.push({type:'newline',action:attrs.action})
@@ -385,6 +426,13 @@ W.CFancyMenuDesc.prototype={
 			button_i.type='button';
 			button_i.action=WrapMenuAction(button_i.action);
 			children.push(button_i);
+			/////////////////
+			var p_and=button_i.text.indexOf('&')
+			if(p_and>=0){
+				//underlined hotkey
+				children.push(
+					{type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
+			}
 		}
 		children.push({type:'newline'})
 	},
@@ -441,10 +489,14 @@ W.TopMenuItem=function(id,attrs){
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0){
 			//hotkey - listview selection setting
-			W.Hotkey("",{key:attrs.text.substr(p_and+1,1).toUpperCase(),action:function(){parent.OnChange(parseInt(obj.id.substr(1)))}})
+			W.Hotkey("",{key:attrs.text.substr(p_and+1,1).toUpperCase(),action:function(){
+				parent.OnChange(parseInt(obj.id.substr(1)))
+				owner.m_show_sub_menus=1;
+				UI.Refresh()
+			}})
 		}
 		//the submenu
-		if(obj.selected){
+		if(obj.selected&&owner.m_show_sub_menus){
 			//placement... leftmost left, other right
 			UI.TopMostWidget(function(){
 				var obj_submenu=W.FancyMenu("sub_menu_"+id,{
@@ -474,11 +526,28 @@ W.TopMenuBar=function(id,attrs){
 	//}
 	//UI.RoundRect(obj)
 	UI.Begin(obj)
+		var is_first=!obj.list_view
+		var fshow_sub_menus=function(){
+			obj.m_show_sub_menus=1
+			UI.Refresh()
+		}
 		UI.PushCliprect(obj.x,obj.y+2,obj.w,obj.h-4)
 		W.ListView('list_view',{x:obj.x,y:obj.y+2,w:obj.w,h:obj.h-4,
-			dimension:'x',layout_spacing:8,
-			item_template:{object_type:W.TopMenuItem,owner:obj},items:desc.$})
+			dimension:'x',layout_spacing:8,is_single_click_mode:1,
+			item_template:{object_type:W.TopMenuItem,owner:obj,OnDblClick:fshow_sub_menus},items:desc.$})
 		UI.PopCliprect()
+		if(!obj.m_show_sub_menus){
+			W.Hotkey("",{key:"DOWN",action:fshow_sub_menus})
+			W.Hotkey("",{key:"RETURN RETURN2",action:fshow_sub_menus})
+			W.Hotkey("",{key:"ESC",action:function(){obj.owner.m_is_in_menu=0;UI.Refresh();}})
+			if(is_first){UI.SetFocus(obj.list_view);}
+			if(is_first&&obj.default_value!=undefined){
+				obj.list_view.OnChange(obj.default_value);
+				obj.m_show_sub_menus=1
+				UI.InvalidateCurrentFrame();
+				UI.Refresh();
+			}
+		}
 	UI.End()
 	return obj;
 }
@@ -525,6 +594,9 @@ W.FancyMenu_prototype={
 			UI.Refresh()
 		}else if(IsHotkey(event,"ESC")){
 			this.HideMenu();
+			UI.Refresh()
+		}else if(IsHotkey(event,"RETURN RETURN2")){
+			this.desc.$[this.selectable_items[sel]].action()
 			UI.Refresh()
 		}
 	},
@@ -583,12 +655,12 @@ W.FancyMenu=function(id,attrs){
 				w_acc+=UI.MeasureText(obj.font,item_i.text.replace('&','')).w
 			}else if(s_type=='button'){
 				item_i.x=w_acc
-				item_i.y=h_acc
+				item_i.y=h_acc+(obj.h_menu_line-obj.h_button)*0.5
 				w_acc+=obj.button_padding
 				w_acc+=UI.MeasureText(obj.font,item_i.text).w
 				w_acc+=obj.button_padding
 				item_i.w=w_acc-item_i.x
-				item_i.h=obj.h_menu_line
+				item_i.h=obj.h_button
 				selectable_items.push(i)
 			}else if(s_type=='rubber'){
 				w_acc=per_part_w[part_id]
@@ -600,6 +672,14 @@ W.FancyMenu=function(id,attrs){
 				h_acc+=obj.h_separator
 				w_acc=obj.side_padding+w_icon;
 			}else if(s_type=='newline'){
+				var right_space=w_needed-w_acc-obj.side_padding
+				if(right_space>0&&part_id>0){
+					for(var j=i-1;j>=0;j--){
+						var item_j=items[j]
+						if(item_j.type=='newline'||item_j.type=='rubber'||item_j.type=='separator'){break;}
+						if(item_j.x!=undefined){item_j.x+=right_space}
+					}
+				}
 				item_i.x=obj.side_padding*0.5
 				item_i.y=h_acc
 				item_i.w=w_needed-obj.side_padding
@@ -608,6 +688,7 @@ W.FancyMenu=function(id,attrs){
 				w_acc=obj.side_padding+w_icon;
 				h_acc+=obj.h_menu_line
 				if(item_i.action){
+					item_i.sel_id=selectable_items.length
 					selectable_items.push(i)
 				}
 			}
@@ -651,19 +732,22 @@ W.FancyMenu=function(id,attrs){
 				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font,text:item_i.icon,color:selected?item_i.sel_color:item_i.color})
 			}
 		}else if(s_type=='button'){
-			W.Button(item_i.text,{x:obj.x+x_icon,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,
-				font:UI.icon_font,text:item_i.text,OnClick:item_i.action,
-				style:obj.button_style})
+			W.Button(item_i.text,{x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,
+				font:item_i.icon?UI.icon_font:obj.font,text:item_i.icon||item_i.text,OnClick:item_i.action,
+				value:selected,
+				style:obj.button_style,
+				flags:8})
 		}else if(s_type=='separator'){
 			UI.RoundRect({x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:obj.h_separator_fill,
 				color:obj.separator_color,
 			})
 		}else if(s_type=='newline'){
 			if(item_i.action){
-				//the most complicated - action -> region -> listview-like element
-				//todo: and active text... and active button / select
-				//todo: leave the listview logic to the menu-level region
-				//!?
+				W.Region("line_"+i.toString(),{
+					x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,
+					OnClick:item_i.action,
+					sel_id:item_i.sel_id,
+					OnMouseOver:function(){obj.value=this.sel_id;UI.Refresh()}})
 			}
 		}else if(s_type=='hotkey'){
 			W.Hotkey("",{key:item_i.key,action:item_i.action})
