@@ -140,6 +140,7 @@ W.TabbedDocument=function(id,attrs){
 	if((obj.n_tabs_last_checked||0)<items.length){
 		//new tab activating
 		obj.current_tab_id=(items.length-1);
+		obj.m_is_in_menu=0
 	}
 	obj.n_tabs_last_checked=items.length;
 	if(!items.length&&obj.m_is_close_pending){
@@ -156,6 +157,7 @@ W.TabbedDocument=function(id,attrs){
 		var w_menu=0;
 		//the big menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
+		UI.BigMenu("&File")
 		w_label_area-=obj.w_menu_button+obj.padding*2
 		if(obj.m_is_in_menu){
 			w_menu=w_label_area-(obj.w_current_tab_label_width||0)
@@ -170,7 +172,8 @@ W.TabbedDocument=function(id,attrs){
 		})
 		if(obj.m_is_in_menu){
 			//var is_1st=!obj.main_menu_bar;
-			W.TopMenuBar("main_menu_bar",{x:obj.x+obj.w_menu_button+obj.padding*2,w:anim.w_menu,y:obj.y,h:obj.h_caption})
+			W.TopMenuBar("main_menu_bar",{x:obj.x+obj.w_menu_button+obj.padding*2,w:anim.w_menu,y:obj.y,h:obj.h_caption,
+				owner:obj})
 			//if(is_1st){
 			//	UI.SetFocus(obj.main_menu_bar)
 			//}
@@ -343,6 +346,12 @@ W.SaveDialog=function(id,attrs){
 
 ////////////////////////////////////////////////////////
 //text (colored), rubber, button, newline (with optional line-wide event)
+var WrapMenuAction=function(action){
+	if(!action){return action;}
+	UI.HackCallback(action)
+	return UI.HackCallback(function(){UI.SetFocus(null);action();});
+}
+
 W.CFancyMenuDesc=function(){
 	this.$=[];
 }
@@ -350,7 +359,8 @@ W.CFancyMenuDesc.prototype={
 	AddNormalItem:function(attrs){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color})
+		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color,sel_color:style.text_sel_color})
+		attrs.action=WrapMenuAction(attrs.action);
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0){
 			//underlined hotkey
@@ -360,7 +370,7 @@ W.CFancyMenuDesc.prototype={
 		if(attrs.key){
 			children.push(
 				{type:'rubber'},
-				{type:'text',text:UI.LocalizeKeyName(attrs.key),color:style.hotkey_color})
+				{type:'text',text:UI.LocalizeKeyName(attrs.key),color:style.hotkey_color,color:style.hotkey_sel_color})
 			if(attrs.enable_hotkey){W.Hotkey("",{key:attrs.key,action:attrs.action})}
 		}
 		children.push({type:'newline',action:attrs.action})
@@ -369,10 +379,11 @@ W.CFancyMenuDesc.prototype={
 	AddButtonRow:function(attrs,buttons){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color},{type:'rubber'})
+		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color,sel_color:style.text_sel_color},{type:'rubber'})
 		for(var i=0;i<buttons.length;i++){
 			var button_i=buttons[i]
 			button_i.type='button';
+			button_i.action=WrapMenuAction(button_i.action);
 			children.push(button_i);
 		}
 		children.push({type:'newline'})
@@ -430,16 +441,19 @@ W.TopMenuItem=function(id,attrs){
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0){
 			//hotkey - listview selection setting
-			W.Hotkey("",{key:attrs.text.substr(p_and+1,1).toUpperCase(),action:parent.OnChange(parseInt(obj.id.substr(1)))})
+			W.Hotkey("",{key:attrs.text.substr(p_and+1,1).toUpperCase(),action:function(){parent.OnChange(parseInt(obj.id.substr(1)))}})
 		}
 		//the submenu
 		if(obj.selected){
 			//placement... leftmost left, other right
 			UI.TopMostWidget(function(){
-				W.FancyMenu("sub_menu_"+id,{
+				var obj_submenu=W.FancyMenu("sub_menu_"+id,{
 					x:id=='$0'?0:obj.x-4,y:owner.y+owner.h,
-					desc:obj.menu
+					desc:obj.menu,
+					HideMenu:function(){owner.owner.m_is_in_menu=0;},
+					parent_menu_list_view:owner.list_view,
 				})
+				UI.SetFocus(obj_submenu)
 			})
 		}
 	UI.End()
@@ -469,8 +483,54 @@ W.TopMenuBar=function(id,attrs){
 	return obj;
 }
 
+W.FancyMenu_prototype={
+	OnBlur:function(obj_new){
+		if(!obj_new||Object.getPrototypeOf(obj_new)!=W.FancyMenu_prototype){
+			this.HideMenu();
+			UI.Refresh()
+		}
+	},
+	OnKeyDown:function(event){
+		var sel=(this.value||0)
+		var n=Math.max(this.selectable_items.length,1)
+		var IsHotkey=UI.IsHotkey
+		if(0){
+		}else if(IsHotkey(event,"UP")){
+			//item id selection
+			sel--
+			if(sel<0){sel=n-1;}
+			this.value=sel;
+			UI.Refresh()
+		}else if(IsHotkey(event,"DOWN")){
+			sel++
+			if(sel>=n){sel=0;}
+			this.value=sel;
+			UI.Refresh()
+		}
+		else if(IsHotkey(event,"LEFT")){
+			var list_view=this.parent_menu_list_view
+			n=list_view.items.length;
+			sel=(list_view.value||0)
+			sel--
+			if(sel<0){sel=n-1;}
+			list_view.OnChange(sel)
+			UI.Refresh()
+		}else if(IsHotkey(event,"RIGHT")){
+			var list_view=this.parent_menu_list_view
+			n=list_view.items.length;
+			sel=(list_view.value||0)
+			sel++
+			if(sel>=n){sel=0;}
+			list_view.OnChange(sel)
+			UI.Refresh()
+		}else if(IsHotkey(event,"ESC")){
+			this.HideMenu();
+			UI.Refresh()
+		}
+	},
+};
 W.FancyMenu=function(id,attrs){
-	var obj=UI.Keep(id,attrs);
+	var obj=UI.Keep(id,attrs,W.FancyMenu_prototype);
 	UI.StdStyling(id,obj,attrs, "fancy_menu");
 	var items=obj.desc.$
 	var w_icon=obj.w_icon
@@ -511,6 +571,7 @@ W.FancyMenu=function(id,attrs){
 		obj.w=w_needed
 		obj.h=h_acc+obj.vertical_padding*2
 		//compute x y w h everywhere, assign icon with text and draw it at 0,y
+		var selectable_items=[]
 		part_id=0;w_acc=obj.side_padding+w_icon;h_acc=obj.vertical_padding;
 		for(var i=0;i<items.length;i++){
 			var item_i=items[i]
@@ -528,6 +589,7 @@ W.FancyMenu=function(id,attrs){
 				w_acc+=obj.button_padding
 				item_i.w=w_acc-item_i.x
 				item_i.h=obj.h_menu_line
+				selectable_items.push(i)
 			}else if(s_type=='rubber'){
 				w_acc=per_part_w[part_id]
 				part_id++
@@ -538,16 +600,20 @@ W.FancyMenu=function(id,attrs){
 				h_acc+=obj.h_separator
 				w_acc=obj.side_padding+w_icon;
 			}else if(s_type=='newline'){
-				item_i.x=obj.side_padding
+				item_i.x=obj.side_padding*0.5
 				item_i.y=h_acc
-				item_i.w=w_needed-obj.side_padding*2
+				item_i.w=w_needed-obj.side_padding
 				item_i.h=obj.h_menu_line
 				part_id=0;
 				w_acc=obj.side_padding+w_icon;
 				h_acc+=obj.h_menu_line
+				if(item_i.action){
+					selectable_items.push(i)
+				}
 			}
 			//again ignore 'hotkey'
 		}
+		obj.selectable_items=selectable_items
 	}
 	/////////////////
 	UI.StdAnchoring(id,obj);
@@ -555,16 +621,34 @@ W.FancyMenu=function(id,attrs){
 		color:obj.shadow_color,
 		border_width:-obj.shadow_size,round:obj.shadow_size})
 	UI.RoundRect(obj)
+	UI.Begin(obj)
 	var hc=UI.GetCharacterHeight(obj.font)
 	var hc_icon=UI.GetCharacterHeight(UI.icon_font)
+	var sel_id1=obj.selectable_items[obj.value||0]
+	var sel_id0=sel_id1
+	if(items[sel_id1].type=='newline'){
+		sel_id0--
+		while(sel_id0>=0&&items[sel_id0].type!='newline'){
+			sel_id0--;
+		}
+		sel_id0++
+	}
+	//todo: newline -> line
 	for(var i=0;i<items.length;i++){
 		var item_i=items[i]
 		var s_type=item_i.type
 		var dx=0;
+		var selected=(i>=sel_id0&&i<=sel_id1)
+		if(sel_id0<sel_id1&&i==sel_id0){
+			var item_sel1=items[sel_id1]
+			UI.RoundRect({x:obj.x+item_sel1.x,y:obj.y+item_sel1.y,w:item_sel1.w,h:item_sel1.h,
+				color:obj.sel_bgcolor,
+			})
+		}
 		if(s_type=='text'){
-			W.Text("",{x:obj.x+item_i.x,y:obj.y+item_i.y+(obj.h_menu_line-hc)*0.5,font:obj.font,text:item_i.text,color:item_i.color,flags:8})
+			W.Text("",{x:obj.x+item_i.x,y:obj.y+item_i.y+(obj.h_menu_line-hc)*0.5,font:obj.font,text:item_i.text,color:selected?item_i.sel_color:item_i.color,flags:8})
 			if(item_i.icon){
-				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font,text:item_i.icon,color:item_i.color})
+				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font,text:item_i.icon,color:selected?item_i.sel_color:item_i.color})
 			}
 		}else if(s_type=='button'){
 			W.Button(item_i.text,{x:obj.x+x_icon,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,
@@ -575,16 +659,17 @@ W.FancyMenu=function(id,attrs){
 				color:obj.separator_color,
 			})
 		}else if(s_type=='newline'){
-			//the most complicated - action -> region -> listview-like element
-			//todo: and active text... and active button / select
-			//todo: leave the listview logic to the menu-level region
 			if(item_i.action){
+				//the most complicated - action -> region -> listview-like element
+				//todo: and active text... and active button / select
+				//todo: leave the listview logic to the menu-level region
 				//!?
 			}
 		}else if(s_type=='hotkey'){
 			W.Hotkey("",{key:item_i.key,action:item_i.action})
 		}
 	}
+	UI.End()
 	return obj
 }
 

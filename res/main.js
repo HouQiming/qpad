@@ -350,7 +350,10 @@ UI.Theme_CustomWidget=function(C){
 			///////////
 			font:UI.Font(UI.font_name,22,-100),
 			text_color:0xff000000,
+			text_sel_color:0xffffffff,
 			hotkey_color:0xff7f7f7f,
+			hotkey_sel_color:0xff7f7f7f,
+			sel_bgcolor:C[0],
 			///////////
 			vertical_padding:4,
 			side_padding:8,

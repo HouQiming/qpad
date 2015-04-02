@@ -1682,19 +1682,22 @@ W.CodeEditor=function(id,attrs){
 			//UI.RoundRect({
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:obj.h,
 			//	color:obj.separator_color})
-			W.Hotkey("",{key:"CTRL+F",action:function(){
-				var sel=obj.doc.GetSelection()
-				obj.show_find_bar=1
-				obj.m_sel0_before_find=obj.doc.sel0.ccnt
-				obj.m_sel1_before_find=obj.doc.sel1.ccnt
-				if(sel[0]<sel[1]){
-					obj.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-				}
-				//if(obj.m_current_find_context){
-				//	obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.m_current_find_context.m_needle,obj.find_flags)
-				//}
-				UI.Refresh()
-			}})
+			if(UI.HasFocus(doc)){
+				var menu_search=UI.BigMenu("&Search")
+				menu_search.AddNormalItem({text:"&Find or replace",enable_hotkey:1,key:"CTRL+F",action:function(){
+					var sel=obj.doc.GetSelection()
+					obj.show_find_bar=1
+					obj.m_sel0_before_find=obj.doc.sel0.ccnt
+					obj.m_sel1_before_find=obj.doc.sel1.ccnt
+					if(sel[0]<sel[1]){
+						obj.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+					}
+					//if(obj.m_current_find_context){
+					//	obj.ResetFindingContext(obj.doc.sel1.ccnt,obj.m_current_find_context.m_needle,obj.find_flags)
+					//}
+					UI.Refresh()
+				}})
+			}
 		}
 	UI.End()
 	return obj
