@@ -725,24 +725,34 @@ W.CodeEditorWidget_prototype={
 			return
 		}
 		doc.ed.saving_context=ctx
+		this.AcquireEditLock();
 		var fsave=UI.HackCallback(function(){
 			var ret=UI.EDSaver_Write(ctx)
 			if(ret=="done"){
 				doc.saved_point=doc.ed.GetUndoQueueLength()
+				this.ReleaseEditLock();
 				doc.ed.saving_context=undefined
 				this.OnSave();
 				UI.Refresh()
 			}else if(ret=="continue"){
 				UI.NextTick(fsave)
 			}else{
+				this.ReleaseEditLock();
 				doc.ed.saving_context=undefined
 				//todo: error notification
 			}
 		}).bind(this)
 		fsave();
 	},
+	///////////////////////////////////////////
+	m_edit_lock:0,
+	AcquireEditLock:function(){
+		this.m_edit_lock++
+	},
+	ReleaseEditLock:function(){
+		if(this.m_edit_lock>0){this.m_edit_lock--;}
+	},
 	////////////////////////////////////
-	//todo: GetFindResult, scroll_x
 	//the virtual document doesn't include middle expansion
 	//middle-expand with fixed additional size to make it possible
 	ResetFindingContext:function(sneedle,flags, force_ccnt){
@@ -1105,17 +1115,57 @@ W.CodeEditorWidget_prototype={
 		}
 		return ret
 	},
+	FindNext:function(direction){
+		UI.assert(!this.m_find_next_context,"panic: FindNext when there is another context")
+		if(!this.m_current_needle){
+			//no needle, no find
+			return;
+		}
+		var doc=this.doc
+		var ccnt=doc.sel1.ccnt
+		var ctx={
+			m_frontier:ccnt,
+			m_owner:this,
+			m_needle:this.m_current_needle,
+			m_flags:this.find_flags,
+			m_match_reported:0,
+			ReportMatch:function(ccnt0,ccnt1){
+				if(direction>0){
+					doc.sel0.ccnt=ccnt0
+					doc.sel1.ccnt=ccnt1
+				}else{
+					doc.sel0.ccnt=ccnt1
+					doc.sel1.ccnt=ccnt0
+				}
+				this.m_match_reported=1
+				doc.AutoScroll("center_if_hidden")
+				UI.Refresh()
+				return 1048576
+			},
+			ffind_next:function(){
+				this.m_frontier=UI.ED_Search(doc.ed,this.m_frontier,direction,this.m_needle,this.m_flags,1048576,this.ReportMatch,this)
+				if(this.m_frontier<0||this.m_match_reported){
+					UI.assert(this.m_owner.m_find_next_context==this,"panic: FindNext context overwritten")
+					this.m_owner.ReleaseEditLock();
+					this.m_owner.m_find_next_context=undefined
+					if(!this.m_match_reported){
+						//todo: notification
+					}
+					UI.Refresh()
+				}else{
+					UI.NextTick(this.ffind_next.bind(this));
+				}
+			}
+		}
+		this.AcquireEditLock();
+		this.m_find_next_context=ctx;
+		ctx.ffind_next();
+	},
 }
 
 var ffindbar_plugin=function(){
 	this.AddEventHandler('ESC',function(){
-		var obj=this.owner
-		obj.show_find_bar=0;
-		obj.doc.sel0.ccnt=obj.m_sel0_before_find
-		obj.doc.sel1.ccnt=obj.m_sel1_before_find
-		obj.doc.AutoScroll('center')
-		obj.doc.scrolling_animation=undefined
-		UI.Refresh()
+		this.CancelFind();
 	})
 	this.AddEventHandler('RETURN',function(){
 		var obj=this.owner
@@ -1354,9 +1404,10 @@ W.CodeEditor=function(id,attrs){
 			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:obj.w-w_line_numbers,h:obj.h})
 		}
 		//todo: loading progress - notification system
-		if(doc&&doc.ed.saving_context){
-			//todo: draw a progress bar with no interaction
+		//todo: find-next/prev context
+		if(doc&&doc.m_edit_lock){
 			obj.__children.push(doc)
+			//todo: still render it, but without the caret
 		}else{
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar
@@ -1394,9 +1445,6 @@ W.CodeEditor=function(id,attrs){
 				doc.visible_scroll_x=anim.scroll_x
 				doc.visible_scroll_y=anim.scroll_y
 			}else{
-				//if(!?){
-				//	!? //this.m_current_needle
-				//}
 				W.Edit("doc",{
 					///////////////
 					language:g_language_C,//todo
@@ -1562,7 +1610,7 @@ W.CodeEditor=function(id,attrs){
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_word",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"字",tooltip:"Word wrap",
+					font:UI.icon_font,text:"字",tooltip:"Whole word",
 					value:(obj.find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
@@ -1571,7 +1619,7 @@ W.CodeEditor=function(id,attrs){
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_regexp",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"正",tooltip:"Regular Expression",
+					font:UI.icon_font,text:"正",tooltip:"Regular expression",
 					value:(obj.find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 					OnChange:function(value){
 						obj.find_flags=(obj.find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
@@ -1583,7 +1631,21 @@ W.CodeEditor=function(id,attrs){
 				W.Edit("find_bar_edit",{language:doc.language,style:obj.find_bar_editor_style,
 					x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 					owner:obj,
-					plugins:[ffindbar_plugin]
+					plugins:[ffindbar_plugin],
+					CancelFind:function(){
+						var obj=this.owner
+						obj.show_find_bar=0;
+						obj.doc.sel0.ccnt=obj.m_sel0_before_find
+						obj.doc.sel1.ccnt=obj.m_sel1_before_find
+						obj.doc.AutoScroll('center')
+						obj.doc.scrolling_animation=undefined
+						UI.Refresh()
+					},
+					OnBlur:function(nd_new){
+						if(nd_new==doc){
+							this.CancelFind();
+						}
+					},
 				},W.CodeEditor_prototype);
 				if(!previous_edit){
 					if(obj.m_current_needle){
@@ -1699,10 +1761,10 @@ W.CodeEditor=function(id,attrs){
 					UI.Refresh()
 				}})
 				menu_search.AddButtonRow({text:"Find "},[
-					{key:"CTRL+G F3",text:"&previous",action:function(){
-						//todo
-					}},{key:"SHIFT+CTRL+G SHIFT+F3",text:"&next",action:function(){
-						//todo
+					{key:"CTRL+G F3",text:"&previous",tooltip:'CTRL+G',action:function(){
+						obj.FindNext(1)
+					}},{key:"SHIFT+CTRL+G SHIFT+F3",text:"&next",tooltip:'SHIFT+CTRL+G',action:function(){
+						obj.FindNext(-1)
 					}}])
 			}
 		}

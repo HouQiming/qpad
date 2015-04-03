@@ -433,6 +433,9 @@ W.CFancyMenuDesc.prototype={
 				children.push(
 					{type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
 			}
+			if(button_i.key){
+				W.Hotkey("",{key:button_i.key,action:button_i.action})
+			}
 		}
 		children.push({type:'newline'})
 	},
@@ -736,6 +739,7 @@ W.FancyMenu=function(id,attrs){
 				font:item_i.icon?UI.icon_font:obj.font,text:item_i.icon||item_i.text,OnClick:item_i.action,
 				value:selected,
 				style:obj.button_style,
+				tooltip:item_i.tooltip,
 				flags:8})
 		}else if(s_type=='separator'){
 			UI.RoundRect({x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:obj.h_separator_fill,
