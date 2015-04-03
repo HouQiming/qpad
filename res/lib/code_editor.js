@@ -789,6 +789,7 @@ W.CodeEditorWidget_prototype={
 			m_needle:sneedle,
 			m_flags:flags,
 			m_find_scroll_visual_y:-(this.h/this.find_item_scale-this.find_item_expand_current*hc)*0.5,
+			m_home_end:'init',
 			///////////////////////////////
 			m_merged_y_windows_backward:[],
 			m_merged_y_windows_forward:[],
@@ -1025,6 +1026,9 @@ W.CodeEditorWidget_prototype={
 			ctx.m_y_extent_backward=current_visual_y
 			if(ctx.m_home_end=='home'){
 				ctx.m_current_point=-(ctx.m_backward_matches.length>>1)
+				if(ctx.m_backward_frontier<0){
+					ctx.m_home_end=undefined
+				}
 			}
 			UI.Refresh()
 		}
@@ -1063,6 +1067,17 @@ W.CodeEditorWidget_prototype={
 			ctx.m_y_extent_forward=current_visual_y+current_y1-current_y0
 			if(ctx.m_home_end=='end'){
 				ctx.m_current_point=(ctx.m_forward_matches.length>>1)
+				if(ctx.m_forward_frontier<0){
+					ctx.m_home_end=undefined
+				}
+			}
+			if(ctx.m_home_end=='init'){
+				if(ctx.m_forward_matches.length>0){
+					ctx.m_current_point=1
+					ctx.m_home_end=undefined
+				}else if(ctx.m_forward_frontier<0){
+					ctx.m_home_end=undefined
+				}
 			}
 			UI.Refresh()
 		}
