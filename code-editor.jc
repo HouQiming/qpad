@@ -1088,9 +1088,119 @@ auto SearchPlainText(CEditableText ed,i64 ccnt_starting,const direction, string 
 SEARCH_FLAG_CASE_SENSITIVE=1
 SEARCH_FLAG_WHOLE_WORD=2
 SEARCH_FLAG_REGEXP=4
-auto SearchRegexp(CEditableText ed,i64 ccnt, string sregexp,int flags,function(i64,i64):int ReportMatch, int budget)
-	//todo: use the old regexp code - duk code too complicated
-	return -1LL
+class CRegexpSearchContext
+	int has6,has4
+	i64 ccnt,ccnt_base
+	RegexIncrementalMatcher matcher
+	iptr[] match0
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"ccnt")
+	};
+
+auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int flags,function(i64,i64):int ReportMatch, int budget)
+	//use the old regexp code - duk code too complicated
+	ctx=JS.Param(1).as(CRegexpSearchContext)
+	if !ctx:
+		ccnt_starting=JS.Param(1).as(i64)
+		//6:^, 4:$
+		has6=0;has4=0
+		se=sregexp
+		if se.n&&se[0]=='^':
+			se=se[1:]
+			has6=1
+		if se.n&&se.back()=='$':
+			se=se[:se.n-2]
+			has4=1
+		if se=="":se="\"\""
+		reo=ParseRegex(se)
+		if !(flags&SEARCH_FLAG_CASE_SENSITIVE):reo=RegexMakeCaseInsensitive(reo)
+		reo=RegexBracket(reo)
+		if has6&&dir>0:
+			reo=ParseRegex("\n")+reo
+		if has4&&dir<0:
+			reo=reo+ParseRegex("\r?\n")
+		if dir<0:
+			reo=reo+ParseRegex("[\\x00-\\xff]*?")
+			regex=RegexReverse(reo)
+		else
+			reo=ParseRegex("[\\x00-\\xff]*?")+reo
+			regex=new Regex(reo)
+		matcher=regex.Matcher()
+		ccnt_base=ccnt_starting
+		if dir>0?has6:has4:
+			matcher.Add('\n')
+			ccnt_base-=dir
+		match0=iptr[].NULL
+		ctx=new CRegexpSearchContext(){matcher:matcher,has4:has4,has6:has6,ccnt:ccnt_starting,ccnt_base:ccnt_base,match0:match0}
+	else
+		matcher=ctx.matcher
+		ccnt_starting=ctx.ccnt
+		ccnt_base=ctx.ccnt_base
+		has4=ctx.has4
+		has6=ctx.has6
+		match0=ctx.match0
+	has_tail_enter=0
+	if dir>0?has4:has6:
+		has_tail_enter=1
+	pbudget=budget
+	testMatch=function(int ch,i64 ccnt,iptr[] match){
+		assert(match.n>=2)
+		auto ccnt0=ccnt_base+dir*match[match.n-2]
+		auto ccnt1=ccnt_base+dir*match[match.n-1]
+		if dir<0:
+			tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp
+		auto match_is_invalid=0
+		if ccnt0==ccnt1&&!has6&&!has4:
+			//ignore zero-sized matches except when we have $/^
+			match_is_invalid=1
+		if !match_is_invalid&&(flags&SEARCH_FLAG_WHOLE_WORD):
+			(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
+			(ch0x,ch1x)=ed.GetUtf8CharNeighborhood(ccnt1)
+			if isWordChar(ch0)==isWordChar(ch1)||isWordChar(ch0x)==isWordChar(ch1x):
+				match_is_invalid=1
+		if !match_is_invalid:
+			(ch0,ch1)=ed.GetCharNeighborhood(ccnt0)
+			if has6&&ch0!='\n':
+				match_is_invalid=1
+			(ch0,ch1)=ed.GetCharNeighborhood(ccnt1)
+			if has4&&ch1!='\n'&&ch1!='\r':
+				match_is_invalid=1
+		if !match_is_invalid:
+			pbudget-=ReportMatch(ccnt0,ccnt1)*16
+		matcher.Clear()
+		matcher.Add(char(ch))
+		ccnt_base=ccnt+(dir<0)
+		match0=matcher.GetMatch()
+	}
+	for ch,ccnt in dir>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
+		matcher.Add(char(ch))
+		auto match=matcher.GetMatch()
+		is_sliding=0
+		if match0&&match&&(match0[match0.n-2]!=match[match.n-2]):
+			is_sliding=1
+			match=match0
+		match0=match
+		if (is_sliding||!matcher.is_matching())&&match:
+			testMatch(int(u8(ch)),ccnt,match)
+		////////////////////////
+		pbudget-=16
+		if pbudget<=0:
+			//we are out of budget, exit
+			ctx.match0=match0
+			ctx.ccnt=ccnt+(dir>0)
+			ctx.ccnt_base=ccnt_base
+			return JS.Return(ctx)
+	ch=(has_tail_enter?int('\n'):-1)
+	if ch!=-1:matcher.Add(char(ch))
+	match=matcher.GetMatch()
+	is_sliding=0
+	if match0&&match&&(match0[match.n-2]!=match[match.n-2]):
+		is_sliding=1
+		match=match0
+	match0=match
+	if (is_sliding||!matcher.is_matching()||ch==-1)&&match:
+		testMatch(ch,dir>0?ed.GetTextSize():-1LL,match)
+	return JS.Return(-1LL)
 	
 ///////////////////////////////////////////
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
@@ -1152,7 +1262,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	}
 	JS_UI["ED_Search"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
-		ccnt0=JS.Param(1).as(i64)
 		direction=JS.Param(2).or(1)
 		s=JS.Param(3).as(string)
 		flags=JS.Param(4).as(int)
@@ -1160,18 +1269,26 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		js_callback=JS.Param(6).as(JSObject)
 		js_this=JS.Param(7).as(JSObject)
 		/////////////
-		ocase=(flags&SEARCH_FLAG_CASE_SENSITIVE)
-		ReportMatch=function(i64 ccnt0,i64 ccnt1){
-			if flags&SEARCH_FLAG_WHOLE_WORD:
-				(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
-				if isWordChar(ch0)==isWordChar(ch1):return 0
-				(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
-				if isWordChar(ch0)==isWordChar(ch1):return 0
-			return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
-		}
 		if flags&SEARCH_FLAG_REGEXP:
-			ret=SearchRegexp(ed,ccnt0, s,flags,ReportMatch, budget)
+			ReportMatch=function(i64 ccnt0,i64 ccnt1){
+				return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
+			}
+			//the regexp version returns an object to JS
+			if direction>0:
+				return SearchRegexp(JS,ed,1, s,flags,ReportMatch, budget)
+			else
+				return SearchRegexp(JS,ed,-1, s,flags,ReportMatch, budget)
 		else
+			ReportMatch=function(i64 ccnt0,i64 ccnt1){
+				if flags&SEARCH_FLAG_WHOLE_WORD:
+					(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
+					if isWordChar(ch0)==isWordChar(ch1):return 0
+					(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
+					if isWordChar(ch0)==isWordChar(ch1):return 0
+				return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
+			}
+			ocase=(flags&SEARCH_FLAG_CASE_SENSITIVE)
+			ccnt0=JS.Param(1).as(i64)
 			if direction>0:
 				ret=SearchPlainText(ed,ccnt0,1, s,ocase,ReportMatch, budget)
 			else

@@ -665,6 +665,19 @@ W.MinimapThingy_prototype={
 	},
 }
 
+UI.IsSearchFrontierCompleted=function(frontier){
+	return UI.GetSearchFrontierCcnt(frontier)<0
+}
+
+UI.GetSearchFrontierCcnt=function(frontier){
+	if((typeof frontier)=='number'){
+		return frontier
+	}else{
+		//print(frontier,frontier.ccnt)
+		return frontier.ccnt
+	}
+}
+
 UI.SEARCH_FLAG_CASE_SENSITIVE=1
 UI.SEARCH_FLAG_WHOLE_WORD=2
 UI.SEARCH_FLAG_REGEXP=4
@@ -989,7 +1002,7 @@ W.CodeEditorWidget_prototype={
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 		var h_safety=hc*this.find_item_expand_current;
 		var h_safety_internal=h_safety+h_find_items//for page up/down
-		if(find_scroll_y<ctx.m_y_extent_backward+h_safety_internal&&ctx.m_backward_frontier>=0){
+		if(find_scroll_y<ctx.m_y_extent_backward+h_safety_internal&&!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)){
 			var p0=ctx.m_backward_matches.length
 			ctx.m_backward_frontier=UI.ED_Search(doc.ed,ctx.m_backward_frontier,-1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchBackward,ctx)
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_backward
@@ -1026,13 +1039,13 @@ W.CodeEditorWidget_prototype={
 			ctx.m_y_extent_backward=current_visual_y
 			if(ctx.m_home_end=='home'){
 				ctx.m_current_point=-(ctx.m_backward_matches.length>>1)
-				if(ctx.m_backward_frontier<0){
+				if(UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)){
 					ctx.m_home_end=undefined
 				}
 			}
 			UI.Refresh()
 		}
-		if(find_scroll_y+find_shared_h>ctx.m_y_extent_forward-h_safety_internal&&ctx.m_forward_frontier>=0){
+		if(find_scroll_y+find_shared_h>ctx.m_y_extent_forward-h_safety_internal&&!UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){
 			var p0=ctx.m_forward_matches.length
 			ctx.m_forward_frontier=UI.ED_Search(doc.ed,ctx.m_forward_frontier,1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchForward,ctx);
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_forward
@@ -1067,7 +1080,7 @@ W.CodeEditorWidget_prototype={
 			ctx.m_y_extent_forward=current_visual_y+current_y1-current_y0
 			if(ctx.m_home_end=='end'){
 				ctx.m_current_point=(ctx.m_forward_matches.length>>1)
-				if(ctx.m_forward_frontier<0){
+				if(UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){
 					ctx.m_home_end=undefined
 				}
 			}
@@ -1075,7 +1088,7 @@ W.CodeEditorWidget_prototype={
 				if(ctx.m_forward_matches.length>0){
 					ctx.m_current_point=1
 					ctx.m_home_end=undefined
-				}else if(ctx.m_forward_frontier<0){
+				}else if(UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){
 					ctx.m_home_end=undefined
 				}
 			}
@@ -1087,8 +1100,8 @@ W.CodeEditorWidget_prototype={
 		if(p0==-((ctx.m_merged_y_windows_backward.length>>2)-1)){
 			//BOF
 			var s_bof_message;
-			if(ctx.m_backward_frontier>=0){
-				s_bof_message=UI._("Searching @1%").replace("@1",((1-ctx.m_backward_frontier/ccnt_tot)*100).toFixed(0))
+			if(!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)){
+				s_bof_message=UI._("Searching @1%").replace("@1",((1-UI.GetSearchFrontierCcnt(ctx.m_backward_frontier)/ccnt_tot)*100).toFixed(0))
 			}else{
 				s_bof_message=UI._("No more matches above")
 			}
@@ -1116,8 +1129,8 @@ W.CodeEditorWidget_prototype={
 		if(p1==(ctx.m_merged_y_windows_forward.length>>2)-1){
 			//EOF
 			var s_eof_message;
-			if(ctx.m_forward_frontier>=0){
-				s_eof_message=UI._("Searching @1%").replace("@1",((ctx.m_forward_frontier/ccnt_tot)*100).toFixed(0))
+			if(!UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){
+				s_eof_message=UI._("Searching @1%").replace("@1",((UI.GetSearchFrontierCcnt(ctx.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
 			}else{
 				s_eof_message=UI._("No more matches below")
 			}
@@ -1159,7 +1172,7 @@ W.CodeEditorWidget_prototype={
 			},
 			ffind_next:function(){
 				this.m_frontier=UI.ED_Search(doc.ed,this.m_frontier,direction,this.m_needle,this.m_flags,1048576,this.ReportMatch,this)
-				if(this.m_frontier<0||this.m_match_reported){
+				if(UI.IsSearchFrontierCompleted(this.m_frontier)||this.m_match_reported){
 					UI.assert(this.m_owner.m_find_next_context==this,"panic: FindNext context overwritten")
 					this.m_owner.ReleaseEditLock();
 					this.m_owner.m_find_next_context=undefined
@@ -1394,11 +1407,11 @@ W.CodeEditor=function(id,attrs){
 				obj.ResetFindingContext(obj.m_current_needle,obj.find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
 				var ctx=obj.m_current_find_context
 				current_find_context=ctx
-				if(ctx.m_backward_frontier>=0&&ctx.m_backward_frontier>rendering_ccnt0){
+				if(!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)&&UI.GetSearchFrontierCcnt(ctx.m_backward_frontier)>rendering_ccnt0){
 					ctx.m_backward_frontier=UI.ED_Search(doc.ed,ctx.m_backward_frontier,-1,ctx.m_needle,ctx.m_flags,65536,ctx.ReportMatchBackward,ctx)
 					UI.Refresh()
 				}
-				if(ctx.m_forward_frontier>=0&&ctx.m_forward_frontier<rendering_ccnt1){
+				if(!UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)&&UI.GetSearchFrontierCcnt(ctx.m_forward_frontier)<rendering_ccnt1){
 					ctx.m_forward_frontier=UI.ED_Search(doc.ed,ctx.m_forward_frontier,1,ctx.m_needle,ctx.m_flags,65536,ctx.ReportMatchForward,ctx);
 					UI.Refresh()
 				}
@@ -1776,10 +1789,10 @@ W.CodeEditor=function(id,attrs){
 					UI.Refresh()
 				}})
 				menu_search.AddButtonRow({text:"Find "},[
-					{key:"CTRL+G F3",text:"&previous",tooltip:'CTRL+G',action:function(){
-						obj.FindNext(1)
-					}},{key:"SHIFT+CTRL+G SHIFT+F3",text:"&next",tooltip:'SHIFT+CTRL+G',action:function(){
+					{key:"SHIFT+CTRL+G SHIFT+F3",text:"&previous",tooltip:'SHIFT+CTRL+G',action:function(){
 						obj.FindNext(-1)
+					}},{key:"CTRL+G F3",text:"&next",tooltip:'CTRL+G',action:function(){
+						obj.FindNext(1)
 					}}])
 			}
 		}
