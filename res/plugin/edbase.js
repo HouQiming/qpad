@@ -391,7 +391,7 @@ UI.RegisterEditorPlugin(function(){
 	//alt+pgup/pgdn
 	if(this.plugin_class!="code_editor"){return;}
 	this.m_outer_scope_queue=[]
-	this.AddEventHandler('ALT+PGUP',function(){
+	var fouter_scope=function(){
 		var ed=this.ed;
 		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
 		if(ccnt_new>=0){
@@ -403,8 +403,8 @@ UI.RegisterEditorPlugin(function(){
 			return 0;
 		}
 		return 1;
-	})
-	this.AddEventHandler('ALT+PGDN',function(){
+	}
+	var finner_scope=function(){
 		if(this.m_outer_scope_queue.length){
 			var ccnt_new=this.m_outer_scope_queue.pop()
 			this.sel0.ccnt=ccnt_new
@@ -413,12 +413,13 @@ UI.RegisterEditorPlugin(function(){
 			UI.Refresh()
 			return 0;
 		}
-	})
-	this.AddEventHandler('selectionChange',function(){
-		this.m_outer_scope_queue=[];
-	})
+	}
+	this.AddEventHandler('ALT+PGUP',fouter_scope)
+	this.AddEventHandler('ALT+PGDN',finner_scope)
+	this.AddEventHandler('selectionChange',function(){this.m_outer_scope_queue=[];})
+	this.AddEventHandler('change',function(){this.m_outer_scope_queue=[];})
 	//alt+up/down
-	this.AddEventHandler('ALT+UP',function(){
+	var fscopeup=function(){
 		var ed=this.ed;
 		var id_indent=ed.m_handler_registration["seeker_indentation"]
 		var my_level=this.GetIndentLevel(this.sel1.ccnt);
@@ -431,8 +432,8 @@ UI.RegisterEditorPlugin(function(){
 			return 0;
 		}
 		return 1
-	})
-	this.AddEventHandler('ALT+DOWN',function(){
+	}
+	var fscopedown=function(){
 		var ed=this.ed;
 		var id_indent=ed.m_handler_registration["seeker_indentation"]
 		var my_level=this.GetIndentLevel(this.sel1.ccnt);
@@ -445,6 +446,28 @@ UI.RegisterEditorPlugin(function(){
 			return 0;
 		}
 		return 1
+	}
+	this.AddEventHandler('ALT+UP',fscopeup)
+	this.AddEventHandler('ALT+DOWN',fscopedown)
+	/////////////////////////
+	this.AddEventHandler('afterRender',function(){
+		if(UI.HasFocus(this)){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			menu_search.AddButtonRow({text:"Scope"},[
+				{text:"&outer",tooltip:'ALT+PGUP',action:function(){
+					fouter_scope.call(doc)
+				}},{text:"&inner",tooltip:'ALT+PGDN',action:function(){
+					finner_scope.call(doc)
+				}}])
+			menu_search.AddButtonRow({text:"Lines of the same indentation"},[
+				{text:"up",tooltip:'ALT+UP',action:function(){
+					fscopeup.call(doc)
+				}},{text:"down",tooltip:'ALT+DOWN',action:function(){
+					fscopedown.call(doc)
+				}}])
+			menu_search.AddSeparator();
+		}
 	})
 });
 
@@ -669,3 +692,4 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('CTRL+SHIFT+P',function(){goto_matching_bracket.call(this,0)})
 	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,1)})
 });
+

@@ -198,7 +198,7 @@ var g_name_by_ext={}
 var g_desc_by_name={}
 
 exports.GetNameByExt=function(s_ext){
-	return (g_name_by_ext[s_ext.toLowerCase()]||"text")
+	return (g_name_by_ext[s_ext.toLowerCase()]||"Plain text")
 }
 
 exports.GetDefinitionByName=function(s_name){

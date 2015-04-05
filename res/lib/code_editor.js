@@ -1804,7 +1804,7 @@ W.CodeEditor=function(id,attrs){
 					}},{key:"CTRL+G F3",text:"&next",tooltip:'CTRL+G',action:function(){
 						obj.FindNext(1)
 					}}])
-				menu_search.AddButtonRow({text:"Quick find"},[
+				menu_search.AddButtonRow({text:"Find the current word"},[
 					{key:"SHIFT+CTRL+F3",text:"above",tooltip:'SHIFT+CTRL+F3',action:function(){
 						obj.BeforeQuickFind(-1);
 						obj.FindNext(-1)
