@@ -1,6 +1,6 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
-var LanguageDefinition=function(){
+var LanguageDefinition=function(owner){
 	this.m_existing_tokens={};
 	this.m_big_chars=[];
 	this.m_bracket_types=[];
@@ -9,6 +9,8 @@ var LanguageDefinition=function(){
 	this.m_color_default="color";
 	this.m_keyword_sets=[];
 	this.m_word_dfa_initial_state=[-1];
+	////////////////
+	this.m_owner=owner
 };
 var REAL_TYPE_MOV=0;
 var REAL_TYPE_XOR=1;
@@ -38,6 +40,8 @@ LanguageDefinition.prototype={
 		var tok1=this.DefineToken(stok1);
 		if(type=="nested"){
 			real_type=REAL_TYPE_ADD;
+			this.m_owner.m_lbracket_tokens=((typeof stok0=="string")?[stok0]:stok0)
+			this.m_owner.m_rbracket_tokens=((typeof stok1=="string")?[stok1]:stok1)
 		}else{
 			if(tok0.length==1&&tok1.length==1&&tok0[0]==tok1[0]){
 				real_type=REAL_TYPE_XOR;
@@ -68,7 +72,7 @@ LanguageDefinition.prototype={
 	},
 	/////////////////
 	isInside:function(bid){
-		if(!this.m_bracket_types[bid].is_key){throw "isInside only works on key brackets";}
+		if(!this.m_bracket_types[bid].is_key){throw new Error("isInside only works on key brackets");}
 		return this.m_inside_mask&(1<<bid);
 	},
 	Enable:function(bid){
@@ -161,6 +165,18 @@ LanguageDefinition.prototype={
 		if(this.m_entry_states.length>64){
 			throw new Error("there are @1 entry states, but the system only supports 64".replace("@1",this.m_entry_states.length))
 		}
+		var inside_mask_to_enabled_mask={};
+		for(var i=0;i<this.m_entry_states.length;i++){
+			var est=this.m_entry_states[i]
+			inside_mask_to_enabled_mask[est.inside]=est.enabled
+		}
+		this.m_owner.m_entry_states=this.m_entry_states
+		this.m_owner.m_inside_mask_to_enabled_mask=inside_mask_to_enabled_mask
+		if(bras.length&&bras[bras.length-1].type==REAL_TYPE_ADD){
+			this.m_owner.m_bracket_enabling_mask=1<<(bras.length-1)
+		}else{
+			this.m_owner.m_bracket_enabling_mask=0;
+		}
 		//translate m_coloring_rules
 		if(this.m_coloring_rules.length>63){
 			throw new Error("there are @1 coloring rules, but the system only supports 63".replace("@1",this.m_coloring_rules.length))
@@ -171,12 +187,40 @@ LanguageDefinition.prototype={
 	},
 };
 
-exports.Define=function(frules,fenabler){
-	var ret=new LanguageDefinition();
+exports.Define=function(frules,owner){
+	var ret=new LanguageDefinition(owner);
 	var fenabler=frules(ret);
 	ret.Finalize(fenabler);
 	return UI.CreateLanguageDefinition(ret);
 };
+
+var g_name_by_ext={}
+var g_desc_by_name={}
+
+exports.GetNameByExt=function(s_ext){
+	return (g_name_by_ext[s_ext.toLowerCase()]||"text")
+}
+
+exports.GetDefinitionByName=function(s_name){
+	var desc=g_desc_by_name[s_name];
+	if(!desc.definition){
+		desc.definition=exports.Define(desc.rules.bind(desc),desc)
+	}
+	return desc.definition
+}
+
+exports.GetDescObjectByName=function(s_name){
+	return g_desc_by_name[s_name];
+}
+
+exports.Register=function(desc){
+	g_desc_by_name[desc.name]=desc
+	if(desc.extensions){
+		for(var i=0;i<desc.extensions.length;i++){
+			g_name_by_ext[desc.extensions[i].toLowerCase()]=desc.name
+		}
+	}
+}
 
 ///////////////////////////////////
 var KeywordSet=function(){
@@ -198,4 +242,4 @@ KeywordSet.prototype={
 	DefineWordColor:function(s_color){
 		this.m_word_color_default=s_color;
 	},
-}
+};

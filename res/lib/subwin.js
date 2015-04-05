@@ -134,6 +134,7 @@ W.TabbedDocument_prototype={
 	OnMenu:function(){
 		this.m_is_in_menu=!this.m_is_in_menu;
 		if(this.m_is_in_menu){
+			//g_menu_action_invoked=0;
 			UI.m_frozen_global_menu=UI.m_global_menu
 		}
 		UI.Refresh()
@@ -202,7 +203,9 @@ W.TabbedDocument=function(id,attrs){
 							W.Hotkey("",{key:"ALT+"+s_text.substr(p_and+1,1).toUpperCase(),action:function(){
 								obj.m_is_in_menu=1;
 								obj.m_menu_preselect=i
+								//g_menu_action_invoked=0;
 								UI.m_frozen_global_menu=UI.m_global_menu
+								UI.InvalidateCurrentFrame()
 								UI.Refresh()
 							}})
 						}
@@ -219,6 +222,7 @@ W.TabbedDocument=function(id,attrs){
 			OnChange:function(value){
 				obj.m_is_in_menu=value
 				if(obj.m_is_in_menu){
+					//g_menu_action_invoked=0;
 					UI.m_frozen_global_menu=UI.m_global_menu
 				}
 			}})
@@ -387,10 +391,17 @@ W.SaveDialog=function(id,attrs){
 
 ////////////////////////////////////////////////////////
 //text (colored), rubber, button, newline (with optional line-wide event)
+//var g_menu_action_invoked=0;
 var WrapMenuAction=function(action){
 	if(!action){return action;}
 	UI.HackCallback(action)
-	return UI.HackCallback(function(){UI.SetFocus(null);action();});
+	return UI.HackCallback(function(){
+		//g_menu_action_invoked=1;
+		UI.SetFocus(null);
+		UI.InvalidateCurrentFrame();
+		UI.Refresh()
+		action();
+	});
 }
 
 W.CFancyMenuDesc=function(){
@@ -400,19 +411,20 @@ W.CFancyMenuDesc.prototype={
 	AddNormalItem:function(attrs){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color,sel_color:style.text_sel_color})
-		attrs.action=WrapMenuAction(attrs.action);
+		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:attrs.action?style.text_color:style.hotkey_color,sel_color:style.text_sel_color})
+		if(attrs.action){attrs.action=WrapMenuAction(attrs.action);}
 		var p_and=attrs.text.indexOf('&')
-		if(p_and>=0){
+		if(p_and>=0&&attrs.action){
 			//underlined hotkey
 			children.push(
-				{type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
+				{type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action},
+				{type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
 		}
 		if(attrs.key){
 			children.push(
 				{type:'rubber'},
 				{type:'text',text:UI.LocalizeKeyName(attrs.key),color:style.hotkey_color,sel_color:style.hotkey_sel_color})
-			if(attrs.enable_hotkey){W.Hotkey("",{key:attrs.key,action:attrs.action})}
+			if(attrs.enable_hotkey&&attrs.action){W.Hotkey("",{key:attrs.key,action:attrs.action})}
 		}
 		children.push({type:'newline',action:attrs.action})
 	},
@@ -431,7 +443,8 @@ W.CFancyMenuDesc.prototype={
 			if(p_and>=0){
 				//underlined hotkey
 				children.push(
-					{type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
+					{type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action},
+					{type:'hotkey',key:'ALT+'+button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
 			}
 			if(button_i.key){
 				W.Hotkey("",{key:button_i.key,action:button_i.action})
@@ -543,13 +556,19 @@ W.TopMenuBar=function(id,attrs){
 			W.Hotkey("",{key:"DOWN",action:fshow_sub_menus})
 			W.Hotkey("",{key:"RETURN RETURN2",action:fshow_sub_menus})
 			W.Hotkey("",{key:"ESC",action:function(){obj.owner.m_is_in_menu=0;UI.Refresh();}})
-			if(is_first){UI.SetFocus(obj.list_view);}
+			if(is_first&&!obj.m_show_sub_menus){
+				UI.SetFocus(obj.list_view);
+			}
 			if(is_first&&obj.default_value!=undefined){
 				obj.list_view.OnChange(obj.default_value);
 				obj.m_show_sub_menus=1
 				UI.InvalidateCurrentFrame();
 				UI.Refresh();
 			}
+			//if(g_menu_action_invoked){
+			//	UI.SetFocus(null)
+			//	g_menu_action_invoked=0;
+			//}
 		}
 	UI.End()
 	return obj;
@@ -705,6 +724,7 @@ W.FancyMenu=function(id,attrs){
 		color:obj.shadow_color,
 		border_width:-obj.shadow_size,round:obj.shadow_size})
 	UI.RoundRect(obj)
+	W.PureRegion(id,obj);
 	UI.Begin(obj)
 	var hc=UI.GetCharacterHeight(obj.font)
 	var hc_icon=UI.GetCharacterHeight(UI.icon_font)

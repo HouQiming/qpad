@@ -240,7 +240,9 @@ UI.Theme_CustomWidget=function(C){
 		code_editor:{
 			editor_style:{
 				font:UI.Font("res/fonts/inconsolata.ttf",24),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
 				color:0xff000000,
+				color_normal:0xff000000,
 				color_overlay:0xff000000,
 				color_string:0xff1c1aa3,
 				color_number:0xff1c1aa3,
@@ -248,6 +250,7 @@ UI.Theme_CustomWidget=function(C){
 				color_keyword:0xffb4771f,
 				color_type:0xffbc470f,
 				color_symbol:0xff7f7f7f,
+				color_symbol2:0xff7f7f7f,
 				color_meta:0xff9a3d6a,
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,

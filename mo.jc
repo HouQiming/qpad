@@ -63,6 +63,10 @@ __generate_json("include_js","build/make_new_docs.js")
 			return JS.Return(fi.latest_time())
 		return 0
 	}
+	jsio["FileExists"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		return JS.Return(System.IO.FileExists(fn))
+	}
 	/////////////
 	dname_base=0
 	jsio["GetNewDocumentName"]=function(JSContext JS){
