@@ -68,6 +68,13 @@ LanguageDefinition.prototype={
 	ColoredDelimiter:function(type,stok0,stok1,color_name){
 		var bid=this.DefineDelimiter(type,stok0,stok1)
 		this.AddColorRule(bid,color_name);
+		if(color_name=="color_comment"){
+			if(stok1=='\n'){
+				this.m_owner.line_comment=stok0
+			}else{
+				this.m_owner.paired_comment=[stok0,stok1]
+			}
+		}
 		return bid;
 	},
 	/////////////////

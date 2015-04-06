@@ -48,6 +48,7 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 
 Language.Register({
 	name:"C/C++",extensions:["c","cxx","cpp","cc","h","hpp"],
+	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -84,6 +85,7 @@ Language.Register({
 
 Language.Register({
 	name:'Microsoft IDL',extensions:['idl'],
+	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','interface','coclass','midl_pragma','import','library','cpp_quote','const','typedef','extern','struct','union'],
@@ -93,6 +95,7 @@ Language.Register({
 
 Language.Register({
 	name:'HLSL shader',extensions:['hlsl'],
+	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['AppendStructuredBuffer','Asm','Asm_fragment','Break','Centroid','Column_major','Compile','Compile_fragment','CompileShader','Const','Continue','ComputeShader','Discard','Do','DomainShader','Else','Extern','False','For','Fxgroup','GeometryShader','Groupshared','Hullshader','If','In','Inline','Inout','InputPatch','Interface','Line','Lineadj','Linear','LineStream','Namespace','Nointerpolation','Noperspective','NULL','Out','OutputPatch','Packoffset','Pass','Pixelfragment','PixelShader','Precise','Return','Register','Row_major','Shared','Snorm','Stateblock','Stateblock_state','Static','Struct','Switch','True','Typedef','Triangle','Triangleadj','TriangleStream','Uniform','Unorm','Vertexfragment','VertexShader','Void','Volatile','While','appendstructuredbuffer','asm','asm_fragment','break','centroid','column_major','compile','compile_fragment','compileshader','const','continue','computeshader','discard','do','domainshader','else','extern','false','for','fxgroup','geometryshader','groupshared','hullshader','if','in','inline','inout','inputpatch','interface','line','lineadj','linear','linestream','namespace','nointerpolation','noperspective','null','out','outputpatch','packoffset','pass','pixelfragment','pixelshader','precise','return','register','row_major','shared','snorm','stateblock','stateblock_state','static','struct','switch','true','typedef','triangle','triangleadj','trianglestream','uniform','unorm','vertexfragment','vertexshader','void','volatile','while'],
@@ -103,6 +106,7 @@ Language.Register({
 
 Language.Register({
 	name:'GLSL shader',extensions:['glsl','essl'],
+	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using','attribute','uniform','varying','layout','centroid','flat','smooth','noperspective','patch','sample','subroutine','in','out','inout','invariant','discard','lowp','mediump','highp','precision'],
@@ -137,6 +141,7 @@ Language.Register({
 
 Language.Register({
 	name:'CUDA',extensions:['cu','cuh'],
+	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2,'__global__':1,'__device__':1,'__host__':1},
 	has_pointer_ops:1,
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -710,6 +715,175 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,1)})
 });
 
+var CountSpacesAfter=function(ed,ccnt){
+	return ed.MoveToBoundary(ccnt,1,"space")-ccnt;
+}
+
+UI.RegisterEditorPlugin(function(){
+	this.AddEventHandler('RETURN RETURN2',function(){
+		var ed=this.ed;
+		var lang=this.plugin_language_desc
+		var ccnt_pos=this.sel1.ccnt
+		var chnext=String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt_pos)[1])
+		var is_bracket_enabled=this.IsBracketEnabledAt(ccnt_pos)
+		var is_lineend=this.IsLineEndAt(ccnt_pos)
+		var did=0
+		//Case 1: enter at a line with dangling lbra of any kind - we indent to the next line, or add a few tabs
+		var lineno=this.GetLC(ccnt_pos)[0]
+		var ccnt_lh=this.SeekLC(lineno,0)
+		var blevel=this.GetBracketLevel(ccnt_pos)
+		var ccnt_lbra=this.FindBracket(blevel-1,ccnt_pos,-1)
+		var snewline="\n"
+		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
+		//if(ed.LineEndingMode=="DOS"){
+		//	snewline="\r\n"
+		//}else{
+		//	snewline="\n"
+		//}
+		var snewline0=snewline
+		var delta_ccnt=Duktape.__byte_length(snewline)
+		if(ccnt_lbra>=ccnt_lh){
+			var ccnt_nextline=this.SeekLineBelowKnownPosition(ccnt_lh,lineno, lineno+1)
+			if(ccnt_nextline>ccnt_lh&&this.IsLineEndAt(ccnt_nextline-1)){
+				//there is a next line: indent to it
+				var nspaces=CountSpacesAfter(ed,ccnt_nextline)
+				var nspaces_curline=CountSpacesAfter(ed,ccnt_lh)
+				if(nspaces<=nspaces_curline){
+					//well... don't do it if the next line is less-indented
+					var nspaces=CountSpacesAfter(ed,ccnt_lh)
+					snewline=snewline+ed.GetText(ccnt_lh,nspaces)+"\t"
+				}else{
+					snewline=snewline+ed.GetText(ccnt_nextline,nspaces)
+				}
+			}else{
+				//add extra indent
+				var nspaces=CountSpacesAfter(ed,ccnt_lh)
+				snewline=snewline+ed.GetText(ccnt_lh,nspaces)+"\t"
+			}
+			delta_ccnt=Duktape.__byte_length(snewline)
+			did=1
+		}
+		//this applies in parallel with the dangling bracket rule
+		if(chnext=='}'&&!lang.curly_bracket_is_not_special&&is_bracket_enabled){
+			if(ccnt_lbra>=ccnt_lh){
+				//Case 2: enter inside {}, we need to add an extra blank line for C-like langs
+				//delta doesn't change
+				var nspaces=CountSpacesAfter(ed,ccnt_lh);
+				snewline=snewline+snewline0+ed.GetText(ccnt_lh,nspaces);
+				did=1;
+			}else{
+				//Case 2.5: we're just putting the } on the next line, do nothing
+				return 0
+			}
+		}
+		if(did){
+			var sel=this.GetSelection()
+			ed.Edit([sel[0],sel[1]-sel[0],snewline])
+			this.sel0.ccnt=ccnt_pos+delta_ccnt
+			this.sel1.ccnt=ccnt_pos+delta_ccnt
+			return 0
+		}
+		//Case 3: auto {} and auto ;, exclusive with Case 1/2
+		//this one is more language dependent
+		if(is_bracket_enabled&&lang.auto_curly_words&&is_lineend){
+			var ch_lineend=String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt_pos)[0])
+			var id_eh
+			if(ch_lineend==')'){
+				var ccnt_eh_bra0=this.FindBracket(blevel-2,ccnt_pos-1,-1)
+				var ccnt_eh=ed.MoveToBoundary(ccnt_eh_bra0,-1,"space")
+				var ccnt_eh0=ed.MoveToBoundary(ccnt_eh,-1,"word_boundary_left")
+				id_eh=ed.GetText(ccnt_eh0,ccnt_eh-ccnt_eh0)
+			}else{
+				var ccnt_eh=ed.MoveToBoundary(ccnt_lh,1,"space")
+				var ccnt_eh1=ed.MoveToBoundary(ccnt_eh,1,"word_boundary_right")
+				id_eh=ed.GetText(ccnt_eh,ccnt_eh1-ccnt_eh)
+			}
+			var nspaces=CountSpacesAfter(ed,ccnt_lh)
+			snewline=snewline+ed.GetText(ccnt_lh,nspaces)
+			var acw=lang.auto_curly_words[id_eh]
+			if((ch_lineend==')'||acw==2&&ch_lineend!=':'&&ch_lineend!=';'&&ch_lineend!=','&&ch_lineend!='\n'&&ch_lineend!='\\'&&ch_lineend)&&acw){
+				//for(), if(), main(), ...
+				//add {} and move cursor in between
+				var delta_ccnt=Duktape.__byte_length(snewline)+2
+				snewline="{"+snewline+"\t"+snewline+"}"
+				if(acw==2){
+					snewline=snewline+';'
+				}
+				var sel=this.GetSelection()
+				ed.Edit([sel[0],sel[1]-sel[0],snewline])
+				this.sel0.ccnt=ccnt_pos+delta_ccnt
+				this.sel1.ccnt=ccnt_pos+delta_ccnt
+				return 0
+			}else{
+				//test left { and stuff, add ; if found
+				var ccnt_left_bra=this.FindBracket(blevel-1,ccnt_pos,-1)
+				if((ccnt_left_bra<0||ed.Get8bitChar(ccnt_left_bra)=='{')&&ch_lineend!='{'&&ch_lineend!='}'&&ch_lineend!=':'&&ch_lineend!=';'&&ch_lineend!=','&&ch_lineend!='\n'&&ch_lineend!='\\'&&ch_lineend){
+					if(lang.paired_comment){
+						var paired_comment1=lang.paired_comment[1]
+						if(ccnt_pos>=Duktape.__byte_length(paired_comment1)){
+							if(ed.GetText(ccnt_pos-Duktape.__byte_length(paired_comment1),Duktape.__byte_length(paired_comment1))==paired_comment1){
+								//don't add ; after /**/
+								return 1
+							}
+						}
+					}
+					var lineno=ed.GetLineNumberAt(ccnt_pos)
+					var ccnt_lh=ed.SeekLine(lineno)
+					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_pos){
+						//don't add ; to a blank line
+						return 1;
+					}
+					if(id_eh=="template"||ccnt_pos>=1&&ed.GetUtf8CharNeighborhood(ccnt_pos)[0]=='>'){
+						//don't add ; to a template line
+						return 1;
+					}
+					snewline=";"+snewline
+					delta_ccnt=Duktape.__byte_length(snewline)
+					var sel=this.GetSelection()
+					ed.Edit([sel[0],sel[1]-sel[0],snewline])
+					this.sel0.ccnt=ccnt_pos+delta_ccnt
+					this.sel1.ccnt=ccnt_pos+delta_ccnt
+					return 0
+				}
+			}
+		}
+		return 1
+	})
+	var f_key_test=function(C){
+		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
+		var ccnt_pos=this.sel1.ccnt
+		if(!this.IsLineEndAt(ccnt_pos)){return 1}
+		var ed=this.ed;
+		var lang=this.plugin_language_desc
+		var lineno=this.GetLC(ccnt_pos)[0]
+		var ccnt_lh=this.SeekLC(lineno,0)
+		if(ccnt_pos!=ed.MoveToBoundary(ccnt_lh,1,"space")){return 1}
+		if(!this.IsBracketEnabledAt(ccnt_pos)){return 1}
+		var blevel=this.GetBracketLevel(ccnt_pos)
+		var ccnt_lbra=this.FindBracket(blevel-1,ccnt_pos,-1)
+		if(ccnt_lbra<0){return 1;}
+		var C_other=MatchingBracket(C)
+		if(ed.GetUtf8CharNeighborhood(ccnt_lbra)[1]!=C_other){return 1;}
+		//dedent it
+		var ccnt_lh_lbra=this.SeekLC(this.GetLC(ccnt_lbra)[0],0)
+		var nspaces_ours=CountSpacesAfter(ed,ccnt_lh)
+		var nspaces_lbra=CountSpacesAfter(ed,ccnt_lh_lbra)
+		if(nspaces_ours<=nspaces_lbra){return 1}
+		if(ed.GetText(ccnt_lh,nspaces_lbra)!=ed.GetText(ccnt_lh_lbra,nspaces_lbra)){return 1;}
+		ed.Edit([ccnt_lh+nspaces_lbra,nspaces_ours-nspaces_lbra,null, ccnt_pos,0,C])
+		this.sel0.ccnt=ccnt_lh+nspaces_lbra+Duktape.__byte_length(C)
+		this.sel1.ccnt=this.sel0.ccnt
+		return 0;
+	}
+	var listening_keys=[")","]","}"]
+	for(var i=0;i<listening_keys.length;i++){
+		var C=listening_keys[i];
+		(function(C){
+			this.AddEventHandler(C,function(){return f_key_test.call(this,C)})
+		}).call(this,C);
+	}
+});
+
 var bracket_context_prototype={
 	PopBacStack:function(){
 		if(this.current_bracket_ac_ccnt_range){
@@ -729,6 +903,7 @@ var bracket_context_prototype={
 		}
 	}
 }
+
 UI.RegisterEditorPlugin(function(){
 	this.m_bracket_ctx={
 		bac_stack:[],
@@ -834,7 +1009,7 @@ UI.RegisterEditorPlugin(function(){
 					break;
 				}
 				var ccnt1=ctx.current_bracket_ac_ccnt_range[1].ccnt
-				PopBacStack()
+				ctx.PopBacStack()
 			}
 			if(this.IsLineEndAt(ccnt1)){
 				//only move if we're at the line end
@@ -846,7 +1021,6 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 1
 	})
-	var listening_keys=["{","[","(","'","\"","$",")","]","}"]
 	var f_key_test=function(C){
 		var lang=this.plugin_language_desc
 		var ed=this.ed;
@@ -865,6 +1039,7 @@ UI.RegisterEditorPlugin(function(){
 					//the state has to allow brackets
 					chbraac=0
 				}
+				//todo: {} before indented line
 			}
 			if(chbraac){
 				//other-half-mismatch test
@@ -882,20 +1057,20 @@ UI.RegisterEditorPlugin(function(){
 				}
 				//smarter auto (): clearly fcall-ish case
 				var ccnt_next_nonspace=ed.MoveToBoundary(ccnt_pos,1,"space")
-				var chnext_nonspace=ed.GetUtf8CharNeighborhood(ccnt_next_nonspace)[1]
+				var chnext_nonspace=String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt_next_nonspace)[1])
 				var is_fcall_like=0
 				//([{
 				if('+-*/|&^%<>.?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&chnext_nonspace!=C&&UI.IsWordChar(chprev)&&this.m_user_just_typed_char){
 					//after-id-and-before-sym-case, and the id is just typed, most likely a func call or sth
 					is_fcall_like=1
 					//avoid ++ --
-					if(chnext_nonspace=='+'.charCodeAt(0)||chnext_nonspace=='-'.charCodeAt(0)){
+					if(chnext_nonspace=='+'||chnext_nonspace=='-'){
 						if(ed.GetChar(ccnt_next_nonspace+1)==chnext_nonspace){
 							is_fcall_like=0
 						}
 					}
 					//avoid * & in C
-					if(lang.has_pointer_ops&&(chnext_nonspace=='*'.charCodeAt(0)||chnext_nonspace=='&'.charCodeAt(0))){
+					if(lang.has_pointer_ops&&(chnext_nonspace=='*'||chnext_nonspace=='&')){
 						is_fcall_like=0
 					}
 					//avoid . in BSGP/SPAP
@@ -950,11 +1125,10 @@ UI.RegisterEditorPlugin(function(){
 		}
 		if(C==ctx.current_bracket_ac){
 			var ccnt1=this.sel1.ccnt
-			if(ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
-				var sel=this.GetSelection()
-				ed.BeginUndoBatch()
-				ed.DeleteSelection()
-				ed.Edit([ccnt,1,C])
+			if(ccnt1+Duktape.__byte_length(C)==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
+				ed.Edit([ccnt1,Duktape.__byte_length(C),C])
+				this.sel0.ccnt=ccnt1+Duktape.__byte_length(C)
+				this.sel1.ccnt=ccnt1+Duktape.__byte_length(C)
 				ctx.PopBacStack()
 				return 0
 			}
@@ -962,6 +1136,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 1
 	}
+	var listening_keys=["{","[","(","'","\"","$",")","]","}"]
 	for(var i=0;i<listening_keys.length;i++){
 		var C=listening_keys[i];
 		(function(C){
