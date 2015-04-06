@@ -252,6 +252,8 @@ UI.Theme_CustomWidget=function(C){
 				color_symbol:0xff7f7f7f,
 				color_symbol2:0xff7f7f7f,
 				color_meta:0xff9a3d6a,
+				/////////////
+				color_completing_bracket:0x80999999,
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
 				scroll_transition_dt:0.075,

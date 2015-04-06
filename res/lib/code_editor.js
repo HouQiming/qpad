@@ -618,7 +618,32 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var ret=Math.max(this.FindOuterBracket(ccnt,-1),this.FindOuterIndentation(ccnt))
 		if(ret>=ccnt){ret=-1;}
 		return ret
-	}
+	},
+	///////////////////////////////
+	IsLineEndAt:function(ccnt){
+		var ch=this.ed.GetUtf8CharNeighborhood(ccnt)[1]
+		if(ch==10){return 1}
+		if(ch==13&&this.ed.GetUtf8CharNeighborhood(ccnt+1)[1]=='\n'){return 1}
+		return 0
+	},
+	IsLeftBracket:function(s){
+		var lang=this.plugin_language_desc
+		var bs=lang.m_lbracket_tokens
+		if(bs){
+			for(var i=0;i<bs.length;i++){
+				if(bs[i]==s){return 1;}
+			}
+		}
+		return 0;
+	},
+	IsRightBracket:function(s){
+		var lang=this.plugin_language_desc
+		var bs=lang.m_rbracket_tokens
+		for(var i=0;i<bs.length;i++){
+			if(bs[i]==s){return 1;}
+		}
+		return 0;
+	},
 })
 
 W.MinimapThingy_prototype={

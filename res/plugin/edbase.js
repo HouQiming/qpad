@@ -48,6 +48,7 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 
 Language.Register({
 	name:"C/C++",extensions:["c","cxx","cpp","cc","h","hpp"],
+	has_pointer_ops:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			keyword:['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'],
@@ -58,6 +59,9 @@ Language.Register({
 
 Language.Register({
 	name:'SPAP#',extensions:['spap'],
+	has_dlist_type:1,
+	has_pointer_ops:1,
+	indent_as_bracelet:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','function','F','sizeof','new','delete','import','export','typedef','stdcall','inline','operator','forall','foreach','in','this','module','project','true','false','abstract','interface','virtual','__host__','__device__','__operation__'],
@@ -69,6 +73,7 @@ Language.Register({
 
 Language.Register({
 	name:'Jacy',extensions:['jc'],
+	indent_as_bracelet:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false'],
@@ -118,6 +123,9 @@ Language.Register({
 
 Language.Register({
 	name:'BSGP',extensions:['i'],
+	has_dlist_type:1,
+	has_pointer_ops:1,
+	indent_as_bracelet:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','namespace','function','Func','sizeof','new','delete','import','export','typedef','stdcall','inline','__fastcall','with','operator','forall','this','uses','need','using','autouses','require','spawn','__interrupt__','__both__','__device__','__host__','__shared__','barrier','par','novirtual','__force_template','try','catch','finally','throw','classof'],
@@ -129,6 +137,7 @@ Language.Register({
 
 Language.Register({
 	name:'CUDA',extensions:['cu','cuh'],
+	has_pointer_ops:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','__global__','__device__','__host__'],
@@ -138,7 +147,7 @@ Language.Register({
 });
 
 Language.Register({
-	name:'JavaScript',extensions:['js'],
+	name:'Javascript',extensions:['js'],
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super'],
@@ -268,6 +277,7 @@ Language.Register({
 
 //Language.Register({
 //	name:'TeX/LaTeX',extensions:['tex','cls'],
+//	curly_bracket_is_not_special:1,is_tex_like:1,
 //	rule:function(lang){
 //		'type':['begin','end','addcontentsline','addtocontents','addtocounter','address','addtolength','addvspace','alph','appendix','arabic','author','backslash','baselineskip','baselinestretch','bf','bibitem','bigskipamount','bigskip','boldmath','boldsymbol','cal','caption','cdots','centering','chapter','circle','cite','cleardoublepage','clearpage','cline','closing','color','copyright','dashbox','date','ddots','documentclass[options]','dotfill','em','emph','ensuremath(LaTeX2e)','epigraph','euro','fbox','flushbottom','fnsymbol','footnote','footnotemark','footnotesize','footnotetext','frac','frame','framebox','frenchspacing','hfill','hline','href','hrulefill','hspace','huge','Huge','hyphenation','include','includegraphics','includeonly','indent','input','it','item','kill','label','large','Large','LARGE','LaTeX','LaTeXe','ldots','lefteqn','line','linebreak','linethickness','linewidth','listoffigures','listoftables','location','makebox','maketitle','markboth','mathcal','mathop','mbox','medskip','multicolumn','multiput','newcommand','newcolumntype','newcounter','newenvironment','newfont','newlength','newline','newpage','newsavebox','newtheorem','nocite','noindent','nolinebreak','nonfrenchspacing','normalsize','nopagebreak','not','onecolumn','opening','oval','overbrace','overline','pagebreak','pagenumbering','pageref','pagestyle','par','paragraph','parbox','parindent','parskip','part','protect','providecommand','put','raggedbottom','raggedleft','raggedright','raisebox','ref','renewcommand','rm','roman','rule','savebox','sbox','sc','scriptsize','section','setcounter','setlength','settowidth','sf','shortstack','signature','sl','slash','small','smallskip','sout','space','sqrt','stackrel','stepcounter','subparagraph','subsection','subsubsection','tableofcontents','telephone','TeX','textbf','textcolor','textit','textmd','textnormal','textrm','textsc','textsf','textsl','texttt','textup','textwidth','textheight','thanks','thispagestyle','tiny','title','today','tt','twocolumn','typeout','typein','uline','underbrace','underline','unitlength','usebox','usecounter','uwave','value','vbox','vcenter','vdots','vector','verb','vfill','vline','vphantom','vspace','usepackage','documentclass'],
 //		'misc':['left','right'],
@@ -275,6 +285,7 @@ Language.Register({
 //});
 //Language.Register({
 //	name:'Bibliography',extensions:['bib'],
+//	curly_bracket_is_not_special:1,is_tex_like:1,
 //});
 
 Language.Register({
@@ -305,6 +316,8 @@ Language.Register({
 
 Language.Register({
 	name:'Python',extensions:['py'],
+	indent_as_bracelet:1,
+	curly_bracket_is_not_special:1,
 	rule:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","#","\n","color_comment");
@@ -628,8 +641,10 @@ UI.RegisterEditorPlugin(function(){
 			}
 			if(is_left_bracket){
 				var ccnt2=this.FindOuterBracket(ccnt,1)
-				HighlightBrackets(this,ccnt-1,ccnt2-1)
-				return
+				if(ccnt2>=0){
+					HighlightBrackets(this,ccnt-1,ccnt2-1)
+					return
+				}
 			}
 			var is_right_bracket=0;
 			for(var i=0;i<lang.m_rbracket_tokens.length;i++){
@@ -643,8 +658,10 @@ UI.RegisterEditorPlugin(function(){
 			}
 			if(is_right_bracket){
 				var ccnt2=this.FindOuterBracket(ccnt,-1)
-				HighlightBrackets(this,ccnt2,ccnt)
-				return
+				if(ccnt2>=0){
+					HighlightBrackets(this,ccnt2,ccnt)
+					return
+				}
 			}
 		}
 		this.m_lbracket_p0.ccnt=0
@@ -693,3 +710,262 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,1)})
 });
 
+var bracket_context_prototype={
+	PopBacStack:function(){
+		if(this.current_bracket_ac_ccnt_range){
+			var rg=this.current_bracket_ac_ccnt_range
+			for(var i=0;i<rg.length;i++){
+				rg[i].discard();
+			}
+		}
+		if(this.bac_stack.length){
+			this.current_bracket_ac=this.bac_stack.pop()
+			this.current_bracket_ac_bralevel=this.bac_stack.pop()
+			this.current_bracket_ac_ccnt_range=this.bac_stack.pop()
+		}else{
+			this.current_bracket_ac=0
+			this.current_bracket_ac_bralevel=0
+			this.current_bracket_ac_ccnt_range=undefined
+		}
+	}
+}
+UI.RegisterEditorPlugin(function(){
+	this.m_bracket_ctx={
+		bac_stack:[],
+		isin:0,
+		current_bracket_ac:0,
+		current_bracket_ac_bralevel:0,
+		detecting_bad_curly:0,
+		current_bracket_ac_ccnt_range:undefined,
+		bad_curly_locator:0,
+	}
+	Object.setPrototypeOf(this.m_bracket_ctx,bracket_context_prototype)
+	////////////
+	//this.AddEventHandler('editorCreate',function(){
+	//	var ed=this.ed;
+	//	var ctx=this.m_bracket_ctx;
+	//	ctx.current_bracket_ac_ccnt_range=[ed.CreateLocator(0,-1),ed.CreateLocator(0,-1)]
+	//	ctx.bad_curly_locator=ed.CreateLocator(0,-1)
+	//})
+	//we need a *stack* of locators
+	this.AddEventHandler('change',function(){
+		var ctx=this.m_bracket_ctx;
+		if(ctx.detecting_bad_curly){
+			ctx.detecting_bad_curly=0
+		}
+	})
+	this.AddEventHandler('}',function(){
+		var ctx=this.m_bracket_ctx;
+		if(ctx.detecting_bad_curly){
+			var ccnt_pos=this.sel1.ccnt
+			var bad_curly_ac_ccnt=ctx.bad_curly_locator.ccnt+1
+			//{ + move away + }
+			//the pair have to be would-be matches: level test, after-ness test
+			var blevel=this.GetBracketLevel(ccnt_pos)
+			if(ccnt_pos>bad_curly_ac_ccnt&&blevel==this.GetBracketLevel(bad_curly_ac_ccnt)-1){
+				//the final left-bra test
+				var ccnt_left_bra=this.FindBracket(blevel-1,ccnt_pos,-1)
+				if(ccnt_left_bra<bad_curly_ac_ccnt&&ed.GetUtf8CharNeighborhood(bad_curly_ac_ccnt)[1]=='}'){
+					//we should indeed cancel out the previous }
+					//but any auto-completion should continue normally
+					var sel=this.GetSelection()
+					var ops=[bad_curly_ac_ccnt,1,null, sel[0],sel[1]-sel[0],'}']
+					ed.Edit(ops)
+					this.sel0.ccnt=sel[0]-1
+					this.sel1.ccnt=sel[0]-1
+					return 0
+				}
+			}
+		}
+		return 1
+	})
+	this.AddEventHandler('selectionChange',function(){
+		var lang=this.plugin_language_desc
+		var ed=this.ed;
+		var ctx=this.m_bracket_ctx;
+		var sel_new=this.GetSelection()
+		var ccntmin=sel_new[0]
+		var ccntmax=sel_new[1]
+		for(;ctx.current_bracket_ac_ccnt_range;){
+			var ccnt_range0=ctx.current_bracket_ac_ccnt_range[0].ccnt
+			var ccnt_range1=ctx.current_bracket_ac_ccnt_range[1].ccnt
+			if(ccntmin<=ccnt_range0||ccntmax>=ccnt_range1){
+				if(ctx.bac_stack.length==0&&ctx.current_bracket_ac=='}'&&!lang.curly_bracket_is_not_special){
+					ctx.detecting_bad_curly=1
+					ctx.bad_curly_locator=ctx.current_bracket_ac_ccnt_range[0]
+				}
+				ctx.PopBacStack()
+			}else{
+				break
+			}
+		}
+	})
+	this.AddEventHandler('BACKSPACE',function(){
+		//left deletion: delete both ends
+		var ed=this.ed;
+		var ctx=this.m_bracket_ctx;
+		var sel_new=this.GetSelection()
+		var ccnt0=sel_new[0]
+		var ccnt1=sel_new[1]
+		if(ctx.current_bracket_ac_ccnt_range&&ccnt0==ccnt1&&ccnt1==ctx.current_bracket_ac_ccnt_range[0].ccnt+1){
+			if(ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt){
+				var ccnt_lbra=ccnt1-1
+				ed.Edit([ccnt_lbra,2,null])
+				this.sel0.ccnt=ccnt_lbra
+				this.sel1.ccnt=ccnt_lbra
+				ctx.PopBacStack()
+				return 0
+			}
+		}
+		return 1
+	})
+	this.AddEventHandler('RETURN RETURN2',function(){
+		var ed=this.ed;
+		var ctx=this.m_bracket_ctx;
+		var sel_new=this.GetSelection()
+		var ccnt0=sel_new[0]
+		var ccnt1=sel_new[1]
+		if(ccnt0==ccnt1&&ctx.current_bracket_ac_ccnt_range&&ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt){
+			//pop everything and move past them before entering
+			var lang=this.plugin_language_desc
+			for(;ctx.current_bracket_ac_ccnt_range&&ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt;){
+				//{} case - don't pop it, also {} vs python
+				if(ctx.current_bracket_ac=='}'&&!lang.curly_bracket_is_not_special){
+					break;
+				}
+				var ccnt1=ctx.current_bracket_ac_ccnt_range[1].ccnt
+				PopBacStack()
+			}
+			if(this.IsLineEndAt(ccnt1)){
+				//only move if we're at the line end
+				this.sel0.ccnt=ccnt1
+				this.sel1.ccnt=ccnt1
+				//go ahead and do it
+				return 1
+			}
+		}
+		return 1
+	})
+	var listening_keys=["{","[","(","'","\"","$",")","]","}"]
+	var f_key_test=function(C){
+		var lang=this.plugin_language_desc
+		var ed=this.ed;
+		var ctx=this.m_bracket_ctx;
+		if(C=="{"||C=="["||C=="("||((C=="'"&&!lang.is_tex_like||C=='$'&&lang.is_tex_like||C=="\"")&&C!=ctx.current_bracket_ac)){
+			var chbraac=MatchingBracket(C)
+			var ccnt_pos=this.sel1.ccnt
+			var ch_neibs=ed.GetUtf8CharNeighborhood(ccnt_pos)
+			var chprev=ch_neibs[0]
+			var chnext=ch_neibs[1]
+			if(chbraac){
+				if(this.IsLeftBracket(String.fromCharCode(C))&&chbraac!="'"&&chbraac!="\""&&chbraac!="$"){
+					//the syntax has to actually consider it as a bracket, or it has to be a quote
+					chbraac=0;
+				}else if(!this.IsBracketEnabledAt(ccnt_pos)){
+					//the state has to allow brackets
+					chbraac=0
+				}
+			}
+			if(chbraac){
+				//other-half-mismatch test
+				var is_lineend=this.IsLineEndAt(ccnt_pos)
+				var is_manual_match=0
+				if(ctx.bac_stack.length){
+					//only the topmost level should check for the match
+					is_manual_match=0
+				}else if(chbraac=='}'&&!lang.indent_as_bracelet){
+					is_manual_match=0;
+				}else{
+					var blevel=this.GetBracketLevel(ccnt_pos)
+					var ccnt_rbra=this.FindBracket(blevel-1,ccnt_pos,1)
+					is_manual_match=(ccnt_rbra>=0&&ed.GetUtf8CharNeighborhood(ccnt_rbra)[1]==chbraac)
+				}
+				//smarter auto (): clearly fcall-ish case
+				var ccnt_next_nonspace=ed.MoveToBoundary(ccnt_pos,1,"space")
+				var chnext_nonspace=ed.GetUtf8CharNeighborhood(ccnt_next_nonspace)[1]
+				var is_fcall_like=0
+				//([{
+				if('+-*/|&^%<>.?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&chnext_nonspace!=C&&UI.IsWordChar(chprev)&&this.m_user_just_typed_char){
+					//after-id-and-before-sym-case, and the id is just typed, most likely a func call or sth
+					is_fcall_like=1
+					//avoid ++ --
+					if(chnext_nonspace=='+'.charCodeAt(0)||chnext_nonspace=='-'.charCodeAt(0)){
+						if(ed.GetChar(ccnt_next_nonspace+1)==chnext_nonspace){
+							is_fcall_like=0
+						}
+					}
+					//avoid * & in C
+					if(lang.has_pointer_ops&&(chnext_nonspace=='*'.charCodeAt(0)||chnext_nonspace=='&'.charCodeAt(0))){
+						is_fcall_like=0
+					}
+					//avoid . in BSGP/SPAP
+					if(lang.has_dlist_type&&chnext_nonspace=='.'){
+						is_fcall_like=0
+					}
+				}
+				if(is_lineend&&!is_manual_match||ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1==ctx.current_bracket_ac_ccnt_range[1].ccnt||is_fcall_like){
+					if(ctx.current_bracket_ac){
+						ctx.bac_stack.push(ctx.current_bracket_ac_ccnt_range)
+						ctx.bac_stack.push(ctx.current_bracket_ac_bralevel)
+						ctx.bac_stack.push(ctx.current_bracket_ac)
+					}
+					//.just_typed_bra=0//for func hint purposes
+					var str=C+chbraac;
+					var sel=this.GetSelection()
+					ctx.current_bracket_ac=chbraac
+					ccnt_pos=sel[0]
+					if(lang.is_tex_like){
+						//\left completion
+						if(C=="{"){
+							if(ccnt_pos>=1&&ed.GetText(ccnt_pos-1,1)=="\\"){
+								str=C+"\\"+chbraac;
+							}
+							if(ccnt_pos>=6&&ed.GetText(ccnt_pos-6,6)=="\\left\\"){
+								str=C+"\\right\\"+chbraac
+							}
+						}else{
+							if(ccnt_pos>=5&&ed.GetText(ccnt_pos-5,5)=="\\left"){
+								str=C+"\\right"+chbraac
+							}
+						}
+					}
+					ed.Edit([sel[0],sel[1]-sel[0],str])
+					//only record the starting ccnt
+					ctx.current_bracket_ac_ccnt_range=[ed.CreateLocator(ccnt_pos,-1), ed.CreateLocator(ccnt_pos+Duktape.__byte_length(str),1), ed.CreateLocator(ccnt_pos+Duktape.__byte_length(C),1)]
+					//get the level AFTER insertion
+					var ccnt_mid=ccnt_pos+Duktape.__byte_length(C)//len(str)-1
+					ctx.current_bracket_ac_bralevel=this.GetBracketLevel(ccnt_mid)
+					this.sel0.ccnt=ccnt_mid
+					this.sel1.ccnt=ccnt_mid
+					var hlobj=ed.CreateHighlight(ctx.current_bracket_ac_ccnt_range[2],ctx.current_bracket_ac_ccnt_range[1],-1)
+					hlobj.color=this.color_completing_bracket;
+					hlobj.invertible=0;
+					ctx.current_bracket_ac_ccnt_range.push(hlobj)
+					//ed.trigger_data.bracket_completed=C//tex \ref or \cite... don't need this
+					ctx.detecting_bad_curly=0
+					return 0
+				}
+			}
+			return 1
+		}
+		if(C==ctx.current_bracket_ac){
+			var ccnt1=this.sel1.ccnt
+			if(ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
+				var sel=this.GetSelection()
+				ed.BeginUndoBatch()
+				ed.DeleteSelection()
+				ed.Edit([ccnt,1,C])
+				ctx.PopBacStack()
+				return 0
+			}
+			return 1
+		}
+		return 1
+	}
+	for(var i=0;i<listening_keys.length;i++){
+		var C=listening_keys[i];
+		(function(C){
+			this.AddEventHandler(C,function(){return f_key_test.call(this,C)})
+		}).call(this,C);
+	}
+});
