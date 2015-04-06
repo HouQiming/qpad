@@ -931,6 +931,7 @@ UI.RegisterEditorPlugin(function(){
 	})
 	this.AddEventHandler('}',function(){
 		var ctx=this.m_bracket_ctx;
+		var ed=this.ed;
 		if(ctx.detecting_bad_curly){
 			var ccnt_pos=this.sel1.ccnt
 			var bad_curly_ac_ccnt=ctx.bad_curly_locator.ccnt+1
@@ -940,14 +941,14 @@ UI.RegisterEditorPlugin(function(){
 			if(ccnt_pos>bad_curly_ac_ccnt&&blevel==this.GetBracketLevel(bad_curly_ac_ccnt)-1){
 				//the final left-bra test
 				var ccnt_left_bra=this.FindBracket(blevel-1,ccnt_pos,-1)
-				if(ccnt_left_bra<bad_curly_ac_ccnt&&ed.GetUtf8CharNeighborhood(bad_curly_ac_ccnt)[1]=='}'){
+				if(ccnt_left_bra<bad_curly_ac_ccnt&&String.fromCharCode(ed.GetUtf8CharNeighborhood(bad_curly_ac_ccnt)[1])=='}'){
 					//we should indeed cancel out the previous }
 					//but any auto-completion should continue normally
 					var sel=this.GetSelection()
 					var ops=[bad_curly_ac_ccnt,1,null, sel[0],sel[1]-sel[0],'}']
 					ed.Edit(ops)
-					this.sel0.ccnt=sel[0]-1
-					this.sel1.ccnt=sel[0]-1
+					this.sel0.ccnt=sel[0]
+					this.sel1.ccnt=sel[0]
 					return 0
 				}
 			}
@@ -1038,8 +1039,16 @@ UI.RegisterEditorPlugin(function(){
 				}else if(!this.IsBracketEnabledAt(ccnt_pos)){
 					//the state has to allow brackets
 					chbraac=0
+				}else if(chbraac=='}'&&!lang.curly_bracket_is_not_special){
+					//{ before indented line
+					var indent_cur_line=this.GetIndentLevel(ccnt_pos);
+					var lineno=this.GetLC(ccnt_pos)[0]
+					var ccnt_lh_next=this.SeekLC(lineno+1,0)
+					var indent_next_line=this.GetIndentLevel(ed.MoveToBoundary(ccnt_lh_next,1,"space"));
+					if(indent_cur_line<indent_next_line){
+						chbraac=0;
+					}
 				}
-				//todo: {} before indented line
 			}
 			if(chbraac){
 				//other-half-mismatch test
