@@ -452,8 +452,8 @@ class CLayouter_programmer
 class CColorer_programmer
 	CLanguageDescription m_lang
 	name=function(){return "colorer"}
-	stateSize=function(){return m_lang.m_total_state_size}
-	contextSize=function(){return m_lang.m_context_size}
+	stateSize=function(){return int(m_lang.m_total_state_size)}
+	contextSize=function(){return int(m_lang.m_context_size)}
 	SetTextStyle=function(JSObject obj){
 		m_lang=obj["language"].as(CLanguageDescription)
 	}
@@ -562,10 +562,10 @@ class CColorer_programmer
 						evt=TColoringEvent(){rule_id:i8(i)}
 						if mask&mask_i:
 							//we're entering, backtrack
-							evt.ofs=I-iptr(lg_token)
+							evt.ofs=int(I-iptr(lg_token))
 							evt.direction=i8(1)
 						else
-							evt.ofs=I
+							evt.ofs=int(I)
 							evt.direction=i8(0)
 						coloring_events.push(evt)
 				mask0=mask

@@ -13,7 +13,7 @@ UI.Theme_CustomWidget=function(C){
 	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.75)
 	var custom_styles={
 		tooltip:{
-			font:UI.Font(UI.font_name,24,-150),
+			font:UI.Font(UI.font_name,24,-100),
 			padding:8,
 			spacing:8,
 			color:0xffffffff,
@@ -58,7 +58,7 @@ UI.Theme_CustomWidget=function(C){
 		tab_label:{
 			transition_dt:0.1,
 			shadow_size:8,
-			font:UI.Font(UI.font_name,24,-150), padding:16,
+			font:UI.Font(UI.font_name,24,-100), padding:16,
 			$:{
 				active:{
 					text_color:0xffffffff,
@@ -269,6 +269,8 @@ UI.Theme_CustomWidget=function(C){
 			top_hint_border_color:0xffaaaaaa,
 			top_hint_max_lines:5,
 			top_hint_max_levels:20,
+			x_scroll_shadow_color:0x7f000000,
+			x_scroll_shadow_size:8,
 			///////
 			show_line_numbers:1,
 			line_number_font:UI.Font("res/fonts/opensans.ttf",14,-50),
@@ -344,12 +346,37 @@ UI.Theme_CustomWidget=function(C){
 					over:{},
 				},
 			},
+			///////
+			w_notification:240,
+			dx_shake_notification:-300,
+		},
+		code_editor_notification:{
+			transition_dt:0.1,
+			padding:6,
+			w_icon:24,
+			w_text:200,
+			shadow_size:8,
+			shadow_color:0xff000000,
+			color:0xffffffff,
+			border_color:0xff000000,
+			border_width:0,
+			round:4,
+			text_color:0xff444444,
+			font:UI.Font(UI.font_name,20,-100),
+			icon_color:0xff000000,
+			icon_font:UI.Font('res/fonts/iconfnt.ttf,!',20),
+			icon:'告',
+			//////////
+			k_shake:400,
+			damping_shake:8,
+			x_min_shake:0.5,
+			dx_min_shake:0.5,
 		},
 		top_menu:{
 			//nothing
 		},
 		top_menu_item:{
-			font:UI.Font(UI.font_name,22,-150),
+			font:UI.Font(UI.font_name,22,-100),
 			padding:8,
 			$:{
 				active:{
@@ -390,7 +417,7 @@ UI.Theme_CustomWidget=function(C){
 			button_style:{
 				transition_dt:0.1,
 				round:0.1,border_width:1,padding:0,
-				font:UI.Font(UI.font_name,24,-150),
+				font:UI.Font(UI.font_name,24,-100),
 				$:{
 					out:{
 						border_color:0xff444444,color:0xffffffff,

@@ -720,6 +720,7 @@ var CountSpacesAfter=function(ed,ccnt){
 }
 
 UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
 	this.AddEventHandler('RETURN RETURN2',function(){
 		var ed=this.ed;
 		var lang=this.plugin_language_desc
@@ -905,6 +906,7 @@ var bracket_context_prototype={
 }
 
 UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
 	this.m_bracket_ctx={
 		bac_stack:[],
 		isin:0,
@@ -1153,3 +1155,9 @@ UI.RegisterEditorPlugin(function(){
 		}).call(this,C);
 	}
 });
+
+//auto-replace
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	//todo: HookedEdit -> main file?
+})

@@ -475,11 +475,11 @@ class CLayouter_fancy
 						words.push(int3(style_id,int(p_last_word+p_last_hyphen),int(I)))
 				if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_END:
 					if ch==COMMAND_RUBBER_SPACE:
-						words.push(int3(-2,0,I))
+						words.push(int3(-2,0,int(I)))
 					else if ch<COMMAND_SET_STYLE:
 						obj_id=ch-COMMAND_INSERT_OBJECT
 						if u32(obj_id)<u32(m_objects.n):
-							words.push(int3(-1,obj_id,I))
+							words.push(int3(-1,obj_id,int(I)))
 					else
 						style_id_new=ch-COMMAND_SET_STYLE
 						if u32(style_id_new)<u32(m_styles.n):
@@ -762,7 +762,7 @@ class CLayouter_fancy
 			//	result.push(i64(I)|(i64(I+1)<<21)|(0LL<<42))
 			//	assert((result.back()>>42)!=-1LL)
 			//else
-			PreprocessParagraph(result,I,sline,sline.EndsWith("\n"))
+			PreprocessParagraph(result,int(I),sline,sline.EndsWith("\n"))
 			if n0<result.n:
 				//shove back real newlines to \n
 				aflag=(result[n0]>>42)

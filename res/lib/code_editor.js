@@ -681,6 +681,71 @@ var RegexpEscape=function(s){
 	return s.replace(g_re_regexp_escape,"\\$&");
 }
 
+var fadein=function(C,alpha){
+	return (((((C>>24)&0xff)*alpha)|0)<<24)|(C&0xffffff)
+};
+
+UI.non_animated_values.x_shake=1
+UI.non_animated_values.dx_shake=1
+UI.non_animated_values.ddx_shake=1
+W.NotificationItem=function(id,attrs){
+	if(!UI.context_parent[id]){
+		attrs.alpha=0;
+	}
+	var obj=UI.Keep(id,attrs)
+	UI.StdStyling(id,obj,attrs, "code_editor_notification");
+	//shaking
+	if(!obj.x_shake){obj.x_shake=0}
+	if(obj.x_shake||obj.dx_shake){
+		var dt_all=Duktape.__ui_seconds_between_ticks(UI.m_last_frame_tick,UI.m_frame_tick)
+		if(!obj.dx_shake){obj.dx_shake=0}
+		if(!obj.ddx_shake){obj.ddx_shake=0}
+		for(var dt_i=0;dt_i<dt_all;dt_i+=0.001){
+			//http://en.wikipedia.org/wiki/Newmark-beta_method
+			var dt=Math.min(dt_all-dt_i,0.001)
+			var a0=obj.ddx_shake
+			var a1=-(obj.k_shake*obj.x_shake)-(obj.damping_shake*obj.dx_shake);
+			var v0=obj.dx_shake
+			var v1=v0+dt*0.5*(a0+a1)
+			var x0=obj.x_shake
+			var x1=x0+dt*(v0+dt*0.25*(a0+a1))
+			obj.x_shake=x1
+			obj.dx_shake=v1
+			obj.ddx_shake=a1
+		}
+		if(Math.abs(obj.dx_shake)<obj.dx_min_shake&&Math.abs(obj.x_shake)<obj.x_min_shake){
+			obj.x_shake=0
+			obj.dx_shake=0;
+			obj.ddx_shake=0;
+		}
+		UI.AutoRefresh()
+	}
+	///////////
+	var tmp={w:obj.w_text,h:1e17,font:obj.font,text:obj.text}
+	UI.LayoutText(tmp);
+	obj.w=obj.padding*2+obj.w_icon+obj.w_text
+	obj.h=obj.padding*2+Math.max(obj.w_icon,tmp.h_text)
+	UI.StdAnchoring(id,obj);
+	UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width,y:obj.y,w:obj.w+obj.shadow_size*0.75,h:obj.h+obj.shadow_size*0.75,
+		color:fadein(obj.shadow_color,obj.alpha),
+		round:obj.shadow_size,
+		border_width:-obj.shadow_size})
+	UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width,y:obj.y,w:obj.w,h:obj.h,
+		color:fadein(obj.color,obj.alpha),round:obj.round,border_color:fadein(obj.border_color,obj.alpha),border_width:obj.border_width})
+	if(obj.progress!=undefined){
+		//progress
+		UI.PushCliprect(obj.x+obj.x_shake+obj.border_width,obj.y,obj.w*obj.progress,obj.h)
+		UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width,y:obj.y,w:obj.w,h:obj.h,
+			color:fadein(obj.progress_color,obj.alpha),
+			round:obj.round,
+			border_color:fadein(obj.border_color,obj.alpha),border_width:obj.border_width})
+		UI.PopCliprect()
+	}
+	UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,fadein(obj.icon_color,obj.alpha),obj.icon.charCodeAt(0))
+	UI.DrawTextControl(tmp,obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding,fadein(obj.text_color,obj.alpha))
+	return obj
+}
+
 UI.SEARCH_FLAG_CASE_SENSITIVE=1
 UI.SEARCH_FLAG_WHOLE_WORD=2
 UI.SEARCH_FLAG_REGEXP=4
@@ -1187,7 +1252,8 @@ W.CodeEditorWidget_prototype={
 					this.m_owner.ReleaseEditLock();
 					this.m_owner.m_find_next_context=undefined
 					if(!this.m_match_reported){
-						//todo: notification
+						//notification
+						this.m_owner.CreateNotification({icon:'警',text:(direction<0?"No more matches above":"No more matches below")})
 					}
 					UI.Refresh()
 				}else{
@@ -1218,6 +1284,41 @@ W.CodeEditorWidget_prototype={
 				this.m_current_needle=RegexpEscape(this.m_current_needle)
 			}
 		}
+	},
+	BringUpNotification:function(item){
+		var ns=this.m_notifications
+		for(var i=0;i<ns.length;i++){
+			var nsi=ns[i]
+			if(nsi==item){
+				for(var j=i-1;j>=0;j--){
+					ns[j+1]=ns[j]
+				}
+				ns[0]=item
+				if(!i){
+					//item.x_shake=this.x_shake_notification
+					this.notification_list[item.id].dx_shake=this.dx_shake_notification
+				}
+				return
+			}
+		}
+	},
+	CreateNotification:function(attrs){
+		var ns=this.m_notifications
+		if(!ns){
+			ns=[]
+			this.m_notifications=ns
+		}
+		for(var i=0;i<ns.length;i++){
+			var nsi=ns[i]
+			if(nsi.text==attrs.text&&(nsi.color==attrs.color||!attrs.color)){
+				//bring it up and shake it - y-animated list?
+				this.BringUpNotification(nsi)
+				return nsi;
+			}
+		}
+		attrs.alpha=1
+		ns.push(attrs)
+		return attrs;
 	},
 }
 
@@ -1465,7 +1566,6 @@ W.CodeEditor=function(id,attrs){
 			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:obj.w-w_line_numbers,h:obj.h})
 		}
 		//todo: loading progress - notification system
-		//todo: find-next/prev context
 		if(doc&&doc.m_edit_lock){
 			obj.__children.push(doc)
 			//todo: still render it, but without the caret
@@ -1514,6 +1614,23 @@ W.CodeEditor=function(id,attrs){
 					///////////////
 					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:obj.w-w_line_numbers-obj.padding-w_scrolling_area,h:obj.h-h_top_hint-h_top_find-h_bottom_find,
 				},W.CodeEditor_prototype);
+				//line number bar shadow when x scrolled
+				if(doc){
+					var x_shadow_size_max=obj.x_scroll_shadow_size
+					var x_shadow_size=Math.min(doc.visible_scroll_x/8,x_shadow_size_max)
+					if(x_shadow_size>0){
+						UI.PushCliprect(obj.x+w_line_numbers,obj.y+h_top_hint,obj.w-w_scrolling_area-w_line_numbers,obj.h-h_top_hint)
+						UI.RoundRect({
+							x:obj.x+w_line_numbers-x_shadow_size_max*2+x_shadow_size,
+							y:obj.y+h_top_hint-x_shadow_size_max,
+							w:2*x_shadow_size_max, 
+							h:obj.h-h_top_hint+x_shadow_size_max*2,
+							round:x_shadow_size_max,
+							border_width:-x_shadow_size_max,
+							color:obj.x_scroll_shadow_color})
+						UI.PopCliprect()
+					}
+				}
 			}
 			if(!doc){
 				//initiate progressive loading
@@ -1838,6 +1955,16 @@ W.CodeEditor=function(id,attrs){
 						obj.FindNext(1)
 					}}])
 			}
+		}
+		if(obj.m_notifications&&!obj.show_find_bar){
+			//h_top_hint+h_top_find
+			//h_top_hint+h_top_find
+			W.ListView('notification_list',{x:obj.x+obj.w-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:obj.h-8,
+				dimension:'y',layout_spacing:8,layout_align:'left',is_single_click_mode:1,no_region:1,no_clipping:1,
+				item_template:{
+					object_type:W.NotificationItem,
+				},items:obj.m_notifications})
+			//todo: dismissing
 		}
 	UI.End()
 	return obj
