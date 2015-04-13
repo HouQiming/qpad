@@ -362,6 +362,7 @@ UI.Theme_CustomWidget=function(C){
 			border_width:0,
 			round:4,
 			text_color:0xff444444,
+			progress_color:C_sel,
 			font:UI.Font(UI.font_name,20,-100),
 			icon_color:0xff000000,
 			icon_font:UI.Font('res/fonts/iconfnt.ttf,!',20),
@@ -573,13 +574,13 @@ UI.Application=function(id,attrs){
 			//}
 			//////////////////////////
 			var menu_file=UI.BigMenu("&File")
-			menu_file.AddNormalItem({text:"&New",key:"CTRL+N",enable_hotkey:1,action:function(){
+			menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:1,action:function(){
 				//UI.NewUIEditorTab()
 				//UI.NewFromTemplate("templates/blank_demo.mo")
 				UI.NewCodeEditorTab()//todo
 				UI.Refresh()
 			}})
-			menu_file.AddNormalItem({text:"&Open",key:"CTRL+O",enable_hotkey:1,action:function(){
+			menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
 				//todo
 				var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
 				if(!fn){return;}

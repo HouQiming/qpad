@@ -18,7 +18,6 @@ var g_language_C=Language.GetDescObjectByName("C/C++")
 ////////////////////////////////////////
 //the UI editor
 var ParseCodeError=function(err){
-	//todo
 	print(err.stack)
 }
 
@@ -300,7 +299,7 @@ W.UIEditor=function(id,attrs){
 			text:"",
 			anchor:ed_rect,anchor_align:"center",anchor_valign:"center",
 			///////////////
-			state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode"],
+			state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
 			language:g_language_C,
 			///////////////
 			OnSelectionChange:function(){
@@ -341,7 +340,6 @@ W.UIEditor=function(id,attrs){
 		//the sandbox is effectively a GLwidget
 		UI.GLWidget(function(){
 			//var tick0=Duktape.__ui_get_tick();
-			//todo: scrolling
 			g_sandbox.DrawSandboxScreen(obj.x+8,obj.y+8,w_sandbox_area,obj.h-16,0,0);
 			//print("g_sandbox.DrawWindow",Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000,"ms");
 		})
@@ -411,7 +409,7 @@ W.UIEditor=function(id,attrs){
 			var s_widget_key="/*insert here*/";
 			var utf8_offset=nthIndex(s_code,s_widget_key,0)
 			if(utf8_offset<0){
-				print("please don't remove the '/*insert here*/' comment")//todo
+				print("please don't remove the '/*insert here*/' comment")
 				return;
 			}
 			var byte_offset=ed.ConvertUTF8OffsetToBytesize(range_0,utf8_offset);
@@ -691,6 +689,7 @@ UI.non_animated_values.ddx_shake=1
 W.NotificationItem=function(id,attrs){
 	if(!UI.context_parent[id]){
 		attrs.alpha=0;
+		attrs.dx_shake=UI.default_styles.code_editor.dx_shake_notification
 	}
 	var obj=UI.Keep(id,attrs)
 	UI.StdStyling(id,obj,attrs, "code_editor_notification");
@@ -741,7 +740,7 @@ W.NotificationItem=function(id,attrs){
 			border_color:fadein(obj.border_color,obj.alpha),border_width:obj.border_width})
 		UI.PopCliprect()
 	}
-	UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,fadein(obj.icon_color,obj.alpha),obj.icon.charCodeAt(0))
+	if(obj.icon){UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,fadein(obj.icon_color,obj.alpha),obj.icon.charCodeAt(0))}
 	UI.DrawTextControl(tmp,obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding,fadein(obj.text_color,obj.alpha))
 	return obj
 }
@@ -804,12 +803,12 @@ W.CodeEditorWidget_prototype={
 	Save:function(){
 		var doc=this.doc
 		if(doc.ed.hfile_loading){
-			//todo: error notification
+			this.CreateNotification({id:'saving_progress',icon:'错',text:"You cannot save a file before it finishes loading"})
 			return
 		}
 		var ctx=UI.EDSaver_Open(doc.ed,this.file_name)
 		if(!ctx){
-			//todo: error notification
+			this.CreateNotification({id:'saving_progress',icon:'错',text:"Cannot create a temporary file for saving"})
 			return
 		}
 		doc.ed.saving_context=ctx
@@ -821,13 +820,17 @@ W.CodeEditorWidget_prototype={
 				this.ReleaseEditLock();
 				doc.ed.saving_context=undefined
 				this.OnSave();
+				this.DismissNotification('saving_progress')
 				UI.Refresh()
 			}else if(ret=="continue"){
+				this.CreateNotification({id:'saving_progress',icon:undefined,text:"Saving @1%...".replace('@1',(ctx.progress*100).toFixed(0)),
+					progress:ctx.progress
+				},"quiet")
 				UI.NextTick(fsave)
 			}else{
 				this.ReleaseEditLock();
 				doc.ed.saving_context=undefined
-				//todo: error notification
+				this.CreateNotification({id:'saving_progress',icon:'错',text:"Failed to save it"})
 			}
 		}).bind(this)
 		fsave();
@@ -847,7 +850,7 @@ W.CodeEditorWidget_prototype={
 		var doc=this.doc
 		var ccnt=(force_ccnt==undefined?doc.sel1.ccnt:force_ccnt)
 		if(this.m_current_find_context){
-			if(force_ccnt&&force_ccnt==this.m_current_find_context.m_starting_ccnt0){
+			if(force_ccnt&&force_ccnt==this.m_current_find_context.m_starting_ccnt0&&!this.m_changed_after_find){
 				return;
 			}
 			this.m_current_find_context.Cancel()
@@ -1010,6 +1013,23 @@ W.CodeEditorWidget_prototype={
 		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,fitem_current.visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),fitem_current.visual_y-h_bof_eof_message_with_sep)
 		ctx.m_find_scroll_visual_y=Math.max(Math.min(ctx.m_find_scroll_visual_y,ctx.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),ctx.m_y_extent_backward-h_bof_eof_message_with_sep)
 	},
+	BisectMatches:function(ccnt){
+		var ctx=this.m_current_find_context
+		var l0=-(ctx.m_backward_matches.length>>1)
+		var l=l0
+		var r=(ctx.m_forward_matches.length>>1)
+		while(l<=r){
+			var m=(l+r)>>1
+			var ccnt_m=this.GetMatchCcnt(m,0)
+			if(ccnt_m<=ccnt){
+				l=m+1;
+			}else{
+				r=m-1;
+			}
+		}
+		if(r<l0){r=l0;}
+		return r;
+	},
 	//visual y -> bsearch -> scroll_y -> ccnt -> bsearch -> match id
 	SeekFindItemByVisualY:function(visual_y,scroll_x){
 		var ctx=this.m_current_find_context
@@ -1034,20 +1054,7 @@ W.CodeEditorWidget_prototype={
 		var scroll_y=visual_y-fitem.visual_y+fitem.scroll_y
 		var ccnt=doc.ed.SeekXY(scroll_x,scroll_y)
 		//ccnt -> bsearch -> match id
-		l0=-(ctx.m_backward_matches.length>>1)
-		l=l0
-		r=(ctx.m_forward_matches.length>>1)
-		while(l<=r){
-			var m=(l+r)>>1
-			var ccnt_m=this.GetMatchCcnt(m,0)
-			if(ccnt_m<=ccnt){
-				l=m+1;
-			}else{
-				r=m-1;
-			}
-		}
-		if(r<l0){r=l0;}
-		ctx.m_current_point=r
+		ctx.m_current_point=this.BisectMatches(ccnt)
 	},
 	RenderVisibleFindItems:function(w_line_numbers,w_find_items,h_find_items, DrawItem){
 		this.AutoScrollFindItems()
@@ -1224,6 +1231,7 @@ W.CodeEditorWidget_prototype={
 			//no needle, no find
 			return;
 		}
+		this.DestroyReplacingContext()
 		var doc=this.doc
 		var ccnt=doc.sel1.ccnt
 		var ctx={
@@ -1253,7 +1261,7 @@ W.CodeEditorWidget_prototype={
 					this.m_owner.m_find_next_context=undefined
 					if(!this.m_match_reported){
 						//notification
-						this.m_owner.CreateNotification({icon:'警',text:(direction<0?"No more matches above":"No more matches below")})
+						this.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?"No more matches above":"No more matches below")})
 					}
 					UI.Refresh()
 				}else{
@@ -1267,7 +1275,7 @@ W.CodeEditorWidget_prototype={
 	},
 	BeforeQuickFind:function(direction){
 		var sel=this.doc.GetSelection()
-		this.show_find_bar=1
+		//this.show_find_bar=1
 		this.m_sel0_before_find=this.doc.sel0.ccnt
 		this.m_sel1_before_find=this.doc.sel1.ccnt
 		if(!(sel[0]<sel[1])){
@@ -1285,6 +1293,92 @@ W.CodeEditorWidget_prototype={
 			}
 		}
 	},
+	///////////////////////////////////
+	SetReplacingContext:function(ccnt0,ccnt1){
+		this.DestroyReplacingContext();
+		var ctx=this.m_current_find_context
+		var doc=this.doc
+		var ed=doc.ed
+		var rctx={
+			m_needle:ctx.m_needle,
+			m_flags:ctx.m_flags,
+			m_locators:[ed.CreateLocator(ccnt0,-1),ed.CreateLocator(ccnt1,1)],
+		}
+		rctx.m_locators[0].undo_tracked=1
+		rctx.m_locators[1].undo_tracked=1
+		var hlobj=doc.ed.CreateHighlight(rctx.m_locators[0],rctx.m_locators[1],-1)
+		hlobj.color=this.find_item_highlight_color;
+		hlobj.invertible=0;
+		rctx.m_highlight=hlobj
+		this.m_replace_context=rctx;
+	},
+	DestroyReplacingContext:function(){
+		var rctx=this.m_replace_context
+		if(rctx){
+			rctx.m_locators[0].discard()
+			rctx.m_locators[1].discard()
+			rctx.m_highlight.discard()
+			this.m_replace_context=undefined
+			this.DismissNotification('find_result')
+		}
+	},
+	DoReplace:function(ccnt0,ccnt1,is_first,s_replace){
+		var doc=this.doc
+		var rctx=this.m_replace_context
+		if(!rctx){return;}
+		this.AcquireEditLock();
+		rctx.m_ccnt0=ccnt0
+		rctx.m_ccnt1=ccnt1
+		rctx.m_frontier=ccnt0
+		rctx.m_match_cost=(is_first?1048576:64)
+		rctx.m_s_replace=s_replace
+		rctx.m_owner=this
+		var ffind_next=function(){
+			//print("replace: ffind_next ",rctx.m_frontier)
+			rctx.m_frontier=UI.ED_Search(doc.ed,rctx.m_frontier,1,rctx.m_needle,rctx.m_flags,1048576, undefined,rctx)
+			//print("search finished ",s_replace)
+			var ccnt_frontier=UI.GetSearchFrontierCcnt(rctx.m_frontier)
+			if(ccnt_frontier<0||ccnt_frontier>=rctx.m_ccnt1||rctx.m_current_replace_job&&is_first){
+				var need_onchange=0
+				rctx.m_owner.ReleaseEditLock();
+				if(rctx.m_current_replace_job){
+					var n_replaced=UI.ED_ApplyReplaceOps(doc.ed,rctx.m_current_replace_job)
+					need_onchange=1
+					rctx.m_owner.CreateNotification({id:'find_result',icon:'对',text:UI._("Replaced @1 matches").replace("@1",n_replaced.toString())})
+				}else{
+					rctx.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?UI._("Nothing replaced above"):UI._("Nothing replaced below"))})
+				}
+				rctx.m_owner.DestroyReplacingContext();
+				if(need_onchange){doc.CallOnChange();}
+			}else{
+				UI.NextTick(ffind_next);
+			}
+		}
+		ffind_next();
+	},
+	DoReplaceFromUI:function(is_first){
+		var doc=this.doc
+		var rctx=this.m_replace_context
+		if(!rctx){return;}
+		var sel=doc.GetSelection()
+		var ccnt0,ccnt1;
+		if(sel[0]<sel[1]){
+			ccnt0=sel[0]
+			ccnt1=sel[1]
+		}else{
+			ccnt0=sel[0]
+			ccnt1=doc.ed.GetTextSize()
+		}
+		var srep_ccnt0=rctx.m_locators[0].ccnt
+		var srep_ccnt1=rctx.m_locators[1].ccnt
+		if(srep_ccnt0<srep_ccnt1){
+			s_replace=doc.ed.GetText(srep_ccnt0,srep_ccnt1-srep_ccnt0)
+		}else{
+			s_replace='';
+		}
+		this.DoReplace(ccnt0,ccnt1,is_first,s_replace)
+	},
+	///////////////////////////////////
 	BringUpNotification:function(item){
 		var ns=this.m_notifications
 		for(var i=0;i<ns.length;i++){
@@ -1294,15 +1388,16 @@ W.CodeEditorWidget_prototype={
 					ns[j+1]=ns[j]
 				}
 				ns[0]=item
-				if(!i){
-					//item.x_shake=this.x_shake_notification
-					this.notification_list[item.id].dx_shake=this.dx_shake_notification
-				}
+				//if(!i){
+				//item.x_shake=this.x_shake_notification
+				this.notification_list[item.id].dx_shake=this.dx_shake_notification
+				//}
 				return
 			}
 		}
 	},
-	CreateNotification:function(attrs){
+	CreateNotification:function(attrs,is_quiet){
+		UI.Refresh()
 		var ns=this.m_notifications
 		if(!ns){
 			ns=[]
@@ -1310,15 +1405,25 @@ W.CodeEditorWidget_prototype={
 		}
 		for(var i=0;i<ns.length;i++){
 			var nsi=ns[i]
-			if(nsi.text==attrs.text&&(nsi.color==attrs.color||!attrs.color)){
+			//(nsi.text==attrs.text&&(nsi.color==attrs.color||!attrs.color)){
+			if(nsi.id==attrs.id){
 				//bring it up and shake it - y-animated list?
-				this.BringUpNotification(nsi)
+				for(var key in attrs){
+					nsi[key]=attrs[key]
+				}
+				if(!is_quiet){this.BringUpNotification(nsi)}
 				return nsi;
 			}
 		}
 		attrs.alpha=1
+		//if(!is_quiet){attrs.dx_shake=this.dx_shake_notification}
 		ns.push(attrs)
 		return attrs;
+	},
+	DismissNotification:function(id){
+		if(this.m_notifications){
+			this.m_notifications=this.m_notifications.filter(function(a){return a.id!=id})
+		}
 	},
 }
 
@@ -1337,6 +1442,7 @@ var ffindbar_plugin=function(){
 		var obj=this.owner
 		obj.doc.sel0.ccnt=obj.m_sel0_before_find
 		obj.doc.sel1.ccnt=obj.m_sel1_before_find
+		obj.DestroyReplacingContext();
 		obj.ResetFindingContext(this.ed.GetText(),obj.m_find_flags)
 	})
 	this.AddEventHandler('UP',function(){
@@ -1406,8 +1512,6 @@ var ffindbar_plugin=function(){
 			UI.Refresh()
 		}
 	})
-	//ctx.m_current_visual_y
-	//todo: main editor onchange should invalidate the find context
 }
 
 W.CodeEditor=function(id,attrs){
@@ -1565,10 +1669,99 @@ W.CodeEditor=function(id,attrs){
 			UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:obj.h})
 			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:obj.w-w_line_numbers,h:obj.h})
 		}
-		//todo: loading progress - notification system
-		if(doc&&doc.m_edit_lock){
+		if(doc&&doc.ed.hfile_loading){
+			//loading progress
+			obj.CreateNotification({
+				id:'loading_progress',
+				icon:undefined,
+				progress:doc.ed.hfile_loading.progress,
+				text:"Loading @1%...".replace('@1',(doc.ed.hfile_loading.progress*100).toFixed(0))},"quiet")
+		}else{
+			obj.DismissNotification('loading_progress')
+		}
+		var DrawLineNumbers=function(scroll_x,scroll_y,area_w,area_y,area_h){
+			if(bm_xys){
+				var hc=UI.GetCharacterHeight(doc.font)
+				UI.PushCliprect(obj.x,area_y,obj.w,area_h)
+				for(var i=0;i<bm_ccnts.length;i++){
+					var y=bm_xys[i*2+1]-scroll_y+area_y
+					var id=bm_ccnts[i][0]
+					UI.RoundRect({x:2,y:y+4,w:w_line_numbers-4,h:hc-8,
+						color:obj.bookmark_color,
+						border_color:obj.bookmark_border_color,
+						border_width:Math.min(hc/8,2),
+						round:4})
+					if(id>=0){
+						UI.DrawChar(obj.bookmark_font,4,y+4,obj.bookmark_text_color,48+id)
+					}
+				}
+				UI.PopCliprect()
+			}
+			if(obj.show_line_numbers){
+				var rendering_ccnt0=doc.SeekXY(scroll_x,scroll_y)
+				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,scroll_y+area_h)
+				var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
+				var line0=doc.GetLC(rendering_ccnt0)[0];
+				var line1=doc.GetLC(rendering_ccnt1)[0];
+				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1);
+				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
+				UI.PushCliprect(obj.x,area_y,obj.w,area_h)
+				for(var i=0;i<line_ccnts.length;i++){
+					if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
+					var s_line_number=(line0+i+1).toString();
+					var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
+					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
+					var x=w_line_numbers-text_dim.w-obj.padding
+					W.Text("",{x:obj.x+x,y:y, font:obj.line_number_font,text:s_line_number,color:line0+i==line_current?obj.line_number_color_focus:obj.line_number_color})
+				}
+				UI.PopCliprect()
+			}
+		}
+		var bm_ccnts=undefined,bm_xys=undefined;
+		var PrepareBookmarks=function(){
+			//prepare bookmarks - they appear under line numbers
+			bm_ccnts=[]
+			for(var i=0;i<doc.m_bookmarks.length;i++){
+				var bm=doc.m_bookmarks[i];
+				if(bm){
+					bm_ccnts.push([i,bm.ccnt])
+				}
+			}
+			var bm_filtered=[];
+			for(var i=0;i<doc.m_unkeyed_bookmarks.length;i++){
+				var bm=doc.m_unkeyed_bookmarks[i];
+				if(bm){
+					bm_ccnts.push([-1,bm.ccnt])
+					bm_filtered.push(bm)
+				}
+			}
+			doc.m_unkeyed_bookmarks=bm_filtered;
+			if(bm_ccnts.length){
+				bm_ccnts.sort(function(a,b){return (a[1]*10+a[0])-(b[1]*10+b[0]);});
+				bm_xys=doc.ed.GetXYEnMasse(bm_ccnts.map(function(a){return a[1]}))
+			}
+		}
+		if(doc&&obj.m_edit_lock){
 			obj.__children.push(doc)
-			//todo: still render it, but without the caret
+			UI.Begin(doc)
+				var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
+					scroll_x:doc.scroll_x,
+					scroll_y:doc.scroll_y})
+			UI.End()
+			doc.visible_scroll_x=anim.scroll_x
+			doc.visible_scroll_y=anim.scroll_y
+			//still render it, but without the caret or user interaction
+			doc.x=obj.x+w_line_numbers+obj.padding
+			doc.y=obj.y
+			doc.w=obj.w-w_line_numbers-obj.padding-w_scrolling_area
+			doc.h=obj.h
+			doc.ed.Render({x:doc.visible_scroll_x,y:doc.visible_scroll_y,
+				w:doc.w/doc.scale,h:doc.h/doc.scale, 
+				scr_x:doc.x*UI.pixels_per_unit,scr_y:doc.y*UI.pixels_per_unit, 
+				scale:UI.pixels_per_unit, obj:doc});
+			//////////////////
+			PrepareBookmarks()
+			DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h);
 		}else{
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar
@@ -1637,71 +1830,62 @@ W.CodeEditor=function(id,attrs){
 				doc=obj.doc
 				doc.OnLoad=obj.OnLoad.bind(obj)
 				doc.StartLoading(obj.file_name)
-				UI.InvalidateCurrentFrame()
-			}
-			//prepare bookmarks - they appear under line numbers
-			var bm_ccnts=[]
-			for(var i=0;i<doc.m_bookmarks.length;i++){
-				var bm=doc.m_bookmarks[i];
-				if(bm){
-					bm_ccnts.push([i,bm.ccnt])
-				}
-			}
-			var bm_filtered=[];
-			for(var i=0;i<doc.m_unkeyed_bookmarks.length;i++){
-				var bm=doc.m_unkeyed_bookmarks[i];
-				if(bm){
-					bm_ccnts.push([-1,bm.ccnt])
-					bm_filtered.push(bm)
-				}
-			}
-			this.m_unkeyed_bookmarks=bm_filtered;
-			var bm_xys=undefined
-			if(bm_ccnts.length){
-				bm_ccnts.sort(function(a,b){return (a[1]*10+a[0])-(b[1]*10+b[0]);});
-				bm_xys=doc.ed.GetXYEnMasse(bm_ccnts.map(function(a){return a[1]}))
-			}
-			//general annotation system after find - f3 / shift-f3
-			//generic drawing function
-			var line_current=doc.GetLC(doc.sel1.ccnt)[0]
-			var DrawLineNumbers=function(scroll_x,scroll_y,area_w,area_y,area_h){
-				if(bm_xys){
-					var hc=UI.GetCharacterHeight(doc.font)
-					UI.PushCliprect(obj.x,area_y,obj.w,area_h)
-					for(var i=0;i<bm_ccnts.length;i++){
-						var y=bm_xys[i*2+1]-scroll_y+area_y
-						var id=bm_ccnts[i][0]
-						UI.RoundRect({x:2,y:y+4,w:w_line_numbers-4,h:hc-8,
-							color:obj.bookmark_color,
-							border_color:obj.bookmark_border_color,
-							border_width:Math.min(hc/8,2),
-							round:4})
-						if(id>=0){
-							UI.DrawChar(obj.bookmark_font,4,y+4,obj.bookmark_text_color,48+id)
+				doc.HookedEdit=function(ops){
+					if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context){
+						var match_id=obj.BisectMatches(ops[0])
+						if(match_id){
+							var match_ccnt0=obj.GetMatchCcnt(match_id,0)
+							var match_ccnt1=obj.GetMatchCcnt(match_id,1)
+							var intersected=1;
+							for(var i=0;i<ops.length;i+=3){
+								var ccnt0_i=ops[i]
+								var ccnt1_i=ops[i]+ops[i+1]
+								if(!(ccnt0_i<=match_ccnt1&&ccnt1_i>=match_ccnt0)){
+									intersected=0;
+									break
+								}
+							}
+							if(intersected){
+								//start replacing - *every* op intersects with the match...
+								obj.SetReplacingContext(match_ccnt0,match_ccnt1)
+							}
 						}
 					}
-					UI.PopCliprect()
+					this.ed.Edit(ops);
 				}
-				if(obj.show_line_numbers){
-					var rendering_ccnt0=doc.SeekXY(scroll_x,scroll_y)
-					var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,scroll_y+area_h)
-					var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
-					var line0=doc.GetLC(rendering_ccnt0)[0];
-					var line1=doc.GetLC(rendering_ccnt1)[0];
-					var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1);
-					var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
-					UI.PushCliprect(obj.x,area_y,obj.w,area_h)
-					for(var i=0;i<line_ccnts.length;i++){
-						if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
-						var s_line_number=(line0+i+1).toString();
-						var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
-						var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
-						var x=w_line_numbers-text_dim.w-obj.padding
-						W.Text("",{x:obj.x+x,y:y, font:obj.line_number_font,text:s_line_number,color:line0+i==line_current?obj.line_number_color_focus:obj.line_number_color})
+				doc.AddEventHandler('change',function(){
+					if(obj.m_current_find_context){
+						obj.m_current_find_context.Cancel()
+						obj.m_current_find_context=undefined
 					}
-					UI.PopCliprect()
+				})
+				doc.AddEventHandler('ESC',function(){
+					obj.m_notifications=[]
+					return 1
+				})
+				UI.InvalidateCurrentFrame()
+			}
+			if(obj.m_replace_context){
+				//replace hint
+				var rctx=obj.m_replace_context
+				var srep_ccnt0=rctx.m_locators[0].ccnt
+				var srep_ccnt1=rctx.m_locators[1].ccnt
+				if(srep_ccnt0<srep_ccnt1){
+					s_replace=doc.ed.GetText(srep_ccnt0,srep_ccnt1-srep_ccnt0)
+				}else{
+					s_replace='';
+				}
+				if(rctx.m_needle==s_replace){
+					obj.DismissNotification('find_result')
+				}else{
+					obj.CreateNotification({
+						id:'find_result',icon:'警',text:[rctx.m_needle,'  \u2192',s_replace].join("\n")
+					},"quiet")
 				}
 			}
+			PrepareBookmarks()
+			//generic drawing function
+			var line_current=doc.GetLC(doc.sel1.ccnt)[0]
 			//the find bar and stuff
 			if(obj.show_find_bar&&current_find_context){
 				//draw the find items
@@ -1784,6 +1968,7 @@ W.CodeEditor=function(id,attrs){
 					value:(obj.m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
 					OnChange:function(value){
 						obj.m_find_flags=(obj.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
+						obj.DestroyReplacingContext();
 						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.m_find_flags)
 					}})
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
@@ -1793,6 +1978,7 @@ W.CodeEditor=function(id,attrs){
 					value:(obj.m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 					OnChange:function(value){
 						obj.m_find_flags=(obj.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
+						obj.DestroyReplacingContext();
 						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.m_find_flags)
 					}})
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
@@ -1802,6 +1988,7 @@ W.CodeEditor=function(id,attrs){
 					value:(obj.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 					OnChange:function(value){
 						obj.m_find_flags=(obj.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
+						obj.DestroyReplacingContext();
 						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.m_find_flags)
 					}})
 				var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
@@ -1848,86 +2035,12 @@ W.CodeEditor=function(id,attrs){
 						text:"Search"})
 				}
 			}
-			//minimap / scroll bar
-			if(w_scrolling_area>0){
-				var y_scrolling_area=obj.y
-				var effective_scroll_y=doc.visible_scroll_y-h_top_hint
-				var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
-				if(obj.show_minimap){
-					var x_minimap=obj.x+obj.w-w_scrolling_area+obj.padding*0.5
-					var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
-					var h_minimap=h_scrolling_area/minimap_scale
-					var scroll_y_minimap=sbar_value*Math.max(ytot-h_minimap,0)
-					UI.PushSubWindow(x_minimap,y_scrolling_area,obj.w_minimap,h_scrolling_area,minimap_scale)
-						doc.ed.Render({x:0,y:scroll_y_minimap,w:obj.w_minimap/minimap_scale,h:h_minimap,
-							scr_x:0,scr_y:0, scale:UI.pixels_per_unit, obj:doc});
-					UI.PopSubWindow()
-					var minimap_page_y0=(effective_scroll_y-scroll_y_minimap)*minimap_scale
-					var minimap_page_y1=(effective_scroll_y+h_scrolling_area-scroll_y_minimap)*minimap_scale
-					UI.RoundRect({
-						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
-						color:obj.minimap_page_shadow})
-					UI.RoundRect({
-						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
-						color:obj.minimap_page_border_color})
-					UI.RoundRect({
-						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y1-obj.minimap_page_border_width, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
-						color:obj.minimap_page_border_color})
-					if((minimap_page_y1-minimap_page_y0)<h_minimap){
-						W.Region('minimap_page',{
-							x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
-							value:sbar_value,
-							factor:h_scrolling_area-(minimap_page_y1-minimap_page_y0),
-							OnChange:function(value){
-								doc.scroll_y=value*(ytot-h_scrolling_area)
-								doc.scrolling_animation=undefined
-								UI.Refresh()
-							},
-						},W.MinimapThingy_prototype)
-					}
-				}
-				//scrollbar background
-				var sbar=UI.RoundRect({x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area, w:obj.w_scroll_bar+4, h:h_scrolling_area,
-					color:obj.line_number_bgcolor
-				})
-				//at-scrollbar bookmark marker
-				var hc_bookmark=UI.GetCharacterHeight(obj.bookmark_font)
-				if(bm_ccnts.length){
-					for(var i=0;i<bm_ccnts.length;i++){
-						var y=Math.max(Math.min(bm_xys[i*2+1]/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
-						var id=bm_ccnts[i][0]
-						UI.RoundRect({
-							x:sbar.x, w:sbar.w,
-							y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
-							color:obj.bookmark_text_color})
-						if(id>=0){
-							UI.DrawChar(obj.bookmark_font,sbar.x+2,
-								y-sbar.y>hc_bookmark?y-obj.bookmark_scroll_bar_marker_size*0.5-hc_bookmark:y+obj.bookmark_scroll_bar_marker_size*0.5,
-								obj.bookmark_text_color,48+id)
-						}
-					}
-				}
-				//the actual bar
-				W.ScrollBar("sbar",{x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area+4, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
-					page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
-					OnChange:function(value){
-						doc.scroll_y=value*(this.total_size-this.page_size)
-						doc.scrolling_animation=undefined
-						UI.Refresh()
-					},
-					style:obj.scroll_bar_style
-				})
-				//separators
-				UI.RoundRect({
-					x:obj.x+obj.w-w_scrolling_area, y:y_scrolling_area, w:1, h:h_scrolling_area,
-					color:obj.separator_color})
-			}
 			//UI.RoundRect({
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:obj.h,
 			//	color:obj.separator_color})
 			if(UI.HasFocus(doc)){
 				var menu_search=UI.BigMenu("&Search")
-				menu_search.AddNormalItem({text:"&Find or replace",enable_hotkey:1,key:"CTRL+F",action:function(){
+				menu_search.AddNormalItem({text:"&Find or replace",icon:"s",enable_hotkey:1,key:"CTRL+F",action:function(){
 					var sel=obj.doc.GetSelection()
 					obj.show_find_bar=1
 					obj.m_sel0_before_find=obj.doc.sel0.ccnt
@@ -1954,11 +2067,92 @@ W.CodeEditor=function(id,attrs){
 						obj.BeforeQuickFind(1);
 						obj.FindNext(1)
 					}}])
+				if(obj.m_replace_context){
+					menu_search.AddSeparator()
+					menu_search.AddButtonRow({text:"Replace"},[
+						{key:"CTRL+D",text:"next",tooltip:'CTRL+D',action:function(){
+							obj.DoReplaceFromUI(1)
+						}},{key:"ALT+A",text:"all",tooltip:'ALT+A',action:function(){
+							obj.DoReplaceFromUI(0)
+						}}])
+				}
 			}
 		}
+		//minimap / scroll bar
+		if(doc&&w_scrolling_area>0){
+			var y_scrolling_area=obj.y
+			var effective_scroll_y=doc.visible_scroll_y-h_top_hint
+			var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
+			if(obj.show_minimap){
+				var x_minimap=obj.x+obj.w-w_scrolling_area+obj.padding*0.5
+				var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
+				var h_minimap=h_scrolling_area/minimap_scale
+				var scroll_y_minimap=sbar_value*Math.max(ytot-h_minimap,0)
+				UI.PushSubWindow(x_minimap,y_scrolling_area,obj.w_minimap,h_scrolling_area,minimap_scale)
+					doc.ed.Render({x:0,y:scroll_y_minimap,w:obj.w_minimap/minimap_scale,h:h_minimap,
+						scr_x:0,scr_y:0, scale:UI.pixels_per_unit, obj:doc});
+				UI.PopSubWindow()
+				var minimap_page_y0=(effective_scroll_y-scroll_y_minimap)*minimap_scale
+				var minimap_page_y1=(effective_scroll_y+h_scrolling_area-scroll_y_minimap)*minimap_scale
+				UI.RoundRect({
+					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
+					color:obj.minimap_page_shadow})
+				UI.RoundRect({
+					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
+					color:obj.minimap_page_border_color})
+				UI.RoundRect({
+					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y1-obj.minimap_page_border_width, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
+					color:obj.minimap_page_border_color})
+				if((minimap_page_y1-minimap_page_y0)<h_minimap){
+					W.Region('minimap_page',{
+						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
+						value:sbar_value,
+						factor:h_scrolling_area-(minimap_page_y1-minimap_page_y0),
+						OnChange:function(value){
+							doc.scroll_y=value*(ytot-h_scrolling_area)
+							doc.scrolling_animation=undefined
+							UI.Refresh()
+						},
+					},W.MinimapThingy_prototype)
+				}
+			}
+			//scrollbar background
+			var sbar=UI.RoundRect({x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area, w:obj.w_scroll_bar+4, h:h_scrolling_area,
+				color:obj.line_number_bgcolor
+			})
+			//at-scrollbar bookmark marker
+			var hc_bookmark=UI.GetCharacterHeight(obj.bookmark_font)
+			if(bm_ccnts.length){
+				for(var i=0;i<bm_ccnts.length;i++){
+					var y=Math.max(Math.min(bm_xys[i*2+1]/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
+					var id=bm_ccnts[i][0]
+					UI.RoundRect({
+						x:sbar.x, w:sbar.w,
+						y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
+						color:obj.bookmark_text_color})
+					if(id>=0){
+						UI.DrawChar(obj.bookmark_font,sbar.x+2,
+							y-sbar.y>hc_bookmark?y-obj.bookmark_scroll_bar_marker_size*0.5-hc_bookmark:y+obj.bookmark_scroll_bar_marker_size*0.5,
+							obj.bookmark_text_color,48+id)
+					}
+				}
+			}
+			//the actual bar
+			W.ScrollBar("sbar",{x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area+4, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
+				page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
+				OnChange:function(value){
+					doc.scroll_y=value*(this.total_size-this.page_size)
+					doc.scrolling_animation=undefined
+					UI.Refresh()
+				},
+				style:obj.scroll_bar_style
+			})
+			//separators
+			UI.RoundRect({
+				x:obj.x+obj.w-w_scrolling_area, y:y_scrolling_area, w:1, h:h_scrolling_area,
+				color:obj.separator_color})
+		}
 		if(obj.m_notifications&&!obj.show_find_bar){
-			//h_top_hint+h_top_find
-			//h_top_hint+h_top_find
 			W.ListView('notification_list',{x:obj.x+obj.w-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:obj.h-8,
 				dimension:'y',layout_spacing:8,layout_align:'left',is_single_click_mode:1,no_region:1,no_clipping:1,
 				item_template:{

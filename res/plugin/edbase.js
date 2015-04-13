@@ -632,41 +632,49 @@ UI.RegisterEditorPlugin(function(){
 	var fcheckbrackets=function(){
 		var ccnt=this.sel1.ccnt
 		var lang=this.plugin_language_desc
-		if(this.IsBracketEnabledAt(ccnt)){
+		//if(this.IsBracketEnabledAt(ccnt)){
 			//what constitutes a bracket, state
-			var is_left_bracket=0
-			for(var i=0;i<lang.m_lbracket_tokens.length;i++){
-				var s=lang.m_lbracket_tokens[i]
-				var lg=Duktape.__byte_length(s)
-				if(this.ed.GetText(ccnt-lg,lg)==s){
-					//left bracket
-					is_left_bracket=1;
-					break
-				}
-			}
-			if(is_left_bracket){
-				var ccnt2=this.FindOuterBracket(ccnt,1)
-				if(ccnt2>=0){
-					HighlightBrackets(this,ccnt-1,ccnt2-1)
-					return
-				}
-			}
-			var is_right_bracket=0;
-			for(var i=0;i<lang.m_rbracket_tokens.length;i++){
-				var s=lang.m_rbracket_tokens[i]
-				var lg=Duktape.__byte_length(s)
-				if(this.ed.GetText(ccnt,lg)==s){
-					//left bracket
-					is_right_bracket=1;
-					break
-				}
-			}
-			if(is_right_bracket){
-				var ccnt2=this.FindOuterBracket(ccnt,-1)
-				if(ccnt2>=0){
-					HighlightBrackets(this,ccnt2,ccnt)
-					return
-				}
+			//var is_left_bracket=0
+			//for(var i=0;i<lang.m_lbracket_tokens.length;i++){
+			//	var s=lang.m_lbracket_tokens[i]
+			//	var lg=Duktape.__byte_length(s)
+			//	if(this.ed.GetText(ccnt-lg,lg)==s){
+			//		//left bracket
+			//		is_left_bracket=1;
+			//		break
+			//	}
+			//}
+			//if(is_left_bracket){
+			//	var ccnt2=this.FindOuterBracket(ccnt,1)
+			//	if(ccnt2>=0){
+			//		HighlightBrackets(this,ccnt-1,ccnt2-1)
+			//		return
+			//	}
+			//}
+			//var is_right_bracket=0;
+			//for(var i=0;i<lang.m_rbracket_tokens.length;i++){
+			//	var s=lang.m_rbracket_tokens[i]
+			//	var lg=Duktape.__byte_length(s)
+			//	if(this.ed.GetText(ccnt,lg)==s){
+			//		//left bracket
+			//		is_right_bracket=1;
+			//		break
+			//	}
+			//}
+			//if(is_right_bracket){
+			//	var ccnt2=this.FindOuterBracket(ccnt,-1)
+			//	if(ccnt2>=0){
+			//		HighlightBrackets(this,ccnt2,ccnt)
+			//		return
+			//	}
+			//}
+		//}
+		var ccnt_right=this.FindOuterBracket(ccnt,1)
+		if(ccnt_right>=0){
+			var ccnt_left=this.FindOuterBracket(ccnt,-1)
+			if(ccnt_left>=0){
+				HighlightBrackets(this,ccnt_left,ccnt_right-1)
+				return
 			}
 		}
 		this.m_lbracket_p0.ccnt=0
@@ -690,8 +698,10 @@ UI.RegisterEditorPlugin(function(){
 		}else if(ccnt==this.m_rbracket_p0.ccnt||ccnt==this.m_rbracket_p1.ccnt){
 			ccnt_new=this.m_lbracket_p1.ccnt;
 		}else{
-			UI.assert(0,"panic: bracket highlight enabled but cursor not at bracket?")
-			return;
+			//UI.assert(0,"panic: bracket highlight enabled but cursor not at bracket?")
+			ccnt_new=this.m_lbracket_p1.ccnt;
+			//ccnt=this.m_rbracket_p1.ccnt;
+			//return;
 		}
 		this.sel0.ccnt=is_sel?ccnt:ccnt_new
 		this.sel1.ccnt=ccnt_new
@@ -1155,9 +1165,3 @@ UI.RegisterEditorPlugin(function(){
 		}).call(this,C);
 	}
 });
-
-//auto-replace
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
-	//todo: HookedEdit -> main file?
-})

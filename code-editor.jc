@@ -92,10 +92,23 @@ class CLayouter_programmer
 	CLanguageDescription m_lang
 	int[] m_cached_colors
 	int m_cached_colors_p_word_part
+	//////////////
+	int[] m_char_width_cache_ascii
+	int[int] m_char_width_cache
 	//todo: easy color change...
 	/////////////////
 	charWidth=inline(ch){
-		return float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))
+		if u32(ch)<u32(0x80):
+			ret=m_char_width_cache_ascii[ch]
+			if !ret:
+				ret=int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch))))+1
+				m_char_width_cache_ascii[ch]=ret
+		else
+			ret=m_char_width_cache[ch]
+			if !ret:
+				ret=int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch))))+1
+				m_char_width_cache[ch]=ret
+		return ret-1
 	}
 	charHeight=inline(){
 		return float2fixed(g_renderer.GetCharacterHeight(m_font))
@@ -238,6 +251,8 @@ class CLayouter_programmer
 	SetTextStyle=function(JSObject obj){
 		m_lang=obj["language"].as(CLanguageDescription)
 		m_font=obj["font"].as(TFont)
+		m_char_width_cache_ascii=new int[128]
+		m_char_width_cache=new int[int]
 		m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width=obj["wrap_width"].or(0.f)
 		m_tab_width_in_fp=i64(m_tab_width)*charWidth(int(' '))
@@ -972,7 +987,7 @@ class CSeeker_indentation
 						//ignore, make it invalid
 						n_ind=-1
 						continue
-					if ch=='\n':
+					else if ch=='\n':
 						//new line, reset n_ind without triggering outer loop
 						n_ind=0
 						continue
@@ -1009,9 +1024,20 @@ registerStateHandler("colorer_programmer",CColorer_programmer)
 registerStateHandler("seeker_indentation",CSeeker_indentation)
 
 ///////////////////////////////////////////
-NEXT_READ_SIZE=1048576
-INITIAL_READ_SIZE=2097152
+NEXT_READ_SIZE=4194304
+INITIAL_READ_SIZE=16777216//2097152
 WRITE_BATCH=4194304
+class CLoadingContext
+	i64 sz
+	//////////
+	//string fn
+	System.IO.CFile hf
+	//////////
+	float progress
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"progress")
+	}
+
 class CSavingContext
 	CEditableText ed
 	i64 ofs
@@ -1203,6 +1229,11 @@ auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int fla
 	return JS.Return(-1LL)
 	
 ///////////////////////////////////////////
+class CReplaceJob
+	m_ops=new TEditop[]
+	string m_s_replace
+	m_match_cost=64
+	
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
 		//initial read, which is a raw edit
@@ -1216,18 +1247,28 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if s.n<INITIAL_READ_SIZE:
 			hf.Close()
 			return JS.Return(0)
-		return JS.Return(hf)
+		ret=new CLoadingContext
+		ret.sz=System.IO.GetFileSize(fn)
+		//ret.fn=fn
+		ret.hf=hf
+		ret.progress=float(min(double(hf.Position())/double(max(ret.sz,1LL)),1.0))
+		return JS.Return(ret)
 	}
 	JS_UI["EDLoader_Read"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
-		hf=JS.Param(1).as(System.IO.CFile)
+		ret=JS.Param(1).as(CLoadingContext)
+		hf=ret.hf
+		//todo: UTF-8 boundary, encoding, ...
 		s=hf.Read(NEXT_READ_SIZE)
 		if s.n:
-			ed.Edit([TEditop(){ccnt:ed.GetTextSize(),s:s}])
+			//t0=System.Time.tick64()
+			ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:s}])
+			//Writeln('insertion: ',System.Time.TicksToSeconds(System.Time.tick64()-t0)*1000.0,' ',s.n)
 		if s.n<NEXT_READ_SIZE:
 			hf.Close()
 			return JS.Return(0)
-		return JS.Return(hf)
+		ret.progress=float(min(double(hf.Position())/double(max(ret.sz,1LL)),1.0))
+		return JS.Return(ret)
 	}
 	JS_UI["EDSaver_Open"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
@@ -1269,24 +1310,52 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		js_callback=JS.Param(6).as(JSObject)
 		js_this=JS.Param(7).as(JSObject)
 		/////////////
+		if !js_callback:
+			//need a context for m_match_cost and stuff
+			rjob=js_this["m_current_replace_job"].as(CReplaceJob)
+			if !rjob:
+				rjob=new CReplaceJob
+				rjob.m_match_cost=js_this["m_match_cost"].or(rjob.m_match_cost)
+				rjob.m_s_replace=js_this["m_s_replace"].as(string)
+				js_this["m_current_replace_job"]=rjob
+			ops=rjob.m_ops
+			//replace mode
+			if flags&SEARCH_FLAG_REGEXP:
+				ReportMatch=function(i64 ccnt0,i64 ccnt1){
+					ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:rjob.m_s_replace})
+					return rjob.m_match_cost
+				}
+			else
+				ReportMatch=function(i64 ccnt0,i64 ccnt1){
+					if flags&SEARCH_FLAG_WHOLE_WORD:
+						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
+						if isWordChar(ch0)==isWordChar(ch1):return 0
+						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
+						if isWordChar(ch0)==isWordChar(ch1):return 0
+					ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:rjob.m_s_replace})
+					return rjob.m_match_cost
+				}
+		else
+			if flags&SEARCH_FLAG_REGEXP:
+				ReportMatch=function(i64 ccnt0,i64 ccnt1){
+					return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
+				}
+			else
+				ReportMatch=function(i64 ccnt0,i64 ccnt1){
+					if flags&SEARCH_FLAG_WHOLE_WORD:
+						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
+						if isWordChar(ch0)==isWordChar(ch1):return 0
+						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
+						if isWordChar(ch0)==isWordChar(ch1):return 0
+					return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
+				}
 		if flags&SEARCH_FLAG_REGEXP:
-			ReportMatch=function(i64 ccnt0,i64 ccnt1){
-				return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
-			}
 			//the regexp version returns an object to JS
 			if direction>0:
 				return SearchRegexp(JS,ed,1, s,flags,ReportMatch, budget)
 			else
 				return SearchRegexp(JS,ed,-1, s,flags,ReportMatch, budget)
 		else
-			ReportMatch=function(i64 ccnt0,i64 ccnt1){
-				if flags&SEARCH_FLAG_WHOLE_WORD:
-					(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
-					if isWordChar(ch0)==isWordChar(ch1):return 0
-					(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
-					if isWordChar(ch0)==isWordChar(ch1):return 0
-				return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
-			}
 			ocase=(flags&SEARCH_FLAG_CASE_SENSITIVE)
 			ccnt0=JS.Param(1).as(i64)
 			if direction>0:
@@ -1294,5 +1363,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			else
 				ret=SearchPlainText(ed,ccnt0,-1, s,ocase,ReportMatch, budget)
 		return JS.Return(ret)
+	}
+	//this is not hook-friendly
+	JS_UI["ED_ApplyReplaceOps"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		rjob=JS.Param(1).as(CReplaceJob)
+		if !ed||!rjob:return JS.ReturnError("invalid parameters")
+		//for now, just do it the dumb way
+		n=rjob.m_ops.n
+		ed.Edit(rjob.m_ops)
+		return JS.Return(n)
 	}
 })
