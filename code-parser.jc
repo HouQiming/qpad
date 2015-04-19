@@ -863,19 +863,24 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			//could do ppm... but likely pointless for such a small sample
 			return 0
 		s_prefix=ed.GetText(ccnt_before_word,ccnt-ccnt_before_word)
-		if !s_prefix.n:return 0
 		/////////////////////
-		auto prefix_smalleri(string a,string b)
+		auto prefix_smalleri0(string a,string b)
+			n_min=min(a.n,b.n)
+			ret=memicmp(__pointer(a.d),__pointer(b.d),n_min)
+			if !ret:
+				ret=a.n-b.n
+			return ret<0
+		auto prefix_smalleri1(string a,string b)
 			n_min=min(a.n,b.n)
 			ret=memicmp(__pointer(a.d),__pointer(b.d),n_min)
 			return ret<0
 		inline SearchPrefix(arr)
 			if typeof(arr)==int[]:
-				ftoosmall=function(int a){return prefix_smalleri(getIdString(a),s_prefix)}
-				fnottoobig=function(int a){return !prefix_smalleri(s_prefix,getIdString(a))}
+				ftoosmall=function(int a){return prefix_smalleri0(getIdString(a),s_prefix)}
+				fnottoobig=function(int a){return !prefix_smalleri1(s_prefix,getIdString(a))}
 			else
-				ftoosmall=function(int2 a){return prefix_smalleri(getIdString(a.x),s_prefix)}
-				fnottoobig=function(int2 a){return !prefix_smalleri(s_prefix,getIdString(a.x))}
+				ftoosmall=function(int2 a){return prefix_smalleri0(getIdString(a.x),s_prefix)}
+				fnottoobig=function(int2 a){return !prefix_smalleri1(s_prefix,getIdString(a.x))}
 			auto n0=arr.Bisect(ftoosmall)
 			auto n1=arr.Bisect(fnottoobig)
 			if typeof(arr)==int[]:
@@ -886,7 +891,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto SearchPPMRange(int2 rg)
 			if rg.x<rg.y:
 				SearchPrefix(fidx.m_ppm_pool[rg.x:rg.y-1])
-		SearchPrefix(fidx.m_ids)
+		if s_prefix.n:
+			//todo: common prefix here
+			SearchPrefix(fidx.m_ids)
 		if fidx.m_ppm1_index:
 			ccnt_last_word=ed.MoveToBoundary(ccnt_before_word,-1,ed.GetStockFCheck("space",-1),4096)
 			ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
@@ -896,6 +903,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				(tok_before,ch1)=ed.GetUtf8CharNeighborhood(ccnt_last_word)
 			SearchPPMRange(fidx.m_ppm1_index[tok_before])
 		else if fidx.m_name_dot_index:
+			Writeln('>>> ',s_prefix)//todo
 			(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt_before_word)
 			ccnt_last_word=ccnt_before_word-1LL
 			if (ch0==int('>')||ch0==int(':')):
@@ -906,6 +914,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if ch0==int('.'):
 				ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
 				if ccnt_before_last_word<ccnt_last_word:
+					Writeln(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word),'.')//todo
 					SearchPPMRange(fidx.m_name_dot_index[getid(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word))])
 			/////////////////////////////////
 			//function bracket index
@@ -936,6 +945,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 								if !nested:arg_id++
 								break
 							}
+						Writeln(ed.GetText(ccnt_before_fname,ccnt_bracket-ccnt_before_fname),'()')//todo
 						SearchPPMRange(fidx.m_function_bracket_index[int2(id_fname,arg_id)])
 		//////////////////////////
 		cands.Sortby(byMember("x"))

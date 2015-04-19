@@ -803,7 +803,9 @@ W.CodeEditorWidget_prototype={
 				obj.m_current_find_context=undefined
 			}
 			if(obj.m_ac_context){
-				obj.m_ac_context=undefined;
+				//this should self-destruct when it's a disabling change
+				//it should work properly if the user continues typing
+				obj.m_ac_context.m_ccnt=-1;
 			}
 		})
 		doc.AddEventHandler('ESC',function(){
@@ -1995,7 +1997,9 @@ W.CodeEditor=function(id,attrs){
 				//auto-completion
 				if(doc.sel0.ccnt==doc.sel1.ccnt&&doc.m_user_just_typed_char){
 					var acctx=obj.m_ac_context
+					var ac_was_actiavted=0
 					if(acctx&&acctx.m_ccnt!=doc.sel1.ccnt){
+						ac_was_actiavted=acctx.m_activated
 						acctx=undefined;
 					}
 					if(!acctx){
@@ -2003,7 +2007,7 @@ W.CodeEditor=function(id,attrs){
 						acctx={
 							m_ccnt:doc.sel1.ccnt,
 							m_accands:accands,
-							m_scroll_x:0,
+							m_scroll_i:0,
 							m_display_items:[],
 							m_n_cands:accands?accands.length:0,
 							m_x_current:obj.accands_padding*0.5,
@@ -2029,80 +2033,123 @@ W.CodeEditor=function(id,attrs){
 								this.m_activated=1;	
 								UI.Refresh()
 							},
+							Confirm:function(id){
+								var s_prefix=this.m_accands.s_prefix
+								var lg=Duktape.__byte_length(s_prefix);
+								var ccnt0=doc.sel1.ccnt-lg
+								var sname=this.m_accands.at(id).name
+								var lg2=Duktape.__byte_length(sname);
+								doc.HookedEdit([ccnt0,lg,sname])
+								obj.m_ac_context=undefined
+								doc.m_user_just_typed_char=0
+								doc.sel0.ccnt=ccnt0+lg2
+								doc.sel1.ccnt=ccnt0+lg2
+								UI.Refresh()
+							},
+							IDFromX:function(x){
+								while(this.m_x_current<x&&this.m_display_items.length<this.m_n_cands){
+									this.GetDisplayItem(this.m_display_items.length)
+								}
+								var dis=this.m_display_items
+								var l=0;
+								var r=dis.length-1
+								while(l<=r){
+									var m=(l+r)>>1
+									if(dis[m].x<=x){
+										l=m+1
+									}else{
+										r=m-1
+									}
+								}
+								return Math.max(r,0)
+							},
 						}
 						obj.m_ac_context=acctx
 						UI.Refresh()
 					}
-					//create pages first... lazily?!
-					//it's pointless to show too many
-					//single line or rectangular?
-					//single line near
-					if(acctx.m_n_cands){
+					//todo: single-candidate mode, common prefix mode, the same: it just comes from the id pool
+					//doc.ed.m_other_overlay always shows the 1st candidate?
+					//need PPM weight calibration, and float weights
+					//can't auto-calibrate - PPM always wins
+					//tab should be strictly for common prefix? if we could guess the 1st candidate right...
+					if(acctx.m_n_cands>1){
+						if(ac_was_actiavted){
+							acctx.Activate()
+						}
+						var ac_w_needed=0
+						for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
+							ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
+						}
 						var ed_caret=doc.GetCaretXY();
 						var x_caret=(ed_caret.x-doc.visible_scroll_x+doc.ed.m_caret_offset);
 						var y_caret=(ed_caret.y-doc.visible_scroll_y);
 						x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
 						var hc=UI.GetCharacterHeight(doc.font)
-						var x_accands=Math.max(Math.min(x_caret,obj.x+obj.w-obj.w_accands-doc.x),0)
+						var x_accands=Math.max(Math.min(x_caret,obj.x+obj.w-ac_w_needed-doc.x),0)
 						var y_accands=y_caret+hc
 						if(doc.y+y_accands+obj.accands_h>obj.y+obj.h){
 							y_accands=y_caret-obj.h_accands
 						}
 						x_accands+=doc.x
 						y_accands+=doc.y
+						var ac_anim_node=W.AnimationNode("accands_scrolling",{
+							scroll_x:acctx.GetDisplayItem(acctx.m_scroll_i).x,
+							current_w:ac_w_needed,
+						})
+						var ac_scroll_x=ac_anim_node.scroll_x
+						var w_accands=ac_anim_node.current_w
 						UI.RoundRect({
 							x:x_accands, y:y_accands, 
-							w:obj.w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
+							w:w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
 							round:obj.accands_shadow_size,
 							border_width:-obj.accands_shadow_size,
 							color:obj.accands_shadow_color})
 						UI.RoundRect({
 							x:x_accands, y:y_accands,
-							w:obj.w_accands, h:obj.h_accands,
+							w:w_accands, h:obj.h_accands,
 							border_width:obj.accands_border_width,
 							border_color:obj.accands_border_color,
 							round:obj.accands_round,
 							color:obj.accands_bgcolor})
-						var ac_anim_node=W.AnimationNode("accands_scrolling",{
-							scroll_x:acctx.m_scroll_x,
-						})
-						var ac_scroll_x=ac_anim_node.scroll_x
-						var ac_scroll_i=(function(){
-							var dis=acctx.m_display_items
-							var l=0;
-							var r=dis.length-1
-							while(l<=r){
-								var m=(l+r)>>1
-								if(dis[m].x<=ac_scroll_x){
-									l=m+1
-								}else{
-									r=m-1
-								}
-							}
-							return Math.max(r,0)
-						})();
 						//draw the candidates
-						//ac_scroll_x
-						UI.PushCliprect(x_accands+obj.accands_padding*0.5-obj.accands_sel_padding, y_accands, obj.w_accands-obj.accands_padding+obj.accands_sel_padding*2, obj.h_accands)
+						UI.PushCliprect(x_accands, y_accands, w_accands, obj.h_accands)
 						var hc_accands=UI.GetCharacterHeight(obj.accands_font)
 						var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
-						//todo: fixed count rather than fixed width
-						for(var i=ac_scroll_i;i<acctx.m_n_cands;i++){
+						var ac_id0=acctx.IDFromX(ac_scroll_x)
+						var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
+						for(var i=ac_id0;i<=ac_id1;i++){
 							var dii=acctx.GetDisplayItem(i)
 							var selected=(acctx.m_activated&&i==acctx.m_selection)
+							var num_id=(i-acctx.m_scroll_i+11)%10
+							var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
+							var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
 							//x, w, name
 							if(selected){
 								UI.RoundRect({
-									x:x_accands+dii.x-obj.accands_sel_padding,y:y_accands_text-obj.accands_sel_padding,
-									w:dii.w+obj.accands_sel_padding*2,h:hc_accands+obj.accands_sel_padding*2,
+									x:x_item-w_hint_char-obj.accands_sel_padding,
+									y:y_accands_text-obj.accands_sel_padding,
+									w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
 									color:obj.accands_sel_bgcolor,
 								})
 							}
-							W.Text("",{x:x_accands+dii.x,y:y_accands_text,
+							W.Text("",{x:x_item,y:y_accands_text,
 								font:obj.accands_font,text:dii.name,
 								color:selected?obj.accands_text_sel_color:obj.accands_text_color})
+							//if(acctx.m_activated){
+							UI.DrawChar(obj.accands_id_font,
+								x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
+								selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
+							W.Hotkey("",{key:"ALT+"+String.fromCharCode(48+num_id),action:(function(i){return function(){
+								acctx.Confirm(i)
+							}})(i)})
+							//}
 						}
 						UI.PopCliprect()
+					}
+				}else{
+					var acctx=obj.m_ac_context
+					if(acctx){
+						obj.m_ac_context=undefined
 					}
 				}
 			}
@@ -2230,15 +2277,59 @@ W.CodeEditor=function(id,attrs){
 				}})
 				///////////////////////
 				var acctx=obj.m_ac_context
-				if(acctx){
+				if(acctx&&acctx.m_n_cands){
 					menu_edit.AddSeparator()
-					if(!acctx.m_activated){
+					if(acctx.m_n_cands==1){
+						//todo: common prefix
+					}else if(!acctx.m_activated){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
 							acctx.Activate()
 						}})
 					}else{
-						//the keys: up down ,. -= 1234567890
-						//!?
+						//the keys: left/right ,. -= 1234567890, enter / space / tab
+						var fprevpage=function(){
+							acctx.m_scroll_i=Math.max(acctx.m_scroll_i-(obj.accands_n_shown),0)
+							acctx.m_selection=acctx.m_scroll_i
+							UI.Refresh()
+						}
+						var fnextpage=function(){
+							acctx.m_scroll_i=Math.min(acctx.m_scroll_i+(obj.accands_n_shown),acctx.m_n_cands-1)
+							acctx.m_selection=acctx.m_scroll_i
+							UI.Refresh()
+						}
+						var fprevcand=function(){
+							if(acctx.m_selection>0){
+								acctx.m_selection--
+								if(acctx.m_selection<acctx.m_scroll_i){
+									acctx.m_scroll_i=Math.max(acctx.m_scroll_i-(obj.accands_n_shown),0)
+								}
+								UI.Refresh();
+							}
+						}
+						var fnextcand=function(){
+							if(acctx.m_selection<acctx.m_n_cands-1){
+								acctx.m_selection++
+								if(acctx.m_scroll_i+obj.accands_n_shown<=acctx.m_selection){
+									acctx.m_scroll_i=Math.min(acctx.m_scroll_i+(obj.accands_n_shown),acctx.m_n_cands-1)
+								}
+								UI.Refresh();
+							}
+						}
+						var fconfirm=function(){
+							acctx.Confirm(acctx.m_selection)
+						}
+						menu_edit.AddButtonRow({text:"Auto-complete"},[
+							{text:"<",tooltip:'- or ,',action:fprevpage},
+							{key:"RETURN RETURN2",text:"confirm",tooltip:'ENTER or SPACE',action:fconfirm},
+							{text:">",tooltip:'= or .',action:fnextpage}])
+						W.Hotkey("",{text:",",action:fprevpage})
+						W.Hotkey("",{text:".",action:fnextpage})
+						W.Hotkey("",{text:"-",action:fprevpage})
+						W.Hotkey("",{text:"=",action:fnextpage})
+						W.Hotkey("",{key:"LEFT",action:fprevcand})
+						W.Hotkey("",{key:"RIGHT",action:fnextcand})
+						W.Hotkey("",{text:" ",action:fconfirm})
+						W.Hotkey("",{key:"TAB",action:fconfirm})
 					}
 				}
 				///////////////////////

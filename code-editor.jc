@@ -404,6 +404,14 @@ class CLayouter_programmer
 						prj_xo=projectXY(xo)
 						g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
 						xo+=dx_j
+				else if m_overlay_obj["type"].as(string)=="AC":
+					//auto-complete
+					xo=x
+					foreach chj,J in Utf8Chars(s_overlay)
+						dx_j=charWidth(chj)
+						prj_xo=projectXY(xo)
+						g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+						xo+=dx_j
 				else
 					assert(0)
 				if m_overlay_obj["type"].as(string)=="IME":
