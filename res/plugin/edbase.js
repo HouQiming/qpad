@@ -3,7 +3,8 @@ var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
 
 Language.Register({
-	name:"Plain text",rules:function(lang){
+	name:"Plain text",parser:"text",
+	rules:function(lang){
 		lang.DefineDefaultColor("color")
 		return function(){}
 	}
@@ -47,7 +48,8 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 };
 
 Language.Register({
-	name:"C/C++",extensions:["c","cxx","cpp","cc","h","hpp"],
+	name:"C/C++",parser:"C",
+	extensions:["c","cxx","cpp","cc","h","hpp"],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
 	rules:function(lang){
@@ -59,10 +61,11 @@ Language.Register({
 })
 
 Language.Register({
-	name:'SPAP#',extensions:['spap'],
+	name:'SPAP#',parser:"C",
+	extensions:['spap'],
 	has_dlist_type:1,
 	has_pointer_ops:1,
-	indent_as_bracelet:1,
+	indent_as_parenthesis:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','function','F','sizeof','new','delete','import','export','typedef','stdcall','inline','operator','forall','foreach','in','this','module','project','true','false','abstract','interface','virtual','__host__','__device__','__operation__'],
@@ -73,8 +76,9 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Jacy',extensions:['jc'],
-	indent_as_bracelet:1,
+	name:'Jacy',parser:"C",
+	extensions:['jc'],
+	indent_as_parenthesis:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false'],
@@ -84,7 +88,8 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Microsoft IDL',extensions:['idl'],
+	name:'Microsoft IDL',parser:"C",
+	extensions:['idl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -94,7 +99,8 @@ Language.Register({
 });
 
 Language.Register({
-	name:'HLSL shader',extensions:['hlsl'],
+	name:'HLSL shader',parser:"C",
+	extensions:['hlsl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -105,7 +111,8 @@ Language.Register({
 });
 
 Language.Register({
-	name:'GLSL shader',extensions:['glsl','essl'],
+	name:'GLSL shader',parser:"C",
+	extensions:['glsl','essl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -116,7 +123,8 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Java',extensions:['java'],
+	name:'Java',parser:"C",
+	extensions:['java'],
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['abstract','assert','break','case','catch','class','const','continue','default','do','else','enum','extends','final','finally','for','goto','if','implements','import','instanceof','interface','native','new','package','private','protected','public','return','static','strictfp','super','switch','synchronized','this','throw','throws','transient','try','while','false','null','true'],
@@ -126,10 +134,11 @@ Language.Register({
 });
 
 Language.Register({
-	name:'BSGP',extensions:['i'],
+	name:'BSGP',parser:"C",
+	extensions:['i'],
 	has_dlist_type:1,
 	has_pointer_ops:1,
-	indent_as_bracelet:1,
+	indent_as_parenthesis:1,
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','namespace','function','Func','sizeof','new','delete','import','export','typedef','stdcall','inline','__fastcall','with','operator','forall','this','uses','need','using','autouses','require','spawn','__interrupt__','__both__','__device__','__host__','__shared__','barrier','par','novirtual','__force_template','try','catch','finally','throw','classof'],
@@ -140,7 +149,8 @@ Language.Register({
 });
 
 Language.Register({
-	name:'CUDA',extensions:['cu','cuh'],
+	name:'CUDA',parser:"C",
+	extensions:['cu','cuh'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2,'__global__':1,'__device__':1,'__host__':1},
 	has_pointer_ops:1,
 	rules:function(lang){
@@ -152,17 +162,19 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Javascript',extensions:['js'],
+	name:'Javascript',parser:"C",
+	extensions:['js'],
 	rules:function(lang){
 		return f_C_like(lang,{
-			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super'],
+			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined'],
 			'type':['typeof','var','void','boolean','byte','int','short','char','double','long','float'],
 		},1)
 	}
 });
 
 Language.Register({
-	name:'HTML',extensions:['htm','html'],
+	name:'HTML',parser:"text",
+	extensions:['htm','html'],
 	rule:function(lang,keywords,has_preprocessor){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
@@ -206,7 +218,8 @@ Language.Register({
 });
 
 Language.Register({
-	name:'XML',extensions:['xml','vcproj','vcxproj','sproj','sln'],
+	name:'XML',parser:"text",
+	extensions:['xml','vcproj','vcxproj','sproj','sln'],
 	rule:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
@@ -254,7 +267,8 @@ var f_shell_like=function(lang,keywords){
 }
 
 Language.Register({
-	name:'RenderMan RIB',extensions:['rib'],
+	name:'RenderMan RIB',parser:"none",
+	extensions:['rib'],
 	rules:function(lang){
 		f_shell_like(lang,{
 			'keyword':['RiArchiveRecord','RiAreaLightSource','RiAtmosphere','RiAttribute','RiAttributeBegin','RiAttributeEnd','RiBasis','RiBegin','RiBlobby','RiBound','RiClipping','RiClippingPlane','RiColor','RiColorSamples','RiConcatTransform','RiCone','RiContext','RiCoordinateSystem','RiCoordSysTransform','RiCropWindow','RiCurves','RiCylinder','RiDeclare','RiDepthOfField','RiDetail','RiDetailRange','RiDisk','RiDisplacement','RiDisplay','RiEnd','RiErrorHandler','RiExposure','RiExterior','RiFormat','RiFrameAspectRatio','RiFrameBegin','RiFrameEnd','RiGeneralPolygon','RiGeometricApproximation','RiGeometry','RiGetContext','RiHider','RiHyperboloid','RiIdentity','RiIlluminate','RiImager','RiInterior','RiLightSource','RiMakeCubeFaceEnvironment','RiMakeLatLongEnvironment','RiMakeShadow','RiMakeTexture','RiMatte','RiMotionBegin','RiMotionEnd','RiNuPatch','RiObjectBegin','RiObjectEnd','RiObjectInstance','RiOpacity','RiOption','RiOrientation','RiParaboloid','RiPatch','RiPatchMesh','RiPerspective','RiPixelFilter','RiPixelSamples','RiPixelVariance','RiPoints','RiPointsGeneralPolygons','RiPointsPolygons','RiPolygon','RiProcedural','RiProjection','RiQuantize','RiReadArchive','RiRelativeDetail','RiReverseOrientation','RiRotate','RiScale','RiScreenWindow','RiShadingInterpolation','RiShadingRate','RiShutter','RiSides','RiSkew','RiSolidBegin','RiSolidEnd','RiSphere','RiSubdivisionMesh','RiSurface','RiTextureCoordinates','RiTorus','RiTransform','RiTransformBegin','RiTransformEnd','RiTransformPoints','RiTranslate','RiTrimCurve','RiWorldBegin','RiWorldEnd'],
@@ -262,7 +276,8 @@ Language.Register({
 	}
 });
 Language.Register({
-	name:'WaveFront OBJ',extensions:['obj'],
+	name:'WaveFront OBJ',parser:"none",
+	extensions:['obj'],
 	rules:function(lang){
 		f_shell_like(lang,{
 			'keyword':['usemtl','mtllib','g','s','o'],
@@ -271,7 +286,8 @@ Language.Register({
 	}
 });
 Language.Register({
-	name:'WaveFront MTL',extensions:['mtl'],
+	name:'WaveFront MTL',parser:"none",
+	extensions:['mtl'],
 	rules:function(lang){
 		f_shell_like(lang,{
 			'keyword':['newmtl'],
@@ -294,7 +310,8 @@ Language.Register({
 //});
 
 Language.Register({
-	name:'Matlab',extensions:['m'],
+	name:'Matlab',parser:"none",
+	extensions:['m'],
 	rule:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","%","\n","color_comment");
@@ -320,8 +337,9 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Python',extensions:['py'],
-	indent_as_bracelet:1,
+	name:'Python',parser:"C",
+	extensions:['py'],
+	indent_as_parenthesis:1,
 	curly_bracket_is_not_special:1,
 	rule:function(lang){
 		lang.DefineDefaultColor("color_symbol")
@@ -397,11 +415,26 @@ UI.RegisterEditorPlugin(function(){
 			return 1;
 		}
 	}
-	this.AddEventHandler('TAB',function(){
-		return indentText.call(this,1)
-	})
-	this.AddEventHandler('SHIFT+TAB',function(){
-		return indentText.call(this,-1)
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			if(sel[0]<sel[1]){
+				var menu_edit=UI.BigMenu("&Edit")
+				menu_edit.AddSeparator()
+				menu_edit.AddNormalItem({text:"&Indent selection",enable_hotkey:0,key:"TAB",action:function(){
+					return indentText.call(this,1)
+				}})
+				menu_edit.AddNormalItem({text:"&Dedent selection",enable_hotkey:0,key:"SHIFT+TAB",action:function(){
+					return indentText.call(this,-1)
+				}})
+				this.AddEventHandler('TAB',function(){
+					return indentText.call(this,1)
+				})
+				this.AddEventHandler('SHIFT+TAB',function(){
+					return indentText.call(this,-1)
+				})
+			}
+		}
 	})
 })
 
@@ -468,10 +501,11 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('ALT+UP',fscopeup)
 	this.AddEventHandler('ALT+DOWN',fscopedown)
 	/////////////////////////
-	this.AddEventHandler('afterRender',function(){
+	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var menu_search=UI.BigMenu("&Search")
 			var doc=this;
+			menu_search.AddSeparator();
 			menu_search.AddButtonRow({text:"Scope"},[
 				{text:"&outer",tooltip:'ALT+PGUP',action:function(){
 					fouter_scope.call(doc)
@@ -484,7 +518,6 @@ UI.RegisterEditorPlugin(function(){
 				}},{text:"down",tooltip:'ALT+DOWN',action:function(){
 					fscopedown.call(doc)
 				}}])
-			menu_search.AddSeparator();
 		}
 	})
 });
@@ -707,18 +740,18 @@ UI.RegisterEditorPlugin(function(){
 		this.sel1.ccnt=ccnt_new
 		UI.Refresh()
 	}
-	this.AddEventHandler('afterRender',function(){
+	this.AddEventHandler('menu',function(){
 		var enabled=(this.m_lbracket_p0.ccnt<this.m_lbracket_p1.ccnt)
 		if(UI.HasFocus(this)&&enabled){
 			var menu_search=UI.BigMenu("&Search")
 			var doc=this;
+			menu_search.AddSeparator();
 			menu_search.AddButtonRow({text:"Parenthesis"},[
 				{text:"&match",tooltip:'SHIFT+CTRL+P',action:function(){
 					goto_matching_bracket.call(doc,0)
 				}},{text:"&select to",tooltip:'CTRL+P',action:function(){
 					goto_matching_bracket.call(doc,1)
 				}}])
-			menu_search.AddSeparator();
 		}
 	})
 	this.AddEventHandler('CTRL+SHIFT+P',function(){goto_matching_bracket.call(this,0)})
@@ -1069,7 +1102,7 @@ UI.RegisterEditorPlugin(function(){
 				if(ctx.bac_stack.length){
 					//only the topmost level should check for the match
 					is_manual_match=0
-				}else if(chbraac=='}'&&!lang.indent_as_bracelet){
+				}else if(chbraac=='}'&&!lang.indent_as_parenthesis){
 					is_manual_match=0;
 				}else{
 					var blevel=this.GetBracketLevel(ccnt_pos)

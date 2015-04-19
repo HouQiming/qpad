@@ -191,6 +191,15 @@ LanguageDefinition.prototype={
 		for(var i=0;i<this.m_coloring_rules.length;i++){
 			this.m_coloring_rules[i].bid=bidmap[this.m_coloring_rules[i].bid];
 		}
+		//a copy of keywords in the desc
+		var all_ids=[]
+		this.m_owner.m_all_keywords=all_ids
+		for(var i=0;i<this.m_keyword_sets.length;i++){
+			var ksi=this.m_keyword_sets[i].m_keywords
+			for(var j=0;j<ksi.length;j++){
+				all_ids.push(ksi[j])
+			}
+		}
 	},
 };
 

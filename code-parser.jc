@@ -1,0 +1,961 @@
+import "system.jc"
+import "gui2d.jc"
+import "javascript.jc"
+import "text-box.jc"
+import System.Math.*
+import System.Algorithm.*
+import System.Console.*
+import Gui2D.detail.*
+import Javascript.*
+import TextBox.*
+import TextBox.detail.*
+
+/////////////////////////////////////
+//parser utility from compiler code
+class CUniqueIDProvider(TTraits)
+	traits=TTraits()
+	int[] a
+	iptr n
+	auto clear()
+		this.a=int[].NULL
+		this.n=0L
+	auto _grow_to(iptr sz)
+		auto a2=new int[sz?sz*2:8L]
+		auto a=this.a
+		auto mask=a2.n-1
+		for i=0:sz-1
+			id=a[i]
+			if !id:continue
+			slot=-1L
+			b=traits.getHash(id)
+			b&=mask
+			delta=1L
+			for(;;)
+				//Write('.')
+				if !a2[b]:
+					slot=b
+					break
+				b+=delta++
+				b&=mask
+			a2[slot]=id
+		this.a=a2
+	auto _find(const CREATE_NEW,traits.TKey key)
+		auto a=this.a
+		auto grown=0
+		auto sz=(a?a.n:0L)
+		if !CREATE_NEW:
+			if !sz:return -1
+		else
+			if !sz:
+				_grow_to(sz)
+				a=this.a
+				sz=(a?a.n:0L)
+				grown=1
+		for(;;)
+			slot=-1L
+			h=iptr(traits.computeHash(key))
+			mask=sz-1
+			b=(iptr(h)&mask)
+			delta=1L
+			for(;;)
+				//Write('#')
+				pi=a[b]
+				if !pi:
+					slot=b
+					break
+				if traits.isKeyEqual(pi,key):
+					//found
+					return pi
+				b+=delta++
+				b&=mask
+			if !CREATE_NEW:
+				return -1
+			if !grown&&(this.n*4+1>=sz*3||sz-this.n<sz>>2):
+				_grow_to(sz)
+				a=this.a
+				sz=(a?a.n:0L)
+				grown=1
+				continue
+			break
+		__rc_barrier()
+		this.a[slot]=traits.createNew(key,h)
+		this.n++
+		return this.a[slot]
+
+//////////////////////////////////////
+//symbol table
+struct TSymbol
+	iptr p_name,n
+	iptr hash
+	int user_slot
+
+class TTraitSymbol
+	TKey=string
+	inline getHash(int id)
+		return g_symbols[id].hash
+	inline computeHash(string key)
+		return iptr(key.__hash__())
+	inline isKeyEqual(int id,string key)
+		//could do: __optimize__ rule for this
+		//return getIdString(id)==key
+		sym=g_symbols[id]
+		return sym.n==key.n&&__basic_api.memcmp(__pointer(g_strings.d+sym.p_name),__pointer(key.d),sym.n)==0
+	inline createNew(string key,iptr hash)
+		p=g_strings.n
+		n=key.n
+		//Writeln(g_strings.n,' ',g_strings.destructor_nbound_or_slice_reference)
+		g_strings.push(key)
+		ret=int(g_symbols.n)
+		g_symbols.push(TSymbol(){'hash':hash,'p_name':p,"n":n})
+		return ret
+
+g_strings=new string
+g_symbols=[TSymbol()]
+g_id_provider=new CUniqueIDProvider(TTraitSymbol)
+
+auto getid(string s)
+	return int(g_id_provider._find(1,s))
+
+auto getIdString(int id)
+	sym=g_symbols[id]
+	return new(g_strings[sym.p_name:sym.p_name+sym.n-1])
+
+//////////////////////////////////////
+//tokenization
+module CharSet
+	auto charset(string e)
+		ok=new u32[8]
+		for i=0:7
+			ok[i]=0
+		inv=0
+		s=0
+		if e[0]=='^':
+			inv=1;s++
+		for(;s<e.n;s++)
+			if s+1<e.n&&e[s+1]=='-':
+				for(i=u32(u8(e[s]));i<=u32(u8(e[s+2]));i++)
+					ok[i>>5]|=(1u<<int(i&31u));
+				s+=2
+			else
+				ok[e[s]>>5]|=(1u<<int(u32(u8(e[s]))&31u));
+		if inv:
+			for i=0:7
+				ok[i]=~ok[i]
+		return ok
+	digits=charset("0-9")
+	digdot=charset("0-9.")
+	hexdigit=charset("0-9a-fA-F")
+	idhead=charset("_A-Za-z\200-\377")
+	idbody=charset("_0-9A-Za-z\200-\377")
+	spaces=charset("\r\t ")
+	spaces_newline=charset("\r\n\t ")
+	newlines=charset("\r\n")
+	inline has(u32[] ok,int c)
+		return !(c&0xffffff00)&&((ok[c>>5]>>(c&31))&1u);
+
+TOK_TYPE=0x20000000
+TOK_TYPE_MASK=-TOK_TYPE
+TOK_CONST=1*TOK_TYPE
+TOK_ID=2*TOK_TYPE
+TOK_STRING=3*TOK_TYPE
+TOK_EOF=4*TOK_TYPE
+TOK_EQ=int('a')
+TOK_NE=int('b')
+TOK_LE=int('c')
+TOK_GE=int('d')
+TOK_AA=int('e')
+TOK_OO=int('f')
+TOK_LL=int('g')
+TOK_GG=int('h')
+TOK_ADD_EQ=int('i')
+TOK_SUB_EQ=int('j')
+TOK_MUL_EQ=int('k')
+TOK_DIV_EQ=int('l')
+TOK_ADD_ADD=int('m')
+TOK_SUB_SUB=int('n')
+////////////////
+TOK_MOD_EQ=int('o')
+TOK_OR_EQ=int('p')
+TOK_AND_EQ=int('q')
+TOK_XOR_EQ=int('r')
+TOK_LSHIFT_EQ=int('s')
+TOK_RSHIFT_EQ=int('t')
+g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
+struct TToken
+	int tok
+	int epos0,epos1
+auto tokenize(string sdata,int g_ignore_indents)
+	auto feed=sdata[0:].ConvertToAsBinary(u8)
+	//we want feed to be zero-terminated
+	//merge all files to one big vector, add zeroes, and pass in the starting location
+	inline cite_raw(iptr epos0,iptr epos1)
+		assert(epos1>0)
+		return feed[epos0:epos1-1].ConvertToAsBinary(char)
+	ptr_start=0
+	ptr=ptr_start
+	inline skipchars(u32[] cs)
+		while ptr<feed.n
+			ch=int(u8(feed[ptr]))
+			if !CharSet.has(cs,ch):return
+			ptr++
+	inline parseOperator()
+		ptr0=ptr
+		state=int(g_sta_tr0[int(feed[ptr])]);ptr++
+		switch state{
+		default:
+			ptr=ptr0
+			return
+		case 1:
+			ch=int(feed[ptr]);ptr++
+			if ch==']':return
+			ptr=ptr0
+			return
+		case 2:
+			return;
+		case 3:
+			//operator() should be allowed
+			ch=int(feed[ptr]);ptr++
+			if ch==')':return
+			ptr=ptr0
+			return
+		case 4:
+			ch=int(feed[ptr]);ptr++
+			if ch=='=':return
+			ptr--;return;
+		case 5:
+			ch=int(feed[ptr]);ptr++
+			if ch=='+':return
+			if ch=='=':return
+			ptr--;return;
+		case 6:
+			ch=int(feed[ptr]);ptr++
+			if ch=='-':return
+			if ch=='=':return
+			ptr--;return;
+		case 7:
+			ch=int(feed[ptr]);ptr++
+			if ch=='<':{state=4;break}
+			if ch=='=':return
+			ptr--;return;
+		case 8:
+			ch=int(feed[ptr]);ptr++
+			if ch=='=':return
+			if ch=='>':{state=4;break}
+			ptr--;return;
+		case 9:
+			ch=int(feed[ptr]);ptr++
+			if ch=='=':return
+			ptr--;return;
+		case 10:
+			ch=int(feed[ptr]);ptr++
+			if ch=='&':return
+			if ch=='=':return
+			ptr--;return;
+		case 11:
+			ch=int(feed[ptr]);ptr++
+			if ch=='=':return
+			if ch=='|':return
+			ptr--;return;
+		}
+		assert(state==4)
+		ch=int(feed[ptr]);ptr++
+		if ch=='=':return
+		ptr--;
+		return;
+	//////////////////////////
+	struct TBracket
+		int ch
+		iptr pos
+	inds=new int[]
+	brastk=new TBracket[]
+	toks=new TToken[]
+	ignore_indents=g_ignore_indents
+	last_significant_newline_position=-1L
+	last_line_comment_position=-1L
+	inline left_bracket(int ch0)
+		brastk.push(TBracket(){ch:ch0,pos:ptr})
+		if ch0=='{':
+			ignore_indents=g_ignore_indents
+			if !ignore_indents:
+				if inds.n:
+					ind0=inds.back()
+				else
+					ind0=0
+				inds.push(ind0|0x80000000)
+		else
+			ignore_indents=1
+	inline push_token(int tok,int epos0,int epos1)
+		toks.push(TToken(){tok:tok,epos0:epos0,epos1:epos1})
+	inline pop_indents()
+		//add } accordingly
+		//ignore the last dedent
+		while inds.n&&!(inds.back()&0x80000000)
+			if !(inds.back()&0x40000000):
+				push_token(int('}'),int(ptr),int(ptr))
+			inds.pop()
+		if inds.n:
+			inds.pop()
+	auto right_bracket(int ch0)
+		matcher=int(ch0==')'?'(':(ch0=='}'?'{':(ch0==']'?'[':'{')))
+		errored=0
+		err_pos=0
+		estr=string.NULL
+		while brastk.n&&brastk.back().ch!=matcher:
+			//compensate for the unmatching bracket
+			if !errored:
+				//if ch0==0:
+				//	//EOF
+				//	error(ETYPE_ERROR,ptr,ptr,"the opening '@1' is not properly closed".Replace(["@1",string(char(brastk.back().ch))]))
+				//else
+				//	error(ETYPE_ERROR,ptr,ptr+1,"the opening '@1' doesn't match the closing '@2'".Replace(["@1",string(char(brastk.back().ch)),"@2",string(char(ch0))]))
+				err_pos=int(brastk.back().pos)
+				estr=new string
+				errored=1
+			ch_poped=brastk.back().ch
+			matcher_ch_poped=char(ch_poped=='('?')':(ch_poped=='{'?'}':']'))
+			estr.push(matcher_ch_poped)
+			push_token(int(matcher_ch_poped),int(ptr),int(ptr)+1)
+			brastk.pop()
+			if ch_poped=='{'&&!g_ignore_indents:
+				pop_indents()
+		if errored:
+			if brastk.n:
+				epos_pop_to=brastk.back().pos+1
+			else
+				epos_pop_to=ptr_start
+			//error(ETYPE_NOTE,ptr,ptr,"inserting '@1'".Replace(["@1",estr]))
+			//if brastk.n:
+			//	error(ETYPE_NOTE,err_pos,err_pos+1,"the opening '@1' was here".Replace(["@1",string(char(brastk.back().ch))]))
+			//else
+			//	error(ETYPE_NOTE,err_pos,err_pos+1,"the opening bracket was not found")
+			//error(ETYPE_NOTE,epos_pop_to,epos_pop_to,FormatAsText("automatically matching dangling opening brackets until here"))
+		if brastk.n:
+			ch_poped=brastk.back().ch
+			brastk.pop()
+			if ch_poped=='{'&&!g_ignore_indents:
+				pop_indents()
+		else
+			if !errored&&ch0:
+				//error(ETYPE_ERROR,ptr,ptr+1,"the closing '@1' does not close any opening bracket".Replace(["@1",string(char(ch0))]))
+				return 0
+		if brastk.n&&brastk.back().ch!='{':
+			ignore_indents=1
+		else
+			ignore_indents=g_ignore_indents
+		return 1
+	for(;;)
+		skipchars(ignore_indents?CharSet.spaces_newline:CharSet.spaces)
+		ch=int(feed[ptr])
+		//numbers
+		if CharSet.has(CharSet.digits,ch):
+			s=ptr
+			ptr++
+			skipchars(CharSet.idbody)
+			id=getid(cite_raw(s,ptr))
+			push_token(TOK_CONST+id,int(s),int(ptr))
+			continue
+		//id
+		if CharSet.has(CharSet.idhead,ch):
+			s=ptr
+			ptr++
+			skipchars(CharSet.idbody)
+			if ptr-s>=8&&cite_raw(ptr-8,ptr)=="operator":
+				//operator state machine
+				parseOperator()
+			id=getid(cite_raw(s,ptr))
+			push_token(TOK_ID+id,int(s),int(ptr))
+			continue
+		ch0=ch
+		if !ch0:break
+		epos0_ch0=ptr
+		ptr++;ch=int(feed[ptr])
+		//is_at_str=0
+		switch ch0{
+		default:
+			break;//nothing
+		case '[','(','{':
+			left_bracket(ch0)
+			break;
+		case ')',']','}':
+			if !right_bracket(ch0):
+				//we shouldn't put it in
+				continue
+			break;
+		case '=':
+			if(ch=='=')
+				ptr++
+				ch0=TOK_EQ;
+			break;
+		case '+':
+			if(ch=='='){ptr++;ch0=TOK_ADD_EQ;}else
+			if(ch=='+'){ptr++;ch0=TOK_ADD_ADD;}
+			break
+		case '-':
+			if(ch=='='){ptr++;ch0=TOK_SUB_EQ;}else
+			if(ch=='-'){ptr++;ch0=TOK_SUB_SUB;}
+			break
+		case '*':
+			if(ch=='='){ptr++;ch0=TOK_MUL_EQ;}
+			break
+		case '<':
+			if(ch=='='){ptr++;ch0=TOK_LE;}else
+			if(ch=='<')
+				ptr++;ch0=TOK_LL;
+				if feed[ptr]==u8('='):
+					ptr++;ch0=TOK_LSHIFT_EQ;
+			break;
+		case '>':
+			if(ch=='='){ptr++;ch0=TOK_GE;}else\
+			if(ch=='>')
+				ptr++;ch0=TOK_GG;
+				if feed[ptr]==u8('='):
+					ptr++;ch0=TOK_RSHIFT_EQ;
+			break;
+		case '!':{if(ch=='='){ptr++;ch0=TOK_NE;}break;}
+		case '&':
+			if(ch=='&'){ptr++;ch0=TOK_AA;}
+			if(ch=='='){ptr++;ch0=TOK_AND_EQ;}
+			break;
+		case '|':
+			if(ch=='|'){ptr++;ch0=TOK_OO;}
+			if(ch=='='){ptr++;ch0=TOK_OR_EQ;}
+			break;
+		case '%':
+			if(ch=='='){ptr++;ch0=TOK_MOD_EQ;}
+			break
+		case '^':
+			if(ch=='='){ptr++;ch0=TOK_XOR_EQ;}
+			break
+		//indent stuff
+		case '\\':
+			//line-escape
+			if(ch=='\n'||ch=='\r')
+				skipchars(CharSet.newlines)
+				continue
+			break;
+		case '\n':
+			//just a normal space when gettext AND no indent
+			assert(!ignore_indents)
+			epos0=ptr
+			app=0
+			ind=0
+			for(ind=0;;)
+				ch=int(feed[ptr]);
+				if !CharSet.has(CharSet.spaces_newline,ch):break
+				ptr++
+				if ch=='\r':
+					//nothing
+				else if ch=='\n':
+					ind=0;app=0
+				else
+					if ch=='\t':{app|=1}else app|=2;
+					ind++;
+				if app==3:
+					app=7
+					//error(ETYPE_ERROR,int(epos0),ptr,"space and tab can't be mixed in indentation")
+			if !feed[ptr]:
+				ind=0
+			if int(feed[ptr])=='}':
+				//auto-pop to 0x80000000 during the latter }
+				//pop_indents()
+				continue
+			else
+				ind0=(inds.n?(inds.back()&0x3fffffff):0)
+				if ind0!=ind:
+					if ind0<ind:
+						if inds.n&&(inds.back()&0x80000000)&&toks.back().tok==int('{'):
+							//ignore the first indent immediately following a {
+							inds.push(ind|0x40000000)
+							last_significant_newline_position=toks.n
+							continue
+						inds.push(ind)
+						ch0=int('{')
+					else
+						//don't pop past the {
+						while inds.n&&(inds.back()&0xbfffffff)>ind:
+							inds.pop();
+							push_token(int('}'),int(ptr),int(ptr))
+						if !inds.n:
+							if ind:
+								//error(ETYPE_ERROR,epos0_ch0,ptr,FormatAsText("indentation mismatch - this line is indented less than the first line in the file"))
+						else if (inds.back()&0x3fffffff)!=ind:
+							//indentation mismatch
+							//error(ETYPE_ERROR,epos0_ch0,ptr,FormatAsText("indentation mismatch - @1 expected but @2 provided").Replace(["@1",string(inds.back()),"@2",string(ind)]))
+						last_significant_newline_position=toks.n
+						continue
+				else
+					ch0=int(';')
+					last_significant_newline_position=toks.n
+					if toks.n:
+						ch_lastline=toks.back().tok
+						if ch_lastline==int(';')||ch_lastline==int(',')||ch_lastline==int('{'):
+							continue
+					if toks.n==last_line_comment_position:
+						//line comments shouldn't generate ;, but they should generate {}
+						continue
+			last_significant_newline_position=toks.n+1
+			break
+		//char/string literal
+		case '"','\'':
+			//is_python_str=0
+			//if ch==ch0:
+			//	if ptr<feed.n-1&&(int)feed[ptr+1]==(int)ch0:
+			//		//python string
+			//		is_python_str=1
+			//		ptr+=2
+			efeed0=ptr
+			c0=ch0
+			isrecover=0
+			//str=new string
+			for(;;)
+				c=int(feed[ptr]);ptr++
+				if c==0:
+					if isrecover:
+						ptr--
+						break
+					ptr--
+					//error(ETYPE_ERROR,int(efeed0),ptr,"this string is not properly enclosed")
+					ptr=efeed0
+					isrecover=1
+					//str.clear()
+					continue
+				if c=='\\'://&&!is_at_str:
+					ch=int(feed[ptr])
+					if ch=='\r'||ch=='\n':
+						ptr++;ch=int(feed[ptr])
+						if ch=='\r'||ch=='\n':
+							ptr++;ch=int(feed[ptr])
+						continue
+					c=ch;ptr++;
+					switch c{
+					case 'n':
+						c=int('\n');break;
+					case 'r':
+						c=int('\r');break;
+					case 't':
+						c=int('\t');break;
+					case 'b':
+						c=int('\b');break;
+					case 'e':
+						c=27;
+						break;
+					case 'x','u':
+						chu=0
+						for j=0:(c=='u'?3:1)
+							chj=int(feed[ptr])
+							if chj:ptr++
+							si=((chj-'0')&0x1f)
+							if si>=0x10:si-=7
+							chu=chu*16+(si&0xf)
+						if c=='x':
+							//str.push(char(chu))
+						else
+							if chu>=2048:
+								//str.push(char(((chu>>12)&0xf)+0xe0))
+								//str.push(char(0x80+((chu>>6)&63)))
+								//str.push(char(0x80+(chu&63)))
+							else if chu>=128:
+								//str.push(char((chu>>6)+0xc0))
+								//str.push(char(0x80+(chu&63)))
+							else
+								//str.push(char(chu))
+						continue
+					default:
+						if CharSet.has(CharSet.digits,c):
+							ptr--
+							s=ptr
+							skipchars(CharSet.digits)
+							c=0
+							for(;s!=ptr;s++)
+								si=int(feed[s])
+								c=c*8+(si-'0')
+						break
+					}
+				else
+					if c==c0:
+						//if is_python_str:
+						//	if ptr<=feed.n-2&&feed[ptr]==c0&&feed[ptr+1]==c0:
+						//		ptr+=2
+						//		break
+						//	else
+						//		goto goodchar0
+						break;
+					if isrecover&&(c=='\r'||c=='\n'):break
+				//:goodchar0
+				//str.push(char(c))
+			//if ch0=='\''&&str.n==1:
+			//	//char
+			//	toks.push(TToken(){'tok':TOK_CONST+getid_const(const_type(CTYPE_INT,8),i64(str[0])),'epos0':int(efeed0)-1,'epos1':int(ptr)})
+			//else
+			//toks.push(TToken(){'tok':TOK_STRING+getid(str),'epos0':int(efeed0)-1,'epos1':int(ptr)})
+			push_token(TOK_STRING,int(efeed0)-1,int(ptr))
+			//todo: python tri-quote strings
+			continue
+		//comments
+		case '/':
+			if(ch=='='){ptr++;ch0=TOK_DIV_EQ;break;}
+			if ch=='/':
+				ptr++
+				for(;;)
+					ch=int(feed[ptr])
+					if ch==0||ch=='\n':break
+					ptr++
+				if last_significant_newline_position==toks.n:
+					last_line_comment_position=toks.n
+				continue
+			if ch=='*':{
+				ptr++
+				auto c=0;
+				for(;;)
+					ch=int(feed[ptr])
+					if ch==0:break
+					ptr++
+					if ch=='/'&&c=='*':break;
+					c=ch;
+				continue
+			}
+			break;
+		case '#':
+			//# as comment for Python, shell and C/C++
+			//todo: C macro recognition
+			for(;;)
+				ch=int(feed[ptr])
+				if ch==0||ch=='\n':break
+				ptr++
+			if last_significant_newline_position==toks.n:
+				last_line_comment_position=toks.n
+			continue
+		}
+		//toks.push(TToken(){'tok':ch0,'epos0':int(epos0_ch0),'epos1':int(ptr)})
+		push_token(ch0,int(epos0_ch0),int(ptr))
+	//////////////////
+	while brastk.n:
+		right_bracket(0)
+	pop_indents()
+	//toks.push(TToken(){'tok':TOK_EOF,'epos0':int(ptr),'epos1':int(ptr)})
+	push_token(TOK_EOF,int(ptr),int(ptr))
+	return toks
+
+//////////////////////////////////////////////////////////////////
+/*
+permissive parser:
+	make sure the brackets match
+	do we even attempt to deduce types?
+		maybe not
+	use the old code?
+		not broken, don't fix
+		the data structure was messy...
+		copy paste from there
+	comment parser - English text
+old version:
+	cursor history not working
+make the .name func() system an independent pass
+	per-file PPM models
+*/
+//global by-last-symbol model (for plain text)
+class CFileIndex
+	//basic model, predict from variable. func()
+	int[] m_ids
+	int2[] m_ppm_pool
+	int2[int] m_name_dot_index
+	int2[int2] m_function_bracket_index //id, ordinal
+	//text-only: predict by last word or last non-word char
+	int2[int] m_ppm1_index 
+
+auto appendKeywords(int[] ids,JSObject options)
+	js_kws=options["m_all_keywords"].as(JSObject)
+	if js_kws:
+		n=js_kws.length()
+		for i=0:n-1
+			ids.push(getid(js_kws[i].as(string)))
+
+if Platform.IS_WINDOWS
+	memicmp=__c_function(int,"_memicmp","string.h")
+else
+	memicmp=__c_function(int,"memicmp","string.h")
+auto ComputeIDOrderingMaps(int[] ids)
+	ids.Sort(inline(id0,id1){
+		sym0=g_symbols[id0]
+		sym1=g_symbols[id1]
+		n_min=min(sym0.n,sym1.n)
+		ret=memicmp(__pointer(g_strings.d+sym0.p_name),__pointer(g_strings.d+sym1.p_name),n_min)
+		if !ret:
+			ret=sym0.n-sym1.n
+		return ret<0
+	})
+	foreach id,I in ids
+		g_symbols[id].user_slot=int(I)
+	return ids
+
+inline IDToOrder(id)
+	return g_symbols[id].user_slot
+
+auto parseAsCLike(string sdata,JSObject options)
+	//enable_semantics=options["enable_semantics"].or(0)
+	sdataz=new char[sdata.n+1]
+	copy(sdataz,sdata)
+	toks=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
+	///////////////////
+	just_ids=new int[]
+	name_dot_entries=new int2[] //name, member
+	func_param_entries=new int3[] //func, ordinal, id
+	///////////////////
+	struct TStkEntry
+		int m_function_id
+		int m_param_id
+	ss=new TStkEntry[]
+	function_id=0
+	param_id=0
+	for i=0:toks.n-1
+		tok_i=toks[i].tok
+		switch(tok_i){
+		default:
+			if (tok_i&TOK_TYPE_MASK)==TOK_ID:
+				id=tok_i-TOK_ID
+				just_ids.push(id)
+				if function_id:
+					func_param_entries.push(int3(function_id,param_id,id))
+			break
+		case '(','[','{':
+			ss.push(TStkEntry(){m_function_id:function_id,m_param_id:param_id})
+			function_id=0
+			if tok_i=='('&&i>0:
+				tok0=toks[i-1].tok
+				if (tok0&TOK_TYPE_MASK)==TOK_ID:
+					function_id=tok0-TOK_ID
+			param_id=0
+			break
+		case ')',']','}':
+			if ss.n:
+				se=ss.pop()
+				function_id=se.m_function_id
+				param_id=se.m_param_id
+			break
+		case ',':
+			if function_id:
+				param_id++
+			break
+		case '.':
+			if i>0&&i<toks.n-1:
+				tok0=toks[i-1].tok
+				tok2=toks[i+1].tok
+				if (tok0&TOK_TYPE_MASK)==TOK_ID&&(tok2&TOK_TYPE_MASK)==TOK_ID:
+					name_dot_entries.push(int2(tok0-TOK_ID,tok2-TOK_ID))
+			break
+		}
+	appendKeywords(just_ids,options)
+	just_ids.Sort();just_ids.Unique()
+	ComputeIDOrderingMaps(just_ids)
+	name_dot_entries.Sort(inline(a){return int2(IDToOrder(a.x),IDToOrder(a.y))});
+	func_param_entries.Sort(inline(a){return int3(IDToOrder(a.x),a.y,IDToOrder(a.z))});
+	/////////////
+	ppm_pool=new int2[]
+	name_dot_index=new int2[int]
+	function_bracket_index=new int2[int2]
+	foreach name,members0 in name_dot_entries.Groupby(byMember("x"))
+		n0=int(ppm_pool.n)
+		members=[a foreach a in members0]
+		foreach id,duplicates in members.Groupby(byMember("y"))
+			ppm_pool.push(int2(id,duplicates.getForEachRepeatCount()))
+		name_dot_index[name]=int2(n0,int(ppm_pool.n))
+	foreach key,members0 in func_param_entries.Groupby(inline(a){return int2(a.x,a.y)})
+		n0=int(ppm_pool.n)
+		members=[a foreach a in members0]
+		foreach id,duplicates in members.Groupby(byMember("z"))
+			ppm_pool.push(int2(id,duplicates.getForEachRepeatCount()))
+		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
+	return new CFileIndex(){
+		m_ids:just_ids,
+		m_ppm_pool:ppm_pool,
+		m_name_dot_index:name_dot_index,
+		m_function_bracket_index:function_bracket_index,
+	}
+
+auto parseAsText(string sdata,JSObject options)
+	//CJK-ignorant tokenization
+	ids=new int[]
+	pword=0
+	foreach ch,I,I2 in Utf8Chars(sdata)
+		if !isWordChar(ch)||isCJK(ch):
+			if pword<I:
+				ids.push(TOK_ID+getid(sdata[pword:I-1]))
+			ids.push(ch)
+			pword=I2
+	//size-based model compression? not yet
+	ids_sorted=new(ids)
+	appendKeywords(ids_sorted,options)
+	ids_sorted.Sort()
+	ids_sorted.Unique()
+	ComputeIDOrderingMaps(ids_sorted)
+	srt=[i for i=1:ids.n-1]
+	srt.Sortby(inline(a){return int2(IDToOrder(ids[a]),IDToOrder(ids[a-1]))})
+	ppm_pool=new int2[]
+	ppm1_index=new int2[int]
+	foreach id1,members0 in srt.Groupby(inline(a){return ids[a]})
+		n0=int(ppm_pool.n)
+		members=[a foreach a in members0]
+		foreach id0,members_inner in members.Groupby(inline(a){return a})
+			weight=members_inner.getForEachRepeatCount()
+			ppm_pool.push(int2(id0,weight))
+		ppm1_index[id1]=int2(n0,int(ppm_pool.n))
+	return new CFileIndex(){
+		m_ids:ids_sorted,
+		m_ppm_pool:ppm_pool,
+		m_ppm1_index:ppm1_index,
+	}
+
+//////////////////////////////////////////////////////////////////
+//auto-completion interface
+class CACContext
+	int2[] m_candidates
+	string s_prefix
+	JS_At=function(JSContext JS){
+		id=JS.Param(0).as(int)
+		ret=JS.New()
+		if uptr(id)>=uptr(m_candidates.n):return 0
+		cand=m_candidates[id]
+		ret["name"]=getIdString(cand.x)
+		ret["weight"]=cand.y
+		return JS.Return(ret)
+	}
+	JS_GetLength=function(JSContext JS){
+		return JS.Return(m_candidates.n)
+	}
+	auto __JS_prototype(JSObject proto)
+		proto.ExportMethod(this,"at",JS_At)
+		proto.ExportProperty(this,"s_prefix")
+		proto.ExportGetterSetter(this,'length',JS_GetLength,(function(JSContext):int).NULL)
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	//todo: multithread it - other-threadly JS ctx? options...
+	JS_UI["ED_ParseAs"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		options=JS.Param(1).as(JSObject)
+		sparser=options["parser"].or("text")
+		if sparser=="none":
+			ret=new CFileIndex(){m_ids:new int[]}
+			appendKeywords(ret.m_ids,options)
+			ret.m_ids.Sort()
+			ret.m_ids.Unique()
+		else
+			sdata=System.IO.ReadAll(fn)
+			if !sdata:return 0
+			if sparser=="C":
+				ret=parseAsCLike(sdata,options)
+			else
+				ret=parseAsText(sdata,options)
+		return JS.Return(ret)
+	}
+	JS_UI["ED_QueryAutoCompletion"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		ccnt=JS.Param(1).as(i64)
+		fidx=doc["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		if !fidx:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		cands=new int2[]
+		if fidx.m_ppm1_index:
+			fcheck=function(int c0,int c1){return !isWordChar(c0)||isCJK(c0)}
+		else
+			fcheck=function(int c0,int c1){return !isWordChar(c0)}
+		ccnt_before_word=ed.MoveToBoundary(ccnt,-1,fcheck,4096)
+		if !(ccnt_before_word<ccnt):
+			//could do ppm... but likely pointless for such a small sample
+			return 0
+		s_prefix=ed.GetText(ccnt_before_word,ccnt-ccnt_before_word)
+		if !s_prefix.n:return 0
+		/////////////////////
+		auto prefix_smalleri(string a,string b)
+			n_min=min(a.n,b.n)
+			ret=memicmp(__pointer(a.d),__pointer(b.d),n_min)
+			return ret<0
+		inline SearchPrefix(arr)
+			if typeof(arr)==int[]:
+				ftoosmall=function(int a){return prefix_smalleri(getIdString(a),s_prefix)}
+				fnottoobig=function(int a){return !prefix_smalleri(s_prefix,getIdString(a))}
+			else
+				ftoosmall=function(int2 a){return prefix_smalleri(getIdString(a.x),s_prefix)}
+				fnottoobig=function(int2 a){return !prefix_smalleri(s_prefix,getIdString(a.x))}
+			auto n0=arr.Bisect(ftoosmall)
+			auto n1=arr.Bisect(fnottoobig)
+			if typeof(arr)==int[]:
+				for i=n0:n1-1
+					cands.push(int2(arr[i],1))
+			else
+				cands.push(arr[n0:n1-1])
+		auto SearchPPMRange(int2 rg)
+			if rg.x<rg.y:
+				SearchPrefix(fidx.m_ppm_pool[rg.x:rg.y-1])
+		SearchPrefix(fidx.m_ids)
+		if fidx.m_ppm1_index:
+			ccnt_last_word=ed.MoveToBoundary(ccnt_before_word,-1,ed.GetStockFCheck("space",-1),4096)
+			ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
+			if ccnt_before_last_word<ccnt_last_word:
+				tok_before=TOK_ID+getid(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word))
+			else
+				(tok_before,ch1)=ed.GetUtf8CharNeighborhood(ccnt_last_word)
+			SearchPPMRange(fidx.m_ppm1_index[tok_before])
+		else if fidx.m_name_dot_index:
+			(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt_before_word)
+			ccnt_last_word=ccnt_before_word-1LL
+			if (ch0==int('>')||ch0==int(':')):
+				ch_before=ed.GetUtf8CharNeighborhood(ccnt_before_word-1)[0]
+				if ch_before==':'&&ch0==':'||ch_before=='-'&&ch0=='>':
+					ch0=int('.')
+					ccnt_last_word--
+			if ch0==int('.'):
+				ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
+				if ccnt_before_last_word<ccnt_last_word:
+					SearchPPMRange(fidx.m_name_dot_index[getid(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word))])
+			/////////////////////////////////
+			//function bracket index
+			lang=doc["plugin_language_desc"].as(JSObject)
+			state_at_ccnt=ed.GetStateAt(ed.m_handler_registration["colorer"].or(-1),ccnt)
+			enabled_mask=lang["m_inside_mask_to_enabled_mask"][int(state_at_ccnt[0])].as(int)
+			bracket_mask=lang["m_bracket_enabling_mask"].as(int)
+			is_bracket_enabled=(enabled_mask&bracket_mask)
+			if is_bracket_enabled:
+				blevel=state_at_ccnt[1]
+				ccnt_bracket=ed.FindNearest(ed.m_handler_registration["colorer"].or(-1),[0LL,blevel-1],ccnt,-1);
+				if ccnt_bracket>=0LL&&ed.GetUtf8CharNeighborhood(ccnt_bracket)[1]==int('(')&&u64(ccnt-ccnt_bracket)<u64(4096):
+					ccnt_before_fname=ed.MoveToBoundary(ccnt_bracket,-1,fcheck,4096)
+					if ccnt_before_fname<ccnt_bracket:
+						id_fname=getid(ed.GetText(ccnt_before_fname,ccnt_bracket-ccnt_before_fname))
+						s_call_content=ed.GetText(ccnt_bracket+1,ccnt-(ccnt_bracket+1))
+						nested=0
+						arg_id=0
+						foreach ch in Utf8Chars(s_call_content)
+							switch(ch){
+							case '(','[','{':
+								nested++
+								break
+							case ')',']','}':
+								nested--
+								break
+							case ',':
+								if !nested:arg_id++
+								break
+							}
+						SearchPPMRange(fidx.m_function_bracket_index[int2(id_fname,arg_id)])
+		//////////////////////////
+		cands.Sortby(byMember("x"))
+		ret_temp=new int2[]
+		foreach id,same_cands in cands.Groupby(byMember("x"))
+			weight=[cc.y for cc in same_cands].Sum()
+			ret_temp.push(int2(id,weight))
+		ret_temp.Sort(inline(ia,ib){
+			auto ret=ia.y-ib.y
+			if !ret:
+				id0=ia.x
+				id1=ib.x
+				sym0=g_symbols[id0]
+				sym1=g_symbols[id1]
+				n_min=min(sym0.n,sym1.n)
+				ret=memicmp(__pointer(g_strings.d+sym0.p_name),__pointer(g_strings.d+sym1.p_name),n_min)
+				if !ret:
+					ret=sym0.n-sym1.n
+			return ret<0
+		})
+		return JS.Return(new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix})
+	}
+})

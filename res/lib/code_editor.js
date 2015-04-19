@@ -3,6 +3,7 @@ var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
+var MAX_PARSABLE=33554432
 
 function parent(){return UI.context_parent;}
 
@@ -506,6 +507,11 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	//per-language portion
 	//language:g_language_C,
 	Init:function(){
+		this.m_event_hooks={}
+		this.m_event_hooks['load']=[]
+		this.m_event_hooks['save']=[]
+		this.m_event_hooks['parse']=[]
+		this.m_event_hooks['menu']=[]
 		W.Edit_prototype.Init.call(this);
 		//these are locators when set
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
@@ -642,6 +648,19 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		return 0;
 	},
+	///////////////////////////////////////
+	//smarter clipboard actions
+	Cut:function(){
+		var ccnt0=this.sel0.ccnt
+		var ccnt1=this.sel1.ccnt
+		if(ccnt0==ccnt1){
+			var line_current=this.GetLC(ccnt1)[0]
+			var line_ccnts=this.SeekAllLinesBetween(line_current,line_current+2)
+			this.sel0.ccnt=line_ccnts[0];
+			this.sel1.ccnt=line_ccnts[1];
+		}
+		W.Edit_prototype.Cut.call(this)
+	},
 })
 
 W.MinimapThingy_prototype={
@@ -750,6 +769,50 @@ UI.SEARCH_FLAG_WHOLE_WORD=2
 UI.SEARCH_FLAG_REGEXP=4
 W.CodeEditorWidget_prototype={
 	m_find_flags:0,
+	OnEditorCreate:function(){
+		var doc=this.doc
+		var obj=this
+		doc.OnLoad=obj.OnLoad.bind(obj)
+		doc.StartLoading(obj.file_name)
+		doc.HookedEdit=function(ops){
+			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context){
+				var match_id=obj.BisectMatches(ops[0])
+				if(match_id){
+					var match_ccnt0=obj.GetMatchCcnt(match_id,0)
+					var match_ccnt1=obj.GetMatchCcnt(match_id,1)
+					var intersected=1;
+					for(var i=0;i<ops.length;i+=3){
+						var ccnt0_i=ops[i]
+						var ccnt1_i=ops[i]+ops[i+1]
+						if(!(ccnt0_i<=match_ccnt1&&ccnt1_i>=match_ccnt0)){
+							intersected=0;
+							break
+						}
+					}
+					if(intersected){
+						//start replacing - *every* op intersects with the match...
+						obj.SetReplacingContext(match_ccnt0,match_ccnt1)
+					}
+				}
+			}
+			this.ed.Edit(ops);
+		}
+		doc.AddEventHandler('change',function(){
+			if(obj.m_current_find_context){
+				obj.m_current_find_context.Cancel()
+				obj.m_current_find_context=undefined
+			}
+			if(obj.m_ac_context){
+				obj.m_ac_context=undefined;
+			}
+		})
+		doc.AddEventHandler('ESC',function(){
+			obj.m_notifications=[]
+			UI.Refresh()
+			return 1
+		})
+	},
+	///////////////////////////
 	OnLoad:function(){
 		var loaded_metadata=(UI.m_ui_metadata[this.file_name]||{})
 		var doc=this.doc
@@ -773,6 +836,8 @@ W.CodeEditorWidget_prototype={
 		doc.AutoScroll("center")
 		doc.scrolling_animation=undefined
 		doc.CallHooks("selectionChange")
+		doc.CallHooks("load")
+		this.ParseFile()
 		UI.Refresh()
 	},
 	SaveMetaData:function(){
@@ -799,6 +864,8 @@ W.CodeEditorWidget_prototype={
 	OnSave:function(){
 		this.SaveMetaData();
 		UI.SaveMetaData();
+		doc.CallHooks("save")
+		this.ParseFile()
 	},
 	Save:function(){
 		var doc=this.doc
@@ -1250,6 +1317,7 @@ W.CodeEditorWidget_prototype={
 				}
 				this.m_match_reported=1
 				doc.AutoScroll("center_if_hidden")
+				doc.CallOnSelectionChange();
 				UI.Refresh()
 				return 1048576
 			},
@@ -1287,6 +1355,10 @@ W.CodeEditorWidget_prototype={
 			sel[1]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[1],1),1,"word_boundary_right"),1)
 		}
 		if(sel[0]<sel[1]){
+			if(this.m_current_find_context){
+				this.m_current_find_context.Cancel()
+				this.m_current_find_context=undefined
+			}
 			this.m_current_needle=this.doc.ed.GetText(sel[0],sel[1]-sel[0])
 			if(this.m_find_flags&UI.SEARCH_FLAG_REGEXP){
 				this.m_current_needle=RegexpEscape(this.m_current_needle)
@@ -1312,14 +1384,15 @@ W.CodeEditorWidget_prototype={
 		rctx.m_highlight=hlobj
 		this.m_replace_context=rctx;
 	},
-	DestroyReplacingContext:function(){
+	DestroyReplacingContext:function(do_dismiss){
+		if(do_dismiss==undefined){do_dismiss=1;}
 		var rctx=this.m_replace_context
 		if(rctx){
 			rctx.m_locators[0].discard()
 			rctx.m_locators[1].discard()
 			rctx.m_highlight.discard()
 			this.m_replace_context=undefined
-			this.DismissNotification('find_result')
+			if(do_dismiss){this.DismissNotification('find_result')}
 		}
 	},
 	DoReplace:function(ccnt0,ccnt1,is_first,s_replace){
@@ -1348,7 +1421,7 @@ W.CodeEditorWidget_prototype={
 				}else{
 					rctx.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?UI._("Nothing replaced above"):UI._("Nothing replaced below"))})
 				}
-				rctx.m_owner.DestroyReplacingContext();
+				rctx.m_owner.DestroyReplacingContext(0);
 				if(need_onchange){doc.CallOnChange();}
 			}else{
 				UI.NextTick(ffind_next);
@@ -1424,6 +1497,16 @@ W.CodeEditorWidget_prototype={
 		if(this.m_notifications){
 			this.m_notifications=this.m_notifications.filter(function(a){return a.id!=id})
 		}
+	},
+	////////////////////////////////
+	ParseFile:function(){
+		var doc=this.doc
+		var sz=doc.ed.GetTextSize()
+		if(sz>MAX_PARSABLE){
+			return;
+		}
+		doc.m_file_index=UI.ED_ParseAs(this.file_name,doc.plugin_language_desc)
+		doc.CallHooks("parse")
 	},
 }
 
@@ -1827,42 +1910,9 @@ W.CodeEditor=function(id,attrs){
 			}
 			if(!doc){
 				//initiate progressive loading
+				//Init
 				doc=obj.doc
-				doc.OnLoad=obj.OnLoad.bind(obj)
-				doc.StartLoading(obj.file_name)
-				doc.HookedEdit=function(ops){
-					if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context){
-						var match_id=obj.BisectMatches(ops[0])
-						if(match_id){
-							var match_ccnt0=obj.GetMatchCcnt(match_id,0)
-							var match_ccnt1=obj.GetMatchCcnt(match_id,1)
-							var intersected=1;
-							for(var i=0;i<ops.length;i+=3){
-								var ccnt0_i=ops[i]
-								var ccnt1_i=ops[i]+ops[i+1]
-								if(!(ccnt0_i<=match_ccnt1&&ccnt1_i>=match_ccnt0)){
-									intersected=0;
-									break
-								}
-							}
-							if(intersected){
-								//start replacing - *every* op intersects with the match...
-								obj.SetReplacingContext(match_ccnt0,match_ccnt1)
-							}
-						}
-					}
-					this.ed.Edit(ops);
-				}
-				doc.AddEventHandler('change',function(){
-					if(obj.m_current_find_context){
-						obj.m_current_find_context.Cancel()
-						obj.m_current_find_context=undefined
-					}
-				})
-				doc.AddEventHandler('ESC',function(){
-					obj.m_notifications=[]
-					return 1
-				})
+				obj.OnEditorCreate()
 				UI.InvalidateCurrentFrame()
 			}
 			if(obj.m_replace_context){
@@ -1941,6 +1991,119 @@ W.CodeEditor=function(id,attrs){
 						x:obj.x, y:obj.y+h_top_hint, w:obj.w-w_scrolling_area, h:obj.top_hint_border_width,
 						color:obj.top_hint_border_color})
 					UI.PopCliprect()
+				}
+				//auto-completion
+				if(doc.sel0.ccnt==doc.sel1.ccnt&&doc.m_user_just_typed_char){
+					var acctx=obj.m_ac_context
+					if(acctx&&acctx.m_ccnt!=doc.sel1.ccnt){
+						acctx=undefined;
+					}
+					if(!acctx){
+						var accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt)
+						acctx={
+							m_ccnt:doc.sel1.ccnt,
+							m_accands:accands,
+							m_scroll_x:0,
+							m_display_items:[],
+							m_n_cands:accands?accands.length:0,
+							m_x_current:obj.accands_padding*0.5,
+							m_selection:0,
+							GetDisplayItem:function(id){
+								var ret=this.m_display_items[id]
+								if(!ret){
+									UI.assert(id==this.m_display_items.length,"panic: not doing acctx sequentially")
+									var cc=this.m_accands.at(id);
+									//ignore weight for now: cc.weight
+									ret={
+										x:this.m_x_current,
+										w:UI.MeasureText(obj.accands_font,cc.name).w,
+										name:cc.name
+									}
+									this.m_x_current+=ret.w+obj.accands_padding
+									this.m_display_items[id]=ret
+								}
+								return ret
+							},
+							Activate:function(){
+								if(!this.m_n_cands){return;}
+								this.m_activated=1;	
+								UI.Refresh()
+							},
+						}
+						obj.m_ac_context=acctx
+						UI.Refresh()
+					}
+					//create pages first... lazily?!
+					//it's pointless to show too many
+					//single line or rectangular?
+					//single line near
+					if(acctx.m_n_cands){
+						var ed_caret=doc.GetCaretXY();
+						var x_caret=(ed_caret.x-doc.visible_scroll_x+doc.ed.m_caret_offset);
+						var y_caret=(ed_caret.y-doc.visible_scroll_y);
+						x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
+						var hc=UI.GetCharacterHeight(doc.font)
+						var x_accands=Math.max(Math.min(x_caret,obj.x+obj.w-obj.w_accands-doc.x),0)
+						var y_accands=y_caret+hc
+						if(doc.y+y_accands+obj.accands_h>obj.y+obj.h){
+							y_accands=y_caret-obj.h_accands
+						}
+						x_accands+=doc.x
+						y_accands+=doc.y
+						UI.RoundRect({
+							x:x_accands, y:y_accands, 
+							w:obj.w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
+							round:obj.accands_shadow_size,
+							border_width:-obj.accands_shadow_size,
+							color:obj.accands_shadow_color})
+						UI.RoundRect({
+							x:x_accands, y:y_accands,
+							w:obj.w_accands, h:obj.h_accands,
+							border_width:obj.accands_border_width,
+							border_color:obj.accands_border_color,
+							round:obj.accands_round,
+							color:obj.accands_bgcolor})
+						var ac_anim_node=W.AnimationNode("accands_scrolling",{
+							scroll_x:acctx.m_scroll_x,
+						})
+						var ac_scroll_x=ac_anim_node.scroll_x
+						var ac_scroll_i=(function(){
+							var dis=acctx.m_display_items
+							var l=0;
+							var r=dis.length-1
+							while(l<=r){
+								var m=(l+r)>>1
+								if(dis[m].x<=ac_scroll_x){
+									l=m+1
+								}else{
+									r=m-1
+								}
+							}
+							return Math.max(r,0)
+						})();
+						//draw the candidates
+						//ac_scroll_x
+						UI.PushCliprect(x_accands+obj.accands_padding*0.5-obj.accands_sel_padding, y_accands, obj.w_accands-obj.accands_padding+obj.accands_sel_padding*2, obj.h_accands)
+						var hc_accands=UI.GetCharacterHeight(obj.accands_font)
+						var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
+						//todo: fixed count rather than fixed width
+						for(var i=ac_scroll_i;i<acctx.m_n_cands;i++){
+							var dii=acctx.GetDisplayItem(i)
+							var selected=(acctx.m_activated&&i==acctx.m_selection)
+							//x, w, name
+							if(selected){
+								UI.RoundRect({
+									x:x_accands+dii.x-obj.accands_sel_padding,y:y_accands_text-obj.accands_sel_padding,
+									w:dii.w+obj.accands_sel_padding*2,h:hc_accands+obj.accands_sel_padding*2,
+									color:obj.accands_sel_bgcolor,
+								})
+							}
+							W.Text("",{x:x_accands+dii.x,y:y_accands_text,
+								font:obj.accands_font,text:dii.name,
+								color:selected?obj.accands_text_sel_color:obj.accands_text_color})
+						}
+						UI.PopCliprect()
+					}
 				}
 			}
 			if(obj.show_find_bar){
@@ -2039,6 +2202,46 @@ W.CodeEditor=function(id,attrs){
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:obj.h,
 			//	color:obj.separator_color})
 			if(UI.HasFocus(doc)){
+				var menu_edit=UI.BigMenu("&Edit")
+				menu_edit.AddNormalItem({text:"&Undo",enable_hotkey:0,key:"CTRL+Z",action:function(){
+					doc.Undo()
+				}})
+				menu_edit.AddNormalItem({text:"&Redo",enable_hotkey:0,key:"CTRL+SHIFT+Z",action:function(){
+					doc.Redo()
+				}})
+				///////////////////////
+				menu_edit.AddSeparator()
+				menu_edit.AddNormalItem({text:"Select &all",enable_hotkey:0,key:"CTRL+A",action:function(){
+					doc.sel0.ccnt=0
+					doc.sel1.ccnt=doc.ed.GetTextSize()
+					doc.CallOnSelectionChange()
+					UI.Refresh()
+				}})
+				if(doc.sel0.ccnt<doc.sel1.ccnt){
+					menu_edit.AddNormalItem({text:"&Copy",icon:"拷",enable_hotkey:0,key:"CTRL+C",action:function(){
+						doc.Copy()
+					}})
+				}
+				menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",enable_hotkey:0,key:"CTRL+X",action:function(){
+					doc.Cut()
+				}})
+				menu_edit.AddNormalItem({text:"&Paste",icon:"粘",enable_hotkey:0,key:"CTRL+V",action:function(){
+					doc.Paste()
+				}})
+				///////////////////////
+				var acctx=obj.m_ac_context
+				if(acctx){
+					menu_edit.AddSeparator()
+					if(!acctx.m_activated){
+						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
+							acctx.Activate()
+						}})
+					}else{
+						//the keys: up down ,. -= 1234567890
+						//!?
+					}
+				}
+				///////////////////////
 				var menu_search=UI.BigMenu("&Search")
 				menu_search.AddNormalItem({text:"&Find or replace",icon:"s",enable_hotkey:1,key:"CTRL+F",action:function(){
 					var sel=obj.doc.GetSelection()
@@ -2076,6 +2279,7 @@ W.CodeEditor=function(id,attrs){
 							obj.DoReplaceFromUI(0)
 						}}])
 				}
+				doc.CallHooks('menu')
 			}
 		}
 		//minimap / scroll bar

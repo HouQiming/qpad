@@ -1,5 +1,6 @@
 import "text-box.jc"
 import "code-editor.jc"
+import "code-parser.jc"
 import "txtx-editor.jc"
 import "zip-doc.jc"
 import "ooc-mipmap.jc"

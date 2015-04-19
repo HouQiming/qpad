@@ -328,6 +328,21 @@ UI.Theme_CustomWidget=function(C){
 			find_message_font:UI.Font("res/fonts/opensans.ttf",32,-50),
 			find_message_color:0xff444444,
 			///////
+			accands_font:UI.Font("res/fonts/opensans.ttf",22,-50),
+			accands_padding:16,
+			accands_sel_padding:2,
+			accands_shadow_color:0x7f000000,
+			accands_shadow_size:8,
+			accands_bgcolor:0xffffffff,
+			accands_round:4,
+			accands_border_width:0,
+			accands_border_color:0xff000000,
+			accands_text_color:0xff000000,
+			accands_text_sel_color:0xffffffff,
+			accands_sel_bgcolor:C[0],
+			w_accands:512,
+			h_accands:32,
+			///////
 			w_scroll_bar:20,
 			scroll_bar_style:{
 				transition_dt:0.1,

@@ -1,5 +1,6 @@
 import "system.jc"
 import "gui2d.jc"
+import "javascript.jc"
 import "text-box.jc"
 import System.Math.*
 import System.Algorithm.*
