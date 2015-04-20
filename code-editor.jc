@@ -76,7 +76,11 @@ class CLanguageDescription
 	u8[] m_word_char_map
 	int m_n_word_char_types
 	int[] m_word_dfa_initial_state
+	int[] m_word_dfa_initial_state_triggered
+	string m_trigger_chars
 
+HL_DISPLAY_MODE_EMBOLDEN=1
+HL_DISPLAY_MODE_TILDE=2
 class CLayouter_programmer
 	FLAG_HAS_TAB=1
 	FLAG_HAS_ENTER=2
@@ -246,7 +250,7 @@ class CLayouter_programmer
 		return s.n
 	}
 	/////////////////
-	long2 m_caret_overlay
+	long3 m_caret_overlay
 	JSObject m_overlay_obj
 	i64 m_caret_offset
 	SetTextStyle=function(JSObject obj){
@@ -291,14 +295,15 @@ class CLayouter_programmer
 			if s:
 				w_overlayd=GetStringWidth(m_font,s)
 		w_overlay=double2fixed(w_overlayd)
-		m_caret_overlay=long2(XYToX(x,y),w_overlay)
+		m_caret_overlay=long3(XYToX(x,y),0LL,w_overlay)
+		m_caret_overlay.y=(m_caret_overlay.x+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp*m_wrap_width_in_fp
 		m_caret_offset=0LL
 		return w_overlay
 	}
 	GetCaretOffset=function(){
 		return m_caret_offset
 	}
-	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scaling){
+	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		//word coloring - update color_ids
 		//get a GRACEFUL_WORD_SIZE context on each side - do it per-char
 		word_dfa=m_lang.m_word_dfa
@@ -313,12 +318,15 @@ class CLayouter_programmer
 			budget--
 			if budget<0:break
 		ccnt_block_end=ccnt_base+i64(s.n)
+		ch_before_word=ed.GetUtf8CharNeighborhood(word_ccnt0)[0]
+		trigger_chars=m_lang.m_trigger_chars
 		for(;;)
 			//Writeln(word_ccnt0)
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
 				if isWordChar(ch):
 					break
+				ch_before_word=ch
 				word_ccnt0=I2
 				if word_ccnt0>=ccnt_block_end:
 					break
@@ -326,7 +334,11 @@ class CLayouter_programmer
 			//now we know we have a word
 			//non-word chars should immediately terminate the DFA
 			color_id=0
-			st=m_lang.m_word_dfa_initial_state[color_ids[max(iptr(word_ccnt0-ccnt_base),0L)]]
+			cid=color_ids[max(iptr(word_ccnt0-ccnt_base),0L)]
+			st=m_lang.m_word_dfa_initial_state[cid]
+			if trigger_chars&&ch_before_word<128&&trigger_chars.IndexOf(char(ch_before_word))>=0:
+				//it's immediately after the trigger char, use the alternative initial state
+				st=m_lang.m_word_dfa_initial_state_triggered[cid]
 			if st>=0:
 				budget=GRACEFUL_WORD_SIZE
 				foreach ch,I in ed.enumCharsForward(word_ccnt0)//it's 8-bit here, not UTF8!
@@ -348,12 +360,13 @@ class CLayouter_programmer
 							color_ids[ofs]=m_cached_colors_p_word_part+color_id
 				else
 					break
+				ch_before_word=ch
 				word_ccnt0=I2
 				if word_ccnt0>=ccnt_block_end:
 					break
 		///////
 		fnt_scaled=m_font
-		fnt_scaled.h*=scaling
+		fnt_scaled.h*=scale
 		//smart emboldening for SRGB
 		//coulddo: per-color emboldening
 		if g_renderer.m_srgb_supported:
@@ -361,8 +374,8 @@ class CLayouter_programmer
 			fnt_scaled.SmartEmbolden(m_cached_colors[0])
 		hc=charHeight()
 		x=GetFlatX(a)
-		if x>m_caret_overlay.x:
-			x+=m_caret_overlay.y
+		if x>m_caret_overlay.x&&x<m_caret_overlay.y:
+			x+=m_caret_overlay.z
 		tab_width=m_tab_width_in_fp
 		wrap_width=m_wrap_width_in_fp
 		iy=x/wrap_width
@@ -371,7 +384,7 @@ class CLayouter_programmer
 			auto y=x0/wrap_width
 			auto x=x0-y*wrap_width
 			y*=hc
-			return float2(fixed2float(x-scroll_x)*scaling+screen_x,fixed2float(y-scroll_y)*scaling+screen_y)
+			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 		auto testOverlay()
 			if m_overlay_obj&&x==m_caret_overlay.x:
 				s_overlay=m_overlay_obj["text"].as(string)
@@ -394,7 +407,7 @@ class CLayouter_programmer
 								(x_sel0,x_sel1)=(x_sel1,x_sel0)
 							//selection - pre-draw the highlight
 							if x_sel0<x_sel1:
-								g_renderer.DrawBitmap(0, prj_x.x+float(x_sel0),prj_x.y,float((x_sel1-x_sel0)*scaling),fixed2float(hc), m_bgcolor_selection)
+								g_renderer.DrawBitmap(0, prj_x.x+float(x_sel0),prj_x.y,float((x_sel1-x_sel0)*scale),fixed2float(hc), m_bgcolor_selection)
 						else
 							x_sel0=0.
 							x_sel1=0.
@@ -417,8 +430,8 @@ class CLayouter_programmer
 				if m_overlay_obj["type"].as(string)=="IME":
 					//draw the underline
 					y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
-					g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.y)*scaling,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
-				x+=m_caret_overlay.y
+					g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.z)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
+				x+=m_caret_overlay.z
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
 		x_right_clip=scroll_x+clip_w
@@ -446,7 +459,7 @@ class CLayouter_programmer
 			else
 				dx_i=charWidth(ch)
 				if ix<x_right_clip:
-					prj_x=float2(fixed2float(ix-scroll_x)*scaling+screen_x,fixed2float(iy*hc-scroll_y)*scaling+screen_y)
+					prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
 					g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 				x+=dx_i
 				ix+=dx_i
@@ -455,6 +468,40 @@ class CLayouter_programmer
 					iy++
 					if iy*hc-scroll_y>=clip_h:break
 		testOverlay()
+	}
+	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
+		hid=ed.m_handler_registration["renderer"].as(int)
+		fnt_bold_scaled=obj["font_emboldened"].as(TFont)
+		fnt_bold_scaled.h*=scale
+		hc=charHeight()
+		////////
+		ccnt0=hl.p0.ccnt
+		ccnt1=hl.p1.ccnt
+		mode=int(hl.display_mode)
+		if mode==HL_DISPLAY_MODE_EMBOLDEN:
+			//only embolden a single char
+			s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
+			wrap_width=m_wrap_width_in_fp
+			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
+			foreach ch in Utf8Chars(s_embolden)
+				iy=x/wrap_width
+				ix=x-iy*wrap_width
+				prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
+				g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,hl.color, ch)
+				dx_i=charWidth(ch)
+				x+=dx_i
+		else
+			//todo: tilde for spell checks
+			//if xy0.y==xy1.y:
+			//	hc=fixed2float(GetCharacterHeightAt(ccnt1))*scale
+			//	g_renderer.DrawBitmap(0, xy0.x,xy0.y,xy1.x-xy0.x,hc, hl.color)
+			//else
+			//	//draw 3 rects, we have a cliprect, don't worry
+			//	hc=fixed2float(GetCharacterHeightAt(ccnt0))*scale
+			//	g_renderer.DrawBitmap(0, xy0.x,xy0.y,max(scr_x+wf*scale-xy0.x,0.f),hc, hl.color)
+			//	g_renderer.DrawBitmap(0, scr_x,xy0.y+hc,wf*scale,max(xy1.y-(xy0.y+hc),0.f), hl.color)
+			//	hc=fixed2float(GetCharacterHeightAt(ccnt1))*scale
+			//	g_renderer.DrawBitmap(0, scr_x,xy1.y,max(xy1.x-scr_x,0.f),hc, hl.color)
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
 		return charHeight()
@@ -962,16 +1009,25 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				word_dfa[st_final+i]=tran_i
 		ret.m_word_dfa=word_dfa
 		//set the per-rule initial states
+		ret.m_trigger_chars=obj["m_trigger_char"].as(string)
 		m_word_dfa_initial_state=obj["m_word_dfa_initial_state"].as(JSObject)
+		m_word_dfa_initial_state_triggered=obj["m_word_dfa_initial_state_triggered"].as(JSObject)
 		n=m_word_dfa_initial_state.length()
 		assert(n==ret.m_coloring_rules.n+1)
 		ret.m_word_dfa_initial_state=new int[n]
+		ret.m_word_dfa_initial_state_triggered=new int[n]
 		//////////////
 		for i=0:m_word_dfa_initial_state.length()-1
 			st=m_word_dfa_initial_state[i].as(int)
 			if st>=0:
 				st=init_state_by_kwset[st]*n_word_char_types
+			stt=m_word_dfa_initial_state_triggered[i].as(int)
+			if stt>=0:
+				stt=init_state_by_kwset[stt]*n_word_char_types
+			else
+				stt=st
 			ret.m_word_dfa_initial_state[i]=st
+			ret.m_word_dfa_initial_state_triggered[i]=stt
 		return JS.Return(ret)
 	}
 })

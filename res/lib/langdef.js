@@ -10,6 +10,8 @@ var LanguageDefinition=function(owner){
 	this.m_color_default="color";
 	this.m_keyword_sets=[];
 	this.m_word_dfa_initial_state=[-1];
+	this.m_word_dfa_initial_state_triggered=[-1];
+	this.m_trigger_char=undefined;
 	////////////////
 	this.m_owner=owner
 };
@@ -65,6 +67,7 @@ LanguageDefinition.prototype={
 		}
 		this.m_coloring_rules.push({bid:bid,color_name:color_name});
 		this.m_word_dfa_initial_state.push(-1)
+		this.m_word_dfa_initial_state_triggered.push(-1)
 	},
 	ColoredDelimiter:function(type,stok0,stok1,color_name){
 		var bid=this.DefineDelimiter(type,stok0,stok1)
@@ -105,7 +108,7 @@ LanguageDefinition.prototype={
 		}
 	},
 	/////////////////
-	DefineKeywordSet:function(s_for_color){
+	DefineKeywordSet:function(s_for_color,ch_triggering){
 		var ret=new KeywordSet()
 		this.m_keyword_sets.push(ret)
 		var id=-1;
@@ -120,8 +123,17 @@ LanguageDefinition.prototype={
 			}
 		}
 		if(id<0){throw new Error("please define color @1 in a rule before defining its keyword set".replace("@1",s_for_color));}
-		if(this.m_word_dfa_initial_state[id]!=-1){throw new Error("color @1 already has a keyword set".replace("@1",s_for_color));}
-		this.m_word_dfa_initial_state[id]=this.m_keyword_sets.length-1;
+		var states=(ch_triggering?this.m_word_dfa_initial_state_triggered:this.m_word_dfa_initial_state)
+		if(states[id]!=-1){throw new Error("color @1 already has a keyword set".replace("@1",s_for_color));}
+		states[id]=this.m_keyword_sets.length-1;
+		if(ch_triggering){
+			if(typeof ch_triggering!="string"){ch_triggering=ch_triggering.join("")}
+			if(this.m_trigger_char){
+				if(this.m_trigger_char!=ch_triggering){throw new Error("only one set of triggering chars is supported")}
+			}else{
+				this.m_trigger_char=ch_triggering
+			}
+		}
 		return ret;
 	},
 	DefineDefaultColor:function(s_color){

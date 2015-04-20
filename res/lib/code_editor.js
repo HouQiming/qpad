@@ -2083,6 +2083,9 @@ W.CodeEditor=function(id,attrs){
 								acctx.Activate()
 							}
 							var ac_w_needed=0
+							while(acctx.m_display_items.length<acctx.m_scroll_i){
+								acctx.GetDisplayItem(acctx.m_display_items.length)
+							}
 							for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
 								ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
 							}

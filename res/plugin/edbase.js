@@ -190,8 +190,10 @@ Language.Register({
 		lang.DefineToken('&quot;')
 		lang.DefineToken('&lt;')
 		lang.DefineToken('&gt;')
-		var kwset=lang.DefineKeywordSet("color_symbol");
+		var kwset=lang.DefineKeywordSet("color_symbol",['<','/']);
 		kwset.DefineKeywords("color_keyword",["DOCTYPE","a","abbr","acronym","address","applet","area","article","aside","audio","b","base","basefont","bdi","bdo","big","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","datalist","dd","del","details","dfn","dialog","dir","div","dl","dt","em","embed","fieldset","figcaption","figure","font","footer","form","frame","frameset","h1","head","header","hr","html","i","iframe","img","input","ins","kbd","keygen","label","legend","li","link","main","map","mark","menu","menuitem","meta","meter","nav","noframes","noscript","object","ol","optgroup","option","output","p","param","pre","progress","q","rp","rt","ruby","s","samp","script","section","select","small","source","span","strike","strong","style","sub","summary","sup","table","tbody","td","textarea","tfoot","th","thead","time","title","tr","track","tt","u","ul","var","video","wbr"])
+		kwset.DefineWordColor("color")
+		kwset=lang.DefineKeywordSet("color_symbol");
 		kwset.DefineWordColor("color")
 		kwset=lang.DefineKeywordSet("color_symbol2");
 		kwset.DefineKeywords("color_keyword",[
@@ -305,18 +307,49 @@ Language.Register({
 	}
 });
 
-//Language.Register({
-//	name:'TeX/LaTeX',extensions:['tex','cls'],
-//	curly_bracket_is_not_special:1,is_tex_like:1,
-//	rules:function(lang){
-//		'type':['begin','end','addcontentsline','addtocontents','addtocounter','address','addtolength','addvspace','alph','appendix','arabic','author','backslash','baselineskip','baselinestretch','bf','bibitem','bigskipamount','bigskip','boldmath','boldsymbol','cal','caption','cdots','centering','chapter','circle','cite','cleardoublepage','clearpage','cline','closing','color','copyright','dashbox','date','ddots','documentclass[options]','dotfill','em','emph','ensuremath(LaTeX2e)','epigraph','euro','fbox','flushbottom','fnsymbol','footnote','footnotemark','footnotesize','footnotetext','frac','frame','framebox','frenchspacing','hfill','hline','href','hrulefill','hspace','huge','Huge','hyphenation','include','includegraphics','includeonly','indent','input','it','item','kill','label','large','Large','LARGE','LaTeX','LaTeXe','ldots','lefteqn','line','linebreak','linethickness','linewidth','listoffigures','listoftables','location','makebox','maketitle','markboth','mathcal','mathop','mbox','medskip','multicolumn','multiput','newcommand','newcolumntype','newcounter','newenvironment','newfont','newlength','newline','newpage','newsavebox','newtheorem','nocite','noindent','nolinebreak','nonfrenchspacing','normalsize','nopagebreak','not','onecolumn','opening','oval','overbrace','overline','pagebreak','pagenumbering','pageref','pagestyle','par','paragraph','parbox','parindent','parskip','part','protect','providecommand','put','raggedbottom','raggedleft','raggedright','raisebox','ref','renewcommand','rm','roman','rule','savebox','sbox','sc','scriptsize','section','setcounter','setlength','settowidth','sf','shortstack','signature','sl','slash','small','smallskip','sout','space','sqrt','stackrel','stepcounter','subparagraph','subsection','subsubsection','tableofcontents','telephone','TeX','textbf','textcolor','textit','textmd','textnormal','textrm','textsc','textsf','textsl','texttt','textup','textwidth','textheight','thanks','thispagestyle','tiny','title','today','tt','twocolumn','typeout','typein','uline','underbrace','underline','unitlength','usebox','usecounter','uwave','value','vbox','vcenter','vdots','vector','verb','vfill','vline','vphantom','vspace','usepackage','documentclass'],
-//		'misc':['left','right'],
-//	}
-//});
-//Language.Register({
-//	name:'Bibliography',extensions:['bib'],
-//	curly_bracket_is_not_special:1,is_tex_like:1,
-//});
+var f_tex_like=function(lang){
+	lang.DefineDefaultColor("color_symbol")
+	var bid_comment=lang.ColoredDelimiter("key","%","\n","color_comment");
+	var bid_math=lang.ColoredDelimiter("key","$","$","color_string");
+	var bid_bracket=lang.DefineDelimiter("nested",['\\begin','{'],['}','\\end']);
+	lang.DefineToken('\\{')
+	lang.DefineToken("\\}")
+	lang.DefineToken("\\\\")
+	lang.DefineToken("\\\n")
+	lang.DefineToken("\\$")
+	lang.DefineToken("\\%")
+	/////////////
+	var kwset=lang.DefineKeywordSet("color_symbol","\\");
+	kwset.DefineWordColor("color_keyword")
+	kwset.DefineKeywords("color_type",['begin','end','addcontentsline','addtocontents','addtocounter','address','addtolength','addvspace','alph','appendix','arabic','author','backslash','baselineskip','baselinestretch','bf','bibitem','bigskipamount','bigskip','boldmath','boldsymbol','cal','caption','cdots','centering','chapter','circle','cite','cleardoublepage','clearpage','cline','closing','color','copyright','dashbox','date','ddots','documentclass[options]','dotfill','em','emph','ensuremath(LaTeX2e)','epigraph','euro','fbox','flushbottom','fnsymbol','footnote','footnotemark','footnotesize','footnotetext','frac','frame','framebox','frenchspacing','hfill','hline','href','hrulefill','hspace','huge','Huge','hyphenation','include','includegraphics','includeonly','indent','input','it','item','kill','label','large','Large','LARGE','LaTeX','LaTeXe','ldots','lefteqn','line','linebreak','linethickness','linewidth','listoffigures','listoftables','location','makebox','maketitle','markboth','mathcal','mathop','mbox','medskip','multicolumn','multiput','newcommand','newcolumntype','newcounter','newenvironment','newfont','newlength','newline','newpage','newsavebox','newtheorem','nocite','noindent','nolinebreak','nonfrenchspacing','normalsize','nopagebreak','not','onecolumn','opening','oval','overbrace','overline','pagebreak','pagenumbering','pageref','pagestyle','par','paragraph','parbox','parindent','parskip','part','protect','providecommand','put','raggedbottom','raggedleft','raggedright','raisebox','ref','renewcommand','rm','roman','rule','savebox','sbox','sc','scriptsize','section','setcounter','setlength','settowidth','sf','shortstack','signature','sl','slash','small','smallskip','sout','space','sqrt','stackrel','stepcounter','subparagraph','subsection','subsubsection','tableofcontents','telephone','TeX','textbf','textcolor','textit','textmd','textnormal','textrm','textsc','textsf','textsl','texttt','textup','textwidth','textheight','thanks','thispagestyle','tiny','title','today','tt','twocolumn','typeout','typein','uline','underbrace','underline','unitlength','usebox','usecounter','uwave','value','vbox','vcenter','vdots','vector','verb','vfill','vline','vphantom','vspace','usepackage','documentclass'])
+	kwset.DefineKeywords("color_meta",['left','right'])
+	kwset=lang.DefineKeywordSet("color_string","\\");
+	kwset.DefineWordColor("color_keyword")
+	kwset.DefineKeywords("color_type",['begin','end','addcontentsline','addtocontents','addtocounter','address','addtolength','addvspace','alph','appendix','arabic','author','backslash','baselineskip','baselinestretch','bf','bibitem','bigskipamount','bigskip','boldmath','boldsymbol','cal','caption','cdots','centering','chapter','circle','cite','cleardoublepage','clearpage','cline','closing','color','copyright','dashbox','date','ddots','documentclass[options]','dotfill','em','emph','ensuremath(LaTeX2e)','epigraph','euro','fbox','flushbottom','fnsymbol','footnote','footnotemark','footnotesize','footnotetext','frac','frame','framebox','frenchspacing','hfill','hline','href','hrulefill','hspace','huge','Huge','hyphenation','include','includegraphics','includeonly','indent','input','it','item','kill','label','large','Large','LARGE','LaTeX','LaTeXe','ldots','lefteqn','line','linebreak','linethickness','linewidth','listoffigures','listoftables','location','makebox','maketitle','markboth','mathcal','mathop','mbox','medskip','multicolumn','multiput','newcommand','newcolumntype','newcounter','newenvironment','newfont','newlength','newline','newpage','newsavebox','newtheorem','nocite','noindent','nolinebreak','nonfrenchspacing','normalsize','nopagebreak','not','onecolumn','opening','oval','overbrace','overline','pagebreak','pagenumbering','pageref','pagestyle','par','paragraph','parbox','parindent','parskip','part','protect','providecommand','put','raggedbottom','raggedleft','raggedright','raisebox','ref','renewcommand','rm','roman','rule','savebox','sbox','sc','scriptsize','section','setcounter','setlength','settowidth','sf','shortstack','signature','sl','slash','small','smallskip','sout','space','sqrt','stackrel','stepcounter','subparagraph','subsection','subsubsection','tableofcontents','telephone','TeX','textbf','textcolor','textit','textmd','textnormal','textrm','textsc','textsf','textsl','texttt','textup','textwidth','textheight','thanks','thispagestyle','tiny','title','today','tt','twocolumn','typeout','typein','uline','underbrace','underline','unitlength','usebox','usecounter','uwave','value','vbox','vcenter','vdots','vector','verb','vfill','vline','vphantom','vspace','usepackage','documentclass'])
+	kwset.DefineKeywords("color_meta",['left','right'])
+	kwset=lang.DefineKeywordSet("color_symbol");
+	kwset.DefineWordColor("color")
+	kwset.DefineWordType("color_number","0-9")
+	return (function(lang){
+		lang.SetExclusive([bid_comment,bid_math])
+		if(lang.isInside(bid_comment)){
+			lang.Disable(bid_bracket);
+		}else{
+			lang.Enable(bid_bracket);
+		}
+	});
+};
+Language.Register({
+	name:'TeX/LaTeX',extensions:['tex','cls'],
+	curly_bracket_is_not_special:1,is_tex_like:1,
+	rules:f_tex_like
+});
+
+Language.Register({
+	name:'Bibliography',extensions:['bib'],
+	curly_bracket_is_not_special:1,is_tex_like:1,
+	rules:f_tex_like
+});
 
 Language.Register({
 	name:'Matlab',parser:"none",
@@ -643,7 +676,7 @@ var MatchingBracket=function(c){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	if(!this.plugin_language_desc||this.plugin_language_desc.name=="Plain text"){return;}
-	//bracket auto-matching with bold hl
+	//bracket auto-matching with bold bracket highlighting
 	this.AddEventHandler('editorCreate',function(){
 		var hl_items=this.CreateTransientHighlight({
 			'depth':1,
@@ -664,10 +697,24 @@ UI.RegisterEditorPlugin(function(){
 		this.m_rbracket_p1=hl_items[1]
 		this.m_rbracket_hl=hl_items[2]
 	})
+	var BracketSizeAt=function(doc,ccnt,side){
+		//ccnt is at the last character of a token...
+		var lang=doc.plugin_language_desc
+		var tokens=(side==0?lang.m_lbracket_tokens:lang.m_rbracket_tokens)
+		for(var i=0;i<tokens.length;i++){
+			var s=tokens[i]
+			var lg=Duktape.__byte_length(s)
+			if(doc.ed.GetText(ccnt+1-lg,lg)==s){
+				return lg
+			}
+		}
+		return 1
+	}
 	var HighlightBrackets=function(doc,ccnt0,ccnt1){
-		doc.m_lbracket_p0.ccnt=ccnt0
+		var sz0=BracketSizeAt(doc,ccnt0,0),sz1=BracketSizeAt(doc,ccnt1,1)
+		doc.m_lbracket_p0.ccnt=ccnt0+1-sz0
 		doc.m_lbracket_p1.ccnt=ccnt0+1
-		doc.m_rbracket_p0.ccnt=ccnt1
+		doc.m_rbracket_p0.ccnt=ccnt1+1-sz1
 		doc.m_rbracket_p1.ccnt=ccnt1+1
 		UI.Refresh()
 	}
@@ -740,13 +787,14 @@ UI.RegisterEditorPlugin(function(){
 		}else if(ccnt==this.m_rbracket_p0.ccnt||ccnt==this.m_rbracket_p1.ccnt){
 			ccnt_new=this.m_lbracket_p1.ccnt;
 		}else{
-			//UI.assert(0,"panic: bracket highlight enabled but cursor not at bracket?")
+			//UI.assert(0,"panic: bracket highlighting enabled but cursor is not at a bracket?")
 			ccnt_new=this.m_lbracket_p1.ccnt;
 			//ccnt=this.m_rbracket_p1.ccnt;
 			//return;
 		}
 		this.sel0.ccnt=is_sel?ccnt:ccnt_new
 		this.sel1.ccnt=ccnt_new
+		this.AutoScroll("center_if_hidden")
 		UI.Refresh()
 	}
 	this.AddEventHandler('menu',function(){
