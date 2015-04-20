@@ -621,7 +621,9 @@ UI.Application=function(id,attrs){
 		//UI.NewUIEditorTab()
 		//UI.NewCodeEditorTab()
 		//UI.OpenFile("c:/tp/kara/ide/edcore.spap")
-		UI.OpenFile("c:/h/edtest/empty.tex")
+		//UI.OpenFile("c:/h/edtest/empty.tex")
+		//UI.OpenFile("c:/tp/papers/ours/vg2015/gpu_scanline.tex")
+		UI.OpenFile("C:/tp/qpad/history.xml")
 		//UI.NewFromTemplate("templates/blank_demo.mo")
 		//c:\tp\pure\mo\pm_tmp\win32\mo\s7main.c
 	}

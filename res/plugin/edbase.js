@@ -233,6 +233,7 @@ Language.Register({
 	extensions:['xml','vcproj','vcxproj','sproj','sln'],
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
+		lang.DefineToken('<')//short tokens must come first
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
 		var bid_cdata=lang.ColoredDelimiter("key","<![CDATA[","]]>","color_symbol2");
 		var bid_header=lang.ColoredDelimiter("key","<?","?>","color_meta");
@@ -246,6 +247,8 @@ Language.Register({
 		lang.DefineToken('&gt;')
 		var kwset=lang.DefineKeywordSet("color_symbol");
 		kwset.DefineWordColor("color")
+		kwset=lang.DefineKeywordSet("color_symbol",['<','/']);
+		kwset.DefineWordColor("color_type")
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_cdata,bid_header,bid_string,bid_string2]);
 			if(lang.isInside(bid_comment)||lang.isInside(bid_cdata)||lang.isInside(bid_header)||lang.isInside(bid_string)||lang.isInside(bid_string2)){

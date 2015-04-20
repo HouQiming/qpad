@@ -28,6 +28,9 @@ LanguageDefinition.prototype={
 			}
 			return ret;
 		}
+		if(stoken.length>=64){
+			throw new Error("bigchar too long, 63 should have been enough")
+		}
 		var n=this.m_existing_tokens[stoken];
 		if(n!=undefined){return [n];}
 		n=(this.m_big_chars.length);

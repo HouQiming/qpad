@@ -503,6 +503,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	tab_is_char:1,
 	plugin_class:'code_editor',
 	state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
+	//state_handlers:["renderer_fancy","colorer_programmer","line_column_unicode","seeker_indentation"],
 	////////////////////
 	//per-language portion
 	//language:g_language_C,
@@ -769,6 +770,7 @@ UI.SEARCH_FLAG_WHOLE_WORD=2
 UI.SEARCH_FLAG_REGEXP=4
 W.CodeEditorWidget_prototype={
 	m_find_flags:0,
+	m_wrap_width:0,
 	OnEditorCreate:function(){
 		var doc=this.doc
 		var obj=this
@@ -837,6 +839,7 @@ W.CodeEditorWidget_prototype={
 		if(loaded_metadata.sel1){doc.sel1.ccnt=Math.max(Math.min(loaded_metadata.sel1,doc.ed.GetTextSize()),0);}
 		this.m_current_needle=loaded_metadata.m_current_needle
 		this.m_find_flags=(loaded_metadata.m_find_flags||0)
+		this.m_wrap_width=(loaded_metadata.m_wrap_width||0)
 		doc.AutoScroll("center")
 		doc.scrolling_animation=undefined
 		doc.CallHooks("selectionChange")
@@ -850,6 +853,7 @@ W.CodeEditorWidget_prototype={
 		var new_metadata={m_bookmarks:[],m_unkeyed_bookmarks:[],
 			m_current_needle:this.m_current_needle,
 			m_find_flags:this.m_find_flags,
+			m_wrap_width:this.m_wrap_width,
 			sel0:doc.sel0.ccnt,
 			sel1:doc.sel1.ccnt,
 		}
@@ -1891,6 +1895,7 @@ W.CodeEditor=function(id,attrs){
 					language:Language.GetDefinitionByName(obj.m_language_id),
 					plugin_language_desc:Language.GetDescObjectByName(obj.m_language_id),
 					style:editor_style,
+					wrap_width:obj.m_wrap_width,
 					///////////////
 					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:obj.w-w_line_numbers-obj.padding-w_scrolling_area,h:obj.h-h_top_hint-h_top_find-h_bottom_find,
 				},W.CodeEditor_prototype);

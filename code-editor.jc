@@ -538,20 +538,30 @@ class CColorer_programmer
 			auto char_map=ld.m_char_map
 			auto dfa=ld.m_bigchar_dfa
 			auto token_lengths=ld.m_token_lengths
-			container={'forEach':inline(fbody){
-				for i=0:sz_context-1
-					fbody(s_context[s_context.n-sz_context+i],~i)
-				foreach ch,I in s
-					fbody(ch,int(I))
-			}}
+			//container={'forEach':inline(fbody){
+			//	for i=0:sz_context-1
+			//		fbody(s_context[s_context.n-sz_context+i],~i)
+			//	foreach ch,I in s
+			//		fbody(ch,int(I))
+			//}}
 			st=0
-			foreach ch,I in container
+			//foreach ch,I in container
+			for(I=-sz_context;I<s.n;I++)
 				if st<0:
-					if I>=0:
-						//Writeln('token: ',~st,' at ',I)
-						fbody_outer(~st,I,token_lengths[~st])
+					//rollback is O(1) so actually rolling back should be OK
+					tok_id=~st
+					rollback=(tok_id&255);tok_id>>=8
+					if I-rollback>=0:
+						//this counts the trailing token of sth into the *next* block
+						//Writeln(tok_id,' ',I,' ',rollback)
+						fbody_outer(tok_id,I-rollback,token_lengths[tok_id])
+						I-=rollback
 					st=0
-				chi=int(char_map[int(u8(ch))])
+				if I>=0:
+					ch=int(u8(s[I]))
+				else
+					ch=int(u8(s_context[s_context.n+I]))
+				chi=int(char_map[ch])
 				st=int(i16(dfa[st*n_char_types+chi]))
 		}}
 	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
@@ -640,7 +650,8 @@ class CColorer_programmer
 							evt.direction=i8(0)
 						coloring_events.push(evt)
 				mask0=mask
-		testEvent(0,0)
+		//the first TOKEN may start before the block...
+		testEvent(-s_context.n,0)
 		foreach tok,I,lg_token in EnumTokens(s_context,s)
 			//ignore nest-only brackets
 			tran=bdfa[bst+tok]
@@ -649,7 +660,7 @@ class CColorer_programmer
 			mask&=tran.m_and
 			mask^=tran.m_xor
 			testEvent(I,lg_token)
-		coloring_events.Sortby(inline(evt){return evt.ofs*2+int(evt.direction)})
+		coloring_events.Sortby(inline(evt){return evt.ofs*2+(evt.direction)})
 		//Writeln(coloring_events)
 		crule_activation=new i8[crules.n]
 		ret=new u8[s.n]
@@ -757,7 +768,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		foreach spattern,I in native_bigchars
 			ch0=int(u8(spattern[0]))
 			if spattern.n==1:
-				state=~int(I)
+				state=~int(I<<8)
 			else
 				state=int(I)|(1<<16)
 			fc_lists[int(char_map[ch0])].push(state)
@@ -773,10 +784,20 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			cur_states=Q[i]
 			my_addr=i*n_char_types
 			tran=new int[][n_char_types]
-			for j=0:tran.n-1
-				tran[j]=new(fc_lists[j])
+			if cur_states.n&&cur_states[0]<0:
+				//we have deferred tokens, DO NOT RESTART
+				for j=0:tran.n-1
+					tran[j]=new int[]
+			else
+				for j=0:tran.n-1
+					tran[j]=new(fc_lists[j])
 			//fc_lists
 			foreach stpacked in cur_states
+				if stpacked<0:
+					//deferred token, increase rollback but keep it
+					for j=0:tran.n-1
+						tran[j].push(stpacked-1)
+					continue
 				pid=(stpacked&0xffff)
 				pos=(stpacked>>16)
 				s_pid=native_bigchars[pid]
@@ -784,7 +805,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				pos++
 				if pos>=s_pid.n:
 					//add action
-					tran[ch_std].push(~pid)
+					tran[ch_std].push(~(pid<<8))
 				else
 					tran[ch_std].push(pid+(pos<<16))
 			//Write(cur_states,' ')
@@ -793,11 +814,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				new_states.Sort()
 				new_states.Unique()
 				actions=u16[].NULL
-				if new_states.n&&new_states[0]<0:
+				if new_states.n&&new_states[0]<0&&new_states.back()<0:
 					//actions - higher pid should take higher priority and get sorted first
-					//coulddo: substring case... defer the action
+					//coulddo: substring case... defer the action and add a rollback
 					new_stid=new_states[0]
-					reached[~new_states[0]]=1
+					reached[~new_states[0]>>8]=1
+					//Writeln('bigchar=',native_bigchars[~new_states[0]>>8],' rollback=',~new_states[0]&255)
 				else
 					new_stid=state_map[new_states]
 					if !new_stid:
@@ -1029,6 +1051,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				stt=st
 			ret.m_word_dfa_initial_state[i]=st
 			ret.m_word_dfa_initial_state_triggered[i]=stt
+		Writeln('language created')//todo
 		return JS.Return(ret)
 	}
 })
