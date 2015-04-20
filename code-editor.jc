@@ -649,7 +649,8 @@ class CColorer_programmer
 			mask&=tran.m_and
 			mask^=tran.m_xor
 			testEvent(I,lg_token)
-		coloring_events.Sortby(inline(evt){return evt.ofs})
+		coloring_events.Sortby(inline(evt){return evt.ofs*2+int(evt.direction)})
+		//Writeln(coloring_events)
 		crule_activation=new i8[crules.n]
 		ret=new u8[s.n]
 		ofs_last=0L

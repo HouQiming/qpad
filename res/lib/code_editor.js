@@ -868,7 +868,7 @@ W.CodeEditorWidget_prototype={
 	OnSave:function(){
 		this.SaveMetaData();
 		UI.SaveMetaData();
-		doc.CallHooks("save")
+		this.doc.CallHooks("save")
 		this.ParseFile()
 	},
 	Save:function(){

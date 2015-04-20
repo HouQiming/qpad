@@ -620,7 +620,8 @@ UI.Application=function(id,attrs){
 	if(!g_all_document_windows.length){
 		//UI.NewUIEditorTab()
 		//UI.NewCodeEditorTab()
-		UI.OpenFile("c:/tp/kara/ide/edcore.spap")
+		//UI.OpenFile("c:/tp/kara/ide/edcore.spap")
+		UI.OpenFile("c:/h/edtest/empty.tex")
 		//UI.NewFromTemplate("templates/blank_demo.mo")
 		//c:\tp\pure\mo\pm_tmp\win32\mo\s7main.c
 	}
