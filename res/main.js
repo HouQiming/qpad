@@ -328,6 +328,7 @@ UI.Theme_CustomWidget=function(C){
 			find_message_font:UI.Font("res/fonts/opensans.ttf",32,-50),
 			find_message_color:0xff444444,
 			///////
+			show_auto_completion:1,
 			accands_font:UI.Font("res/fonts/opensans.ttf",22,-50),
 			accands_id_font:UI.Font("res/fonts/opensans.ttf",12,200),
 			accands_padding:24,

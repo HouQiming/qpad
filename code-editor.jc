@@ -747,6 +747,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				actions=u16[].NULL
 				if new_states.n&&new_states[0]<0:
 					//actions - higher pid should take higher priority and get sorted first
+					//coulddo: substring case... defer the action
 					new_stid=new_states[0]
 					reached[~new_states[0]]=1
 				else
@@ -809,6 +810,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ret.m_all_key_states=m_all_key_states
 		/////////////
 		//the bracket DFA
+		m_contradiction_fixes=obj["m_contradiction_fixes"].as(JSObject)
 		n_key_states=m_all_key_states.n
 		n_tokens=native_bigchars.n
 		bdfa=new TBDFATransition[n_key_states*n_tokens]
@@ -847,8 +849,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			for i=0:n_tokens-1
 				bdfa[st+i].m_and=~bdfa[st+i].m_and
 				key_state_i=((key_state&bdfa[st+i].m_and)^bdfa[st+i].m_xor)
-				bdfa[st+i].m_next_state=u16((m_id_from_key_state[key_state_i])*n_tokens)
+				if m_id_from_key_state[key_state_i]<0:
+					//self-contradicting transition, correct it by anding the enabling mask
+					key_state_i=m_contradiction_fixes[key_state_i].as(int)
 				assert(m_id_from_key_state[key_state_i]>=0)
+				bdfa[st+i].m_next_state=u16((m_id_from_key_state[key_state_i])*n_tokens)
 		ret.m_id_from_key_state=m_id_from_key_state
 		ret.m_n_key_states=n_key_states
 		ret.m_token_lengths=token_lengths

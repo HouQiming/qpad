@@ -5,6 +5,7 @@ var LanguageDefinition=function(owner){
 	this.m_big_chars=[];
 	this.m_bracket_types=[];
 	this.m_entry_states=[];
+	this.m_contradiction_fixes=[];
 	this.m_coloring_rules=[];
 	this.m_color_default="color";
 	this.m_keyword_sets=[];
@@ -129,15 +130,20 @@ LanguageDefinition.prototype={
 	/////////////////
 	Finalize:function(fenabler){
 		var bras=this.m_bracket_types;
-		bras.sort(function(a,b){
-			return (b.is_key-a.is_key||a.type-b.type);
-		})
+		for(var i=1;i<bras.length;i++){
+			if(bras[i].is_key>bras[i-1].is_key||bras[i].is_key==bras[i-1].is_key&&bras[i].type<bras[i-1].type){
+				throw new Error("key brackets must appear before nested ones, pairs must appear before self-paired ones: failed at @1".replace("@1","#"+i))
+			}
+		}
+		//bras.sort(function(a,b){
+		//	return (b.is_key-a.is_key||a.type-b.type);
+		//})
 		var n_keys=bras.length;
 		for(var i=0;i<bras.length;i++){
 			if(!bras[i].is_key){n_keys=i;break;}
 		}
 		if(n_keys>12){
-			throw new Error("too many key brackets, do you really have that much inter-bracket dependency?")
+			throw new Error("too many key brackets (only 12 supported), do you really have that much inter-bracket dependency?")
 		}
 		if(bras.length>=32){
 			throw new Error("too many bracket types, 31 types is surely enough?")
@@ -157,8 +163,9 @@ LanguageDefinition.prototype={
 			}
 			this.m_enabling_mask|=this.m_inside_mask;
 			fenabler(this);
+			this.m_contradiction_fixes[this.m_inside_mask]=(this.m_enabling_mask&this.m_inside_mask)
 			if((this.m_enabling_mask&this.m_inside_mask)!=this.m_inside_mask){
-				//self-contradicting, ignore it
+				//self-contradicting, add a correcting entry it
 				continue
 			}
 			var raw_enabling_mask=0;
@@ -206,7 +213,12 @@ LanguageDefinition.prototype={
 exports.Define=function(frules,owner){
 	var ret=new LanguageDefinition(owner);
 	var fenabler=frules(ret);
-	ret.Finalize(fenabler);
+	try{
+		ret.Finalize(fenabler);
+	}catch(err){
+		err.message="Error in language definition "+owner.name+"\n"+err.message
+		throw err
+	}
 	return UI.CreateLanguageDefinition(ret);
 };
 

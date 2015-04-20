@@ -14,14 +14,14 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	lang.DefineDefaultColor("color_symbol")
 	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
-	var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
-	var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 	var bid_preprocessor
 	if(has_preprocessor){
 		bid_preprocessor=lang.ColoredDelimiter("key","#","\n","color_meta");
 	}else{
 		bid_preprocessor=bid_comment
 	}
+	var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
+	var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 	var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
 	lang.DefineToken("\\\\")
 	lang.DefineToken("\\'")
@@ -175,15 +175,16 @@ Language.Register({
 Language.Register({
 	name:'HTML',parser:"text",
 	extensions:['htm','html'],
-	rule:function(lang,keywords,has_preprocessor){
+	rules:function(lang,keywords,has_preprocessor){
 		lang.DefineDefaultColor("color_symbol")
+		//var bid_tag=lang.DefineDelimiter("key","<",">");
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
-		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
-		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 		var bid_script=lang.ColoredDelimiter("key","<script","</script>","color_symbol2");
-		var bid_js_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
 		var bid_js_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 		var bid_js_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
+		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
+		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
+		var bid_js_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
 		lang.DefineToken("&amp;")
 		lang.DefineToken("&apos;")
 		lang.DefineToken('&quot;')
@@ -199,8 +200,9 @@ Language.Register({
 		kwset.DefineKeywords("color_type",['typeof','var','void','boolean','byte','int','short','char','double','long','float'])
 		kwset.DefineWordColor("color")
 		return (function(lang){
-			lang.SetExclusive([bid_comment,bid_string,bid_string2]);
+			//lang.SetExclusive([bid_comment,bid_tag,bid_script]);
 			lang.SetExclusive([bid_comment,bid_script]);
+			//bid_string,bid_string2
 			if(lang.isInside(bid_script)){
 				lang.SetExclusive([bid_js_comment,bid_js_comment2,bid_string,bid_string2]);
 				if(lang.isInside(bid_js_comment)||lang.isInside(bid_js_comment2)){
@@ -208,10 +210,17 @@ Language.Register({
 				}else{
 					lang.Disable(bid_js_bracket);
 				}
+			//}else if(lang.isInside(bid_tag)){
+			//	//we're in tags, enable strings but disable the JS stuff
+			//	lang.Disable(bid_js_bracket);
+			//	lang.Disable(bid_js_comment);
+			//	lang.Disable(bid_js_comment2);
 			}else{
 				lang.Disable(bid_js_bracket);
 				lang.Disable(bid_js_comment);
 				lang.Disable(bid_js_comment2);
+				lang.Disable(bid_string);
+				lang.Disable(bid_string2);
 			}
 		});
 	}
@@ -220,7 +229,7 @@ Language.Register({
 Language.Register({
 	name:'XML',parser:"text",
 	extensions:['xml','vcproj','vcxproj','sproj','sln'],
-	rule:function(lang){
+	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
 		var bid_cdata=lang.ColoredDelimiter("key","<![CDATA[","]]>","color_symbol2");
@@ -299,7 +308,7 @@ Language.Register({
 //Language.Register({
 //	name:'TeX/LaTeX',extensions:['tex','cls'],
 //	curly_bracket_is_not_special:1,is_tex_like:1,
-//	rule:function(lang){
+//	rules:function(lang){
 //		'type':['begin','end','addcontentsline','addtocontents','addtocounter','address','addtolength','addvspace','alph','appendix','arabic','author','backslash','baselineskip','baselinestretch','bf','bibitem','bigskipamount','bigskip','boldmath','boldsymbol','cal','caption','cdots','centering','chapter','circle','cite','cleardoublepage','clearpage','cline','closing','color','copyright','dashbox','date','ddots','documentclass[options]','dotfill','em','emph','ensuremath(LaTeX2e)','epigraph','euro','fbox','flushbottom','fnsymbol','footnote','footnotemark','footnotesize','footnotetext','frac','frame','framebox','frenchspacing','hfill','hline','href','hrulefill','hspace','huge','Huge','hyphenation','include','includegraphics','includeonly','indent','input','it','item','kill','label','large','Large','LARGE','LaTeX','LaTeXe','ldots','lefteqn','line','linebreak','linethickness','linewidth','listoffigures','listoftables','location','makebox','maketitle','markboth','mathcal','mathop','mbox','medskip','multicolumn','multiput','newcommand','newcolumntype','newcounter','newenvironment','newfont','newlength','newline','newpage','newsavebox','newtheorem','nocite','noindent','nolinebreak','nonfrenchspacing','normalsize','nopagebreak','not','onecolumn','opening','oval','overbrace','overline','pagebreak','pagenumbering','pageref','pagestyle','par','paragraph','parbox','parindent','parskip','part','protect','providecommand','put','raggedbottom','raggedleft','raggedright','raisebox','ref','renewcommand','rm','roman','rule','savebox','sbox','sc','scriptsize','section','setcounter','setlength','settowidth','sf','shortstack','signature','sl','slash','small','smallskip','sout','space','sqrt','stackrel','stepcounter','subparagraph','subsection','subsubsection','tableofcontents','telephone','TeX','textbf','textcolor','textit','textmd','textnormal','textrm','textsc','textsf','textsl','texttt','textup','textwidth','textheight','thanks','thispagestyle','tiny','title','today','tt','twocolumn','typeout','typein','uline','underbrace','underline','unitlength','usebox','usecounter','uwave','value','vbox','vcenter','vdots','vector','verb','vfill','vline','vphantom','vspace','usepackage','documentclass'],
 //		'misc':['left','right'],
 //	}
@@ -312,7 +321,7 @@ Language.Register({
 Language.Register({
 	name:'Matlab',parser:"none",
 	extensions:['m'],
-	rule:function(lang){
+	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","%","\n","color_comment");
 		var bid_string=lang.ColoredDelimiter("key","'","'","color_string");
@@ -341,7 +350,7 @@ Language.Register({
 	extensions:['py'],
 	indent_as_parenthesis:1,
 	curly_bracket_is_not_special:1,
-	rule:function(lang){
+	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","#","\n","color_comment");
 		var bid_string0=lang.ColoredDelimiter("key","'","'","color_string");

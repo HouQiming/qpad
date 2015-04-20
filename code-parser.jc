@@ -655,7 +655,7 @@ make the .name func() system an independent pass
 //global by-last-symbol model (for plain text)
 class CFileIndex
 	//basic model, predict from variable. func()
-	int[] m_ids
+	int2[] m_ids
 	int2[] m_ppm_pool
 	int2[int] m_name_dot_index
 	int2[int2] m_function_bracket_index //id, ordinal
@@ -673,10 +673,15 @@ if Platform.IS_WINDOWS
 	memicmp=__c_function(int,"_memicmp","string.h")
 else
 	memicmp=__c_function(int,"memicmp","string.h")
-auto ComputeIDOrderingMaps(int[] ids)
+auto ComputeIDOrderingMaps(int[] just_ids)
+	just_ids.Sort()
+	ids=new int2[]
+	foreach id,duplicates in just_ids.Groupby(inline(a){return a})
+		ids.push(int2(id,duplicates.getForEachRepeatCount()))
+	just_ids.discard()
 	ids.Sort(inline(id0,id1){
-		sym0=g_symbols[id0]
-		sym1=g_symbols[id1]
+		sym0=g_symbols[id0.x]
+		sym1=g_symbols[id1.x]
 		n_min=min(sym0.n,sym1.n)
 		ret=memicmp(__pointer(g_strings.d+sym0.p_name),__pointer(g_strings.d+sym1.p_name),n_min)
 		if !ret:
@@ -684,7 +689,7 @@ auto ComputeIDOrderingMaps(int[] ids)
 		return ret<0
 	})
 	foreach id,I in ids
-		g_symbols[id].user_slot=int(I)
+		g_symbols[id.x].user_slot=int(I)
 	return ids
 
 inline IDToOrder(id)
@@ -744,10 +749,9 @@ auto parseAsCLike(string sdata,JSObject options)
 			break
 		}
 	appendKeywords(just_ids,options)
-	just_ids.Sort();just_ids.Unique()
-	ComputeIDOrderingMaps(just_ids)
-	name_dot_entries.Sort(inline(a){return int2(IDToOrder(a.x),IDToOrder(a.y))});
-	func_param_entries.Sort(inline(a){return int3(IDToOrder(a.x),a.y,IDToOrder(a.z))});
+	unique_ids=ComputeIDOrderingMaps(just_ids)
+	name_dot_entries.Sortby(inline(a){return int2(IDToOrder(a.x),IDToOrder(a.y))});
+	func_param_entries.Sortby(inline(a){return int3(IDToOrder(a.x),a.y,IDToOrder(a.z))});
 	/////////////
 	ppm_pool=new int2[]
 	name_dot_index=new int2[int]
@@ -765,7 +769,7 @@ auto parseAsCLike(string sdata,JSObject options)
 			ppm_pool.push(int2(id,duplicates.getForEachRepeatCount()))
 		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
 	return new CFileIndex(){
-		m_ids:just_ids,
+		m_ids:unique_ids,
 		m_ppm_pool:ppm_pool,
 		m_name_dot_index:name_dot_index,
 		m_function_bracket_index:function_bracket_index,
@@ -774,32 +778,41 @@ auto parseAsCLike(string sdata,JSObject options)
 auto parseAsText(string sdata,JSObject options)
 	//CJK-ignorant tokenization
 	ids=new int[]
+	ids_sorted=new int[]
 	pword=0
 	foreach ch,I,I2 in Utf8Chars(sdata)
 		if !isWordChar(ch)||isCJK(ch):
 			if pword<I:
-				ids.push(TOK_ID+getid(sdata[pword:I-1]))
-			ids.push(ch)
+				id=getid(sdata[pword:I-1])
+				ids.push(TOK_ID+id)
+				ids_sorted.push(id)
+			if ch!=' '&&ch!='\t':
+				//ignore spaces
+				ids.push(ch)
 			pword=I2
 	//size-based model compression? not yet
-	ids_sorted=new(ids)
 	appendKeywords(ids_sorted,options)
-	ids_sorted.Sort()
-	ids_sorted.Unique()
-	ComputeIDOrderingMaps(ids_sorted)
+	unique_ids=ComputeIDOrderingMaps(ids_sorted)
+	inline IDToOrder2(id)
+		if id>=TOK_ID:
+			return TOK_ID+g_symbols[id-TOK_ID].user_slot
+		else
+			return id
 	srt=[i for i=1:ids.n-1]
-	srt.Sortby(inline(a){return int2(IDToOrder(ids[a]),IDToOrder(ids[a-1]))})
+	srt.Sortby(inline(a){return int2(IDToOrder2(ids[a-1]),IDToOrder2(ids[a]))})
 	ppm_pool=new int2[]
 	ppm1_index=new int2[int]
-	foreach id1,members0 in srt.Groupby(inline(a){return ids[a]})
+	//id1 goes before id0
+	foreach id1,members0 in srt.Groupby(inline(a){return ids[a-1]})
 		n0=int(ppm_pool.n)
 		members=[a foreach a in members0]
-		foreach id0,members_inner in members.Groupby(inline(a){return a})
-			weight=members_inner.getForEachRepeatCount()
-			ppm_pool.push(int2(id0,weight))
+		foreach id0,members_inner in members.Groupby(inline(a){return ids[a]})
+			if id0>=TOK_ID:
+				weight=members_inner.getForEachRepeatCount()
+				ppm_pool.push(int2(id0-TOK_ID,weight))
 		ppm1_index[id1]=int2(n0,int(ppm_pool.n))
 	return new CFileIndex(){
-		m_ids:ids_sorted,
+		m_ids:unique_ids,
 		m_ppm_pool:ppm_pool,
 		m_ppm1_index:ppm1_index,
 	}
@@ -809,6 +822,7 @@ auto parseAsText(string sdata,JSObject options)
 class CACContext
 	int2[] m_candidates
 	string s_prefix
+	string m_common_prefix
 	JS_At=function(JSContext JS){
 		id=JS.Param(0).as(int)
 		ret=JS.New()
@@ -824,7 +838,21 @@ class CACContext
 	auto __JS_prototype(JSObject proto)
 		proto.ExportMethod(this,"at",JS_At)
 		proto.ExportProperty(this,"s_prefix")
+		proto.ExportProperty(this,"m_common_prefix")
 		proto.ExportGetterSetter(this,'length',JS_GetLength,(function(JSContext):int).NULL)
+
+inline chrequi(auto ch0,auto chw0)
+	ch=int(ch0)
+	chw=int(chw0)
+	return (ch^chw)==0x20&&u32((ch|0x20)-'a')<26u||ch0==chw0
+
+auto CommonPrefix(string a,string b)
+	retx=new string
+	for(i=0;;i++)
+		if i>=a.n||i>=b.n||!chrequi(a[i],b[i]):
+			retx=a[0:i-1]
+			break
+	return retx
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	//todo: multithread it - other-threadly JS ctx? options...
@@ -833,8 +861,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		options=JS.Param(1).as(JSObject)
 		sparser=options["parser"].or("text")
 		if sparser=="none":
-			ret=new CFileIndex(){m_ids:new int[]}
-			appendKeywords(ret.m_ids,options)
+			ids=new int[]
+			appendKeywords(ids,options)
+			ret=new CFileIndex(){m_ids:ComputeIDOrderingMaps(ids)}
 			ret.m_ids.Sort()
 			ret.m_ids.Unique()
 		else
@@ -859,9 +888,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		else
 			fcheck=function(int c0,int c1){return !isWordChar(c0)}
 		ccnt_before_word=ed.MoveToBoundary(ccnt,-1,fcheck,4096)
-		if !(ccnt_before_word<ccnt):
-			//could do ppm... but likely pointless for such a small sample
-			return 0
+		//if !(ccnt_before_word<ccnt):
+		//	//could do ppm... but likely pointless for such a small sample
+		//	return 0
 		s_prefix=ed.GetText(ccnt_before_word,ccnt-ccnt_before_word)
 		/////////////////////
 		auto prefix_smalleri0(string a,string b)
@@ -874,26 +903,30 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			n_min=min(a.n,b.n)
 			ret=memicmp(__pointer(a.d),__pointer(b.d),n_min)
 			return ret<0
-		inline SearchPrefix(arr)
-			if typeof(arr)==int[]:
-				ftoosmall=function(int a){return prefix_smalleri0(getIdString(a),s_prefix)}
-				fnottoobig=function(int a){return !prefix_smalleri1(s_prefix,getIdString(a))}
-			else
-				ftoosmall=function(int2 a){return prefix_smalleri0(getIdString(a.x),s_prefix)}
-				fnottoobig=function(int2 a){return !prefix_smalleri1(s_prefix,getIdString(a.x))}
+		auto SearchPrefix(int2[] arr,float weight_scale)
+			ftoosmall=function(int2 a){return prefix_smalleri0(getIdString(a.x),s_prefix)}
+			fnottoobig=function(int2 a){return !prefix_smalleri1(s_prefix,getIdString(a.x))}
 			auto n0=arr.Bisect(ftoosmall)
 			auto n1=arr.Bisect(fnottoobig)
-			if typeof(arr)==int[]:
-				for i=n0:n1-1
-					cands.push(int2(arr[i],1))
-			else
-				cands.push(arr[n0:n1-1])
-		auto SearchPPMRange(int2 rg)
+			for i=n0:n1-1
+				arr_i=arr[i]
+				//if weight_scale>1.f:
+				//	Writeln(getIdString(arr_i.x),' ',arr_i.y,' ',weight_scale)
+				cands.push(int2(arr_i.x,__float_as_int(float(arr_i.y)*weight_scale)))
+		//weight normalization? no: evidence size is also significant
+		auto SearchPPMRange(int2 rg,float weight_scale)
 			if rg.x<rg.y:
-				SearchPrefix(fidx.m_ppm_pool[rg.x:rg.y-1])
+				SearchPrefix(fidx.m_ppm_pool[rg.x:rg.y-1],weight_scale)
 		if s_prefix.n:
-			//todo: common prefix here
-			SearchPrefix(fidx.m_ids)
+			//common prefix here - if we have a common prefix, make it the only candidate and *mark* it as *continue after confirmation*
+			SearchPrefix(fidx.m_ids,1.f)
+			if cands.n:
+				s_common_prefix=CommonPrefix(getIdString(cands[0].x)[s_prefix.n:],getIdString(cands.back().x)[s_prefix.n:])
+				if s_common_prefix.n:
+					cands=[int2(getid(getIdString(cands[0].x)[:s_prefix.n+s_common_prefix.n-1]),0x3f800000)]
+					return JS.Return(new CACContext(){
+						m_candidates:cands,
+						s_prefix:s_prefix,m_common_prefix:s_common_prefix})
 		if fidx.m_ppm1_index:
 			ccnt_last_word=ed.MoveToBoundary(ccnt_before_word,-1,ed.GetStockFCheck("space",-1),4096)
 			ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
@@ -901,9 +934,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				tok_before=TOK_ID+getid(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word))
 			else
 				(tok_before,ch1)=ed.GetUtf8CharNeighborhood(ccnt_last_word)
-			SearchPPMRange(fidx.m_ppm1_index[tok_before])
+			SearchPPMRange(fidx.m_ppm1_index[tok_before],65536.f)
 		else if fidx.m_name_dot_index:
-			Writeln('>>> ',s_prefix)//todo
+			//Writeln('>>> ',s_prefix)
 			(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt_before_word)
 			ccnt_last_word=ccnt_before_word-1LL
 			if (ch0==int('>')||ch0==int(':')):
@@ -914,8 +947,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if ch0==int('.'):
 				ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
 				if ccnt_before_last_word<ccnt_last_word:
-					Writeln(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word),'.')//todo
-					SearchPPMRange(fidx.m_name_dot_index[getid(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word))])
+					//Writeln(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word),'.')
+					SearchPPMRange(fidx.m_name_dot_index[getid(ed.GetText(ccnt_before_last_word,ccnt_last_word-ccnt_before_last_word))],1048576.f)
 			/////////////////////////////////
 			//function bracket index
 			lang=doc["plugin_language_desc"].as(JSObject)
@@ -945,16 +978,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 								if !nested:arg_id++
 								break
 							}
-						Writeln(ed.GetText(ccnt_before_fname,ccnt_bracket-ccnt_before_fname),'()')//todo
-						SearchPPMRange(fidx.m_function_bracket_index[int2(id_fname,arg_id)])
+						//Writeln(ed.GetText(ccnt_before_fname,ccnt_bracket-ccnt_before_fname),'()')
+						SearchPPMRange(fidx.m_function_bracket_index[int2(id_fname,arg_id)],65536.f)
 		//////////////////////////
 		cands.Sortby(byMember("x"))
 		ret_temp=new int2[]
 		foreach id,same_cands in cands.Groupby(byMember("x"))
-			weight=[cc.y for cc in same_cands].Sum()
+			weight=__float_as_int([__int_as_float(cc.y) for cc in same_cands].Sum())
 			ret_temp.push(int2(id,weight))
 		ret_temp.Sort(inline(ia,ib){
-			auto ret=ia.y-ib.y
+			auto ret=ib.y-ia.y
 			if !ret:
 				id0=ia.x
 				id1=ib.x
@@ -966,6 +999,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					ret=sym0.n-sym1.n
 			return ret<0
 		})
-		return JS.Return(new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix})
+		acret=new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix}
+		if ret_temp.n==1:
+			acret.m_common_prefix=getIdString(ret_temp[0].x)[s_prefix.n:]
+		return JS.Return(acret)
 	}
 })

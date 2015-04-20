@@ -810,6 +810,8 @@ W.CodeEditorWidget_prototype={
 		})
 		doc.AddEventHandler('ESC',function(){
 			obj.m_notifications=[]
+			obj.m_ac_context=undefined
+			doc.m_user_just_typed_char=0
 			UI.Refresh()
 			return 1
 		})
@@ -1941,6 +1943,7 @@ W.CodeEditor=function(id,attrs){
 			//the find bar and stuff
 			if(obj.show_find_bar&&current_find_context){
 				//draw the find items
+				doc.ed.m_other_overlay=undefined
 				UI.PushSubWindow(obj.x,obj.y+obj.h_find_bar,obj.w-w_scrolling_area,obj.h-obj.h_find_bar,obj.find_item_scale)
 				var hc=UI.GetCharacterHeight(doc.font)
 				var w_find_items=(obj.w-w_scrolling_area)/obj.find_item_scale, h_find_items=(obj.h-obj.h_find_bar)/obj.find_item_scale-obj.find_item_expand_current*hc;
@@ -1995,12 +1998,15 @@ W.CodeEditor=function(id,attrs){
 					UI.PopCliprect()
 				}
 				//auto-completion
-				if(doc.sel0.ccnt==doc.sel1.ccnt&&doc.m_user_just_typed_char){
+				var got_overlay_before=!!doc.ed.m_other_overlay;
+				doc.ed.m_other_overlay=undefined
+				if(doc.sel0.ccnt==doc.sel1.ccnt&&doc.m_user_just_typed_char&&obj.show_auto_completion){
 					var acctx=obj.m_ac_context
 					var ac_was_actiavted=0
 					if(acctx&&acctx.m_ccnt!=doc.sel1.ccnt){
 						ac_was_actiavted=acctx.m_activated
 						acctx=undefined;
+						UI.InvalidateCurrentFrame()
 					}
 					if(!acctx){
 						var accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt)
@@ -2040,8 +2046,12 @@ W.CodeEditor=function(id,attrs){
 								var sname=this.m_accands.at(id).name
 								var lg2=Duktape.__byte_length(sname);
 								doc.HookedEdit([ccnt0,lg,sname])
-								obj.m_ac_context=undefined
-								doc.m_user_just_typed_char=0
+								if(!this.m_accands.m_common_prefix){
+									obj.m_ac_context=undefined
+									doc.m_user_just_typed_char=0
+								}else{
+									obj.m_ac_context.m_ccnt=-1;
+								}
 								doc.sel0.ccnt=ccnt0+lg2
 								doc.sel1.ccnt=ccnt0+lg2
 								UI.Refresh()
@@ -2067,90 +2077,98 @@ W.CodeEditor=function(id,attrs){
 						obj.m_ac_context=acctx
 						UI.Refresh()
 					}
-					//todo: single-candidate mode, common prefix mode, the same: it just comes from the id pool
-					//doc.ed.m_other_overlay always shows the 1st candidate?
-					//need PPM weight calibration, and float weights
-					//can't auto-calibrate - PPM always wins
-					//tab should be strictly for common prefix? if we could guess the 1st candidate right...
-					if(acctx.m_n_cands>1){
-						if(ac_was_actiavted){
-							acctx.Activate()
-						}
-						var ac_w_needed=0
-						for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
-							ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
-						}
-						var ed_caret=doc.GetCaretXY();
-						var x_caret=(ed_caret.x-doc.visible_scroll_x+doc.ed.m_caret_offset);
-						var y_caret=(ed_caret.y-doc.visible_scroll_y);
-						x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
-						var hc=UI.GetCharacterHeight(doc.font)
-						var x_accands=Math.max(Math.min(x_caret,obj.x+obj.w-ac_w_needed-doc.x),0)
-						var y_accands=y_caret+hc
-						if(doc.y+y_accands+obj.accands_h>obj.y+obj.h){
-							y_accands=y_caret-obj.h_accands
-						}
-						x_accands+=doc.x
-						y_accands+=doc.y
-						var ac_anim_node=W.AnimationNode("accands_scrolling",{
-							scroll_x:acctx.GetDisplayItem(acctx.m_scroll_i).x,
-							current_w:ac_w_needed,
-						})
-						var ac_scroll_x=ac_anim_node.scroll_x
-						var w_accands=ac_anim_node.current_w
-						UI.RoundRect({
-							x:x_accands, y:y_accands, 
-							w:w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
-							round:obj.accands_shadow_size,
-							border_width:-obj.accands_shadow_size,
-							color:obj.accands_shadow_color})
-						UI.RoundRect({
-							x:x_accands, y:y_accands,
-							w:w_accands, h:obj.h_accands,
-							border_width:obj.accands_border_width,
-							border_color:obj.accands_border_color,
-							round:obj.accands_round,
-							color:obj.accands_bgcolor})
-						//draw the candidates
-						UI.PushCliprect(x_accands, y_accands, w_accands, obj.h_accands)
-						var hc_accands=UI.GetCharacterHeight(obj.accands_font)
-						var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
-						var ac_id0=acctx.IDFromX(ac_scroll_x)
-						var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
-						for(var i=ac_id0;i<=ac_id1;i++){
-							var dii=acctx.GetDisplayItem(i)
-							var selected=(acctx.m_activated&&i==acctx.m_selection)
-							var num_id=(i-acctx.m_scroll_i+11)%10
-							var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
-							var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
-							//x, w, name
-							if(selected){
-								UI.RoundRect({
-									x:x_item-w_hint_char-obj.accands_sel_padding,
-									y:y_accands_text-obj.accands_sel_padding,
-									w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
-									color:obj.accands_sel_bgcolor,
-								})
+					if(!obj.show_find_bar){
+						if(acctx.m_n_cands>1){
+							if(ac_was_actiavted){
+								acctx.Activate()
 							}
-							W.Text("",{x:x_item,y:y_accands_text,
-								font:obj.accands_font,text:dii.name,
-								color:selected?obj.accands_text_sel_color:obj.accands_text_color})
-							//if(acctx.m_activated){
-							UI.DrawChar(obj.accands_id_font,
-								x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
-								selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
-							W.Hotkey("",{key:"ALT+"+String.fromCharCode(48+num_id),action:(function(i){return function(){
-								acctx.Confirm(i)
-							}})(i)})
-							//}
+							var ac_w_needed=0
+							for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
+								ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
+							}
+							var ed_caret=doc.GetCaretXY();
+							var x_caret=(ed_caret.x-doc.visible_scroll_x+doc.ed.m_caret_offset);
+							var y_caret=(ed_caret.y-doc.visible_scroll_y);
+							x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
+							var hc=UI.GetCharacterHeight(doc.font)
+							var x_accands=Math.max(Math.min(x_caret,obj.x+obj.w-ac_w_needed-doc.x),0)
+							var y_accands=y_caret+hc
+							if(doc.y+y_accands+obj.accands_h>obj.y+obj.h){
+								y_accands=y_caret-obj.h_accands
+							}
+							x_accands+=doc.x
+							y_accands+=doc.y
+							var ac_anim_node=W.AnimationNode("accands_scrolling",{
+								scroll_x:acctx.GetDisplayItem(acctx.m_scroll_i).x,
+								current_w:ac_w_needed,
+							})
+							var ac_scroll_x=ac_anim_node.scroll_x
+							var w_accands=ac_anim_node.current_w
+							UI.RoundRect({
+								x:x_accands, y:y_accands, 
+								w:w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
+								round:obj.accands_shadow_size,
+								border_width:-obj.accands_shadow_size,
+								color:obj.accands_shadow_color})
+							UI.RoundRect({
+								x:x_accands, y:y_accands,
+								w:w_accands, h:obj.h_accands,
+								border_width:obj.accands_border_width,
+								border_color:obj.accands_border_color,
+								round:obj.accands_round,
+								color:obj.accands_bgcolor})
+							//draw the candidates
+							UI.PushCliprect(x_accands, y_accands, w_accands, obj.h_accands)
+							var hc_accands=UI.GetCharacterHeight(obj.accands_font)
+							var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
+							var ac_id0=acctx.IDFromX(ac_scroll_x)
+							var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
+							for(var i=ac_id0;i<=ac_id1;i++){
+								var dii=acctx.GetDisplayItem(i)
+								var selected=(acctx.m_activated&&i==acctx.m_selection)
+								var num_id=(i-acctx.m_scroll_i+11)%10
+								var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
+								var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
+								//x, w, name
+								if(selected){
+									UI.RoundRect({
+										x:x_item-w_hint_char-obj.accands_sel_padding,
+										y:y_accands_text-obj.accands_sel_padding,
+										w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
+										color:obj.accands_sel_bgcolor,
+									})
+								}
+								W.Text("",{x:x_item,y:y_accands_text,
+									font:obj.accands_font,text:dii.name,
+									color:selected?obj.accands_text_sel_color:obj.accands_text_color})
+								//if(acctx.m_activated){
+								UI.DrawChar(obj.accands_id_font,
+									x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
+									selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
+								W.Hotkey("",{key:"ALT+"+String.fromCharCode(48+num_id),action:(function(i){return function(){
+									acctx.Confirm(i)
+								}})(i)})
+								//}
+							}
+							UI.PopCliprect()
+						}else if(acctx.m_n_cands==1){
+							//doc.ed.m_other_overlay always shows the 1st candidate?
+							//need PPM weight calibration, and float weights
+							//can't auto-calibrate - PPM always wins
+							//tab should be strictly for common prefix? if we could guess the 1st candidate right...
+							var s_name=acctx.m_accands.at(0).name
+							doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
 						}
-						UI.PopCliprect()
 					}
 				}else{
 					var acctx=obj.m_ac_context
 					if(acctx){
 						obj.m_ac_context=undefined
+						UI.InvalidateCurrentFrame()
 					}
+				}
+				if(got_overlay_before&&!doc.ed.m_other_overlay){
+					UI.InvalidateCurrentFrame()
 				}
 			}
 			if(obj.show_find_bar){
@@ -2280,7 +2298,9 @@ W.CodeEditor=function(id,attrs){
 				if(acctx&&acctx.m_n_cands){
 					menu_edit.AddSeparator()
 					if(acctx.m_n_cands==1){
-						//todo: common prefix
+						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
+							acctx.Confirm(0)
+						}})
 					}else if(!acctx.m_activated){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
 							acctx.Activate()
