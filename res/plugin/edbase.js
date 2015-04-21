@@ -1155,6 +1155,14 @@ UI.RegisterEditorPlugin(function(){
 					}
 				}
 			}
+			if(chbraac==C){
+				//for self-matching things, we need to take space/non-space neighbors as a hint
+				//do not auto-match when the next char is a word-char
+				//also deny ' in tex when the *previous* char is a word-char
+				if(UI.IsWordChar(chnext)||UI.IsWordChar(chprev)){
+					chbraac=0;
+				}
+			}
 			if(chbraac){
 				//other-half-mismatch test
 				var is_lineend=this.IsLineEndAt(ccnt_pos)

@@ -239,6 +239,24 @@ UI.Theme_CustomWidget=function(C){
 		},
 		code_editor:{
 			editor_style:{
+				//todo
+				"styles":[{
+					"name":"normaltext",
+					font:UI.Font("res/fonts/cmunrm.ttf",24),
+					"flags":0,
+					"color":4278190080,
+					"relative_line_space":0,
+					"relative_paragraph_space":0.8
+				},{
+					"name":"chapter",
+					font:UI.Font("res/fonts/cmunrm.ttf",24),
+					"flags":0,
+					"color":4278190080,
+					"relative_line_space":0,
+					"relative_paragraph_space":0.8
+				}],
+				wrap_width:1024,
+				//todo
 				font:UI.Font("res/fonts/inconsolata.ttf",24),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
 				color:0xff000000,
