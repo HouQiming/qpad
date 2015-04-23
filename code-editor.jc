@@ -2,6 +2,7 @@ import "system.jc"
 import "gui2d.jc"
 import "javascript.jc"
 import "text-box.jc"
+import "tex-like.jc"
 import System.Math.*
 import System.Algorithm.*
 import System.Console.*
@@ -9,6 +10,63 @@ import Gui2D.detail.*
 import Javascript.*
 import TextBox.*
 import TextBox.detail.*
+import TexLike.*
+
+//text -> i64[]
+auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
+	styles=new CStyleHolder(){m_styles:[new CStyle(){font:font}],m_enable_ligatures:0}
+	ret=new i64[]
+	foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
+		n0=ret.n
+		(atoms,eatoms,tail_style_id)=TextToLayoutAtom(hyp,s,0,styles,CEmbededObject[].NULL)
+		line_breaks=DPLayoutGeneral(atoms,w_line)
+		GenerateTextLayout(
+			styles,
+			s,atoms,eatoms,line_breaks,tail_style_id,
+			int(I),w_line,s.EndsWith("\n"),
+			function(int style_id, int ccnt0,int ccnt1){
+				//char range
+				assert(ccnt0>=0&&ccnt1>ccnt0)
+				ret.push((i64(ccnt1)<<32)+i64(ccnt0))
+				//atom_i=ret.back()
+				//value1=int(atom_i>>32)
+				//value0=int(atom_i)
+				//assert(value0>=0&&value1>value0)
+			},
+			function(i64 dw,int ccnt){
+				//space
+				assert(dw>=0LL&&dw==i64(int(dw)))
+				ret.push((i64(0x80000000|int(ccnt))<<32)+i64(dw))
+				//atom_i=ret.back()
+				//value1=int(atom_i>>32)
+				//value0=int(atom_i)
+				//if value1>=0:
+				//	if !(value0>=0&&value1>value0):
+				//		Writeln(ccnt,' ',dw)
+				//	assert(value0>=0&&value1>value0)
+			},
+			function(i64 h_up,i64 h_line,int aflag_ccnt){
+				//line
+				//there is only one style, we know the heights
+				assert(aflag_ccnt>=0)
+				ret.push((-1LL<<32)+i64(aflag_ccnt))
+				//atom_i=ret.back()
+				//value1=int(atom_i>>32)
+				//value0=int(atom_i)
+				//if value1>=0:assert(value0>=0&&value1>value0)
+			},
+			function(int oid, int ccnt){
+				//object
+				//do nothing
+			})
+		if n0<ret.n:
+			//shove back real newlines to \n
+			high_dword=int(ret[n0]>>32)
+			if high_dword==-1:
+				ccnt=(int(ret[n0])&ATOM_MASK_CCNT)
+				if ccnt>0&&sblock[ccnt-1]=='\n':
+					ret[n0]-=1LL
+	return ret
 
 /*
 or-ing tokens
@@ -90,19 +148,24 @@ class CLayouter_programmer
 	m_tab_width=4
 	m_wrap_width=0.f
 	m_font=TFont()
+	m_font_emboldened=TFont()
 	m_bgcolor_selection=0xff800000
 	m_color_overlay=0xff000000
+	//////////////
+	m_enable_advanced_wrapping=0
+	CHyphenator m_hyp
 	//////////////
 	JSObject m_style
 	CLanguageDescription m_lang
 	int[] m_cached_colors
 	int m_cached_colors_p_word_part
+	int m_cached_color_virtual_hyphen
 	//////////////
 	int[] m_char_width_cache_ascii
 	int[int] m_char_width_cache
-	//todo: easy color change...
 	/////////////////
-	charWidth=inline(ch){
+	//todo: compare speed with inline ver
+	charWidth=function(int ch){
 		if u32(ch)<u32(0x80):
 			ret=m_char_width_cache_ascii[ch]
 			if !ret:
@@ -123,37 +186,53 @@ class CLayouter_programmer
 	name=function(){return "renderer"}
 	stateSize=function(){return 4}
 	/////////////////
+	isLineOnly=function(){
+		return m_enable_advanced_wrapping
+	}
+	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
+		if m_enable_advanced_wrapping:
+			//-' '-1LL to avoid OOB values
+			return WrapTextSimple(m_hyp,s, m_font,m_wrap_width_in_fp-charWidth(int(' '))-1LL)
+		else
+			return i64[].NULL
+	}
+	/////////////////
 	//final format: pre-tab width, has-tabbed-ness, tab-enter width, has-enter-ness, post-enter width
 	//do not use a render-central design
-	AddString=function(i64[] a,i64[] unused,string s_context,string s,iptr ofs){
+	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
 		w_pre_tab=a[0]
 		w_tab_enter=a[1]
 		w_post_enter=a[2]
 		flags=int(a[3])
-		foreach ch,I in Utf8Chars(s)
-			if I>=ofs:break
-			if ch=='\t':
-				if !(flags&FLAG_HAS_ENTER):
-					if !(flags&FLAG_HAS_TAB):
-						flags|=FLAG_HAS_TAB
+		if m_enable_advanced_wrapping:
+			//the fancy mode only uses w_pre_tab
+			w_pre_tab=_RenderText(MODE_BB,0LL,a,pp,s,ofs, u8[].NULL, 0LL,0LL,0LL,0LL,0.f,0.f,0.f)
+			//flags|=FLAG_HAS_ENTER
+		else
+			foreach ch,I in Utf8Chars(s)
+				if I>=ofs:break
+				if ch=='\t':
+					if !(flags&FLAG_HAS_ENTER):
+						if !(flags&FLAG_HAS_TAB):
+							flags|=FLAG_HAS_TAB
+						else
+							w_tab_enter=(w_tab_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
 					else
-						w_tab_enter=(w_tab_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
-				else
-					w_post_enter=(w_post_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
-			else if ch=='\n':
-				if !(flags&FLAG_HAS_ENTER):
-					flags|=FLAG_HAS_ENTER
-				else
-					w_post_enter=(w_post_enter/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
-			else if ch!='\r':
-				dx=charWidth(ch)
-				if !(flags&FLAG_HAS_ENTER):
-					if !(flags&FLAG_HAS_TAB):
-						w_pre_tab+=dx
-					else 
-						w_tab_enter+=dx
-				else
-					w_post_enter+=dx
+						w_post_enter=(w_post_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+				else if ch=='\n':
+					if !(flags&FLAG_HAS_ENTER):
+						flags|=FLAG_HAS_ENTER
+					else
+						w_post_enter=(w_post_enter/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+				else if ch!='\r':
+					dx=charWidth(ch)
+					if !(flags&FLAG_HAS_ENTER):
+						if !(flags&FLAG_HAS_TAB):
+							w_pre_tab+=dx
+						else 
+							w_tab_enter+=dx
+					else
+						w_post_enter+=dx
 		a[0]=w_pre_tab
 		a[1]=w_tab_enter
 		a[2]=w_post_enter
@@ -218,7 +297,9 @@ class CLayouter_programmer
 	Compare=function(i64[] a,i64[] b){
 		return __C_compare(GetFlatX(a),XYToX(b[0],b[1]))
 	}
-	SeekInBlock=function(i64 ccnt_base,i64[] a,i64[] unused,string s,i64[] b){
+	SeekInBlock=function(i64 ccnt_base,i64[] a,i64[] pp,string s,i64[] b){
+		if m_enable_advanced_wrapping:
+			return iptr(_RenderText(MODE_SEEK,0LL,a,pp,s,s.n, u8[].NULL, b[0],b[1],0LL,0LL,0.f,0.f,0.f))
 		x_goal=XYToX(b[0],b[1])
 		x=GetFlatX(a)
 		if b.n>2:
@@ -256,6 +337,7 @@ class CLayouter_programmer
 	SetTextStyle=function(JSObject obj){
 		m_lang=obj["language"].as(CLanguageDescription)
 		m_font=obj["font"].as(TFont)
+		m_font_emboldened=obj["font_emboldened"].as(TFont)
 		m_char_width_cache_ascii=new int[128]
 		m_char_width_cache=new int[int]
 		m_tab_width=obj["tab_width"].or(8)
@@ -265,16 +347,12 @@ class CLayouter_programmer
 			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
 		else
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
+		obj["displayed_wrap_width"]=fixed2double(m_wrap_width_in_fp)
 		////////////
-		m_cached_colors_p_word_part=m_lang.m_coloring_rules.n+1
-		m_cached_colors=new int[m_cached_colors_p_word_part+m_lang.m_word_color_names.n]
-		m_cached_colors[0]=obj[m_lang.m_default_color_name].or(0xff000000)
-		foreach crule,I in m_lang.m_coloring_rules
-			m_cached_colors[I+1]=obj[crule.color_name].or(0xff000000)
-		foreach color_name,I in m_lang.m_word_color_names
-			m_cached_colors[m_cached_colors_p_word_part+I]=obj[color_name].or(0xff000000)
-		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
-		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
+		BeginRender(obj)
+		/////////
+		m_hyp=obj["hyphenator"].as(CHyphenator)
+		m_enable_advanced_wrapping=!!m_hyp
 	}
 	BeginRender=function(JSObject obj){
 		m_cached_colors_p_word_part=m_lang.m_coloring_rules.n+1
@@ -286,6 +364,7 @@ class CLayouter_programmer
 			m_cached_colors[m_cached_colors_p_word_part+I]=obj[color_name].or(0xff000000)
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
+		m_cached_color_virtual_hyphen=int(obj["color_hyphen"].or(u32(m_cached_color_virtual_hyphen)))
 	}
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
 		m_overlay_obj=obj
@@ -303,7 +382,54 @@ class CLayouter_programmer
 	GetCaretOffset=function(){
 		return m_caret_offset
 	}
-	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] unused,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
+	DrawOverlay=inline(fnt_scaled,scale,x,projectXY){
+		s_overlay=m_overlay_obj["text"].as(string)
+		auto prj_x=projectXY(x)
+		if s_overlay:
+			overlay_sel0=m_overlay_obj["start"].or(0L)
+			overlay_sel1=overlay_sel0+m_overlay_obj["length"].or(0L)
+			if m_overlay_obj["type"].as(string)=="IME":
+				cmap=new iptr[]
+				foreach chj,J in Utf8Chars(s_overlay)
+					cmap.push(J)
+				cmap.push(s_overlay.n)
+				overlay_sel0=min(overlay_sel0,cmap.n-1)
+				overlay_sel1=min(overlay_sel1,cmap.n-1)
+				if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
+					x_sel0=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel0]-1])
+					x_sel1=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel1]-1])
+					m_caret_offset=double2fixed(x_sel1)
+					if x_sel0>x_sel1:
+						(x_sel0,x_sel1)=(x_sel1,x_sel0)
+					//selection - pre-draw the highlight
+					if x_sel0<x_sel1:
+						g_renderer.DrawBitmap(0, prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
+				else
+					x_sel0=0.
+					x_sel1=0.
+			xo=x
+			foreach chj,J in Utf8Chars(s_overlay)
+				dx_j=charWidth(chj)
+				prj_xo=projectXY(xo)
+				g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+				xo+=dx_j
+		else if m_overlay_obj["type"].as(string)=="AC":
+			//auto-complete
+			xo=x
+			foreach chj,J in Utf8Chars(s_overlay)
+				dx_j=charWidth(chj)
+				prj_xo=projectXY(xo)
+				g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+				xo+=dx_j
+		else
+			assert(0)
+		if m_overlay_obj["type"].as(string)=="IME":
+			//draw the underline
+			y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
+			g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.z)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
+	
+	}
+	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		//word coloring - update color_ids
 		//get a GRACEFUL_WORD_SIZE context on each side - do it per-char
 		word_dfa=m_lang.m_word_dfa
@@ -387,54 +513,15 @@ class CLayouter_programmer
 			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 		auto testOverlay()
 			if m_overlay_obj&&x==m_caret_overlay.x:
-				s_overlay=m_overlay_obj["text"].as(string)
-				auto prj_x=projectXY(x)
-				if s_overlay:
-					overlay_sel0=m_overlay_obj["start"].or(0L)
-					overlay_sel1=overlay_sel0+m_overlay_obj["length"].or(0L)
-					if m_overlay_obj["type"].as(string)=="IME":
-						cmap=new iptr[]
-						foreach chj,J in Utf8Chars(s_overlay)
-							cmap.push(J)
-						cmap.push(s_overlay.n)
-						overlay_sel0=min(overlay_sel0,cmap.n-1)
-						overlay_sel1=min(overlay_sel1,cmap.n-1)
-						if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
-							x_sel0=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel0]-1])
-							x_sel1=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel1]-1])
-							m_caret_offset=double2fixed(x_sel1)
-							if x_sel0>x_sel1:
-								(x_sel0,x_sel1)=(x_sel1,x_sel0)
-							//selection - pre-draw the highlight
-							if x_sel0<x_sel1:
-								g_renderer.DrawBitmap(0, prj_x.x+float(x_sel0),prj_x.y,float((x_sel1-x_sel0)*scale),fixed2float(hc), m_bgcolor_selection)
-						else
-							x_sel0=0.
-							x_sel1=0.
-					xo=x
-					foreach chj,J in Utf8Chars(s_overlay)
-						dx_j=charWidth(chj)
-						prj_xo=projectXY(xo)
-						g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
-						xo+=dx_j
-				else if m_overlay_obj["type"].as(string)=="AC":
-					//auto-complete
-					xo=x
-					foreach chj,J in Utf8Chars(s_overlay)
-						dx_j=charWidth(chj)
-						prj_xo=projectXY(xo)
-						g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
-						xo+=dx_j
-				else
-					assert(0)
-				if m_overlay_obj["type"].as(string)=="IME":
-					//draw the underline
-					y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
-					g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.z)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
+				DrawOverlay(fnt_scaled,scale,x,projectXY)
 				x+=m_caret_overlay.z
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
 		x_right_clip=scroll_x+clip_w
+		if m_enable_advanced_wrapping:
+			//we won't need x_right_clip here anyway
+			_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n, color_ids, scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
+			return 
 		for ch,I in Utf8Chars(s)
 			testOverlay()
 			if ch=='\n':
@@ -471,7 +558,7 @@ class CLayouter_programmer
 	}
 	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		hid=ed.m_handler_registration["renderer"].as(int)
-		fnt_bold_scaled=obj["font_emboldened"].as(TFont)
+		fnt_bold_scaled=m_font_emboldened
 		fnt_bold_scaled.h*=scale
 		hc=charHeight()
 		////////
@@ -480,6 +567,7 @@ class CLayouter_programmer
 		mode=int(hl.display_mode)
 		if mode==HL_DISPLAY_MODE_EMBOLDEN:
 			//only embolden a single char
+			ch_prev=ed.GetUtf8CharNeighborhood(ccnt0)[0]
 			s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
 			wrap_width=m_wrap_width_in_fp
 			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
@@ -490,6 +578,9 @@ class CLayouter_programmer
 				g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,hl.color, ch)
 				dx_i=charWidth(ch)
 				x+=dx_i
+				if m_enable_advanced_wrapping:
+					x+=float2fixed(g_renderer.GetKerning(m_font,ch_prev,ch))
+					ch_prev=ch
 		else
 			//todo: tilde for spell checks
 			//if xy0.y==xy1.y:
@@ -516,9 +607,188 @@ class CLayouter_programmer
 		y*=charHeight()
 		return long2(x,y)
 	}
-	//todo: IsAtLineWrap
+	IsAtLineWrap=function(i64[] a,i64[] pp,string s,iptr ofs){
+		if m_enable_advanced_wrapping:
+			foreach atom_i,I in pp[1:]
+				high_dword=int(atom_i>>32)
+				if high_dword==-1:
+					ccnt=(int(atom_i)&ATOM_MASK_CCNT)
+					if ccnt==ofs&&(ofs>=s.n||s[ofs]!='\n'):
+						return 1
+					if ccnt>ofs:break
+		else
+			//not \n and divides m_wrap_width_in_fp
+			a2=new(a)
+			AddString(a2,pp,new string,s,ofs)
+			x0=GetFlatX(a2)
+			//todo: we could have \n in the block above...
+			if !(x0%m_wrap_width_in_fp):
+				if ofs&&s[ofs-1]!='\n':
+					return -1
+		return 0
+	}
 	//////////////////////////////
 	__JS_prototype=function(JSObject proto){}
+	//////////////////////////////
+	MODE_BB=0
+	MODE_SEEK=1
+	MODE_RENDER=2
+	_RenderText=function(int mode,i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
+		//use flat x
+		hc=charHeight()
+		wrap_width=m_wrap_width_in_fp
+		inline projectX(i64 x)
+			return fixed2float(x-scroll_x)*scale+screen_x
+		inline projectY(i64 y)
+			return fixed2float(y*hc-scroll_y)*scale+screen_y
+		inline projectXY(i64 x0)
+			auto y=x0/wrap_width
+			auto x=x0-y*wrap_width
+			y*=hc
+			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
+		//re-create the atoms, convert string, then render
+		flat_x=a[0]
+		y=flat_x/wrap_width
+		x=flat_x-y*wrap_width
+		if flat_x>m_caret_overlay.x&&flat_x<m_caret_overlay.y:
+			//it's an abuse of the separate x/y: we must avoid wrapping
+			x+=m_caret_overlay.z
+		y_overlay=m_caret_overlay.x/wrap_width
+		x_overlay=m_caret_overlay.x-y_overlay*wrap_width
+		//////////////////////////////////
+		newline_flags=0
+		y_baseline=float2fixed(g_renderer.GetFontBaseline(m_font))
+		h_line=hc
+		fnt_scaled=TFont()
+		dy_baseline=0LL
+		ch32_prev=int('\n')
+		color=m_cached_colors[0]
+		if mode==MODE_RENDER:
+			fnt_scaled=m_font
+			fnt_scaled.h*=scale
+			//smart emboldening for SRGB - it has to be done *after* the scale
+			if g_renderer.m_srgb_supported:
+				color_default=m_cached_colors[0]
+				fnt_scaled.SmartEmbolden(m_cached_colors[0])
+		OfsCheck=__inline_loop_body(ccnt){
+			if mode==MODE_BB&&h_line:
+				//never return before the first newline
+				if ccnt>=ofs:return y*wrap_width+x
+		}
+		SeekCheck=__inline_loop_body(ccnt){
+			if mode==MODE_SEEK:
+				y_real=y*hc
+				if y_real>scroll_y||scroll_y>=y_real&&scroll_y<y_real+h_line&&x>scroll_x:
+					return i64(ccnt)
+		}
+		myDrawChar=function(int ch32){
+			if m_overlay_obj&&x==x_overlay&&y==y_overlay:
+				flat_x=y*wrap_width+x
+				DrawOverlay(fnt_scaled,scale,flat_x,projectXY)
+				x+=m_caret_overlay.z
+			if ch32!=int(' '):
+				dy_flags=0LL
+				g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y+dy_baseline+dy_flags),color, ch32)
+		}
+		NewlineCheck=inline(){
+			if mode==MODE_RENDER:myDrawChar(int(' '))
+			if newline_flags:
+				if mode==MODE_RENDER&&(newline_flags&ATOM_FLAG_HYPHEN):
+					color=m_cached_color_virtual_hyphen
+					myDrawChar(int('-'))
+				x=0LL
+				y++
+		}
+		foreach atom_i in pp
+			value1=int(atom_i>>32)
+			value0=int(atom_i)
+			if value1==-1:
+				//line start
+				OfsCheck(value0&ATOM_MASK_CCNT)
+				SeekCheck(value0&ATOM_MASK_CCNT)
+				NewlineCheck()
+				if mode==MODE_RENDER:
+					if y*hc-scroll_y>=clip_h:break
+				newline_flags=(value0&(ATOM_FLAG_NEWLINE|ATOM_FLAG_HYPHEN))
+				ch32_prev=int('\n')
+				if !ofs:
+					//re-check for block-head case
+					if mode==MODE_SEEK:
+						return i64(value0)
+					else
+						//if mode==MODE_BB:
+						return y*wrap_width+x
+			else if value1&0x80000000:
+				//space
+				value1&=0x7fffffff
+				OfsCheck(value1)
+				x+=i64(value0)
+				SeekCheck(value1)
+				ch32_prev=int(' ')
+			else
+				//Writeln(value0,' ',value1)
+				assert(value0>=0&&value1>value0)
+				//ignore RTL reversal here - conceptually it goes LTR, and we just flip it "visually"
+				//and precompute the ranges
+				//arabic transformations - in the recursion
+				__inline_loop_body TranslateArabic(iptr ccnt0,string s_part)
+					auto su32=[int2(ch,int(ccnt0+I)) foreach ch,I in Utf8Chars(s_part)]
+					for J=0:su32.n-1
+						ch32=su32[J].x
+						if isArabic(ch32):
+							prev_arabic=(J>0&&isArabic(su32[J-1].x))
+							next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
+							ch32=g_arabic_table[(ch32-0x600)*4+next_arabic*2+prev_arabic]
+						//ch32
+						x+=float2fixed(g_renderer.GetKerning(m_font,ch32_prev,ch32))
+						OfsCheck(su32[J].y)
+						if mode==MODE_RENDER:
+							if ch32!=' '&&ch32!='\t'&&ch32!='\r'&&ch32!='\n':
+								color=m_cached_colors[int(color_ids[su32[J].y])]
+								myDrawChar(ch32)
+						x+=charWidth(ch32)
+						ch32_prev=ch32
+						SeekCheck(su32[J].y)
+				//__inline_loop_body AddLigature(iptr ccnt0,iptr nc,string s_ligature)
+				//	ch32=0
+				//	foreach ch in Utf8Chars(s_ligature)
+				//		ch32=ch
+				//		break
+				//	x0=x
+				//	x+=float2fixed(g_renderer.GetKerning(m_font,ch32_prev,ch32))
+				//	auto dx=charWidth(ch32)
+				//	if mode==MODE_RENDER:
+				//		myDrawChar(ch32)
+				//	else if mode==MODE_SEEK:
+				//		for j=0:nc-1
+				//			xj=x+dx*i64(j+1)/i64(nc)
+				//			if y>scroll_y||scroll_y>=y&&scroll_y<y+h_line&&xj>=scroll_x:
+				//				return i64(ccnt0+j)
+				//	else if mode==MODE_BB:
+				//		for j=0:nc-1
+				//			if ccnt0+j>=ofs:return x+dx*i64(j)/i64(nc)+y*wrap_width
+				//	x+=dx
+				//	ch32_prev=ch32
+				spart=s[value0:value1-1]
+				//ligatures=m_styles[current_style_id].ligatures
+				//ligature_poses=spart.FindAll(ligatures)
+				//p_last=0L
+				//for i=0:2:ligature_poses.n-2
+				//	p=ligature_poses[i]
+				//	id=ligature_poses[i+1]
+				//	if p_last<p:
+				//		TranslateArabic(value0+p_last,spart[p_last:p-1])
+				//	p_last=p+ligatures[id*2+0].n
+				//	AddLigature(value0+p,p_last-p,ligatures[id*2+1])
+				//if p_last<spart.n:
+				//	TranslateArabic(value0+p_last,spart[p_last:])
+				TranslateArabic(value0,spart)
+		NewlineCheck()
+		if mode==MODE_SEEK:
+			return i64(s.n)
+		else
+			return y*wrap_width+x
+	}
 
 class CColorer_programmer
 	CLanguageDescription m_lang
@@ -1051,7 +1321,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				stt=st
 			ret.m_word_dfa_initial_state[i]=st
 			ret.m_word_dfa_initial_state_triggered[i]=stt
-		Writeln('language created')//todo
 		return JS.Return(ret)
 	}
 })

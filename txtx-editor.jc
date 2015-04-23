@@ -24,364 +24,11 @@ COMMAND_RUBBER_SPACE=0x107fff
 COMMAND_SET_STYLE=0x108000
 COMMAND_END=0x110000
 
-///////////////////////////////
-class CHyphenator
-	int[][string] exceptions
-	u16[] dfa
-	u16[] ops
-	int n_char_types
-	int[int] char_map
-	left_min=3
-	right_min=3
-	auto HyphenateWord(string sword)
-		exception=exceptions[sword.ToLower()]
-		if exception:return exception
-		//if sword.n<min_hyphen:return new int[]
-		//returns int separation points
-		hyp_levels=new u8[]
-		hyp_points=new int[]
-		n=n_char_types
-		local_dfa=dfa
-		local_char_map=char_map
-		local_ops=ops
-		st=0
-		inline goDown(int ch)
-			st=int(local_dfa[st*n+ch])
-			if st>=32768:
-				st-=32768
-				for(;;)
-					op=int(local_ops[st])
-					if op>=32768:
-						st=op-32768
-						break
-					//4as. - it *could* try to place a value on pos 0
-					addr=int(hyp_levels.n)-(op&0xff)
-					if u32(addr)<u32(hyp_levels.n):
-						lv0=int(hyp_levels[addr])
-						lv1=(op>>8)
-						if lv0<lv1:
-							hyp_levels[addr]=lv1
-					//else
-					//	Writeln(int(hyp_levels.n),' ',(op&0xff))
-					assert(u32(addr+1)<=u32(hyp_levels.n))
-					st++
-		goDown(0)
-		foreach ch,I in Utf8Chars(sword)
-			hyp_points.push(int(I))
-			hyp_levels.push(u8(0))
-			goDown(local_char_map[ch])
-		hyp_points.push(int(sword.n))
-		hyp_levels.push(u8(0))
-		goDown(0)
-		//use -3 to make sure we ignore the word tail
-		//Writeln(hyp_levels)
-		//Writeln(hyp_points)
-		n2=0
-		for i=0:hyp_points.n-3
-			if (int(hyp_levels[i])&1)&&i>=left_min&&i<sword.n-right_min:
-				hyp_points[n2++]=hyp_points[i+1]
-		hyp_points.resize(n2)
-		return hyp_points
-	auto debugDumpHyphenation(string sword)
-		hyp_points=[0]
-		hyp_points.push(HyphenateWord(sword))
-		hyp_points.push(int(sword.n))
-		s=new string
-		for i=0:hyp_points.n-2
-			if i:SWrite(s,'-')
-			SWrite(s,sword[hyp_points[i]:hyp_points[i+1]-1])
-		return s
-	JS_toString=function(JSContext JS){
-		obj_big=JS.New()
-		obj_temp=JS.NewArray();p=0
-		foreach d,k in exceptions
-			obj_temp[p]=k;p++
-			obj_temp[p]=d;p++
-		obj_big["exceptions"]=obj_temp
-		obj_temp=JS.NewArray();p=0
-		foreach d,k in char_map
-			obj_temp[p]=k;p++
-			obj_temp[p]=d;p++
-		obj_big["char_map"]=obj_temp
-		obj_big["left_min"]=left_min
-		obj_big["right_min"]=right_min
-		obj_big["n_char_types"]=n_char_types
-		obj_big["size_dfa"]=dfa.n
-		obj_big["size_ops"]=ops.n
-		s0=new string
-		s0.push(JS.GetGlobal()["JSON"].CallMethod(string,"stringify",obj_big))
-		s0.push('\n')
-		if s0.n&1:
-			s0.push('\n')
-		s0.push(dfa[0:].ConvertToAsBinary(char))
-		s0.push(ops[0:].ConvertToAsBinary(char))
-		return JS.Return(s0)
-	}
-	__JS_prototype=function(JSObject proto){
-		proto.ExportMethod(this,"toString",JS_toString)
-	}
-
-auto createNullHyphenator()
-	ret=new CHyphenator
-	ret.exceptions=new int[][string]
-	ret.dfa=[u16(0)]
-	ret.ops=new u16[]
-	ret.n_char_types=1
-	ret.char_map=new int[int]
-	return ret
-
-g_null_hyphenator=createNullHyphenator()
-
-auto parseCachedHyphenator(JSContext JS,string sdata)
-	pline=sdata.IndexOf('\n')
-	if pline<0:return CHyphenator.NULL
-	obj_big=JS.GetGlobal()["JSON"].CallMethod(JSObject,"parse",sdata[:pline-1])
-	if (pline+1)&1:pline++
-	pu16=sdata[pline+1:].ConvertToAsBinary(u16)
-	ret=new CHyphenator
-	ret.left_min=obj_big["left_min"].as(int)
-	ret.right_min=obj_big["right_min"].as(int)
-	ret.n_char_types=obj_big["n_char_types"].as(int)
-	size_dfa=obj_big["size_dfa"].as(int)
-	size_ops=obj_big["size_ops"].as(int)
-	ret.dfa=pu16[:size_dfa-1]
-	ret.ops=pu16[size_dfa:]
-	///////////
-	obj_temp=obj_big["char_map"].as(JSObject)
-	n=obj_temp.length()
-	assert(!(n&1))
-	ret.char_map=new int[int]
-	for i=0:2:n-2
-		k=obj_temp[i+0].as(int)
-		d=obj_temp[i+1].as(int)
-		ret.char_map[k]=d
-	obj_temp=obj_big["exceptions"].as(JSObject)
-	n=obj_temp.length()
-	assert(!(n&1))
-	ret.exceptions=new int[][string]
-	for i=0:2:n-2
-		k=obj_temp[i+0].as(string)
-		obj_value=obj_temp[i+1].as(JSObject)
-		m_i=obj_value.length()
-		d=new int[m_i]
-		for j=0:m_i-1
-			d[j]=obj_value[j].as(int)
-		ret.exceptions[k]=d
-	return ret
-
-auto parseTexHyphenFile(JSContext JS,string sdata)
-	//pack ops at the tail as i8
-	ret=new CHyphenator
-	is_pattern=1
-	all_patterns=new string[]
-	all_exceptions=new int[][string]
-	foreach sline in sdata.Tokenize("\r\n")
-		if sline[0]=='%':continue
-		if sline[0]=='\\':
-			is_pattern=(sline.StartsWith("\\pattern"))
-			continue
-		if sline.n>=128:
-			if Platform.BUILD=="debug":
-				Writeln('pattern too long: ',sline)
-			return CHyphenator.NULL
-		if sline[0]=='{'||sline[0]=='}':continue
-		spattern=new string
-		if is_pattern:
-			//insert into 
-			ops=new string
-			foreach chc,I in sline
-				ch=int(u8(chc))
-				if u32(ch-int('0'))<10u:
-					ops.push(i8(spattern.n))
-					ops.push(i8(ch-int('0')))
-				else
-					spattern.push(chc)
-			spattern.push(i8(0))
-			all_patterns.push(spattern+ops)
-		else
-			opsi=new int[]
-			foreach chc,I in sline
-				if chc=='-':
-					opsi.push(int(spattern.n))
-				else
-					spattern.push(chc)
-			all_exceptions[spattern]=opsi
-			//Writeln(spattern,' ',opsi)
-	ret.exceptions=all_exceptions
-	///////////
-	//todo: make this a function
-	chappeared=new int[int]
-	foreach spattern in all_patterns
-		foreach ch,I in Utf8Chars(spattern)
-			if !ch:break
-			if ch!=char('.'):
-				chappeared[ch]=1
-	chlist=new int[]
-	foreach d,k,I in chappeared
-		chlist.push(k)
-		chappeared.D(I)=int(chlist.n)
-	//do the upper case
-	chlist_upper=Utf8ToUnicode32(JS["String"]["prototype"]["toUpperCase"].CallAsMethod(string,Unicode32ToUtf8(chlist)))
-	if chlist_upper.n!=chlist.n:
-		if Platform.BUILD=="debug":
-			Writeln('bad upper case conversion');
-			Writeln('  ',Unicode32ToUtf8(chlist))
-			Writeln('  ',Unicode32ToUtf8(chlist_upper))
-		return CHyphenator.NULL
-	for i=0:chlist.n-1
-		chappeared[chlist_upper[i]]=chappeared[chlist[i]]
-	ret.char_map=chappeared
-	n_char_types=int(chlist.n+1)
-	ret.n_char_types=n_char_types
-	//first-char lists
-	//all_patterns.Sort()
-	fc_lists=new int[][n_char_types]
-	for i=0:fc_lists.n-1
-		fc_lists[i]=new int[]
-	foreach spattern,I in all_patterns
-		ch0=Utf8CodeAt(spattern,0L)
-		fc_lists[chappeared[ch0]].push(int(I)|(1<<16))
-	//multi-state DFA -> single-state DFA
-	if all_patterns.n>=32768:
-		if Platform.BUILD=="debug":
-			Writeln('too many patterns: ',all_patterns.n)
-		return CHyphenator.NULL
-	state_map=new int[int[]]
-	ops_map=new int[u16[]]
-	state_addrs=[0]
-	Q=[new int[]]
-	dfa=new u16[n_char_types]
-	dfa_ops=new u16[]
-	for(i=0L;i<Q.n;i++)
-		cur_states=Q[i]
-		my_addr=i*n_char_types
-		tran=new int[][n_char_types]
-		for j=0:tran.n-1
-			tran[j]=new(fc_lists[j])
-		//fc_lists
-		foreach stpacked in cur_states
-			pid=(stpacked&0xffff)
-			pos=(stpacked>>16)
-			s_pid=all_patterns[pid]
-			ch_utf8=Utf8CodeAt(s_pid,pos)
-			ch_std=chappeared[ch_utf8]
-			pos+=Utf8Length(ch_utf8)
-			if !s_pid[pos]:
-				//add action
-				tran[ch_std].push(~pid)
-			else
-				tran[ch_std].push(pid+(pos<<16))
-		//Write(cur_states,' ')
-		for j=0:tran.n-1
-			new_states=tran[j]
-			new_states.Sort()
-			new_states.Unique()
-			actions=u16[].NULL
-			if new_states.n&&new_states[0]<0:
-				//actions
-				actions=new u16[]
-				p_states=new_states.n
-				for k=0:new_states.n-1
-					if new_states[k]>=0:
-						p_states=k
-						break
-					else
-						pid=~new_states[k]
-						s_pid=all_patterns[pid]
-						pzero=s_pid.IndexOf(char(0))
-						for paction=pzero+1:2:s_pid.n-2
-							action_pos=pzero-int(u8(s_pid[paction]))
-							action_value=int(u8(s_pid[paction+1]))
-							actions.push(u16(action_value*256+action_pos+1))
-				actions.Sort()
-				actions.Unique()
-				new_states=new_states[p_states:]
-			new_stid=state_map[new_states]
-			if !new_stid:
-				if new_states.n:
-					new_stid=int(Q.n)
-					Q.push(new_states)
-					dfa.resize(dfa.n+n_char_types)
-					assert(dfa.n==n_char_types*Q.n)
-					state_map[new_states]=new_stid
-			if actions:
-				//fill dfa
-				actions.push(u16(32768+new_stid))
-				opid=ops_map[actions]
-				if !opid:
-					opid=32768+int(dfa_ops.n)
-					dfa_ops.push(actions)
-					ops_map[actions]=opid
-				addr_j=opid
-			else
-				addr_j=new_stid
-			dfa[my_addr+j]=u16(addr_j)
-			//Write(' ',new_stid)
-		//Writeln()
-	ret.dfa=dfa
-	if Q.n>=32768:
-		if Platform.BUILD=="debug":
-			Writeln('dfa too complicated: ',Q.n)
-		return CHyphenator.NULL
-	if dfa_ops.n>=32767:
-		if Platform.BUILD=="debug":
-			Writeln('ops too complicated: ',dfa_ops.n)
-		return CHyphenator.NULL
-	//Writeln('patterns = ',all_patterns.n)
-	//Writeln('dfa size = ',dfa.n)
-	//Writeln('ops size = ',dfa_ops.n)
-	//Writeln('states = ',Q.n)
-	//Writeln(dfa)
-	//Writeln(dfa_ops)
-	ret.ops=dfa_ops
-	return ret
-
-FLAG_IS_SPACE=0x80000000
-FLAG_HYPHENATE_AFTER=0x40000000//can also appear in the intermediate "words"
-FLAG_BAD_BOL=0x20000000
-FLAG_BAD_EOL=0x02000000
-FLAG_CAN_PAD_AFTER=0x10000000
-FLAG_CAN_PAD_AFTER_WEAK=0x08000000
-FLAG_RUBBER=0x04000000
-ATOM_FLAG_LINE_BREAK=(1<<21)
-ATOM_FLAG_NEWLINE=(1<<20)
-ATOM_FLAG_HYPHEN=(1<<19)
-ATOM_MASK_CCNT=((1<<19)-1)
-MAX_HYPHENATABLE_WORD=256
-struct TLayoutAtom
-	int flags
-	int style_id
-	int pword0,pword1
-	/////////////
-	i64 w,h
-	i64 tail_kerning
-	i64 y_baseline
-g_char_to_flags=(function(){
-	ret=new int[int]
-	//opening parenthesis / quotation
-	foreach ch in [40,91,123,171,3898,3900,5787,8216,8218,8219,8220,8222,8223,8249,8261,8317,8333,8968,8970,9001,10088,10090,10092,10094,10096,10098,10100,10181,10214,10216,10218,10220,10222,10627,10629,10631,10633,10635,10637,10639,10641,10643,10645,10647,10712,10714,10748,11778,11780,11785,11788,11804,11808,11810,11812,11814,11816,11842,12296,12298,12300,12302,12304,12308,12310,12312,12314,12317,64831,65047,65077,65079,65081,65083,65085,65087,65089,65091,65095,65113,65115,65117,65288,65339,65371,65375,65378]
-		ret[ch]=FLAG_BAD_EOL
-	//closing parenthesis / quotation
-	foreach ch in [41,93,125,187,3899,3901,5788,8217,8221,8250,8262,8318,8334,8969,8971,9002,10089,10091,10093,10095,10097,10099,10101,10182,10215,10217,10219,10221,10223,10628,10630,10632,10634,10636,10638,10640,10642,10644,10646,10648,10713,10715,10749,11779,11781,11786,11789,11805,11809,11811,11813,11815,11817,12297,12299,12301,12303,12305,12309,12311,12313,12315,12318,12319,64830,65048,65078,65080,65082,65084,65086,65088,65090,65092,65096,65114,65116,65118,65289,65341,65373,65376,65379]
-		ret[ch]=FLAG_BAD_BOL
-	//non-breaking stuff and non-paired quotation masks
-	foreach ch in [34,39,160,3852,8199,8209,8239]
-		//just bad as both BOL and EOL
-		ret[ch]=(FLAG_BAD_BOL|FLAG_BAD_EOL)
-	//spaces
-	foreach ch in [9,10,13,32,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8239,8287,12288]
-		ret[ch]=FLAG_IS_SPACE|FLAG_CAN_PAD_AFTER
-	return ret
-})()
-g_utf8_ligatures=[
-	"IJ","Ĳ", "ij","ĳ", "եւ","և", "ff","ﬀ", "fi","ﬁ", "fl","ﬂ", "ffi","ﬃ", "ffl","ﬄ", "ſt","ﬅ", "st","ﬆ", "մն","ﬓ", "մե","ﬔ", "մի","ﬕ", "վն","ﬖ", "մխ","ﬗ", "אל","ﭏ",
-	//"``","“", "''","”"
-	]
-g_arabic_table=[1536,1536,1536,1536,1537,1537,1537,1537,1538,1538,1538,1538,1539,1539,1539,1539,1540,1540,1540,1540,1541,1541,1541,1541,1542,1542,1542,1542,1543,1543,1543,1543,1544,1544,1544,1544,1545,1545,1545,1545,1546,1546,1546,1546,1547,1547,1547,1547,1548,1548,1548,1548,1549,1549,1549,1549,1550,1550,1550,1550,1551,1551,1551,1551,1552,1552,1552,1552,1553,1553,1553,1553,1554,1554,1554,1554,1555,1555,1555,1555,1556,1556,1556,1556,1557,1557,1557,1557,1558,1558,1558,1558,1559,1559,1559,1559,1560,1560,1560,1560,1561,1561,1561,1561,1562,1562,1562,1562,1563,1563,1563,1563,1564,1564,1564,1564,1565,1565,1565,1565,1566,1566,1566,1566,1567,1567,1567,1567,1568,1568,1568,1568,65152,1569,1569,1569,65153,1570,65154,1570,65155,1571,65156,1571,65157,1572,65158,1572,65159,1573,65160,1573,65161,65163,65162,65164,65165,1575,65166,1575,65167,65169,65168,65170,65171,1577,65172,1577,65173,65175,65174,65176,65177,65179,65178,65180,65181,65183,65182,65184,65185,65187,65186,65188,65189,65191,65190,65192,65193,1583,65194,1583,65195,1584,65196,1584,65197,1585,65198,1585,65199,1586,65200,1586,65201,65203,65202,65204,65205,65207,65206,65208,65209,65211,65210,65212,65213,65215,65214,65216,65217,65219,65218,65220,65221,65223,65222,65224,65225,65227,65226,65228,65229,65231,65230,65232,1595,1595,1595,1595,1596,1596,1596,1596,1597,1597,1597,1597,1598,1598,1598,1598,1599,1599,1599,1599,1600,1600,1600,1600,65233,65235,65234,65236,65237,65239,65238,65240,65241,65243,65242,65244,65245,65247,65246,65248,65249,65251,65250,65252,65253,65255,65254,65256,65257,65259,65258,65260,65261,1608,65262,1608,65263,64488,65264,64489,65265,65267,65266,65268,1611,1611,1611,1611,1612,1612,1612,1612,1613,1613,1613,1613,1614,1614,1614,1614,1615,1615,1615,1615,1616,1616,1616,1616,1617,1617,1617,1617,1618,1618,1618,1618,1619,1619,1619,1619,1620,1620,1620,1620,1621,1621,1621,1621,1622,1622,1622,1622,1623,1623,1623,1623,1624,1624,1624,1624,1625,1625,1625,1625,1626,1626,1626,1626,1627,1627,1627,1627,1628,1628,1628,1628,1629,1629,1629,1629,1630,1630,1630,1630,1631,1631,1631,1631,1632,1632,1632,1632,1633,1633,1633,1633,1634,1634,1634,1634,1635,1635,1635,1635,1636,1636,1636,1636,1637,1637,1637,1637,1638,1638,1638,1638,1639,1639,1639,1639,1640,1640,1640,1640,1641,1641,1641,1641,1642,1642,1642,1642,1643,1643,1643,1643,1644,1644,1644,1644,1645,1645,1645,1645,1646,1646,1646,1646,1647,1647,1647,1647,1648,1648,1648,1648,64336,1649,64337,1649,1650,1650,1650,1650,1651,1651,1651,1651,1652,1652,1652,1652,1653,1653,1653,1653,1654,1654,1654,1654,64477,1655,1655,1655,1656,1656,1656,1656,64358,64360,64359,64361,64350,64352,64351,64353,64338,64340,64339,64341,1660,1660,1660,1660,1661,1661,1661,1661,64342,64344,64343,64345,64354,64356,64355,64357,64346,64348,64347,64349,1665,1665,1665,1665,1666,1666,1666,1666,64374,64376,64375,64377,64370,64372,64371,64373,1669,1669,1669,1669,64378,64380,64379,64381,64382,64384,64383,64385,64392,1672,64393,1672,1673,1673,1673,1673,1674,1674,1674,1674,1675,1675,1675,1675,64388,1676,64389,1676,64386,1677,64387,1677,64390,1678,64391,1678,1679,1679,1679,1679,1680,1680,1680,1680,64396,1681,64397,1681,1682,1682,1682,1682,1683,1683,1683,1683,1684,1684,1684,1684,1685,1685,1685,1685,1686,1686,1686,1686,1687,1687,1687,1687,64394,1688,64395,1688,1689,1689,1689,1689,1690,1690,1690,1690,1691,1691,1691,1691,1692,1692,1692,1692,1693,1693,1693,1693,1694,1694,1694,1694,1695,1695,1695,1695,1696,1696,1696,1696,1697,1697,1697,1697,1698,1698,1698,1698,1699,1699,1699,1699,64362,64364,64363,64365,1701,1701,1701,1701,64366,64368,64367,64369,1703,1703,1703,1703,1704,1704,1704,1704,64398,64400,64399,64401,1706,1706,1706,1706,1707,1707,1707,1707,1708,1708,1708,1708,64467,64469,64468,64470,1710,1710,1710,1710,64402,64404,64403,64405,1712,1712,1712,1712,64410,64412,64411,64413,1714,1714,1714,1714,64406,64408,64407,64409,1716,1716,1716,1716,1717,1717,1717,1717,1718,1718,1718,1718,1719,1719,1719,1719,1720,1720,1720,1720,1721,1721,1721,1721,64414,1722,64415,1722,64416,64418,64417,64419,1724,1724,1724,1724,1725,1725,1725,1725,64426,64428,64427,64429,1727,1727,1727,1727,64420,1728,64421,1728,64422,64424,64423,64425,1730,1730,1730,1730,1731,1731,1731,1731,1732,1732,1732,1732,64480,1733,64481,1733,64473,1734,64474,1734,64471,1735,64472,1735,64475,1736,64476,1736,64482,1737,64483,1737,1738,1738,1738,1738,64478,1739,64479,1739,64508,64510,64509,64511,1741,1741,1741,1741,1742,1742,1742,1742,1743,1743,1743,1743,64484,64486,64485,64487,1745,1745,1745,1745,64430,1746,64431,1746,64432,1747,64433,1747,1748,1748,1748,1748,1749,1749,1749,1749,1750,1750,1750,1750,1751,1751,1751,1751,1752,1752,1752,1752,1753,1753,1753,1753,1754,1754,1754,1754,1755,1755,1755,1755,1756,1756,1756,1756,1757,1757,1757,1757,1758,1758,1758,1758,1759,1759,1759,1759,1760,1760,1760,1760,1761,1761,1761,1761,1762,1762,1762,1762,1763,1763,1763,1763,1764,1764,1764,1764,1765,1765,1765,1765,1766,1766,1766,1766,1767,1767,1767,1767,1768,1768,1768,1768,1769,1769,1769,1769,1770,1770,1770,1770,1771,1771,1771,1771,1772,1772,1772,1772,1773,1773,1773,1773,1774,1774,1774,1774,1775,1775,1775,1775,1776,1776,1776,1776,1777,1777,1777,1777,1778,1778,1778,1778,1779,1779,1779,1779,1780,1780,1780,1780,1781,1781,1781,1781,1782,1782,1782,1782,1783,1783,1783,1783,1784,1784,1784,1784,1785,1785,1785,1785,1786,1786,1786,1786,1787,1787,1787,1787,1788,1788,1788,1788,1789,1789,1789,1789,1790,1790,1790,1790,1791,1791,1791,1791]
-inline isArabic(ch){return u32(ch-0x600)<0x100u}
 //they're relative to font height
 SUPERSCRIPT_BASELINE=-32//.0/64.0
 SUBSCRIPT_BASELINE=12//.0/64.0
+
+///////////////////////////////
 class CStyle
 	UNDERLINED=1
 	STRIKED_OUT=2
@@ -432,6 +79,7 @@ class CLayouter_fancy
 	MODE_RENDER=2
 	/////////
 	m_wrap_width_in_fp=800LL*64LL
+	m_enable_meta_chars=1
 	//m_h_blank_line_in_fp=0LL
 	m_bgcolor=0xffffffff
 	m_bgcolor_selection=0xff800000
@@ -451,7 +99,7 @@ class CLayouter_fancy
 				next_arabic=(J<su32.n-1&&isArabic(su32[J+1]))
 				su32[J]=g_arabic_table[(su32[J]-0x600)*4+next_arabic*2+prev_arabic]
 		return Unicode32ToUtf8(su32).Replace(m_styles[style_id].ligatures)
-	auto PreprocessParagraph(i64[] result,int offset_base,string s,int has_tail_newline)
+	auto PreprocessParagraph(i64[] result,int offset_base,string s,int has_tail_newline,int enable_meta_chars)
 		//create the "words"
 		style_id=0
 		p_last_word=0L
@@ -473,7 +121,7 @@ class CLayouter_fancy
 						p_last_hyphen=p
 					if p_last_hyphen<I-p_last_word:
 						words.push(int3(style_id,int(p_last_word+p_last_hyphen),int(I)))
-				if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_END:
+				if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_END&&enable_meta_chars:
 					if ch==COMMAND_RUBBER_SPACE:
 						words.push(int3(-2,0,int(I)))
 					else if ch<COMMAND_SET_STYLE:
@@ -753,6 +401,7 @@ class CLayouter_fancy
 			FlushWord()
 	/////////////////
 	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
+		enable_meta_chars=m_enable_meta_chars
 		result=new i64[]
 		foreach sline,I in s.TokenizeEx("\n",s.TOKENIZE_ALLOW_EMPTY|s.TOKENIZE_INCLUDE_SEPARATOR)
 			n0=result.n
@@ -762,7 +411,7 @@ class CLayouter_fancy
 			//	result.push(i64(I)|(i64(I+1)<<21)|(0LL<<42))
 			//	assert((result.back()>>42)!=-1LL)
 			//else
-			PreprocessParagraph(result,int(I),sline,sline.EndsWith("\n"))
+			PreprocessParagraph(result,int(I),sline,sline.EndsWith("\n"),enable_meta_chars)
 			if n0<result.n:
 				//shove back real newlines to \n
 				aflag=(result[n0]>>42)
@@ -773,6 +422,7 @@ class CLayouter_fancy
 		return result
 	}
 	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
+		//todo: ofs_base
 		bb=_RenderText(MODE_BB,0LL,a,pp,s,ofs, 0LL,0LL,0.f,0.f,0.f)
 		a[0]=bb.x
 		a[1]=bb.y
@@ -848,6 +498,7 @@ class CLayouter_fancy
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		//m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width_in_fp=float2fixed(obj["wrap_width"].or(800.f))
+		m_enable_meta_chars=float2fixed(obj["enable_meta_chars"].or(1))
 		//m_h_blank_line_in_fp=float2fixed(obj["h_blank_line"].or(0.f))
 		m_hyphenator=obj["hyphenator"].or(g_null_hyphenator)
 		/////////////////

@@ -513,6 +513,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks['save']=[]
 		this.m_event_hooks['parse']=[]
 		this.m_event_hooks['menu']=[]
+		//before creating the editor, try to call a language callback
+		var loaded_metadata=(this.file_name&&UI.m_ui_metadata[this.file_name]||{})
+		var hyp_name=(loaded_metadata.m_hyphenator_name||this.plugin_language_desc&&this.plugin_language_desc.default_hyphenator_name)
+		if(hyp_name){
+			this.hyphenator=Language.GetHyphenator(hyp_name)
+			this.m_hyphenator_name=hyp_name
+			this.font=this.tex_font
+			this.font_emboldened=this.tex_font_emboldened
+		}
 		W.Edit_prototype.Init.call(this);
 		//these are locators when set
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
@@ -854,6 +863,7 @@ W.CodeEditorWidget_prototype={
 			m_current_needle:this.m_current_needle,
 			m_find_flags:this.m_find_flags,
 			m_wrap_width:this.m_wrap_width,
+			m_hyphenator_name:this.m_hyphenator_name,
 			sel0:doc.sel0.ccnt,
 			sel1:doc.sel1.ccnt,
 		}

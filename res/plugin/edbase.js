@@ -345,6 +345,7 @@ var f_tex_like=function(lang){
 Language.Register({
 	name:'TeX/LaTeX',extensions:['tex','cls'],
 	curly_bracket_is_not_special:1,is_tex_like:1,
+	default_hyphenator_name:"en_us",
 	rules:f_tex_like
 });
 
@@ -1200,7 +1201,7 @@ UI.RegisterEditorPlugin(function(){
 						is_fcall_like=0
 					}
 				}
-				if(is_lineend&&!is_manual_match||ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1==ctx.current_bracket_ac_ccnt_range[1].ccnt||is_fcall_like){
+				if((is_lineend||chbraac==C&&!UI.IsWordChar(chnext)&&!UI.IsWordChar(chprev))&&!is_manual_match||ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1==ctx.current_bracket_ac_ccnt_range[1].ccnt||is_fcall_like){
 					if(ctx.current_bracket_ac){
 						ctx.bac_stack.push(ctx.current_bracket_ac_ccnt_range)
 						ctx.bac_stack.push(ctx.current_bracket_ac_bralevel)

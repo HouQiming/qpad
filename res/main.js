@@ -240,25 +240,12 @@ UI.Theme_CustomWidget=function(C){
 		code_editor:{
 			editor_style:{
 				//todo
-				"styles":[{
-					"name":"normaltext",
-					font:UI.Font("res/fonts/cmunrm.ttf",24),
-					"flags":0,
-					"color":4278190080,
-					"relative_line_space":0,
-					"relative_paragraph_space":0.8
-				},{
-					"name":"chapter",
-					font:UI.Font("res/fonts/cmunrm.ttf",24),
-					"flags":0,
-					"color":4278190080,
-					"relative_line_space":0,
-					"relative_paragraph_space":0.8
-				}],
 				wrap_width:1024,
 				//todo
 				font:UI.Font("res/fonts/inconsolata.ttf",24),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
+				tex_font:UI.Font("res/fonts/cmunss.ttf",24),
+				tex_font_emboldened:UI.Font("res/fonts/cmunss.ttf",24,200),
 				color:0xff000000,
 				color_normal:0xff000000,
 				color_overlay:0xff7f7f7f,
@@ -270,6 +257,8 @@ UI.Theme_CustomWidget=function(C){
 				color_symbol:0xff7f7f7f,
 				color_symbol2:0xff7f7f7f,
 				color_meta:0xff9a3d6a,
+				//virtual hyphen for tex-like files, should be even less obvious than normal symbols
+				color_hyphen:0xffaaaaaa,
 				/////////////
 				color_completing_bracket:0x80999999,
 				bgcolor_selection:C[0]&0x3fffffff,
