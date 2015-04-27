@@ -52,7 +52,7 @@ Language.Register({
 	extensions:["c","cxx","cpp","cc","h","hpp"],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -68,7 +68,7 @@ Language.Register({
 	has_dlist_type:1,
 	has_pointer_ops:1,
 	indent_as_parenthesis:1,
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -83,7 +83,7 @@ Language.Register({
 	name:'Jacy',parser:"C",
 	extensions:['jc'],
 	indent_as_parenthesis:1,
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -97,7 +97,7 @@ Language.Register({
 	name:'Microsoft IDL',parser:"C",
 	extensions:['idl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -110,7 +110,7 @@ Language.Register({
 	name:'HLSL shader',parser:"C",
 	extensions:['hlsl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -124,7 +124,7 @@ Language.Register({
 	name:'GLSL shader',parser:"C",
 	extensions:['glsl','essl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -137,7 +137,7 @@ Language.Register({
 Language.Register({
 	name:'Java',parser:"C",
 	extensions:['java'],
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -153,7 +153,7 @@ Language.Register({
 	has_dlist_type:1,
 	has_pointer_ops:1,
 	indent_as_parenthesis:1,
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -169,7 +169,7 @@ Language.Register({
 	extensions:['cu','cuh'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2,'__global__':1,'__device__':1,'__host__':1},
 	has_pointer_ops:1,
-	file_icon_color:0xffb4771f,
+	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -183,7 +183,7 @@ Language.Register({
 	name:'Javascript',parser:"C",
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1},
 	extensions:['js'],
-	file_icon_color:0xff1c1ae3,
+	file_icon_color:0xffb4771f,
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
@@ -196,7 +196,7 @@ Language.Register({
 Language.Register({
 	name:'HTML',parser:"text",
 	extensions:['htm','html'],
-	file_icon_color:0xff9a3d6a,
+	file_icon_color:0xff444444,
 	file_icon:'マ',
 	rules:function(lang,keywords,has_preprocessor){
 		lang.DefineDefaultColor("color_symbol")
@@ -254,7 +254,7 @@ Language.Register({
 Language.Register({
 	name:'XML',parser:"text",
 	extensions:['xml','vcproj','vcxproj','sproj','sln'],
-	file_icon_color:0xff9a3d6a,
+	file_icon_color:0xff444444,
 	file_icon:'マ',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
@@ -308,7 +308,7 @@ var f_shell_like=function(lang,keywords){
 Language.Register({
 	name:'RenderMan RIB',parser:"none",
 	extensions:['rib'],
-	file_icon_color:0xff9a3d6a,
+	file_icon_color:0xff444444,
 	file_icon:'も',
 	rules:function(lang){
 		return f_shell_like(lang,{
@@ -319,7 +319,7 @@ Language.Register({
 Language.Register({
 	name:'WaveFront OBJ',parser:"none",
 	extensions:['obj'],
-	file_icon_color:0xff9a3d6a,
+	file_icon_color:0xff444444,
 	file_icon:'も',
 	rules:function(lang){
 		return f_shell_like(lang,{
@@ -331,7 +331,7 @@ Language.Register({
 Language.Register({
 	name:'WaveFront MTL',parser:"none",
 	extensions:['mtl'],
-	file_icon_color:0xff9a3d6a,
+	file_icon_color:0xff444444,
 	file_icon:'も',
 	rules:function(lang){
 		return f_shell_like(lang,{
@@ -377,7 +377,7 @@ Language.Register({
 	name:'TeX/LaTeX',extensions:['tex','cls'],
 	curly_bracket_is_not_special:1,is_tex_like:1,
 	default_hyphenator_name:"en_us",
-	file_icon_color:0xff2ca033,
+	file_icon_color:0xffb4771f,
 	file_icon:'テ',
 	rules:f_tex_like
 });
@@ -395,7 +395,7 @@ Language.Register({
 	name:'Markdown',extensions:['md','markdown'],
 	curly_bracket_is_not_special:1,
 	default_hyphenator_name:"en_us",
-	file_icon_color:0xff2ca033,
+	file_icon_color:0xff444444,
 	file_icon:'文',
 	rules:function(lang){
 		lang.DefineDefaultColor("color")
@@ -410,7 +410,7 @@ Language.Register({
 Language.Register({
 	name:'Matlab',parser:"none",
 	extensions:['m'],
-	file_icon_color:0xff1c1ae3,
+	file_icon_color:0xffb4771f,
 	file_icon:'プ',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
@@ -441,7 +441,7 @@ Language.Register({
 	extensions:['py'],
 	indent_as_parenthesis:1,
 	curly_bracket_is_not_special:1,
-	file_icon_color:0xff1c1ae3,
+	file_icon_color:0xffb4771f,
 	file_icon:'プ',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
