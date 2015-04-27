@@ -8,6 +8,8 @@ require("res/lib/demo_doc");
 
 UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.SetFontSharpening(1)
+//UI.SetFontSharpening(0)
+UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
 UI.Theme_CustomWidget=function(C){
 	var C_dark=UI.lerp_rgba(C[0],0xff000000,0.15)
 	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.75)
@@ -241,11 +243,15 @@ UI.Theme_CustomWidget=function(C){
 			editor_style:{
 				//todo
 				wrap_width:1024,
+				font:UI.Font("res/fonts/inconsolata.ttf",28),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
+				tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
+				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
 				//todo
-				font:UI.Font("res/fonts/inconsolata.ttf",24),
-				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
-				tex_font:UI.Font("res/fonts/cmunss.ttf",24),
-				tex_font_emboldened:UI.Font("res/fonts/cmunss.ttf",24,200),
+				//font:UI.Font("res/fonts/inconsolata.ttf",24),
+				//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
+				//tex_font:UI.Font("res/fonts/cmunss.ttf",24),
+				//tex_font_emboldened:UI.Font("res/fonts/cmunss.ttf",24,200),
 				color:0xff000000,
 				color_normal:0xff000000,
 				color_overlay:0xff7f7f7f,
@@ -312,6 +318,9 @@ UI.Theme_CustomWidget=function(C){
 			find_bar_button_size:28,
 			find_bar_editor_style:{
 				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				tex_font:UI.Font("res/fonts/cmunrm.ttf",20),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
+				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
 				color:0xff000000,
 				color_overlay:0xff000000,
 				color_string:0xff1c1aa3,
@@ -375,6 +384,9 @@ UI.Theme_CustomWidget=function(C){
 			///////
 			w_notification:240,
 			dx_shake_notification:-300,
+			///////
+			sxs_shadow_size:6,
+			sxs_shadow_color:0xaa000000,
 		},
 		code_editor_notification:{
 			transition_dt:0.1,
@@ -398,6 +410,25 @@ UI.Theme_CustomWidget=function(C){
 			damping_shake:8,
 			x_min_shake:0.5,
 			dx_min_shake:0.5,
+		},
+		sxs_new_page:{
+			color:0xffffffff,
+			border_color:0xff000000,
+			border_width:0,
+			round:0,
+			//todo
+		},
+		file_item:{
+			h:56,h_icon:48,
+			file_icon_color:0xff444444,
+			name_font:UI.Font("res/fonts/opensans.ttf",24,-50),
+			misc_font:UI.Font("res/fonts/opensans.ttf",18,-50),
+			name_color:0xff000000,
+			misc_color:0xff7f7f7f,
+			sel_bgcolor:C[0],
+			sel_file_icon_color:0xffffffff,
+			sel_name_color:0xffffffff,
+			sel_misc_color:0xffcccccc,
 		},
 		top_menu:{
 			//nothing
@@ -484,8 +515,10 @@ UI.Theme_CustomWidget=function(C){
 	for(var key in custom_styles){
 		s0[key]=custom_styles[key]
 	}
+	s0.scroll_bar.middle_bar.color=0xff444444
 }
 UI.Theme_Minimalistic([0xffcc7733])
+UI.icon_font_name='res/fonts/iconfnt.ttf,!'
 UI.icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
 UI.icon_font_20=UI.Font('res/fonts/iconfnt.ttf,!',20);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
@@ -520,13 +553,13 @@ UI.Application=function(id,attrs){
 			}
 			var w_property_bar=320;
 			//UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):
-			var obj_panel=W.AutoHidePanel("property_panel",{
-				x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:0,
-				max_velocity:16000,acceleration:10000,velocity_to_target_threshold:0.005,
-				anchor_placement:'right',//(app.w<app.h?'down':'right'),
-				knob_size:UI.IS_MOBILE?40:4,
-			});
-			var reg_panel=UI.context_regions.pop()
+			//var obj_panel=W.AutoHidePanel("property_panel",{
+			//	x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:0,
+			//	max_velocity:16000,acceleration:10000,velocity_to_target_threshold:0.005,
+			//	anchor_placement:'right',//(app.w<app.h?'down':'right'),
+			//	knob_size:UI.IS_MOBILE?40:4,
+			//});
+			//var reg_panel=UI.context_regions.pop()
 			//var panel_placement=obj_panel.anchor_placement
 			UI.document_property_sheet={};
 			//if(panel_placement=='down'){
@@ -539,7 +572,7 @@ UI.Application=function(id,attrs){
 			//}else{
 			W.TabbedDocument("document_area",{
 				'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
-				'x':0,'y':0,'w':obj_panel.x,
+				'x':0,'y':0,'w':app.w,//obj_panel.x,
 				items:g_all_document_windows,
 				Close:function(){UI.DestroyWindow(app)},
 			})
@@ -548,11 +581,11 @@ UI.Application=function(id,attrs){
 			if(app.document_area.active_tab){
 				property_windows=(app.document_area.active_tab.property_windows||property_windows);
 			}
-			UI.context_regions.push(reg_panel)
+			//UI.context_regions.push(reg_panel)
 			//////////////////////////
-			var w_shadow=6
-			var w_bar=4;
-			var shadow_color=0xaa000000
+			//var w_shadow=6
+			//var w_bar=4;
+			//var shadow_color=0xaa000000
 			//if(panel_placement=='down'){
 			//	UI.RoundRect({
 			//		x:-w_shadow,y:obj_panel.y-w_bar-w_shadow,w:app.w+w_shadow*2,h:w_shadow*2,
@@ -576,38 +609,37 @@ UI.Application=function(id,attrs){
 			//		'color':UI.current_theme_color,
 			//	})
 			//}else{
-			UI.RoundRect({
-				x:obj_panel.x-w_bar-w_shadow,y:-w_shadow,w:w_shadow*2,h:app.h+w_shadow*2,
-				color:shadow_color,border_width:-w_shadow,round:w_shadow,
-			})
-			UI.RoundRect({
-				x:obj_panel.x-w_bar,y:0,w:w_property_bar,h:app.h,
-				color:0xfff0f0f0,border_width:0,
-			})
-			W.Group("property_bar",{
-				'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
-				'x':0,'y':0,'w':w_property_bar,
-				item_template:{'object_type':W.SubWindow},items:property_windows,
-				///////////
-				'layout_direction':'down','layout_spacing':0,'layout_align':'fill','layout_valign':'up',
-				'property_sheet':UI.document_property_sheet,
-			});
-			W.RoundRect("",{
-				'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
-				'x':-w_bar,'y':0,'w':w_bar,
-				'color':UI.current_theme_color,
-			})
+			//UI.RoundRect({
+			//	x:obj_panel.x-w_bar-w_shadow,y:-w_shadow,w:w_shadow*2,h:app.h+w_shadow*2,
+			//	color:shadow_color,border_width:-w_shadow,round:w_shadow,
+			//})
+			//UI.RoundRect({
+			//	x:obj_panel.x-w_bar,y:0,w:w_property_bar,h:app.h,
+			//	color:0xfff0f0f0,border_width:0,
+			//})
+			//W.Group("property_bar",{
+			//	'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
+			//	'x':0,'y':0,'w':w_property_bar,
+			//	item_template:{'object_type':W.SubWindow},items:property_windows,
+			//	///////////
+			//	'layout_direction':'down','layout_spacing':0,'layout_align':'fill','layout_valign':'up',
+			//	'property_sheet':UI.document_property_sheet,
+			//});
+			//W.RoundRect("",{
+			//	'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
+			//	'x':-w_bar,'y':0,'w':w_bar,
+			//	'color':UI.current_theme_color,
+			//})
 			//}
 			//////////////////////////
 			var menu_file=UI.BigMenu("&File")
 			menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:1,action:function(){
-				//UI.NewUIEditorTab()
-				//UI.NewFromTemplate("templates/blank_demo.mo")
-				UI.NewCodeEditorTab()//todo
+				UI.UpdateNewDocumentSearchPath()
+				UI.NewCodeEditorTab()
 				UI.Refresh()
 			}})
+			//todo: alt+q
 			menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
-				//todo
 				var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
 				if(!fn){return;}
 				UI.OpenFile(fn.replace(new RegExp("\\\\","g"),"/"));
@@ -630,9 +662,14 @@ UI.Application=function(id,attrs){
 		//UI.OpenFile("c:/tp/kara/ide/edcore.spap")
 		//UI.OpenFile("c:/h/edtest/empty.tex")
 		//UI.OpenFile("c:/tp/papers/ours/vg2015/gpu_scanline.tex")
-		UI.OpenFile("C:/tp/qpad/history.xml")
+		//UI.OpenFile("C:/tp/qpad/history.xml")
 		//UI.NewFromTemplate("templates/blank_demo.mo")
 		//c:\tp\pure\mo\pm_tmp\win32\mo\s7main.c
+		//UI.OpenFile("C:/h/syousetu/stars_tr.md")
+		//UI.OpenFile("c:/h/edtest/crap.c")
+		UI.UpdateNewDocumentSearchPath()
+		UI.NewCodeEditorTab()
+		UI.Refresh()
 	}
 };
 

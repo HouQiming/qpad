@@ -653,7 +653,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int enable_meta_chars, CStyleHold
 		eol_badness=0LL
 		w_extra_eol=0LL
 		if flags&FLAG_BAD_BOL:
-			bol_badness=BAD_BOLEOL_BADNESS(style_id)
+			bol_badness+=BAD_BOLEOL_BADNESS(style_id)
 		if flags&FLAG_IS_SPACE:
 			bol_badness+=LEADING_SPACE_BADNESS
 		if flags&FLAG_HYPHENATE_AFTER:

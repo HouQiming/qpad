@@ -230,11 +230,11 @@ exports.Define=function(frules,owner){
 	var fenabler=frules(ret);
 	try{
 		ret.Finalize(fenabler);
+		return UI.CreateLanguageDefinition(ret);
 	}catch(err){
 		err.message="Error in language definition "+owner.name+"\n"+err.message
 		throw err
 	}
-	return UI.CreateLanguageDefinition(ret);
 };
 
 var g_name_by_ext={}

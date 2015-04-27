@@ -16,6 +16,17 @@ UI.RemovePath=function(fname){
 	return main_name;
 }
 
+UI.GetPathFromFilename=function(fname){
+	var ret=fname.match(g_regexp_chopdir);
+	var main_name=null;
+	if(!ret){
+		main_name=".";
+	}else{
+		main_name=ret[1];
+	}
+	return main_name;
+}
+
 UI.GetMainFileName=function(fname){
 	var ret=fname.match(g_regexp_chopdir);
 	var main_name=null;
@@ -417,4 +428,25 @@ UI.NewFromTemplate=function(fn_template,fn_real){
 	}
 	ret.m_file_name=(fn_real||IO.GetNewDocumentName("doc","mo","document"));
 	return ret;
+}
+
+////////////////////////////////////
+UI.BumpHistory=function(file_name){
+	var hist=UI.m_ui_metadata["<history>"]
+	if(!hist){
+		hist=[]
+		UI.m_ui_metadata["<history>"]=hist;
+	}
+	for(var i=0;i<hist.length;i++){
+		if(hist[i]==file_name){
+			for(var j=i;j<hist.length;j++){
+				hist[j]=hist[j+1];
+			}
+			hist[hist.length-1]=file_name
+			UI.SaveMetaData();
+			return;
+		}
+	}
+	hist.push(file_name)
+	UI.SaveMetaData();
 }

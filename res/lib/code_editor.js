@@ -281,7 +281,7 @@ UI.NewUIEditorTab=function(fname0){
 		color_theme:[0xff9a3d6a],
 	})
 };
-UI.RegisterLoaderForExtension("js",function(fn){return UI.NewUIEditorTab(fn)})
+//UI.RegisterLoaderForExtension("js",function(fn){return UI.NewUIEditorTab(fn)})
 UI.RegisterLoaderForExtension("*",function(fn){return UI.NewCodeEditorTab(fn)})
 
 W.UIEditor=function(id,attrs){
@@ -771,6 +771,9 @@ W.NotificationItem=function(id,attrs){
 	}
 	if(obj.icon){UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,fadein(obj.icon_color,obj.alpha),obj.icon.charCodeAt(0))}
 	UI.DrawTextControl(tmp,obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding,fadein(obj.text_color,obj.alpha))
+	if(obj.OnClick){
+		W.PureRegion(id,obj)
+	}
 	return obj
 }
 
@@ -818,11 +821,13 @@ W.CodeEditorWidget_prototype={
 				//it should work properly if the user continues typing
 				obj.m_ac_context.m_ccnt=-1;
 			}
+			obj.m_is_brand_new=0
 		})
 		doc.AddEventHandler('ESC',function(){
 			obj.m_notifications=[]
 			obj.m_ac_context=undefined
 			doc.m_user_just_typed_char=0
+			obj.DestroyReplacingContext();
 			UI.Refresh()
 			return 1
 		})
@@ -935,7 +940,7 @@ W.CodeEditorWidget_prototype={
 		var doc=this.doc
 		var ccnt=(force_ccnt==undefined?doc.sel1.ccnt:force_ccnt)
 		if(this.m_current_find_context){
-			if(force_ccnt&&force_ccnt==this.m_current_find_context.m_starting_ccnt0&&!this.m_changed_after_find){
+			if(force_ccnt!=undefined&&force_ccnt==this.m_current_find_context.m_starting_ccnt0&&!this.m_changed_after_find){
 				return;
 			}
 			this.m_current_find_context.Cancel()
@@ -1019,6 +1024,7 @@ W.CodeEditorWidget_prototype={
 		if(force_ccnt==undefined){
 			this.AutoScrollFindItems();
 			UI.InvalidateCurrentFrame();
+			UI.Refresh()
 		}
 	},
 	GetFindItem:function(id){
@@ -1488,7 +1494,6 @@ W.CodeEditorWidget_prototype={
 		}
 	},
 	CreateNotification:function(attrs,is_quiet){
-		UI.Refresh()
 		var ns=this.m_notifications
 		if(!ns){
 			ns=[]
@@ -1509,6 +1514,7 @@ W.CodeEditorWidget_prototype={
 		attrs.alpha=1
 		//if(!is_quiet){attrs.dx_shake=this.dx_shake_notification}
 		ns.push(attrs)
+		UI.Refresh()
 		return attrs;
 	},
 	DismissNotification:function(id){
@@ -1518,9 +1524,10 @@ W.CodeEditorWidget_prototype={
 	},
 	////////////////////////////////
 	ParseFile:function(){
+		UI.BumpHistory(this.file_name)
 		var doc=this.doc
 		var sz=doc.ed.GetTextSize()
-		if(sz>MAX_PARSABLE){
+		if(sz>MAX_PARSABLE||!this.show_auto_completion){
 			return;
 		}
 		doc.m_file_index=UI.ED_ParseAs(this.file_name,doc.plugin_language_desc)
@@ -1615,17 +1622,253 @@ var ffindbar_plugin=function(){
 	})
 }
 
+var FILE_LISTING_BUDGET=100
+W.FileItemOnDemand=function(){
+	if(!this.name_to_find){
+		return "keep"
+	}
+	if(!this.m_find_context){
+		this.m_find_context=IO.CreateEnumFileContext(this.name_to_find,0)
+	}
+	var ret=[];
+	for(var i=0;i<FILE_LISTING_BUDGET;i++){
+		var fnext=this.m_find_context()
+		if(!fnext){
+			this.m_find_context=undefined;
+			return ret
+		}
+		if(UI.m_current_file_list.m_appeared_full_names[fnext.name]){continue;}
+		UI.m_current_file_list.m_appeared_full_names[fnext.name]=1
+		ret.push({
+			name:fnext.name,
+			size:fnext.size,
+			is_dir:fnext.is_dir,
+			time:fnext.time,
+			h:UI.default_styles.file_item.h})
+	}
+	ret.push(this)
+	return ret;
+}
+
+var GetSmartFileName=function(obj_param){
+	var redo_queue=[]
+	redo_queue.push(obj_param)
+	for(;redo_queue.length;){
+		var obj=redo_queue.pop()
+		var ret=obj.display_name
+		if(ret){return ret;}
+		var arv=UI.m_current_file_list.m_appeared_names
+		var name=obj.name
+		var name_s=name
+		for(;;){
+			var pslash=name_s.lastIndexOf('/')
+			var cur_name
+			if(pslash<=0){
+				cur_name=name
+			}else{
+				cur_name=name.substr(pslash+1)
+			}
+			var obj0=arv[cur_name];
+			if(!obj0){
+				arv[cur_name]=obj
+				obj.display_name=cur_name
+				break;
+			}
+			if(typeof obj0=='string'){
+				//screwed, continue
+			}else{
+				//need to re-get obj0's name
+				obj0.display_name=undefined
+				redo_queue.push(obj0)
+				UI.InvalidateCurrentFrame()
+				UI.Refresh()
+				arv[cur_name]='screwed'
+			}
+			if(pslash<=0){
+				obj.display_name=cur_name
+				break
+			}
+			name_s=name_s.substr(0,pslash)
+		}
+	}
+	return obj_param.display_name
+}
+
+var ZeroPad=function(n,w){
+	var s=n.toString();
+	if(s.length<w){
+		var a=[]
+		for(var i=s.length;i<w;i++){
+			a.push('0')
+		}
+		a.push(s)
+		s=a.join("")
+	}
+	return s
+}
+
+var FormatFileSize=function(size){
+	if(size<1024){
+		return size+"B"
+	}else if(size<1048576){
+		return (size/1024).toFixed(1)+"KB"
+	}else if(size<1073741824){
+		return (size/1048576).toFixed(1)+"MB"
+	}else if(size<1099511627776){
+		return (size/1073741824).toFixed(1)+"GB"
+	}else{
+		return (size/1099511627776).toFixed(1)+"TB"
+	}
+}
+
+var FormatRelativeTime=function(then,now){
+	if(now[0]==then[0]){
+		if(now[1]==then[1]){
+			if(now[2]==then[2]){
+				return UI.Format("@1:@2",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
+			}else if(now[2]==then[2]+1){
+				return UI.Format("@1:@2 Yesterday",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
+			}
+		}
+		return UI.MonthDay(then[1],then[2])
+	}else{
+		return UI.Format("@1/@2/@3",ZeroPad(then[1]+1,2),ZeroPad(then[2]+1,2),then[0])
+	}
+}
+
+var FileItem_prototype={
+	OnDblClick:function(event){
+		var fn=this.name
+		var obj=UI.m_sxs_active_editor
+		obj.file_name=fn
+		obj.doc=undefined
+		obj.m_language_id=undefined
+		obj.m_is_brand_new=0;
+		UI.Refresh()
+	},
+}
+W.FileItem=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"file_item",FileItem_prototype);
+	UI.Begin(obj)
+		//icon, name, meta-info
+		//hopefully go without a separator line
+		var s_ext=UI.GetFileNameExtension(obj.name)
+		var language_id=Language.GetNameByExt(s_ext)
+		var desc=Language.GetDescObjectByName(language_id)
+		var ext_color=(desc.file_icon_color||obj.file_icon_color)
+		var sel_bgcolor=ext_color
+		var icon_code=(desc.file_icon||'档').charCodeAt(0)
+		//////////////
+		var icon_font=UI.Font(UI.icon_font_name,obj.h_icon)
+		var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
+		if(obj.selected){
+			ext_color=obj.sel_file_icon_color
+			UI.RoundRect({
+				x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
+				color:sel_bgcolor})
+		}
+		UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
+		W.Text("",{x:obj.x+w_icon,y:obj.y+4,
+			font:obj.name_font,text:GetSmartFileName(obj),
+			color:obj.selected?obj.sel_name_color:obj.name_color})
+		var s_misc_text=[FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
+		W.Text("",{x:obj.x+w_icon,y:obj.y+30,
+			font:obj.misc_font,text:s_misc_text,
+			color:obj.selected?obj.sel_misc_color:obj.misc_color})
+		s_ext=s_ext.toUpperCase()
+		if(!desc.file_icon){
+			var ext_dims=UI.MeasureText(UI.Font(UI.font_name,24),s_ext)
+			var ext_font=UI.Font(UI.font_name,Math.min(24*28/ext_dims.w,24))
+			ext_dims=UI.MeasureText(ext_font,s_ext)
+			W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
+				font:ext_font,text:s_ext,
+				color:ext_color})
+		}
+	UI.End()
+	return obj
+}
+
+W.SXS_NewPage=function(id,attrs){
+	//todo: proper refreshing on metadata change
+	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
+	UI.Begin(obj)
+		UI.RoundRect(obj)
+		UI.m_current_file_list={
+			m_now:IO.WallClockTime(),
+			m_appeared_names:{},
+			m_appeared_full_names:{},
+		}
+		var files=obj.m_file_list;
+		if(!files){
+			//these are just file-searching jobs, realize them when displayed
+			//todo: user search
+			files=[]
+			var hist=UI.m_ui_metadata["<history>"]
+			if(hist){
+				for(var i=hist.length-1;i>=0;i--){
+					files.push({name_to_find:hist[i]})
+				}
+			}
+			files.push({
+				name_to_find:UI.m_new_document_search_path+"/*"
+			})
+			obj.m_file_list=files
+			obj.file_list=undefined
+		}
+		W.ListView('file_list',{
+			x:obj.x+4,y:obj.y,w:obj.w-8,h:obj.h,
+			mouse_wheel_speed:80,
+			dimension:'y',layout_spacing:0,layout_align:'fill',
+			OnDemand:W.FileItemOnDemand,
+			item_template:{
+				object_type:W.FileItem,
+			},items:files})
+		//todo: the search bar, on-demand sort, proper wiping of child elements
+		//the windows way: "mounted" history
+		//bread / search
+	UI.End()
+	return obj
+}
+
 W.CodeEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
 	if(!obj.m_language_id){
 		var s_ext=UI.GetFileNameExtension(obj.file_name)
 		obj.m_language_id=Language.GetNameByExt(s_ext)
 	}
+	var sxs_visualizer=obj.m_sxs_visualizer;
+	var w_obj_area=obj.w
+	var h_obj_area=obj.h
+	var x_sxs_area=0
+	var y_sxs_area=0
+	var w_sxs_area=0
+	var h_sxs_area=0
+	var sxs_area_dim=undefined
+	if(obj.m_is_brand_new){
+		sxs_visualizer=W.SXS_NewPage
+	}
+	if(sxs_visualizer){
+		if(w_obj_area>=h_obj_area){
+			w_obj_area>>=1
+			x_sxs_area=obj.x+w_obj_area
+			y_sxs_area=obj.y
+			w_sxs_area=obj.w-w_obj_area
+			h_sxs_area=obj.h
+			sxs_area_dim='x'
+		}else{
+			h_obj_area>>=1
+			x_sxs_area=obj.x
+			y_sxs_area=obj.y+h_obj_area
+			w_sxs_area=obj.w
+			h_sxs_area=obj.h-h_obj_area
+			sxs_area_dim='y'
+		}
+	}
 	UI.Begin(obj)
 		//main code area
 		var doc=obj.doc
 		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,w_scrolling_area=0,y_top_hint_scroll=0;
-		var h_scrolling_area=obj.h
+		var h_scrolling_area=h_obj_area
 		var h_top_find=0,h_bottom_find=0
 		var editor_style=UI.default_styles.code_editor.editor_style
 		var top_hint_bbs=[]
@@ -1635,16 +1878,16 @@ W.CodeEditor=function(id,attrs){
 			//scrolling and stuff
 			var ccnt_tot=doc.ed.GetTextSize()
 			var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
-			if(obj.h<ytot){
+			if(h_obj_area<ytot){
 				w_scrolling_area=obj.w_scroll_bar+4
 				if(obj.show_minimap){
 					w_scrolling_area+=obj.w_minimap+obj.padding
 				}
 			}
-			if(obj.w<=w_line_numbers+w_scrolling_area){
+			if(w_obj_area<=w_line_numbers+w_scrolling_area){
 				w_scrolling_area=0
-				if(obj.w<=w_line_numbers){
-					w_line_numbers=obj.w*0.5
+				if(w_obj_area<=w_line_numbers){
+					w_line_numbers=w_obj_area*0.5
 				}
 			}
 			//top hint in a separate area
@@ -1713,7 +1956,7 @@ W.CodeEditor=function(id,attrs){
 					if(anim.transition_frame1){anim.transition_frame1.scroll_y+=h_top_hint-prev_h_top_hint;}
 				}
 				doc.scroll_y+=h_top_hint-prev_h_top_hint
-				doc.h=obj.h-h_top_hint
+				doc.h=h_obj_area-h_top_hint
 				if(!UI.nd_captured){doc.AutoScroll("show");}
 			}
 			//current line highlight
@@ -1764,11 +2007,11 @@ W.CodeEditor=function(id,attrs){
 		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4
 		w_line_numbers+=obj.padding+w_bookmark;
 		if(obj.show_find_bar&&current_find_context){
-			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:obj.w,h:obj.h})
-			UI.RoundRect({color:obj.bgcolor,x:obj.x+obj.w-w_scrolling_area,y:obj.y,w:w_scrolling_area,h:obj.h})
+			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
+			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_obj_area-w_scrolling_area,y:obj.y,w:w_scrolling_area,h:h_obj_area})
 		}else{
-			UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:obj.h})
-			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:obj.w-w_line_numbers,h:obj.h})
+			UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:h_obj_area})
+			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_obj_area-w_line_numbers,h:h_obj_area})
 		}
 		if(doc&&doc.ed.hfile_loading){
 			//loading progress
@@ -1783,7 +2026,7 @@ W.CodeEditor=function(id,attrs){
 		var DrawLineNumbers=function(scroll_x,scroll_y,area_w,area_y,area_h){
 			if(bm_xys){
 				var hc=UI.GetCharacterHeight(doc.font)
-				UI.PushCliprect(obj.x,area_y,obj.w,area_h)
+				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
 				for(var i=0;i<bm_ccnts.length;i++){
 					var y=bm_xys[i*2+1]-scroll_y+area_y
 					var id=bm_ccnts[i][0]
@@ -1806,7 +2049,7 @@ W.CodeEditor=function(id,attrs){
 				var line1=doc.GetLC(rendering_ccnt1)[0];
 				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1);
 				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
-				UI.PushCliprect(obj.x,area_y,obj.w,area_h)
+				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
 				for(var i=0;i<line_ccnts.length;i++){
 					if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
 					var s_line_number=(line0+i+1).toString();
@@ -1854,8 +2097,8 @@ W.CodeEditor=function(id,attrs){
 			//still render it, but without the caret or user interaction
 			doc.x=obj.x+w_line_numbers+obj.padding
 			doc.y=obj.y
-			doc.w=obj.w-w_line_numbers-obj.padding-w_scrolling_area
-			doc.h=obj.h
+			doc.w=w_obj_area-w_line_numbers-obj.padding-w_scrolling_area
+			doc.h=h_obj_area
 			doc.ed.Render({x:doc.visible_scroll_x,y:doc.visible_scroll_y,
 				w:doc.w/doc.scale,h:doc.h/doc.scale, 
 				scr_x:doc.x*UI.pixels_per_unit,scr_y:doc.y*UI.pixels_per_unit, 
@@ -1868,19 +2111,19 @@ W.CodeEditor=function(id,attrs){
 				h_top_find+=obj.h_find_bar
 			}
 			//individual lines, each with a box and a little shadow for separation
-			var h_max_find_items_per_side=(obj.h-obj.h_find_bar)*obj.find_item_space_percentage*0.5
-			var h_find_item_middle=obj.h-obj.h_find_bar-h_max_find_items_per_side*2
+			var h_max_find_items_per_side=(h_obj_area-obj.h_find_bar)*obj.find_item_space_percentage*0.5
+			var h_find_item_middle=h_obj_area-obj.h_find_bar-h_max_find_items_per_side*2
 			//var find_ranges_back=undefined;
 			//var find_ranges_forward=undefined;
 			var find_item_scroll_x=undefined
-			var w_document=obj.w-w_scrolling_area-w_line_numbers
+			var w_document=w_obj_area-w_scrolling_area-w_line_numbers
 			var DrawFindItemBox=function(y,h){
 				UI.RoundRect({color:obj.line_number_bgcolor,x:0,y:y,w:w_line_numbers,h:h})
-				UI.RoundRect({color:obj.bgcolor,x:0+w_line_numbers,y:y,w:(obj.w-w_scrolling_area)/obj.find_item_scale,h:h})
-				UI.RoundRect({x:0,y:y,w:(obj.w-w_scrolling_area)/obj.find_item_scale,h:h,
+				UI.RoundRect({color:obj.bgcolor,x:0+w_line_numbers,y:y,w:(w_obj_area-w_scrolling_area)/obj.find_item_scale,h:h})
+				UI.RoundRect({x:0,y:y,w:(w_obj_area-w_scrolling_area)/obj.find_item_scale,h:h,
 					color:0,border_color:obj.find_item_border_color,border_width:obj.find_item_border_width})
-				UI.PushCliprect(0,y+h,(obj.w-w_scrolling_area)/obj.find_item_scale,obj.find_item_separation)
-					UI.RoundRect({x:0-obj.find_item_shadow_size,y:y+h-obj.find_item_shadow_size,w:(obj.w-w_scrolling_area)/obj.find_item_scale+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
+				UI.PushCliprect(0,y+h,(w_obj_area-w_scrolling_area)/obj.find_item_scale,obj.find_item_separation)
+					UI.RoundRect({x:0-obj.find_item_shadow_size,y:y+h-obj.find_item_shadow_size,w:(w_obj_area-w_scrolling_area)/obj.find_item_scale+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
 						color:obj.find_item_shadow_color,
 						round:obj.find_item_shadow_size,
 						border_width:-obj.find_item_shadow_size})
@@ -1888,7 +2131,7 @@ W.CodeEditor=function(id,attrs){
 			}
 			var DrawFindItemHighlight=function(y,h,highlight_alpha){
 				var alpha=Math.max(Math.min(((1-highlight_alpha)*64)|0,255),0)
-				UI.RoundRect({color:(obj.find_mode_bgcolor&0xffffff)|(alpha<<24),x:0,y:y,w:(obj.w-w_scrolling_area)/obj.find_item_scale,h:h})
+				UI.RoundRect({color:(obj.find_mode_bgcolor&0xffffff)|(alpha<<24),x:0,y:y,w:(w_obj_area-w_scrolling_area)/obj.find_item_scale,h:h})
 			}
 			if(obj.show_find_bar&&current_find_context){
 				obj.__children.push(doc)
@@ -1907,19 +2150,19 @@ W.CodeEditor=function(id,attrs){
 					style:editor_style,
 					wrap_width:obj.m_wrap_width,
 					///////////////
-					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:obj.w-w_line_numbers-obj.padding-w_scrolling_area,h:obj.h-h_top_hint-h_top_find-h_bottom_find,
+					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,h:h_obj_area-h_top_hint-h_top_find-h_bottom_find,
 				},W.CodeEditor_prototype);
 				//line number bar shadow when x scrolled
 				if(doc){
 					var x_shadow_size_max=obj.x_scroll_shadow_size
 					var x_shadow_size=Math.min(doc.visible_scroll_x/8,x_shadow_size_max)
 					if(x_shadow_size>0){
-						UI.PushCliprect(obj.x+w_line_numbers,obj.y+h_top_hint,obj.w-w_scrolling_area-w_line_numbers,obj.h-h_top_hint)
+						UI.PushCliprect(obj.x+w_line_numbers,obj.y+h_top_hint,w_obj_area-w_scrolling_area-w_line_numbers,h_obj_area-h_top_hint)
 						UI.RoundRect({
 							x:obj.x+w_line_numbers-x_shadow_size_max*2+x_shadow_size,
 							y:obj.y+h_top_hint-x_shadow_size_max,
 							w:2*x_shadow_size_max, 
-							h:obj.h-h_top_hint+x_shadow_size_max*2,
+							h:h_obj_area-h_top_hint+x_shadow_size_max*2,
 							round:x_shadow_size_max,
 							border_width:-x_shadow_size_max,
 							color:obj.x_scroll_shadow_color})
@@ -1933,6 +2176,7 @@ W.CodeEditor=function(id,attrs){
 				doc=obj.doc
 				obj.OnEditorCreate()
 				UI.InvalidateCurrentFrame()
+				UI.Refresh()
 			}
 			if(obj.m_replace_context){
 				//replace hint
@@ -1959,9 +2203,9 @@ W.CodeEditor=function(id,attrs){
 			if(obj.show_find_bar&&current_find_context){
 				//draw the find items
 				doc.ed.m_other_overlay=undefined
-				UI.PushSubWindow(obj.x,obj.y+obj.h_find_bar,obj.w-w_scrolling_area,obj.h-obj.h_find_bar,obj.find_item_scale)
+				UI.PushSubWindow(obj.x,obj.y+obj.h_find_bar,w_obj_area-w_scrolling_area,h_obj_area-obj.h_find_bar,obj.find_item_scale)
 				var hc=UI.GetCharacterHeight(doc.font)
-				var w_find_items=(obj.w-w_scrolling_area)/obj.find_item_scale, h_find_items=(obj.h-obj.h_find_bar)/obj.find_item_scale-obj.find_item_expand_current*hc;
+				var w_find_items=(w_obj_area-w_scrolling_area)/obj.find_item_scale, h_find_items=(h_obj_area-obj.h_find_bar)/obj.find_item_scale-obj.find_item_expand_current*hc;
 				var h_expand_max=hc*obj.find_item_expand_current
 				var render_secs=0,ln_secs=0;
 				//DrawItem
@@ -1993,22 +2237,22 @@ W.CodeEditor=function(id,attrs){
 						var y1=top_hint_bbs[bbi+1]
 						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
 						if(hh>=0){
-							doc.ed.Render({x:0,y:y0,w:obj.w-w_line_numbers-w_scrolling_area,h:hh,
+							doc.ed.Render({x:0,y:y0,w:w_obj_area-w_line_numbers-w_scrolling_area,h:hh,
 								scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
 							//also draw the line numbers
 							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
 						}
 						y_top_hint+=y1-y0;
 					}
-					UI.PushCliprect(obj.x,obj.y+h_top_hint,obj.w-w_scrolling_area,obj.h-h_top_hint)
+					UI.PushCliprect(obj.x,obj.y+h_top_hint,w_obj_area-w_scrolling_area,h_obj_area-h_top_hint)
 					//a (shadowed) separation bar
 					UI.RoundRect({
-						x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:obj.w-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+						x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:w_obj_area-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
 						round:obj.top_hint_shadow_size,
 						border_width:-obj.top_hint_shadow_size,
 						color:obj.top_hint_shadow_color})
 					UI.RoundRect({
-						x:obj.x, y:obj.y+h_top_hint, w:obj.w-w_scrolling_area, h:obj.top_hint_border_width,
+						x:obj.x, y:obj.y+h_top_hint, w:w_obj_area-w_scrolling_area, h:obj.top_hint_border_width,
 						color:obj.top_hint_border_color})
 					UI.PopCliprect()
 				}
@@ -2022,6 +2266,7 @@ W.CodeEditor=function(id,attrs){
 						ac_was_actiavted=acctx.m_activated
 						acctx=undefined;
 						UI.InvalidateCurrentFrame()
+						UI.Refresh()
 					}
 					if(!acctx){
 						var accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt)
@@ -2109,9 +2354,9 @@ W.CodeEditor=function(id,attrs){
 							var y_caret=(ed_caret.y-doc.visible_scroll_y);
 							x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
 							var hc=UI.GetCharacterHeight(doc.font)
-							var x_accands=Math.max(Math.min(x_caret,obj.x+obj.w-ac_w_needed-doc.x),0)
+							var x_accands=Math.max(Math.min(x_caret,obj.x+w_obj_area-ac_w_needed-doc.x),0)
 							var y_accands=y_caret+hc
-							if(doc.y+y_accands+obj.accands_h>obj.y+obj.h){
+							if(doc.y+y_accands+obj.accands_h>obj.y+h_obj_area){
 								y_accands=y_caret-obj.h_accands
 							}
 							x_accands+=doc.x
@@ -2183,26 +2428,28 @@ W.CodeEditor=function(id,attrs){
 					if(acctx){
 						obj.m_ac_context=undefined
 						UI.InvalidateCurrentFrame()
+						UI.Refresh()
 					}
 				}
 				if(got_overlay_before&&!doc.ed.m_other_overlay){
 					UI.InvalidateCurrentFrame()
+					UI.Refresh()
 				}
 			}
 			if(obj.show_find_bar){
 				//the find bar
-				UI.PushCliprect(obj.x,obj.y,obj.w-w_scrolling_area,obj.h)
+				UI.PushCliprect(obj.x,obj.y,w_obj_area-w_scrolling_area,h_obj_area)
 				UI.RoundRect({
-					x:obj.x-obj.find_bar_shadow_size, y:obj.y+obj.h_find_bar-obj.find_bar_shadow_size, w:obj.w-w_scrolling_area+2*obj.find_bar_shadow_size, h:obj.find_bar_shadow_size*2,
+					x:obj.x-obj.find_bar_shadow_size, y:obj.y+obj.h_find_bar-obj.find_bar_shadow_size, w:w_obj_area-w_scrolling_area+2*obj.find_bar_shadow_size, h:obj.find_bar_shadow_size*2,
 					round:obj.find_bar_shadow_size,
 					border_width:-obj.find_bar_shadow_size,
 					color:obj.find_bar_shadow_color})
 				UI.PopCliprect()
-				UI.RoundRect({x:obj.x,y:obj.y,w:obj.w-w_scrolling_area,h:obj.h_find_bar,
+				UI.RoundRect({x:obj.x,y:obj.y,w:w_obj_area-w_scrolling_area,h:obj.h_find_bar,
 					color:obj.find_bar_bgcolor})
 				var rect_bar=UI.RoundRect({
 					x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
-					w:obj.w-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*3,h:obj.h_find_bar-obj.find_bar_padding*2,
+					w:w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*3,h:obj.h_find_bar-obj.find_bar_padding*2,
 					color:obj.find_bar_color,
 					round:obj.find_bar_round})
 				UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
@@ -2241,7 +2488,9 @@ W.CodeEditor=function(id,attrs){
 				var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
 				var previous_edit=obj.find_bar_edit
 				W.Edit("find_bar_edit",{
-					language:doc.language,style:obj.find_bar_editor_style,
+					language:doc.language,
+					plugin_language_desc:doc.plugin_language_desc,
+					style:obj.find_bar_editor_style,
 					x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 					owner:obj,
 					plugins:[ffindbar_plugin],
@@ -2282,7 +2531,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//UI.RoundRect({
-			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:obj.h,
+			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:h_obj_area,
 			//	color:obj.separator_color})
 			if(UI.HasFocus(doc)){
 				var menu_edit=UI.BigMenu("&Edit")
@@ -2417,7 +2666,7 @@ W.CodeEditor=function(id,attrs){
 			var effective_scroll_y=doc.visible_scroll_y-h_top_hint
 			var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
 			if(obj.show_minimap){
-				var x_minimap=obj.x+obj.w-w_scrolling_area+obj.padding*0.5
+				var x_minimap=obj.x+w_obj_area-w_scrolling_area+obj.padding*0.5
 				var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
 				var h_minimap=h_scrolling_area/minimap_scale
 				var scroll_y_minimap=sbar_value*Math.max(ytot-h_minimap,0)
@@ -2450,7 +2699,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//scrollbar background
-			var sbar=UI.RoundRect({x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area, w:obj.w_scroll_bar+4, h:h_scrolling_area,
+			var sbar=UI.RoundRect({x:obj.x+w_obj_area-obj.w_scroll_bar-4, y:y_scrolling_area, w:obj.w_scroll_bar+4, h:h_scrolling_area,
 				color:obj.line_number_bgcolor
 			})
 			//at-scrollbar bookmark marker
@@ -2471,7 +2720,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//the actual bar
-			W.ScrollBar("sbar",{x:obj.x+obj.w-obj.w_scroll_bar-4, y:y_scrolling_area+4, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
+			W.ScrollBar("sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar-4, y:y_scrolling_area+4, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
 				page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
 				OnChange:function(value){
 					doc.scroll_y=value*(this.total_size-this.page_size)
@@ -2482,16 +2731,36 @@ W.CodeEditor=function(id,attrs){
 			})
 			//separators
 			UI.RoundRect({
-				x:obj.x+obj.w-w_scrolling_area, y:y_scrolling_area, w:1, h:h_scrolling_area,
+				x:obj.x+w_obj_area-w_scrolling_area, y:y_scrolling_area, w:1, h:h_scrolling_area,
 				color:obj.separator_color})
 		}
 		if(obj.m_notifications&&!obj.show_find_bar){
-			W.ListView('notification_list',{x:obj.x+obj.w-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:obj.h-8,
+			W.ListView('notification_list',{x:obj.x+w_obj_area-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:h_obj_area-8,
 				dimension:'y',layout_spacing:8,layout_align:'left',is_single_click_mode:1,no_region:1,no_clipping:1,
 				item_template:{
 					object_type:W.NotificationItem,
 				},items:obj.m_notifications})
-			//todo: dismissing
+		}
+		///////////////////////////////////////
+		if(sxs_visualizer){
+			//it could just get parent as owner
+			//separation shadow
+			var w_shadow=obj.sxs_shadow_size
+			if(sxs_area_dim=='x'){
+				UI.RoundRect({
+					x:x_sxs_area-w_shadow,y:y_sxs_area-w_shadow,w:w_shadow*2,h:h_sxs_area+w_shadow*2,
+					color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
+				})
+			}else{
+				UI.RoundRect({
+					x:x_sxs_area-w_shadow,y:y_sxs_area-w_shadow,w:w_sxs_area+w_shadow*2,h:w_shadow*2,
+					color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
+				})
+			}
+			UI.m_sxs_active_editor=obj
+			sxs_visualizer('sxs_visualizer',{x:x_sxs_area,y:y_sxs_area,w:w_sxs_area,h:h_sxs_area})
+		}else{
+			UI.m_sxs_active_editor=undefined
 		}
 	UI.End()
 	return obj
@@ -2504,8 +2773,8 @@ UI.NewCodeEditorTab=function(fname0){
 		title:UI.RemovePath(file_name),
 		body:function(){
 			//use styling for editor themes
-			//todo: load a style object from some user-defined file
 			UI.context_parent.body=this.doc;
+			if(this.doc){this.file_name=this.doc.file_name}
 			var body=W.CodeEditor("body",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
@@ -2513,9 +2782,14 @@ UI.NewCodeEditorTab=function(fname0){
 			})
 			if(!this.doc){
 				this.doc=body;
+				body.m_is_brand_new=!fname0
 			}
 			var doc=body.doc;
-			body.title=UI.RemovePath(this.file_name)
+			if(body.m_is_brand_new){
+				body.title="New Tab"
+			}else{
+				body.title=UI.RemovePath(body.file_name)
+			}
 			this.need_save=0
 			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
 				body.title=body.title+'*'

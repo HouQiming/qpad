@@ -52,6 +52,8 @@ Language.Register({
 	extensions:["c","cxx","cpp","cc","h","hpp"],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			keyword:['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'],
@@ -66,6 +68,8 @@ Language.Register({
 	has_dlist_type:1,
 	has_pointer_ops:1,
 	indent_as_parenthesis:1,
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','function','F','sizeof','new','delete','import','export','typedef','stdcall','inline','operator','forall','foreach','in','this','module','project','true','false','abstract','interface','virtual','__host__','__device__','__operation__'],
@@ -79,6 +83,8 @@ Language.Register({
 	name:'Jacy',parser:"C",
 	extensions:['jc'],
 	indent_as_parenthesis:1,
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false'],
@@ -91,6 +97,8 @@ Language.Register({
 	name:'Microsoft IDL',parser:"C",
 	extensions:['idl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','interface','coclass','midl_pragma','import','library','cpp_quote','const','typedef','extern','struct','union'],
@@ -102,6 +110,8 @@ Language.Register({
 	name:'HLSL shader',parser:"C",
 	extensions:['hlsl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['AppendStructuredBuffer','Asm','Asm_fragment','Break','Centroid','Column_major','Compile','Compile_fragment','CompileShader','Const','Continue','ComputeShader','Discard','Do','DomainShader','Else','Extern','False','For','Fxgroup','GeometryShader','Groupshared','Hullshader','If','In','Inline','Inout','InputPatch','Interface','Line','Lineadj','Linear','LineStream','Namespace','Nointerpolation','Noperspective','NULL','Out','OutputPatch','Packoffset','Pass','Pixelfragment','PixelShader','Precise','Return','Register','Row_major','Shared','Snorm','Stateblock','Stateblock_state','Static','Struct','Switch','True','Typedef','Triangle','Triangleadj','TriangleStream','Uniform','Unorm','Vertexfragment','VertexShader','Void','Volatile','While','appendstructuredbuffer','asm','asm_fragment','break','centroid','column_major','compile','compile_fragment','compileshader','const','continue','computeshader','discard','do','domainshader','else','extern','false','for','fxgroup','geometryshader','groupshared','hullshader','if','in','inline','inout','inputpatch','interface','line','lineadj','linear','linestream','namespace','nointerpolation','noperspective','null','out','outputpatch','packoffset','pass','pixelfragment','pixelshader','precise','return','register','row_major','shared','snorm','stateblock','stateblock_state','static','struct','switch','true','typedef','triangle','triangleadj','trianglestream','uniform','unorm','vertexfragment','vertexshader','void','volatile','while'],
@@ -114,6 +124,8 @@ Language.Register({
 	name:'GLSL shader',parser:"C",
 	extensions:['glsl','essl'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'class':2,'struct':2,'union':2},
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using','attribute','uniform','varying','layout','centroid','flat','smooth','noperspective','patch','sample','subroutine','in','out','inout','invariant','discard','lowp','mediump','highp','precision'],
@@ -125,6 +137,8 @@ Language.Register({
 Language.Register({
 	name:'Java',parser:"C",
 	extensions:['java'],
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['abstract','assert','break','case','catch','class','const','continue','default','do','else','enum','extends','final','finally','for','goto','if','implements','import','instanceof','interface','native','new','package','private','protected','public','return','static','strictfp','super','switch','synchronized','this','throw','throws','transient','try','while','false','null','true'],
@@ -139,6 +153,8 @@ Language.Register({
 	has_dlist_type:1,
 	has_pointer_ops:1,
 	indent_as_parenthesis:1,
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','namespace','function','Func','sizeof','new','delete','import','export','typedef','stdcall','inline','__fastcall','with','operator','forall','this','uses','need','using','autouses','require','spawn','__interrupt__','__both__','__device__','__host__','__shared__','barrier','par','novirtual','__force_template','try','catch','finally','throw','classof'],
@@ -153,6 +169,8 @@ Language.Register({
 	extensions:['cu','cuh'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2,'__global__':1,'__device__':1,'__host__':1},
 	has_pointer_ops:1,
+	file_icon_color:0xffb4771f,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','__global__','__device__','__host__'],
@@ -163,7 +181,10 @@ Language.Register({
 
 Language.Register({
 	name:'Javascript',parser:"C",
+	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1},
 	extensions:['js'],
+	file_icon_color:0xff1c1ae3,
+	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined'],
@@ -175,6 +196,8 @@ Language.Register({
 Language.Register({
 	name:'HTML',parser:"text",
 	extensions:['htm','html'],
+	file_icon_color:0xff9a3d6a,
+	file_icon:'マ',
 	rules:function(lang,keywords,has_preprocessor){
 		lang.DefineDefaultColor("color_symbol")
 		//var bid_tag=lang.DefineDelimiter("key","<",">");
@@ -231,6 +254,8 @@ Language.Register({
 Language.Register({
 	name:'XML',parser:"text",
 	extensions:['xml','vcproj','vcxproj','sproj','sln'],
+	file_icon_color:0xff9a3d6a,
+	file_icon:'マ',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		lang.DefineToken('<')//short tokens must come first
@@ -283,8 +308,10 @@ var f_shell_like=function(lang,keywords){
 Language.Register({
 	name:'RenderMan RIB',parser:"none",
 	extensions:['rib'],
+	file_icon_color:0xff9a3d6a,
+	file_icon:'も',
 	rules:function(lang){
-		f_shell_like(lang,{
+		return f_shell_like(lang,{
 			'keyword':['RiArchiveRecord','RiAreaLightSource','RiAtmosphere','RiAttribute','RiAttributeBegin','RiAttributeEnd','RiBasis','RiBegin','RiBlobby','RiBound','RiClipping','RiClippingPlane','RiColor','RiColorSamples','RiConcatTransform','RiCone','RiContext','RiCoordinateSystem','RiCoordSysTransform','RiCropWindow','RiCurves','RiCylinder','RiDeclare','RiDepthOfField','RiDetail','RiDetailRange','RiDisk','RiDisplacement','RiDisplay','RiEnd','RiErrorHandler','RiExposure','RiExterior','RiFormat','RiFrameAspectRatio','RiFrameBegin','RiFrameEnd','RiGeneralPolygon','RiGeometricApproximation','RiGeometry','RiGetContext','RiHider','RiHyperboloid','RiIdentity','RiIlluminate','RiImager','RiInterior','RiLightSource','RiMakeCubeFaceEnvironment','RiMakeLatLongEnvironment','RiMakeShadow','RiMakeTexture','RiMatte','RiMotionBegin','RiMotionEnd','RiNuPatch','RiObjectBegin','RiObjectEnd','RiObjectInstance','RiOpacity','RiOption','RiOrientation','RiParaboloid','RiPatch','RiPatchMesh','RiPerspective','RiPixelFilter','RiPixelSamples','RiPixelVariance','RiPoints','RiPointsGeneralPolygons','RiPointsPolygons','RiPolygon','RiProcedural','RiProjection','RiQuantize','RiReadArchive','RiRelativeDetail','RiReverseOrientation','RiRotate','RiScale','RiScreenWindow','RiShadingInterpolation','RiShadingRate','RiShutter','RiSides','RiSkew','RiSolidBegin','RiSolidEnd','RiSphere','RiSubdivisionMesh','RiSurface','RiTextureCoordinates','RiTorus','RiTransform','RiTransformBegin','RiTransformEnd','RiTransformPoints','RiTranslate','RiTrimCurve','RiWorldBegin','RiWorldEnd'],
 		})
 	}
@@ -292,8 +319,10 @@ Language.Register({
 Language.Register({
 	name:'WaveFront OBJ',parser:"none",
 	extensions:['obj'],
+	file_icon_color:0xff9a3d6a,
+	file_icon:'も',
 	rules:function(lang){
-		f_shell_like(lang,{
+		return f_shell_like(lang,{
 			'keyword':['usemtl','mtllib','g','s','o'],
 			'type':['v','vn','vt','f'],
 		})
@@ -302,8 +331,10 @@ Language.Register({
 Language.Register({
 	name:'WaveFront MTL',parser:"none",
 	extensions:['mtl'],
+	file_icon_color:0xff9a3d6a,
+	file_icon:'も',
 	rules:function(lang){
-		f_shell_like(lang,{
+		return f_shell_like(lang,{
 			'keyword':['newmtl'],
 			'type':['Ka','Kd','Ks','illum','Ns','map_Kd','map_bump','bump','map_opacity','map_d','refl','map_kS','map_kA','map_Ns'],
 		})
@@ -346,18 +377,41 @@ Language.Register({
 	name:'TeX/LaTeX',extensions:['tex','cls'],
 	curly_bracket_is_not_special:1,is_tex_like:1,
 	default_hyphenator_name:"en_us",
+	file_icon_color:0xff2ca033,
+	file_icon:'テ',
 	rules:f_tex_like
 });
 
 Language.Register({
 	name:'Bibliography',extensions:['bib'],
 	curly_bracket_is_not_special:1,is_tex_like:1,
+	default_hyphenator_name:"en_us",
+	file_icon_color:0xff2ca033,
+	file_icon:'テ',
 	rules:f_tex_like
+});
+
+Language.Register({
+	name:'Markdown',extensions:['md','markdown'],
+	curly_bracket_is_not_special:1,
+	default_hyphenator_name:"en_us",
+	file_icon_color:0xff2ca033,
+	file_icon:'文',
+	rules:function(lang){
+		lang.DefineDefaultColor("color")
+		var bid_title=lang.ColoredDelimiter("key","#","\n","color_type");
+		/////////////
+		return (function(lang){
+			//nothing
+		});
+	}
 });
 
 Language.Register({
 	name:'Matlab',parser:"none",
 	extensions:['m'],
+	file_icon_color:0xff1c1ae3,
+	file_icon:'プ',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","%","\n","color_comment");
@@ -387,6 +441,8 @@ Language.Register({
 	extensions:['py'],
 	indent_as_parenthesis:1,
 	curly_bracket_is_not_special:1,
+	file_icon_color:0xff1c1ae3,
+	file_icon:'プ',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","#","\n","color_comment");
@@ -493,10 +549,7 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
 		if(ccnt_new>=0){
 			this.m_outer_scope_queue.push(this.sel1.ccnt)
-			this.sel0.ccnt=ccnt_new
-			this.sel1.ccnt=ccnt_new
-			this.AutoScroll("center_if_hidden");
-			UI.Refresh()
+			this.SetCaretTo(ccnt_new)
 			return 0;
 		}
 		return 1;
@@ -504,10 +557,7 @@ UI.RegisterEditorPlugin(function(){
 	var finner_scope=function(){
 		if(this.m_outer_scope_queue.length){
 			var ccnt_new=this.m_outer_scope_queue.pop()
-			this.sel0.ccnt=ccnt_new
-			this.sel1.ccnt=ccnt_new
-			this.AutoScroll("center_if_hidden");
-			UI.Refresh()
+			this.SetCaretTo(ccnt_new)
 			return 0;
 		}
 	}
@@ -522,10 +572,7 @@ UI.RegisterEditorPlugin(function(){
 		var my_level=this.GetIndentLevel(this.sel1.ccnt);
 		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",Math.max(this.sel1.ccnt-1-this.GetLC(this.sel1.ccnt)[1],0),-1);
 		if(ccnt_new>=0){
-			this.sel0.ccnt=ccnt_new
-			this.sel1.ccnt=ccnt_new
-			this.AutoScroll("center_if_hidden");
-			UI.Refresh()
+			this.SetCaretTo(ccnt_new)
 			return 0;
 		}
 		return 1
@@ -536,10 +583,7 @@ UI.RegisterEditorPlugin(function(){
 		var my_level=this.GetIndentLevel(this.sel1.ccnt);
 		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",this.SeekLC(this.GetLC(this.sel1.ccnt)[0]+1),1);
 		if(ccnt_new>=0){
-			this.sel0.ccnt=ccnt_new
-			this.sel1.ccnt=ccnt_new
-			this.AutoScroll("center_if_hidden");
-			UI.Refresh()
+			this.SetCaretTo(ccnt_new)
 			return 0;
 		}
 		return 1
@@ -618,10 +662,7 @@ UI.RegisterEditorPlugin(function(){
 				var ed=this.ed;
 				var ccnt=this.sel1.ccnt;
 				if(this.m_bookmarks[i]){
-					this.sel0.ccnt=this.m_bookmarks[i].ccnt
-					this.sel1.ccnt=this.m_bookmarks[i].ccnt
-					this.AutoScroll("center_if_hidden");
-					UI.Refresh()
+					this.SetCaretTo(this.m_bookmarks[i].ccnt)
 					return 0
 				}
 				return 1;
@@ -645,20 +686,14 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt=this.sel1.ccnt;
 		var bm=this.FindNearestBookmark(ccnt+1,1)
 		if(!bm){return 1;}
-		this.sel0.ccnt=bm.ccnt
-		this.sel1.ccnt=bm.ccnt
-		this.AutoScroll("center_if_hidden");
-		UI.Refresh()
+		this.SetCaretTo(bm.ccnt)
 		return 0;
 	})
 	this.AddEventHandler('SHIFT+F2',function(){
 		var ccnt=this.sel1.ccnt;
 		var bm=this.FindNearestBookmark(ccnt-1,-1)
 		if(!bm){return 1;}
-		this.sel0.ccnt=bm.ccnt
-		this.sel1.ccnt=bm.ccnt
-		this.AutoScroll("center_if_hidden");
-		UI.Refresh()
+		this.SetCaretTo(bm.ccnt)
 		return 0;
 	})
 });
@@ -796,10 +831,7 @@ UI.RegisterEditorPlugin(function(){
 			//ccnt=this.m_rbracket_p1.ccnt;
 			//return;
 		}
-		this.sel0.ccnt=is_sel?ccnt:ccnt_new
-		this.sel1.ccnt=ccnt_new
-		this.AutoScroll("center_if_hidden")
-		UI.Refresh()
+		this.SetSelection(is_sel?ccnt:ccnt_new,ccnt_new)
 	}
 	this.AddEventHandler('menu',function(){
 		var enabled=(this.m_lbracket_p0.ccnt<this.m_lbracket_p1.ccnt)
@@ -824,6 +856,7 @@ var CountSpacesAfter=function(ed,ccnt){
 }
 
 UI.RegisterEditorPlugin(function(){
+	//bracket-related auto-indent
 	if(this.plugin_class!="code_editor"){return;}
 	this.AddEventHandler('RETURN RETURN2',function(){
 		var ed=this.ed;
@@ -884,8 +917,7 @@ UI.RegisterEditorPlugin(function(){
 		if(did){
 			var sel=this.GetSelection()
 			ed.Edit([sel[0],sel[1]-sel[0],snewline])
-			this.sel0.ccnt=ccnt_pos+delta_ccnt
-			this.sel1.ccnt=ccnt_pos+delta_ccnt
+			this.SetCaretTo(ccnt_pos+delta_ccnt)
 			return 0
 		}
 		//Case 3: auto {} and auto ;, exclusive with Case 1/2
@@ -916,8 +948,7 @@ UI.RegisterEditorPlugin(function(){
 				}
 				var sel=this.GetSelection()
 				ed.Edit([sel[0],sel[1]-sel[0],snewline])
-				this.sel0.ccnt=ccnt_pos+delta_ccnt
-				this.sel1.ccnt=ccnt_pos+delta_ccnt
+				this.SetCaretTo(ccnt_pos+delta_ccnt)
 				return 0
 			}else{
 				//test left { and stuff, add ; if found
@@ -932,8 +963,8 @@ UI.RegisterEditorPlugin(function(){
 							}
 						}
 					}
-					var lineno=ed.GetLineNumberAt(ccnt_pos)
-					var ccnt_lh=ed.SeekLine(lineno)
+					var lineno=this.GetLC(ccnt_pos)[0]
+					var ccnt_lh=this.SeekLC(lineno,0)
 					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_pos){
 						//don't add ; to a blank line
 						return 1;
@@ -946,8 +977,7 @@ UI.RegisterEditorPlugin(function(){
 					delta_ccnt=Duktape.__byte_length(snewline)
 					var sel=this.GetSelection()
 					ed.Edit([sel[0],sel[1]-sel[0],snewline])
-					this.sel0.ccnt=ccnt_pos+delta_ccnt
-					this.sel1.ccnt=ccnt_pos+delta_ccnt
+					this.SetCaretTo(ccnt_pos+delta_ccnt)
 					return 0
 				}
 			}
@@ -976,8 +1006,7 @@ UI.RegisterEditorPlugin(function(){
 		if(nspaces_ours<=nspaces_lbra){return 1}
 		if(ed.GetText(ccnt_lh,nspaces_lbra)!=ed.GetText(ccnt_lh_lbra,nspaces_lbra)){return 1;}
 		ed.Edit([ccnt_lh+nspaces_lbra,nspaces_ours-nspaces_lbra,null, ccnt_pos,0,C])
-		this.sel0.ccnt=ccnt_lh+nspaces_lbra+Duktape.__byte_length(C)
-		this.sel1.ccnt=this.sel0.ccnt
+		this.SetSelection(ccnt_lh+nspaces_lbra+Duktape.__byte_length(C),this.sel0.ccnt)
 		return 0;
 	}
 	var listening_keys=[")","]","}"]
@@ -1010,6 +1039,7 @@ var bracket_context_prototype={
 }
 
 UI.RegisterEditorPlugin(function(){
+	//bracket completion
 	if(this.plugin_class!="code_editor"){return;}
 	this.m_bracket_ctx={
 		bac_stack:[],
@@ -1053,8 +1083,7 @@ UI.RegisterEditorPlugin(function(){
 					var sel=this.GetSelection()
 					var ops=[bad_curly_ac_ccnt,1,null, sel[0],sel[1]-sel[0],'}']
 					ed.Edit(ops)
-					this.sel0.ccnt=sel[0]
-					this.sel1.ccnt=sel[0]
+					this.SetCaretTo(sel[0])
 					return 0
 				}
 			}
@@ -1093,8 +1122,7 @@ UI.RegisterEditorPlugin(function(){
 			if(ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt){
 				var ccnt_lbra=ccnt1-1
 				ed.Edit([ccnt_lbra,2,null])
-				this.sel0.ccnt=ccnt_lbra
-				this.sel1.ccnt=ccnt_lbra
+				this.SetCaretTo(ccnt_lbra)
 				ctx.PopBacStack()
 				return 0
 			}
@@ -1120,8 +1148,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 			if(this.IsLineEndAt(ccnt1)){
 				//only move if we're at the line end
-				this.sel0.ccnt=ccnt1
-				this.sel1.ccnt=ccnt1
+				this.SetCaretTo(ccnt1)
 				//go ahead and do it
 				return 1
 			}
@@ -1233,8 +1260,7 @@ UI.RegisterEditorPlugin(function(){
 					//get the level AFTER insertion
 					var ccnt_mid=ccnt_pos+Duktape.__byte_length(C)//len(str)-1
 					ctx.current_bracket_ac_bralevel=this.GetBracketLevel(ccnt_mid)
-					this.sel0.ccnt=ccnt_mid
-					this.sel1.ccnt=ccnt_mid
+					this.SetCaretTo(ccnt_mid)
 					var hlobj=ed.CreateHighlight(ctx.current_bracket_ac_ccnt_range[2],ctx.current_bracket_ac_ccnt_range[1],-1)
 					hlobj.color=this.color_completing_bracket;
 					hlobj.invertible=0;
@@ -1250,8 +1276,7 @@ UI.RegisterEditorPlugin(function(){
 			var ccnt1=this.sel1.ccnt
 			if(ccnt1+Duktape.__byte_length(C)==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
 				ed.Edit([ccnt1,Duktape.__byte_length(C),C])
-				this.sel0.ccnt=ccnt1+Duktape.__byte_length(C)
-				this.sel1.ccnt=ccnt1+Duktape.__byte_length(C)
+				this.SetCaretTo(ccnt1+Duktape.__byte_length(C))
 				ctx.PopBacStack()
 				return 0
 			}

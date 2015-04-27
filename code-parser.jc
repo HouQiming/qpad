@@ -888,9 +888,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		else
 			fcheck=function(int c0,int c1){return !isWordChar(c0)}
 		ccnt_before_word=ed.MoveToBoundary(ccnt,-1,fcheck,4096)
-		//if !(ccnt_before_word<ccnt):
-		//	//could do ppm... but likely pointless for such a small sample
-		//	return 0
+		if !(ccnt_before_word<ccnt):
+			//could do ppm... but it's rather annoying
+			return 0
 		s_prefix=ed.GetText(ccnt_before_word,ccnt-ccnt_before_word)
 		/////////////////////
 		auto prefix_smalleri0(string a,string b)

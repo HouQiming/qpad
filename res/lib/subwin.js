@@ -778,8 +778,24 @@ W.FancyMenu=function(id,attrs){
 		}
 	}
 	UI.End()
+	UI.m_the_document_area=obj
 	return obj
 }
 
 //todo: search support
-//todo: notification system
+
+///////////////////////
+UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
+UI.UpdateNewDocumentSearchPath=function(){
+	if(!UI.m_the_document_area){return;}
+	var active_document=UI.m_the_document_area.active_tab
+	var ret=undefined;
+	if(active_document&&active_document.file_name){
+		ret=UI.GetPathFromFilename(active_document.file_name)
+	}
+	if(!ret){
+		ret=IO.GetNewDocumentName(undefined,undefined,"document");
+	}
+	UI.m_new_document_search_path=ret
+	return ret
+}

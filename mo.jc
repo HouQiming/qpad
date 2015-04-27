@@ -68,14 +68,34 @@ __generate_json("include_js","build/make_new_docs.js")
 		fn=JS.Param(0).or(new string)
 		return JS.Return(System.IO.FileExists(fn))
 	}
+	jsio["CreateEnumFileContext"]=function(JSContext JS){
+		fn0=JS.Param(0).as(string)
+		flags=JS.Param(1).or(0)
+		if !fn0:return 0
+		fnextfile=System.IO.CreateEnumFileContext(fn0,flags)
+		return JS.Return(function(JSContext JS){
+			auto fn
+			auto fi
+			(fn,fi)=fnextfile()
+			if !fn:return 0
+			ret=JS.New()
+			ret["name"]=fn
+			ret["size"]=fi.size
+			ret["attr"]=fi.attr
+			ret["is_dir"]=fi.is_dir()
+			ret["time"]=System.Time.ToLocalTime(i64(fi.latest_time()))
+			return JS.Return(ret)
+		})
+	}
+	jsio["WallClockTime"]=function(JSContext JS){
+		return JS.Return(System.Time.ToLocalTime(System.Time.WallClockTime()))
+	}
 	/////////////
 	dname_base=0
 	jsio["GetNewDocumentName"]=function(JSContext JS){
 		fn_base=JS.Param(0).as(string)
 		s_ext=JS.Param(1).as(string)
 		s_path_hint=JS.Param(2).or("document")
-		if !fn_base||!s_ext:
-			return 0
 		//todo: per-platform s_path_hint translation
 		if Platform.IS_WINDOWS:
 			s_userdir=System.Env.ExpandEnvironmentStrings(string("%USERPROFILE%"))
@@ -92,6 +112,8 @@ __generate_json("include_js","build/make_new_docs.js")
 				s_userdir=s_userdir.Replace(["\\","/"])
 		else
 			s_userdir=System.Env.GetStoragePath()
+		if !fn_base||!s_ext:
+			return JS.Return(s_userdir)
 		fn_base=s_userdir+"/"+fn_base
 		for(;;)
 			fn=FormatAsText(fn_base,formatNumber(dname_base,{base:16,align:4}),".",s_ext)

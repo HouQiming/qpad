@@ -355,6 +355,9 @@ class CLayouter_programmer
 		m_enable_advanced_wrapping=!!m_hyp
 	}
 	BeginRender=function(JSObject obj){
+		if Platform.BUILD=="debug":
+			if !m_lang:
+				obj.GetContext().evalVoid("UI.DumpCallStack()","<stack>")
 		m_cached_colors_p_word_part=m_lang.m_coloring_rules.n+1
 		m_cached_colors=new int[m_cached_colors_p_word_part+m_lang.m_word_color_names.n]
 		m_cached_colors[0]=obj[m_lang.m_default_color_name].or(0xff000000)
@@ -446,6 +449,7 @@ class CLayouter_programmer
 		ccnt_block_end=ccnt_base+i64(s.n)
 		ch_before_word=ed.GetUtf8CharNeighborhood(word_ccnt0)[0]
 		trigger_chars=m_lang.m_trigger_chars
+		word_ccnt0_bak=word_ccnt0-1
 		for(;;)
 			//Writeln(word_ccnt0)
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
@@ -457,6 +461,11 @@ class CLayouter_programmer
 				if word_ccnt0>=ccnt_block_end:
 					break
 			if word_ccnt0>=ccnt_block_end:break
+			if word_ccnt0==word_ccnt0_bak:
+				//blocked by invalid utf8
+				break
+			word_ccnt0_bak=word_ccnt0
+			//Writeln(word_ccnt0,' ',ccnt_block_end,' ',s[word_ccnt0])
 			//now we know we have a word
 			//non-word chars should immediately terminate the DFA
 			color_id=0
@@ -496,8 +505,7 @@ class CLayouter_programmer
 		//smart emboldening for SRGB
 		//coulddo: per-color emboldening
 		if g_renderer.m_srgb_supported:
-			color_default=m_cached_colors[0]
-			fnt_scaled.SmartEmbolden(m_cached_colors[0])
+			fnt_scaled.SmartEmbolden(0xff000000)
 		hc=charHeight()
 		x=GetFlatX(a)
 		if x>m_caret_overlay.x&&x<m_caret_overlay.y:
@@ -621,10 +629,10 @@ class CLayouter_programmer
 			a2=new(a)
 			AddString(a2,pp,new string,s,ofs)
 			x0=GetFlatX(a2)
-			//todo: we could have \n in the block above...
+			//we could have \n in the block above... and the test is done outside
 			if !(x0%m_wrap_width_in_fp):
-				if ofs&&s[ofs-1]!='\n':
-					return -1
+				//if ofs&&s[ofs-1]!='\n':
+				return -1
 		return 0
 	}
 	//////////////////////////////
@@ -641,11 +649,11 @@ class CLayouter_programmer
 			return fixed2float(x-scroll_x)*scale+screen_x
 		inline projectY(i64 y)
 			return fixed2float(y*hc-scroll_y)*scale+screen_y
-		inline projectXY(i64 x0)
-			auto y=x0/wrap_width
-			auto x=x0-y*wrap_width
-			y*=hc
-			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
+		//inline projectXY(i64 x0)
+		//	auto y=x0/wrap_width
+		//	auto x=x0-y*wrap_width
+		//	y*=hc
+		//	return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 		//re-create the atoms, convert string, then render
 		flat_x=a[0]
 		y=flat_x/wrap_width
@@ -668,8 +676,7 @@ class CLayouter_programmer
 			fnt_scaled.h*=scale
 			//smart emboldening for SRGB - it has to be done *after* the scale
 			if g_renderer.m_srgb_supported:
-				color_default=m_cached_colors[0]
-				fnt_scaled.SmartEmbolden(m_cached_colors[0])
+				fnt_scaled.SmartEmbolden(0xff000000)
 		OfsCheck=__inline_loop_body(ccnt){
 			if mode==MODE_BB&&h_line:
 				//never return before the first newline
@@ -684,6 +691,10 @@ class CLayouter_programmer
 		myDrawChar=function(int ch32){
 			if m_overlay_obj&&x==x_overlay&&y==y_overlay:
 				flat_x=y*wrap_width+x
+				inline projectXY(i64 x0)
+					//DO NOT WRAP DURING DRAWOVERLAY!
+					auto x=x0-y*wrap_width
+					return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y*hc-scroll_y)*scale+screen_y)
 				DrawOverlay(fnt_scaled,scale,flat_x,projectXY)
 				x+=m_caret_overlay.z
 			if ch32!=int(' '):
@@ -823,7 +834,7 @@ class CColorer_programmer
 					rollback=(tok_id&255);tok_id>>=8
 					if I-rollback>=0:
 						//this counts the trailing token of sth into the *next* block
-						//Writeln(tok_id,' ',I,' ',rollback)
+						//Writeln('token: ',tok_id,' ',I,' ',rollback)
 						fbody_outer(tok_id,I-rollback,token_lengths[tok_id])
 						I-=rollback
 					st=0
@@ -905,6 +916,7 @@ class CColorer_programmer
 			i8 direction
 		coloring_events=new TColoringEvent[]
 		inline testEvent(I,lg_token)
+			//Writeln('testEvent ',I,' ',lg_token,' ',mask)
 			if mask!=mask0:
 				//test color rules sequentially - they are only tested at color *changes*
 				for i=crules.n-1:-1:0
@@ -921,7 +933,7 @@ class CColorer_programmer
 						coloring_events.push(evt)
 				mask0=mask
 		//the first TOKEN may start before the block...
-		testEvent(-s_context.n,0)
+		testEvent(-s_context.n-1,0)
 		foreach tok,I,lg_token in EnumTokens(s_context,s)
 			//ignore nest-only brackets
 			tran=bdfa[bst+tok]
@@ -1047,11 +1059,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ops_map=new int[u16[]]
 		state_addrs=[0]
 		Q=[new int[]]
+		depths=[0]
 		dfa=new u16[n_char_types]
 		dfa_ops=new u16[]
 		reached=new i8[native_bigchars.n]
 		for(i=0L;i<Q.n;i++)
 			cur_states=Q[i]
+			cur_depth=depths[i]
 			my_addr=i*n_char_types
 			tran=new int[][n_char_types]
 			if cur_states.n&&cur_states[0]<0:
@@ -1084,6 +1098,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				new_states.Sort()
 				new_states.Unique()
 				actions=u16[].NULL
+				if new_states.n&&new_states[0]<0&&new_states.back()>=0:
+					//remove the tokens for which the generatable token is not a prefix of
+					new_states=[a foreach a in new_states if a<0||(a>>16)==cur_depth+1]
 				if new_states.n&&new_states[0]<0&&new_states.back()<0:
 					//actions - higher pid should take higher priority and get sorted first
 					//coulddo: substring case... defer the action and add a rollback
@@ -1096,6 +1113,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						if new_states.n:
 							new_stid=int(Q.n)
 							Q.push(new_states)
+							depths.push(cur_depth+1)
 							dfa.resize(dfa.n+n_char_types)
 							assert(dfa.n==n_char_types*Q.n)
 							state_map[new_states]=new_stid
@@ -1390,11 +1408,15 @@ registerStateHandler("seeker_indentation",CSeeker_indentation)
 NEXT_READ_SIZE=4194304
 INITIAL_READ_SIZE=16777216//2097152
 WRITE_BATCH=4194304
+//NEXT_READ_SIZE=233
+//INITIAL_READ_SIZE=233
+//WRITE_BATCH=4194304
 class CLoadingContext
 	i64 sz
 	//////////
 	//string fn
 	System.IO.CFile hf
+	string s_lingering
 	//////////
 	float progress
 	__JS_prototype=function(JSObject proto){
@@ -1621,13 +1643,41 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ed=JS.Param(0).as(CEditableText)
 		ret=JS.Param(1).as(CLoadingContext)
 		hf=ret.hf
-		//todo: UTF-8 boundary, encoding, ...
+		//if ret.s_lingering:
+		//	ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
+		//	ret.s_lingering=string.NULL
+		//after encoding
 		s=hf.Read(NEXT_READ_SIZE)
+		n_read=s.n
+		//todo: encoding
+		if ret.s_lingering:
+			s=ret.s_lingering+s
+			ret.s_lingering=string.NULL
 		if s.n:
-			//t0=System.Time.tick64()
-			ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:s}])
-			//Writeln('insertion: ',System.Time.TicksToSeconds(System.Time.tick64()-t0)*1000.0,' ',s.n)
-		if s.n<NEXT_READ_SIZE:
+			//UTF-8 boundary into ret.s_lingering
+			pchop=s.n
+			for i=s.n-1:-1:max(0,s.n-8)
+				c0mask=(int(u8(s[i]))&0xc0)
+				if c0mask==0x80:
+					//do nothing
+				else if c0mask==0xc0:
+					p_chop=i
+					break
+				else
+					p_chop=i+1
+					break
+			//Writeln(pchop,' ',s.n)
+			if pchop<s.n:
+				ret.s_lingering=new(s[pchop:])
+				ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:s[:pchop-1]}])
+			else
+				//t0=System.Time.tick64()
+				ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:s}])
+				//Writeln('insertion: ',System.Time.TicksToSeconds(System.Time.tick64()-t0)*1000.0,' ',s.n)
+		if n_read<NEXT_READ_SIZE:
+			if ret.s_lingering:
+				ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
+				ret.s_lingering=string.NULL
 			hf.Close()
 			return JS.Return(0)
 		ret.progress=float(min(double(hf.Position())/double(max(ret.sz,1LL)),1.0))
