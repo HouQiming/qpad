@@ -570,9 +570,23 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	//overloaded methods
 	StartLoading:function(fn){
 		var ed=this.ed;
-		ed.hfile_loading=UI.EDLoader_Open(ed,fn)
+		var is_preview=this.m_is_preview
+		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:undefined)
+		//abandonment should work as is...
 		var floadNext=(function(){
-			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading)
+			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:undefined)
+			if(is_preview){
+				var rendering_ccnt1=this.SeekXY(0,this.h)
+				if(rendering_ccnt1<ed.GetTextSize()){
+					//abandon and stop loading, without calling OnLoad
+					if(ed.hfile_loading){
+						ed.hfile_loading.discard()
+						ed.hfile_loading=undefined
+					}
+					UI.Refresh()
+					return
+				}
+			}
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
 			}else{
@@ -862,6 +876,7 @@ W.CodeEditorWidget_prototype={
 		UI.Refresh()
 	},
 	SaveMetaData:function(){
+		if(this.m_is_preview){return;}
 		var doc=this.doc
 		if(!doc||!IO.FileExists(this.file_name)){return;}
 		var new_metadata={m_bookmarks:[],m_unkeyed_bookmarks:[],
@@ -1524,6 +1539,7 @@ W.CodeEditorWidget_prototype={
 	},
 	////////////////////////////////
 	ParseFile:function(){
+		if(this.m_is_preview){return;}
 		UI.BumpHistory(this.file_name)
 		var doc=this.doc
 		var sz=doc.ed.GetTextSize()
@@ -1628,7 +1644,8 @@ W.FileItemOnDemand=function(){
 		return "keep"
 	}
 	if(!this.m_find_context){
-		this.m_find_context=IO.CreateEnumFileContext(this.name_to_find,0)
+		//enum both files and dirs
+		this.m_find_context=IO.CreateEnumFileContext(this.name_to_find,3)
 	}
 	var ret=[];
 	for(var i=0;i<FILE_LISTING_BUDGET;i++){
@@ -1651,44 +1668,46 @@ W.FileItemOnDemand=function(){
 }
 
 var GetSmartFileName=function(obj_param){
-	var redo_queue=[]
-	redo_queue.push(obj_param)
-	for(;redo_queue.length;){
-		var obj=redo_queue.pop()
-		var ret=obj.display_name
-		if(ret){return ret;}
-		var arv=UI.m_current_file_list.m_appeared_names
-		var name=obj.name
-		var name_s=name
-		for(;;){
-			var pslash=name_s.lastIndexOf('/')
-			var cur_name
-			if(pslash<=0){
-				cur_name=name
-			}else{
-				cur_name=name.substr(pslash+1)
+	if(!obj_param.display_name){
+		var redo_queue=[]
+		redo_queue.push(obj_param)
+		for(;redo_queue.length;){
+			var obj=redo_queue.pop()
+			var ret=obj.display_name
+			if(ret){return ret;}
+			var arv=UI.m_current_file_list.m_appeared_names
+			var name=obj.name
+			var name_s=name
+			for(;;){
+				var pslash=name_s.lastIndexOf('/')
+				var cur_name
+				if(pslash<=0){
+					cur_name=name
+				}else{
+					cur_name=name.substr(pslash+1)
+				}
+				var obj0=arv[cur_name];
+				if(!obj0){
+					arv[cur_name]=obj
+					obj.display_name=cur_name
+					break;
+				}
+				if(typeof obj0=='string'){
+					//screwed, continue
+				}else{
+					//need to re-get obj0's name
+					obj0.display_name=undefined
+					redo_queue.push(obj0)
+					UI.InvalidateCurrentFrame()
+					UI.Refresh()
+					arv[cur_name]='screwed'
+				}
+				if(pslash<=0){
+					obj.display_name=cur_name
+					break
+				}
+				name_s=name_s.substr(0,pslash)
 			}
-			var obj0=arv[cur_name];
-			if(!obj0){
-				arv[cur_name]=obj
-				obj.display_name=cur_name
-				break;
-			}
-			if(typeof obj0=='string'){
-				//screwed, continue
-			}else{
-				//need to re-get obj0's name
-				obj0.display_name=undefined
-				redo_queue.push(obj0)
-				UI.InvalidateCurrentFrame()
-				UI.Refresh()
-				arv[cur_name]='screwed'
-			}
-			if(pslash<=0){
-				obj.display_name=cur_name
-				break
-			}
-			name_s=name_s.substr(0,pslash)
 		}
 	}
 	return obj_param.display_name
@@ -1738,12 +1757,24 @@ var FormatRelativeTime=function(then,now){
 
 var FileItem_prototype={
 	OnDblClick:function(event){
+		if(this.is_dir){
+			var obj=this.owner
+			var fbar=obj.find_bar_edit
+			var ed=fbar.ed
+			ed.Edit([0,ed.GetTextSize(),this.name+'/'])
+			fbar.sel1.ccnt=ed.GetTextSize()
+			fbar.sel0.ccnt=fbar.sel1.ccnt
+			fbar.CallOnChange()
+			UI.Refresh()
+			return
+		}
 		var fn=this.name
-		var obj=UI.m_sxs_active_editor
+		var obj=this.owner.owner
 		obj.file_name=fn
 		obj.doc=undefined
 		obj.m_language_id=undefined
-		obj.m_is_brand_new=0;
+		obj.m_is_brand_new=undefined;
+		obj.m_is_preview=undefined;
 		UI.Refresh()
 	},
 }
@@ -1756,8 +1787,12 @@ W.FileItem=function(id,attrs){
 		var language_id=Language.GetNameByExt(s_ext)
 		var desc=Language.GetDescObjectByName(language_id)
 		var ext_color=(desc.file_icon_color||obj.file_icon_color)
-		var sel_bgcolor=ext_color
 		var icon_code=(desc.file_icon||'档').charCodeAt(0)
+		if(obj.is_dir){
+			ext_color=0xffb4771f
+			icon_code='开'.charCodeAt(0)
+		}
+		var sel_bgcolor=ext_color
 		//////////////
 		var icon_font=UI.Font(UI.icon_font_name,obj.h_icon)
 		var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
@@ -1771,12 +1806,12 @@ W.FileItem=function(id,attrs){
 		W.Text("",{x:obj.x+w_icon,y:obj.y+4,
 			font:obj.name_font,text:GetSmartFileName(obj),
 			color:obj.selected?obj.sel_name_color:obj.name_color})
-		var s_misc_text=[FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
+		var s_misc_text=[obj.is_dir?UI._("Folder"):FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
 		W.Text("",{x:obj.x+w_icon,y:obj.y+30,
 			font:obj.misc_font,text:s_misc_text,
 			color:obj.selected?obj.sel_misc_color:obj.misc_color})
 		s_ext=s_ext.toUpperCase()
-		if(!desc.file_icon){
+		if(!desc.file_icon&&!obj.is_dir){
 			var ext_dims=UI.MeasureText(UI.Font(UI.font_name,24),s_ext)
 			var ext_font=UI.Font(UI.font_name,Math.min(24*28/ext_dims.w,24))
 			ext_dims=UI.MeasureText(ext_font,s_ext)
@@ -1788,42 +1823,178 @@ W.FileItem=function(id,attrs){
 	return obj
 }
 
+var fnewpage_findbar_plugin=function(){
+	this.AddEventHandler('ESC',function(){
+		var obj=this.owner
+		if(this.m_close_on_esc){
+			UI.top.app.document_area.CloseTab()
+		}else{
+			var editor_widget=obj.owner
+			editor_widget.m_is_brand_new=0
+			if(editor_widget.m_file_name_before_preview){
+				//clear preview
+				editor_widget.file_name=editor_widget.m_file_name_before_preview
+				editor_widget.doc=undefined
+				editor_widget.m_language_id=undefined
+				editor_widget.m_is_preview=0
+				editor_widget.m_file_name_before_preview=undefined
+			}
+		}
+		UI.Refresh()
+	})
+	var fpassthrough=function(key,event){
+		var obj=this.owner
+		obj.file_list.OnKeyDown(event)
+	}
+	this.AddEventHandler('change',function(){
+		var obj=this.owner
+		obj.m_file_list=undefined
+		UI.Refresh()
+	})
+	this.AddEventHandler('RETURN RETURN2',fpassthrough)
+	this.AddEventHandler('UP',fpassthrough)
+	this.AddEventHandler('DOWN',fpassthrough)
+	this.AddEventHandler('PGUP',fpassthrough)
+	this.AddEventHandler('PGDN',fpassthrough)
+	this.AddEventHandler('TAB',function(key,event){
+		//todo: path completion
+	})
+}
+
+var g_regexp_backslash=new RegExp("\\\\","g");
+var g_regexp_abspath=new RegExp("(([a-zA-Z]:/)|(/)).*");
 W.SXS_NewPage=function(id,attrs){
 	//todo: proper refreshing on metadata change
+	//todo: left-window preview... how? initiate a weak load, core ready
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
 	UI.Begin(obj)
 		UI.RoundRect(obj)
-		UI.m_current_file_list={
-			m_now:IO.WallClockTime(),
-			m_appeared_names:{},
-			m_appeared_full_names:{},
+		////////////////////////////////////////////
+		//the find bar
+		UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h_find_bar,
+			color:obj.find_bar_bgcolor})
+		var rect_bar=UI.RoundRect({
+			x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
+			w:obj.w-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
+			color:obj.find_bar_color,
+			round:obj.find_bar_round})
+		UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
+			obj.find_bar_hint_color,'s'.charCodeAt(0))
+		var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
+		var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
+		W.Edit("find_bar_edit",{
+			style:obj.find_bar_editor_style,
+			x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+			owner:obj,
+			plugins:[fnewpage_findbar_plugin],
+		});
+		if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
+			W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+				font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
+				text:"Search"})
 		}
+		////////////////////////////////////////////
+		UI.m_current_file_list=obj.m_current_file_list
 		var files=obj.m_file_list;
+		var first_time=0
 		if(!files){
-			//these are just file-searching jobs, realize them when displayed
-			//todo: user search
+			obj.m_current_file_list={
+				m_now:IO.WallClockTime(),
+				m_appeared_names:{},
+				m_appeared_full_names:{},
+			}
+			UI.m_current_file_list=obj.m_current_file_list
 			files=[]
-			var hist=UI.m_ui_metadata["<history>"]
-			if(hist){
-				for(var i=hist.length-1;i>=0;i--){
-					files.push({name_to_find:hist[i]})
+			///////////////////////
+			var s_search_text=obj.find_bar_edit.ed.GetText()
+			//it's more of a smart interpretation of the user-typed string, not a full-blown explorer
+			//history mode
+			//only do space split for hist mode
+			if(s_search_text.indexOf('/')<0){
+				var hist=UI.m_ui_metadata["<history>"].filter(function(a){return a.toUpperCase()})
+				if(hist){
+					var hist_keywords=s_search_text.split(" ");
+					for(var i=hist.length-1;i>=0;i--){
+						var fn_i=hist[i],fn_i_search=fn_i.toUpperCase()
+						var is_invalid=0;
+						for(var j=0;j<hist_keywords.length;j++){
+							if(fn_i.indexOf(hist_keywords[j])<0){
+								is_invalid=1
+								break;
+							}
+						}
+						if(is_invalid){continue;}
+						files.push({name_to_find:fn_i})
+					}
 				}
 			}
-			files.push({
-				name_to_find:UI.m_new_document_search_path+"/*"
-			})
+			//file system part
+			var s_path=s_search_text
+			if(s_path.length||!files.length){
+				s_path=s_path.replace(g_regexp_backslash,"/")
+				if(s_path.match(g_regexp_abspath)){
+					//do nothing: it's absolute
+				}else{
+					s_path=UI.m_new_document_search_path+"/"+s_path
+				}
+				files.push({
+					name_to_find:s_path+"*"
+				})
+			}
+			//coulddo: git project part
 			obj.m_file_list=files
 			obj.file_list=undefined
+			first_time=1
 		}
 		W.ListView('file_list',{
-			x:obj.x+4,y:obj.y,w:obj.w-8,h:obj.h,
+			x:obj.x+4,y:obj.y+obj.h_find_bar+4,w:obj.w-8,h:obj.h-obj.h_find_bar-4,
 			mouse_wheel_speed:80,
 			dimension:'y',layout_spacing:0,layout_align:'fill',
 			OnDemand:W.FileItemOnDemand,
+			OnChange:function(value){
+				W.ListView_prototype.OnChange.call(this,value)
+				this.OpenPreview(value)
+			},
+			OpenPreview:function(value){
+				var editor_widget=obj.owner
+				if(!editor_widget.m_is_brand_new){return;}
+				if(editor_widget.m_file_name_before_preview){
+					//clear preview first
+					editor_widget.file_name=editor_widget.m_file_name_before_preview
+					editor_widget.doc=undefined
+					editor_widget.m_language_id=undefined
+					editor_widget.m_is_preview=0
+					editor_widget.m_file_name_before_preview=undefined
+				}
+				if(!this.items.length){return;}
+				if(!this.items[value].name||this.items[value].is_dir){return;}
+				var fn=this.name
+				if(!editor_widget.m_file_name_before_preview){
+					editor_widget.m_file_name_before_preview=editor_widget.file_name
+				}
+				editor_widget.file_name=this.items[value].name
+				editor_widget.doc=undefined
+				editor_widget.m_language_id=undefined
+				editor_widget.m_is_brand_new=1
+				editor_widget.m_is_preview=1
+				UI.Refresh()
+			},
 			item_template:{
 				object_type:W.FileItem,
+				owner:obj,
 			},items:files})
-		//todo: the search bar, on-demand sort, proper wiping of child elements
+		if(first_time){
+			obj.file_list.OpenPreview(0)
+		}
+		//find bar shadow
+		UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
+		UI.RoundRect({
+			x:obj.x-obj.find_bar_shadow_size, y:obj.y+obj.h_find_bar-obj.find_bar_shadow_size, w:obj.w+2*obj.find_bar_shadow_size, h:obj.find_bar_shadow_size*2,
+			round:obj.find_bar_shadow_size,
+			border_width:-obj.find_bar_shadow_size,
+			color:obj.find_bar_shadow_color})
+		UI.PopCliprect()
+		//todo: on-demand sort, proper wiping of child elements
 		//the windows way: "mounted" history
 		//bread / search
 	UI.End()
@@ -1878,7 +2049,7 @@ W.CodeEditor=function(id,attrs){
 			//scrolling and stuff
 			var ccnt_tot=doc.ed.GetTextSize()
 			var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
-			if(h_obj_area<ytot){
+			if(h_obj_area<ytot&&!obj.m_is_preview){
 				w_scrolling_area=obj.w_scroll_bar+4
 				if(obj.show_minimap){
 					w_scrolling_area+=obj.w_minimap+obj.padding
@@ -2148,9 +2319,11 @@ W.CodeEditor=function(id,attrs){
 					language:Language.GetDefinitionByName(obj.m_language_id),
 					plugin_language_desc:Language.GetDescObjectByName(obj.m_language_id),
 					style:editor_style,
-					wrap_width:obj.m_wrap_width,
+					wrap_width:obj.m_is_preview?w_obj_area-w_line_numbers-obj.padding-w_scrolling_area:obj.m_wrap_width,
 					///////////////
 					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,h:h_obj_area-h_top_hint-h_top_find-h_bottom_find,
+					///////////////
+					m_is_preview:obj.m_is_preview,
 				},W.CodeEditor_prototype);
 				//line number bar shadow when x scrolled
 				if(doc){
@@ -2524,7 +2697,7 @@ W.CodeEditor=function(id,attrs){
 					UI.InvalidateCurrentFrame();
 					UI.Refresh()
 				}
-				if(!obj.find_bar_edit.ed.GetTextSize()){
+				if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 					W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 						font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
 						text:"Search"})
@@ -2757,10 +2930,7 @@ W.CodeEditor=function(id,attrs){
 					color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
 				})
 			}
-			UI.m_sxs_active_editor=obj
-			sxs_visualizer('sxs_visualizer',{x:x_sxs_area,y:y_sxs_area,w:w_sxs_area,h:h_sxs_area})
-		}else{
-			UI.m_sxs_active_editor=undefined
+			sxs_visualizer('sxs_visualizer',{x:x_sxs_area,y:y_sxs_area,w:w_sxs_area,h:h_sxs_area,owner:obj})
 		}
 	UI.End()
 	return obj
@@ -2791,9 +2961,15 @@ UI.NewCodeEditorTab=function(fname0){
 				body.title=UI.RemovePath(body.file_name)
 			}
 			this.need_save=0
-			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
+			if(doc&&(doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
 				body.title=body.title+'*'
 				this.need_save=1
+			}
+			if(this.auto_focus_file_search&&body.sxs_visualizer&&body.sxs_visualizer.find_bar_edit){
+				this.auto_focus_file_search=0
+				UI.SetFocus(body.sxs_visualizer.find_bar_edit)
+				body.sxs_visualizer.find_bar_edit.m_close_on_esc=1
+				UI.Refresh()
 			}
 			return body;
 		},

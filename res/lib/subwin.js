@@ -71,6 +71,7 @@ W.TabLabel=function(id,attrs){
 W.TabbedDocument_prototype={
 	//closer -> class: OnClose notification and stuff
 	CloseTab:function(tabid,forced){
+		if(tabid==undefined){tabid=this.current_tab_id}
 		var tab=this.items[tabid]
 		if(tab.need_save&&!forced){
 			this.current_tab_id=tabid

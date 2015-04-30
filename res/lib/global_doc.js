@@ -2,7 +2,7 @@ var UI=require("gui2d/ui");
 
 //////////////////////////
 var g_regexp_chopdir=new RegExp("(.*)[/\\\\]([^/\\\\]*)");
-var g_regexp_chopext=new RegExp("(.*)\\.([^.\\\\]*)");
+var g_regexp_chopext=new RegExp("(.*)\\.([^./\\\\]*)");
 var g_style_core_properties=["name","font_face","font_size","font_embolden","flags","color","relative_line_space","relative_paragraph_space"];
 
 UI.RemovePath=function(fname){

@@ -10,6 +10,7 @@ UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.SetFontSharpening(1)
 //UI.SetFontSharpening(0)
 UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
+UI.icon_font_name='res/fonts/iconfnt.ttf,!'
 UI.Theme_CustomWidget=function(C){
 	var C_dark=UI.lerp_rgba(C[0],0xff000000,0.15)
 	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.75)
@@ -247,6 +248,7 @@ UI.Theme_CustomWidget=function(C){
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
+				font_tilde:UI.Font(UI.icon_font_name,28),
 				//todo
 				//font:UI.Font("res/fonts/inconsolata.ttf",24),
 				//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
@@ -263,8 +265,10 @@ UI.Theme_CustomWidget=function(C){
 				color_symbol:0xff7f7f7f,
 				color_symbol2:0xff7f7f7f,
 				color_meta:0xff9a3d6a,
+				/////////////
 				//virtual hyphen for tex-like files, should be even less obvious than normal symbols
 				color_hyphen:0xffaaaaaa,
+				color_tilde_spell_error:0xff1c1aa3,
 				/////////////
 				color_completing_bracket:0x80999999,
 				bgcolor_selection:C[0]&0x3fffffff,
@@ -416,7 +420,23 @@ UI.Theme_CustomWidget=function(C){
 			border_color:0xff000000,
 			border_width:0,
 			round:0,
-			//todo
+			//////////////////////
+			h_find_bar:32,
+			find_bar_bgcolor:0xffffffff,
+			find_bar_color:0xffe8e8e8,
+			find_bar_round:8,
+			find_bar_padding:4,
+			find_bar_hint_color:0xff7f7f7f,
+			find_bar_shadow_color:0x7f000000,
+			find_bar_shadow_size:8,
+			find_bar_hint_font:UI.Font("res/fonts/opensans.ttf",20,-50),
+			find_bar_button_size:28,
+			find_bar_editor_style:{
+				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				color:0xff000000,
+				bgcolor_selection:C[0]&0x3fffffff,
+				tab_width:4,
+			},
 		},
 		file_item:{
 			h:56,h_icon:48,
@@ -518,9 +538,8 @@ UI.Theme_CustomWidget=function(C){
 	s0.scroll_bar.middle_bar.color=0xff444444
 }
 UI.Theme_Minimalistic([0xffcc7733])
-UI.icon_font_name='res/fonts/iconfnt.ttf,!'
-UI.icon_font=UI.Font('res/fonts/iconfnt.ttf,!',24);
-UI.icon_font_20=UI.Font('res/fonts/iconfnt.ttf,!',20);
+UI.icon_font=UI.Font(UI.icon_font_name,24);
+UI.icon_font_20=UI.Font(UI.icon_font_name,20);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
 UI.font_name="res/fonts/opensans.ttf"
 
@@ -638,7 +657,6 @@ UI.Application=function(id,attrs){
 				UI.NewCodeEditorTab()
 				UI.Refresh()
 			}})
-			//todo: alt+q
 			menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
 				var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
 				if(!fn){return;}
@@ -649,6 +667,12 @@ UI.Application=function(id,attrs){
 				app.document_area.SaveCurrent();
 			}});
 			//todo: drag-loading
+			menu_file.AddSeparator();
+			menu_file.AddNormalItem({text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:function(){
+				UI.UpdateNewDocumentSearchPath()
+				UI.NewCodeEditorTab().auto_focus_file_search=1
+				UI.Refresh()
+			}})
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({text:"E&xit",action:function(){
 				if(!app.OnClose()){UI.DestroyWindow(app)}
@@ -668,7 +692,7 @@ UI.Application=function(id,attrs){
 		//UI.OpenFile("C:/h/syousetu/stars_tr.md")
 		//UI.OpenFile("c:/h/edtest/crap.c")
 		UI.UpdateNewDocumentSearchPath()
-		UI.NewCodeEditorTab()
+		UI.NewCodeEditorTab().auto_focus_file_search=1
 		UI.Refresh()
 	}
 };

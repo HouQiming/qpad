@@ -3,6 +3,7 @@ import "gui2d.jc"
 import "javascript.jc"
 import "text-box.jc"
 import "tex-like.jc"
+import "hunspell.jc"
 import System.Math.*
 import System.Algorithm.*
 import System.Console.*
@@ -137,6 +138,20 @@ class CLanguageDescription
 	int[] m_word_dfa_initial_state_triggered
 	string m_trigger_chars
 
+auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
+	//just use a glyph - '~' in the icon font!
+	//its height is 0.03*h, width is 1*h...
+	h_tilde_raw=g_renderer.GetCharacterHeight(fnt_tilde)
+	w_tilde=g_renderer.GetCharacterAdvance(fnt_tilde,int('~'))
+	for(x=x0;x<x1;x+=w_tilde)
+		need_clipping=0
+		if x+w_tilde>x1:
+			need_clipping=1
+			g_renderer.PushCliprect(x,y,w_tilde,h_tilde_raw)
+		g_renderer.DrawChar(fnt_tilde,x,y,C,int('~'))
+		if need_clipping:
+			g_renderer.PopCliprect()
+
 HL_DISPLAY_MODE_EMBOLDEN=1
 HL_DISPLAY_MODE_TILDE=2
 class CLayouter_programmer
@@ -154,6 +169,9 @@ class CLayouter_programmer
 	//////////////
 	m_enable_advanced_wrapping=0
 	CHyphenator m_hyp
+	//////////////
+	__pointer m_spell_checker
+	long2[] m_current_frame_spell_errors
 	//////////////
 	JSObject m_style
 	CLanguageDescription m_lang
@@ -353,6 +371,9 @@ class CLayouter_programmer
 		/////////
 		m_hyp=obj["hyphenator"].as(CHyphenator)
 		m_enable_advanced_wrapping=!!m_hyp
+		sname=obj["spell_checker"].as(string)
+		if sname&&sname.n:
+			m_spell_checker=Hunspell.getSpeller(sname)
 	}
 	BeginRender=function(JSObject obj){
 		if Platform.BUILD=="debug":
@@ -368,6 +389,8 @@ class CLayouter_programmer
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
 		m_cached_color_virtual_hyphen=int(obj["color_hyphen"].or(u32(m_cached_color_virtual_hyphen)))
+		if m_spell_checker:
+			m_current_frame_spell_errors=new long2[]
 	}
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
 		m_overlay_obj=obj
@@ -461,7 +484,8 @@ class CLayouter_programmer
 				if word_ccnt0>=ccnt_block_end:
 					break
 			if word_ccnt0>=ccnt_block_end:break
-			if word_ccnt0==word_ccnt0_bak:
+			//Writeln(word_ccnt0,' ',word_ccnt0_bak)
+			if word_ccnt0<=word_ccnt0_bak:
 				//blocked by invalid utf8
 				break
 			word_ccnt0_bak=word_ccnt0
@@ -485,6 +509,9 @@ class CLayouter_programmer
 					budget--
 					if budget<0:break
 			if st>=0:st=word_dfa[st+1]
+			if m_spell_checker:
+				ccnt_before_word=word_ccnt0
+				s_word=new string
 			color_id=~st
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
@@ -493,12 +520,37 @@ class CLayouter_programmer
 					if uptr(ofs)<uptr(color_ids.n):
 						if color_id>0:
 							color_ids[ofs]=m_cached_colors_p_word_part+color_id
+					if m_spell_checker:
+						if ch>=65536:
+							//surrogate pair - 2nd
+							s_word.push(char(((ch>>18)&0xf)+0xf0))
+							s_word.push(char(0x80+((ch>>12)&63)))
+							s_word.push(char(0x80+((ch>>6)&63)))
+							s_word.push(char(0x80+(ch&63)))
+							continue
+						else if ch>=2048:
+							s_word.push(char(((ch>>12)&0xf)+0xe0))
+							s_word.push(char(0x80+((ch>>6)&63)))
+							s_word.push(char(0x80+(ch&63)))
+						else if ch>=128:
+							s_word.push(char((ch>>6)+0xc0))
+							s_word.push(char(0x80+(ch&63)))
+						else
+							s_word.push(char(ch))
 				else
 					break
 				ch_before_word=ch
 				word_ccnt0=I2
 				if word_ccnt0>=ccnt_block_end:
 					break
+			if m_spell_checker:
+				//spell check
+				if s_word.n>1&&!Hunspell.spell(m_spell_checker,s_word):
+					if s_word[0]>='A'&&s_word[0]<='Z':
+						s_word[0]|=i8(0x20)
+						if !Hunspell.spell(m_spell_checker,s_word):
+							//not a word
+							m_current_frame_spell_errors.push(long2(ccnt_before_word,word_ccnt0))
 		///////
 		fnt_scaled=m_font
 		fnt_scaled.h*=scale
@@ -589,18 +641,33 @@ class CLayouter_programmer
 				if m_enable_advanced_wrapping:
 					x+=float2fixed(g_renderer.GetKerning(m_font,ch_prev,ch))
 					ch_prev=ch
-		else
-			//todo: tilde for spell checks
-			//if xy0.y==xy1.y:
-			//	hc=fixed2float(GetCharacterHeightAt(ccnt1))*scale
-			//	g_renderer.DrawBitmap(0, xy0.x,xy0.y,xy1.x-xy0.x,hc, hl.color)
-			//else
-			//	//draw 3 rects, we have a cliprect, don't worry
-			//	hc=fixed2float(GetCharacterHeightAt(ccnt0))*scale
-			//	g_renderer.DrawBitmap(0, xy0.x,xy0.y,max(scr_x+wf*scale-xy0.x,0.f),hc, hl.color)
-			//	g_renderer.DrawBitmap(0, scr_x,xy0.y+hc,wf*scale,max(xy1.y-(xy0.y+hc),0.f), hl.color)
-			//	hc=fixed2float(GetCharacterHeightAt(ccnt1))*scale
-			//	g_renderer.DrawBitmap(0, scr_x,xy1.y,max(xy1.x-scr_x,0.f),hc, hl.color)
+		if m_current_frame_spell_errors:
+			//tilde for spell checks
+			m_current_frame_spell_errors.Sort()
+			spell_error_ccnts=m_current_frame_spell_errors[0:].ConvertToAsBinary(i64)
+			xys=ed.GetXYEnMasse(spell_error_ccnts)
+			dy_baseline=g_renderer.GetFontBaseline(m_font)*scale
+			C_tilde=obj["color_tilde_spell_error"].as(int)
+			fnt_tilde=obj["font_tilde"].as(TFont)
+			fnt_tilde.h=m_font.h*scale
+			fnt_tilde.SmartEmbolden(C_tilde)
+			inline xyToFloat(x,y)
+				return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
+			wf=fixed2float(clip_w)
+			hcf=g_renderer.GetCharacterHeight(m_font)*scale
+			for i=0:4:xys.n-4
+				xy0=xyToFloat(xys[i+0],xys[i+1])
+				xy1=xyToFloat(xys[i+2],xys[i+3])
+				if xy0.y==xy1.y:
+					DrawTilde(fnt_tilde,xy0.x,xy1.x,xy0.y+dy_baseline, C_tilde)
+				else
+					//draw 3 rects, we have a cliprect, don't worry
+					DrawTilde(fnt_tilde,xy0.x,max(screen_x+wf*scale,xy0.x),xy0.y+dy_baseline, C_tilde)
+					//per-line draw...
+					for(y=xy0.y+hcf;y<xy1.y-hcf*0.5f;y+=hcf)
+						DrawTilde(fnt_tilde,screen_x,screen_x+wf*scale,y+dy_baseline, C_tilde)
+					DrawTilde(fnt_tilde,screen_x,max(xy1.x,screen_x),xy1.y+dy_baseline, C_tilde)
+			m_current_frame_spell_errors=long2[].NULL
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
 		return charHeight()
@@ -1419,8 +1486,15 @@ class CLoadingContext
 	string s_lingering
 	//////////
 	float progress
+	JS_discard=function(JSContext JS){
+		if hf:
+			hf.Close()
+			hf=System.IO.CFile.NULL
+		return 0
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"progress")
+		proto.ExportMethod(this,"discard",JS_discard)
 	}
 
 class CSavingContext
@@ -1624,12 +1698,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//initial read, which is a raw edit
 		ed=JS.Param(0).as(CEditableText)
 		fn=JS.Param(1).or(new string)
+		szread=JS.Param(2).or(INITIAL_READ_SIZE)
 		hf=System.IO.OpenFile(fn)
 		if !hf:return 0
-		s=hf.Read(INITIAL_READ_SIZE)
+		s=hf.Read(szread)
 		if s.n:
 			ed.RawEdit([TEditop(){s:s}])
-		if s.n<INITIAL_READ_SIZE:
+		if s.n<szread:
 			hf.Close()
 			return JS.Return(0)
 		ret=new CLoadingContext
@@ -1642,12 +1717,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Read"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
 		ret=JS.Param(1).as(CLoadingContext)
+		szread=JS.Param(2).or(NEXT_READ_SIZE)
 		hf=ret.hf
 		//if ret.s_lingering:
 		//	ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
 		//	ret.s_lingering=string.NULL
 		//after encoding
-		s=hf.Read(NEXT_READ_SIZE)
+		s=hf.Read(szread)
 		n_read=s.n
 		//todo: encoding
 		if ret.s_lingering:
@@ -1674,7 +1750,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//t0=System.Time.tick64()
 				ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:s}])
 				//Writeln('insertion: ',System.Time.TicksToSeconds(System.Time.tick64()-t0)*1000.0,' ',s.n)
-		if n_read<NEXT_READ_SIZE:
+		if n_read<szread:
 			if ret.s_lingering:
 				ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
 				ret.s_lingering=string.NULL
