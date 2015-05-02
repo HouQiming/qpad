@@ -729,6 +729,8 @@ class CLayouter_programmer
 		Hunspell.addWord(m_spell_checker,m_spell_checker_name,s_word)
 		return JS.Return(1)
 	}
+	string[] m_cached_suggestion
+	string m_cached_suggestion_word
 	JS_Suggest=function(JSContext JS){
 		if !m_spell_checker:return 0
 		ed=JS.Param(0).as(CEditableText)
@@ -738,7 +740,12 @@ class CLayouter_programmer
 			word_pos=m_current_frame_spell_errors[p]
 			if ccnt>=word_pos.x&&ccnt<word_pos.y:
 				s_word=ed.GetText(word_pos.x,word_pos.y-word_pos.x)
-				suggestions=Hunspell.suggest(m_spell_checker,s_word)
+				if m_cached_suggestion_word&&m_cached_suggestion_word==s_word:
+					suggestions=m_cached_suggestion
+				else
+					suggestions=Hunspell.suggest(m_spell_checker,s_word)
+					m_cached_suggestion=suggestions
+					m_cached_suggestion_word=s_word
 				ret=JS.New()
 				ret["suggestions"]=suggestions
 				ret["s_prefix"]=s_word

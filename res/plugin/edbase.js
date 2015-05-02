@@ -555,6 +555,7 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
 		if(ccnt_new>=0){
 			this.m_outer_scope_queue.push(this.sel1.ccnt)
+			this.m_outer_scope_queue_just_pushed=1
 			this.SetCaretTo(ccnt_new)
 			return 0;
 		}
@@ -569,7 +570,10 @@ UI.RegisterEditorPlugin(function(){
 	}
 	this.AddEventHandler('ALT+PGUP',fouter_scope)
 	this.AddEventHandler('ALT+PGDN',finner_scope)
-	this.AddEventHandler('selectionChange',function(){this.m_outer_scope_queue=[];})
+	this.AddEventHandler('selectionChange',function(){
+		if(this.m_outer_scope_queue_just_pushed){this.m_outer_scope_queue_just_pushed=0;return;}
+		this.m_outer_scope_queue=[];
+	})
 	this.AddEventHandler('change',function(){this.m_outer_scope_queue=[];})
 	//alt+up/down
 	var fscopeup=function(){
@@ -742,21 +746,8 @@ UI.RegisterEditorPlugin(function(){
 		this.m_rbracket_p1=hl_items[1]
 		this.m_rbracket_hl=hl_items[2]
 	})
-	var BracketSizeAt=function(doc,ccnt,side){
-		//ccnt is at the last character of a token...
-		var lang=doc.plugin_language_desc
-		var tokens=(side==0?lang.m_lbracket_tokens:lang.m_rbracket_tokens)
-		for(var i=0;i<tokens.length;i++){
-			var s=tokens[i]
-			var lg=Duktape.__byte_length(s)
-			if(doc.ed.GetText(ccnt+1-lg,lg)==s){
-				return lg
-			}
-		}
-		return 1
-	}
 	var HighlightBrackets=function(doc,ccnt0,ccnt1){
-		var sz0=BracketSizeAt(doc,ccnt0,0),sz1=BracketSizeAt(doc,ccnt1,1)
+		var sz0=doc.BracketSizeAt(ccnt0,0),sz1=doc.BracketSizeAt(ccnt1,1)
 		doc.m_lbracket_p0.ccnt=ccnt0+1-sz0
 		doc.m_lbracket_p1.ccnt=ccnt0+1
 		doc.m_rbracket_p0.ccnt=ccnt1+1-sz1

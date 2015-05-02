@@ -646,8 +646,27 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		return ed.FindNearest(id_indent,[my_level-1],"l",ccnt,-1);
 	},
 	///////////////////////////////
+	BracketSizeAt:function(ccnt,side){
+		//ccnt is at the last character of a token...
+		var lang=this.plugin_language_desc
+		if(!lang){return 1;}
+		var tokens=(side==0?lang.m_lbracket_tokens:lang.m_rbracket_tokens)
+		if(!tokens){return 1;}
+		for(var i=0;i<tokens.length;i++){
+			var s=tokens[i]
+			var lg=Duktape.__byte_length(s)
+			if(this.ed.GetText(ccnt+1-lg,lg)==s){
+				return lg
+			}
+		}
+		return 1
+	},
+	FindOuterBracket_SizeFriendly:function(ccnt,delta){
+		var ccnt_raw=this.FindOuterBracket(ccnt,delta)
+		return ccnt_raw+1-this.BracketSizeAt(ccnt_raw,0)
+	},
 	FindOuterLevel:function(ccnt){
-		var ret=Math.max(this.FindOuterBracket(ccnt,-1),this.FindOuterIndentation(ccnt))
+		var ret=Math.max(this.FindOuterBracket_SizeFriendly(ccnt,-1),this.FindOuterIndentation(ccnt))
 		if(ret>=ccnt){ret=-1;}
 		return ret
 	},
