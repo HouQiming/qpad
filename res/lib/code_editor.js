@@ -1979,9 +1979,9 @@ W.SXS_NewPage=function(id,attrs){
 				W.ListView_prototype.OnChange.call(this,value)
 				this.OpenPreview(value)
 			},
-			OpenPreview:function(value){
+			OpenPreview:function(value,is_explicit){
 				var editor_widget=obj.owner
-				if(!editor_widget.m_is_brand_new){return;}
+				if(!editor_widget.m_is_brand_new||!UI.HasFocus(obj.find_bar_edit)&&!is_explicit){return;}
 				if(editor_widget.m_file_name_before_preview){
 					//clear preview first
 					editor_widget.file_name=editor_widget.m_file_name_before_preview
@@ -2008,7 +2008,7 @@ W.SXS_NewPage=function(id,attrs){
 				owner:obj,
 			},items:files})
 		if(first_time){
-			obj.file_list.OpenPreview(0)
+			obj.file_list.OpenPreview(0,"explicit")
 		}
 		//find bar shadow
 		UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
@@ -2027,6 +2027,15 @@ W.SXS_NewPage=function(id,attrs){
 
 W.CodeEditor=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
+	if(obj.m_is_brand_new&&obj.doc&&UI.HasFocus(obj.doc)){
+		if(obj.m_file_name_before_preview){
+			obj.file_name=obj.m_file_name_before_preview
+			obj.doc=undefined
+			obj.m_language_id=undefined
+			obj.m_is_preview=0
+			obj.m_file_name_before_preview=undefined
+		}
+	}
 	if(!obj.m_language_id){
 		var s_ext=UI.GetFileNameExtension(obj.file_name)
 		obj.m_language_id=Language.GetNameByExt(s_ext)
