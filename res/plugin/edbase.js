@@ -365,6 +365,7 @@ var f_tex_like=function(lang){
 	kwset=lang.DefineKeywordSet("color_symbol");
 	kwset.DefineWordColor("color")
 	kwset.DefineWordType("color_number","0-9")
+	lang.SetSpellCheckedColor("color")
 	return (function(lang){
 		lang.SetExclusive([bid_comment,bid_math])
 		if(lang.isInside(bid_comment)){
@@ -404,6 +405,7 @@ Language.Register({
 	rules:function(lang){
 		lang.DefineDefaultColor("color")
 		var bid_title=lang.ColoredDelimiter("key","#","\n","color_type");
+		lang.SetSpellCheckedColor("color")
 		/////////////
 		return (function(lang){
 			//nothing
@@ -666,7 +668,7 @@ UI.RegisterEditorPlugin(function(){
 				var ed=this.ed;
 				var ccnt=this.sel1.ccnt;
 				if(this.m_bookmarks[i]){
-					this.SetCaretTo(this.m_bookmarks[i].ccnt)
+					this.SetCaretTo(this.m_bookmarks[i].ccnt,"auto_center")
 					return 0
 				}
 				return 1;
@@ -1296,3 +1298,30 @@ UI.RegisterEditorPlugin(function(){
 		}).call(this,C);
 	}
 });
+
+//ignoring trailing spaces
+UI.RegisterEditorPlugin(function(){
+	this.AddEventHandler('END',function(){
+		var ed_caret=this.GetCaretXY();
+		var ccnt_lend=this.SeekXY(1e17,ed_caret.y);
+		var ccnt_reend=this.GetEnhancedEnd(this.sel1.ccnt)
+		if(ccnt_reend<ccnt_lend&&this.sel1.ccnt!=ccnt_reend){
+			//auto-strip the trailing space
+			this.ed.Edit([ccnt_reend,ccnt_lend-ccnt_reend,null])
+			this.SetCaretTo(ccnt_reend)
+			return 0
+		}
+		return 1
+	})
+	this.AddEventHandler('DELETE',function(){
+		if(this.sel0.ccnt==this.sel1.ccnt){
+			var ccnt=this.sel1.ccnt
+			var ccnt_after=this.ed.MoveToBoundary(ccnt,1,"space")
+			if(ccnt<ccnt_after&&this.ed.GetUtf8CharNeighborhood(ccnt_after)[1]==10&&ccnt_after<this.ed.GetTextSize()){
+				this.sel1.ccnt=ccnt_after+1
+				return 1
+			}
+		}
+		return 1
+	})
+})

@@ -27,6 +27,6 @@
 
 (function(){
 	mkdir(g_bin_dir+"/dict")
-	UpdateTo(g_bin_dir+"/dict/en_us.aff",g_base_dir+"/build/en_US.aff")
-	UpdateTo(g_bin_dir+"/dict/en_us.dic",g_base_dir+"/build/en_US.dic")
+	UpdateTo(g_bin_dir+"/dict/en_us.aff",g_base_dir+"/build/dict/en_US.aff")
+	UpdateTo(g_bin_dir+"/dict/en_us.dic",g_base_dir+"/build/dict/en_US.dic")
 })();

@@ -923,7 +923,20 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if cands.n:
 				s_common_prefix=CommonPrefix(getIdString(cands[0].x)[s_prefix.n:],getIdString(cands.back().x)[s_prefix.n:])
 				if s_common_prefix.n:
-					cands=[int2(getid(getIdString(cands[0].x)[:s_prefix.n+s_common_prefix.n-1]),0x3f800000)]
+					//find the most similar
+					best=0
+					best_I=0
+					foreach cc,I in cands
+						s_cc=getIdString(cc.x)
+						score=0
+						for i=0:min(s_prefix.n,s_cc.n)-1
+							if s_prefix[i]==s_cc[i]:
+								score++
+						if best<score:
+							best=score
+							best_I=I
+						if best>=s_prefix.n:break
+					cands=[int2(getid(getIdString(cands[best_I].x)[:s_prefix.n+s_common_prefix.n-1]),0x3f800000)]
 					return JS.Return(new CACContext(){
 						m_candidates:cands,
 						s_prefix:s_prefix,m_common_prefix:s_common_prefix})
@@ -1003,5 +1016,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if ret_temp.n==1:
 			acret.m_common_prefix=getIdString(ret_temp[0].x)[s_prefix.n:]
 		return JS.Return(acret)
+	}
+	JS_UI["ED_CopyCase"]=function(JSContext JS){
+		s_src=Utf8ToUnicode32(JS.Param(0).as(string))
+		s_src_lower=Utf8ToUnicode32(JS.Param(1).as(string))
+		s_src_upper=Utf8ToUnicode32(JS.Param(2).as(string))
+		s_tar=Utf8ToUnicode32(JS.Param(3).as(string))
+		for i=0:min(min(s_src.n,s_tar.n),min(s_src_lower.n,s_src_upper.n))-1
+			if s_tar[i]==s_src_lower[i]||s_tar[i]==s_src_upper[i]:
+				s_src[i]=s_tar[i]
+		return JS.Return(Unicode32ToUtf8(s_src))
 	}
 })

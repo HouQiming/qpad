@@ -248,7 +248,7 @@ UI.Theme_CustomWidget=function(C){
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
-				font_tilde:UI.Font(UI.icon_font_name,28),
+				font_tilde:UI.Font(UI.icon_font_name,28,100),
 				//todo
 				//font:UI.Font("res/fonts/inconsolata.ttf",24),
 				//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
@@ -325,6 +325,7 @@ UI.Theme_CustomWidget=function(C){
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",20),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
+				font_tilde:UI.Font(UI.icon_font_name,28,100),
 				color:0xff000000,
 				color_overlay:0xff000000,
 				color_string:0xff1c1aa3,

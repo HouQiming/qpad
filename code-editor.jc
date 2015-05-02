@@ -20,7 +20,7 @@ auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
 	foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 		n0=ret.n
 		(atoms,eatoms,tail_style_id)=TextToLayoutAtom(hyp,s,0,styles,CEmbededObject[].NULL)
-		line_breaks=DPLayoutGeneral(atoms,w_line)
+		line_breaks=DPLayoutGeneral(atoms,w_line,1)
 		GenerateTextLayout(
 			styles,
 			s,atoms,eatoms,line_breaks,tail_style_id,
@@ -137,6 +137,8 @@ class CLanguageDescription
 	int[] m_word_dfa_initial_state
 	int[] m_word_dfa_initial_state_triggered
 	string m_trigger_chars
+	/////////
+	int m_color_id_spell_check
 
 auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
 	//just use a glyph - '~' in the icon font!
@@ -147,7 +149,7 @@ auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
 		need_clipping=0
 		if x+w_tilde>x1:
 			need_clipping=1
-			g_renderer.PushCliprect(x,y,w_tilde,h_tilde_raw)
+			g_renderer.PushCliprect(x,y,x1-x,h_tilde_raw)
 		g_renderer.DrawChar(fnt_tilde,x,y,C,int('~'))
 		if need_clipping:
 			g_renderer.PopCliprect()
@@ -171,7 +173,9 @@ class CLayouter_programmer
 	CHyphenator m_hyp
 	//////////////
 	__pointer m_spell_checker
+	string m_spell_checker_name
 	long2[] m_current_frame_spell_errors
+	int m_temporarily_disable_spell_check
 	//////////////
 	JSObject m_style
 	CLanguageDescription m_lang
@@ -371,9 +375,11 @@ class CLayouter_programmer
 		/////////
 		m_hyp=obj["hyphenator"].as(CHyphenator)
 		m_enable_advanced_wrapping=!!m_hyp
-		sname=obj["spell_checker"].as(string)
+		sname=obj["m_spell_checker"].as(string)
 		if sname&&sname.n:
 			m_spell_checker=Hunspell.getSpeller(sname)
+			if m_spell_checker:
+				m_spell_checker_name=sname
 	}
 	BeginRender=function(JSObject obj){
 		if Platform.BUILD=="debug":
@@ -461,6 +467,7 @@ class CLayouter_programmer
 		word_dfa=m_lang.m_word_dfa
 		word_char_map=m_lang.m_word_char_map
 		n_word_char_types=m_lang.m_n_word_char_types
+		color_id_spell_check=m_lang.m_color_id_spell_check
 		//start from word_ccnt0, do per-char enum until we go out of block
 		word_ccnt0=ccnt_base
 		budget=GRACEFUL_WORD_SIZE
@@ -473,6 +480,7 @@ class CLayouter_programmer
 		ch_before_word=ed.GetUtf8CharNeighborhood(word_ccnt0)[0]
 		trigger_chars=m_lang.m_trigger_chars
 		word_ccnt0_bak=word_ccnt0-1
+		s_word=new string
 		for(;;)
 			//Writeln(word_ccnt0)
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
@@ -509,10 +517,13 @@ class CLayouter_programmer
 					budget--
 					if budget<0:break
 			if st>=0:st=word_dfa[st+1]
-			if m_spell_checker:
-				ccnt_before_word=word_ccnt0
-				s_word=new string
 			color_id=~st
+			need_spell_check=0
+			if m_spell_checker&&!m_temporarily_disable_spell_check:
+				ccnt_before_word=word_ccnt0
+				if color_id==color_id_spell_check:
+					s_word.n=0
+					need_spell_check=1
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
 				if isWordChar(ch):
@@ -520,14 +531,13 @@ class CLayouter_programmer
 					if uptr(ofs)<uptr(color_ids.n):
 						if color_id>0:
 							color_ids[ofs]=m_cached_colors_p_word_part+color_id
-					if m_spell_checker:
+					if need_spell_check:
 						if ch>=65536:
 							//surrogate pair - 2nd
 							s_word.push(char(((ch>>18)&0xf)+0xf0))
 							s_word.push(char(0x80+((ch>>12)&63)))
 							s_word.push(char(0x80+((ch>>6)&63)))
 							s_word.push(char(0x80+(ch&63)))
-							continue
 						else if ch>=2048:
 							s_word.push(char(((ch>>12)&0xf)+0xe0))
 							s_word.push(char(0x80+((ch>>6)&63)))
@@ -543,12 +553,17 @@ class CLayouter_programmer
 				word_ccnt0=I2
 				if word_ccnt0>=ccnt_block_end:
 					break
-			if m_spell_checker:
+			if need_spell_check:
 				//spell check
-				if s_word.n>1&&!Hunspell.spell(m_spell_checker,s_word):
-					if s_word[0]>='A'&&s_word[0]<='Z':
-						s_word[0]|=i8(0x20)
-						if !Hunspell.spell(m_spell_checker,s_word):
+				if s_word.n>1:
+					s_word.push(char(0))
+					if !Hunspell.spell(m_spell_checker,s_word):
+						is_bad=1
+						if s_word[0]>='A'&&s_word[0]<='Z':
+							s_word[0]|=i8(0x20)
+							if Hunspell.spell(m_spell_checker,s_word):
+								is_bad=0
+						if is_bad:
 							//not a word
 							m_current_frame_spell_errors.push(long2(ccnt_before_word,word_ccnt0))
 		///////
@@ -616,37 +631,13 @@ class CLayouter_programmer
 					if iy*hc-scroll_y>=clip_h:break
 		testOverlay()
 	}
-	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
-		hid=ed.m_handler_registration["renderer"].as(int)
-		fnt_bold_scaled=m_font_emboldened
-		fnt_bold_scaled.h*=scale
-		hc=charHeight()
-		////////
-		ccnt0=hl.p0.ccnt
-		ccnt1=hl.p1.ccnt
-		mode=int(hl.display_mode)
-		if mode==HL_DISPLAY_MODE_EMBOLDEN:
-			//only embolden a single char
-			ch_prev=ed.GetUtf8CharNeighborhood(ccnt0)[0]
-			s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
-			wrap_width=m_wrap_width_in_fp
-			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
-			foreach ch in Utf8Chars(s_embolden)
-				iy=x/wrap_width
-				ix=x-iy*wrap_width
-				prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
-				g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,hl.color, ch)
-				dx_i=charWidth(ch)
-				x+=dx_i
-				if m_enable_advanced_wrapping:
-					x+=float2fixed(g_renderer.GetKerning(m_font,ch_prev,ch))
-					ch_prev=ch
+	EndRender=function(JSObject obj,CEditableText ed, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		if m_current_frame_spell_errors:
 			//tilde for spell checks
 			m_current_frame_spell_errors.Sort()
 			spell_error_ccnts=m_current_frame_spell_errors[0:].ConvertToAsBinary(i64)
 			xys=ed.GetXYEnMasse(spell_error_ccnts)
-			dy_baseline=g_renderer.GetFontBaseline(m_font)*scale
+			dy_baseline=(g_renderer.GetFontBaseline(m_font)+0.04f*m_font.h)*scale
 			C_tilde=obj["color_tilde_spell_error"].as(int)
 			fnt_tilde=obj["font_tilde"].as(TFont)
 			fnt_tilde.h=m_font.h*scale
@@ -667,7 +658,35 @@ class CLayouter_programmer
 					for(y=xy0.y+hcf;y<xy1.y-hcf*0.5f;y+=hcf)
 						DrawTilde(fnt_tilde,screen_x,screen_x+wf*scale,y+dy_baseline, C_tilde)
 					DrawTilde(fnt_tilde,screen_x,max(xy1.x,screen_x),xy1.y+dy_baseline, C_tilde)
-			m_current_frame_spell_errors=long2[].NULL
+			//m_current_frame_spell_errors=long2[].NULL
+	}
+	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
+		hid=ed.m_handler_registration["renderer"].as(int)
+		fnt_bold_scaled=m_font_emboldened
+		fnt_bold_scaled.h*=scale
+		hc=charHeight()
+		////////
+		ccnt0=hl.p0.ccnt
+		ccnt1=hl.p1.ccnt
+		mode=int(hl.display_mode)
+		if mode==HL_DISPLAY_MODE_EMBOLDEN:
+			//only embolden a single char
+			ch_prev=ed.GetUtf8CharNeighborhood(ccnt0)[0]
+			s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
+			wrap_width=m_wrap_width_in_fp
+			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
+			if x>=m_caret_overlay.x&&x<m_caret_overlay.y:
+				x+=m_caret_overlay.z
+			foreach ch in Utf8Chars(s_embolden)
+				iy=x/wrap_width
+				ix=x-iy*wrap_width
+				prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
+				g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,hl.color, ch)
+				dx_i=charWidth(ch)
+				x+=dx_i
+				if m_enable_advanced_wrapping:
+					x+=float2fixed(g_renderer.GetKerning(m_font,ch_prev,ch))
+					ch_prev=ch
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
 		return charHeight()
@@ -703,7 +722,35 @@ class CLayouter_programmer
 		return 0
 	}
 	//////////////////////////////
-	__JS_prototype=function(JSObject proto){}
+	JS_AddWord=function(JSContext JS){
+		if !m_spell_checker:return 0
+		s_word=JS.Param(0).as(string)
+		if !s_word:return 0
+		Hunspell.addWord(m_spell_checker,m_spell_checker_name,s_word)
+		return JS.Return(1)
+	}
+	JS_Suggest=function(JSContext JS){
+		if !m_spell_checker:return 0
+		ed=JS.Param(0).as(CEditableText)
+		ccnt=JS.Param(1).as(i64)
+		p=m_current_frame_spell_errors.Bisect(function(long2 a){return a.y<=ccnt})
+		if p<m_current_frame_spell_errors.n:
+			word_pos=m_current_frame_spell_errors[p]
+			if ccnt>=word_pos.x&&ccnt<word_pos.y:
+				s_word=ed.GetText(word_pos.x,word_pos.y-word_pos.x)
+				suggestions=Hunspell.suggest(m_spell_checker,s_word)
+				ret=JS.New()
+				ret["suggestions"]=suggestions
+				ret["s_prefix"]=s_word
+				ret["ccnt0"]=word_pos.x
+				return JS.Return(ret)
+		return 0
+	}
+	__JS_prototype=function(JSObject proto){
+		proto.ExportMethod(this,"HunspellAddWord",JS_AddWord)
+		proto.ExportMethod(this,"HunspellSuggest",JS_Suggest)
+		proto.ExportProperty(this,"m_temporarily_disable_spell_check")
+	}
 	//////////////////////////////
 	MODE_BB=0
 	MODE_SEEK=1
@@ -1321,6 +1368,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				word_color_id_map[s_color]=color_id+1
 			return color_id
 		m_keyword_sets=obj["m_keyword_sets"].as(JSObject)
+		s_spell_color=obj["m_color_id_spell_check"].as(string)
+		if s_spell_color:
+			ret.m_color_id_spell_check=getWordColorID(s_spell_color)
+		else
+			ret.m_color_id_spell_check=-1
 		init_state_by_kwset=new int[]
 		for ksi=0:m_keyword_sets.length()-1
 			keyword_set_i=m_keyword_sets[ksi].as(JSObject)

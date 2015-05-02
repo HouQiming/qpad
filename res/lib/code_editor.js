@@ -522,6 +522,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			this.font=this.tex_font
 			this.font_emboldened=this.tex_font_emboldened
 		}
+		var spell_checker=(loaded_metadata.m_spell_checker||this.plugin_language_desc&&this.plugin_language_desc.spell_checker)
+		if(spell_checker){
+			this.m_spell_checker=spell_checker;
+		}
 		W.Edit_prototype.Init.call(this);
 		//these are locators when set
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
@@ -884,6 +888,7 @@ W.CodeEditorWidget_prototype={
 			m_find_flags:this.m_find_flags,
 			m_wrap_width:this.m_wrap_width,
 			m_hyphenator_name:this.m_hyphenator_name,
+			m_spell_checker:this.m_spell_checker,
 			sel0:doc.sel0.ccnt,
 			sel1:doc.sel1.ccnt,
 		}
@@ -2402,37 +2407,10 @@ W.CodeEditor=function(id,attrs){
 			}else{
 				//line numbers
 				DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h);
-				//the top hint
-				if(top_hint_bbs.length){
-					var y_top_hint=y_top_hint_scroll;
-					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
-						var y0=top_hint_bbs[bbi]
-						var y1=top_hint_bbs[bbi+1]
-						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
-						if(hh>=0){
-							doc.ed.Render({x:0,y:y0,w:w_obj_area-w_line_numbers-w_scrolling_area,h:hh,
-								scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
-							//also draw the line numbers
-							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
-						}
-						y_top_hint+=y1-y0;
-					}
-					UI.PushCliprect(obj.x,obj.y+h_top_hint,w_obj_area-w_scrolling_area,h_obj_area-h_top_hint)
-					//a (shadowed) separation bar
-					UI.RoundRect({
-						x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:w_obj_area-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
-						round:obj.top_hint_shadow_size,
-						border_width:-obj.top_hint_shadow_size,
-						color:obj.top_hint_shadow_color})
-					UI.RoundRect({
-						x:obj.x, y:obj.y+h_top_hint, w:w_obj_area-w_scrolling_area, h:obj.top_hint_border_width,
-						color:obj.top_hint_border_color})
-					UI.PopCliprect()
-				}
 				//auto-completion
 				var got_overlay_before=!!doc.ed.m_other_overlay;
 				doc.ed.m_other_overlay=undefined
-				if(doc.sel0.ccnt==doc.sel1.ccnt&&doc.m_user_just_typed_char&&obj.show_auto_completion){
+				if(doc.sel0.ccnt==doc.sel1.ccnt&&obj.show_auto_completion&&(doc.m_user_just_typed_char||doc.plugin_language_desc.default_hyphenator_name)){
 					var acctx=obj.m_ac_context
 					var ac_was_actiavted=0
 					if(acctx&&acctx.m_ccnt!=doc.sel1.ccnt){
@@ -2442,8 +2420,33 @@ W.CodeEditor=function(id,attrs){
 						UI.Refresh()
 					}
 					if(!acctx){
-						var accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt)
+						var accands
+						var is_spell_mode=0
+						if(doc.m_user_just_typed_char){
+							accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt)
+						}else{
+							//tex mode - it's actually a spelling suggestion
+							//var ccnt_word=doc.sel1.ccnt
+							//var ccnt_word0=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_word,-1),-1,"word_boundary_left"),-1)
+							//var ccnt_word1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_word,1),1,"word_boundary_right"),1)
+							var accands={length:0,at:function(id){return this.suggestions[id]},suggestions:[],s_prefix:""}
+							is_spell_mode=1
+							//if(ccnt_word0+1<ccnt_word1){
+							var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+							//accands.s_prefix=doc.ed.GetText(ccnt_word0,ccnt_word1-ccnt_word0)
+							var spell_ctx=renderer.HunspellSuggest(doc.ed,doc.sel1.ccnt)
+							if(spell_ctx){
+								var suggestions=spell_ctx.suggestions
+								accands.s_prefix=spell_ctx.s_prefix
+								suggestions.push("Add '@1' to dictionary".replace("@1",accands.s_prefix))
+								accands.suggestions=suggestions.map(function(a){return {name:a,weight:1}})
+								accands.length=suggestions.length
+								accands.ccnt0=spell_ctx.ccnt0
+							}
+							//}
+						}
 						acctx={
+							m_is_spell_mode:is_spell_mode,
 							m_ccnt:doc.sel1.ccnt,
 							m_accands:accands,
 							m_scroll_i:0,
@@ -2469,14 +2472,27 @@ W.CodeEditor=function(id,attrs){
 							},
 							Activate:function(){
 								if(!this.m_n_cands){return;}
-								this.m_activated=1;	
+								this.m_activated=1;
 								UI.Refresh()
 							},
 							Confirm:function(id){
 								var s_prefix=this.m_accands.s_prefix
+								if(is_spell_mode&&id==this.m_n_cands-1){
+									//coulddo: remove, or just give a "user-dic-editing" option
+									var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+									renderer.HunspellAddWord(s_prefix);
+									UI.Refresh();
+									return;
+								}
 								var lg=Duktape.__byte_length(s_prefix);
 								var ccnt0=doc.sel1.ccnt-lg
+								if(is_spell_mode){
+									ccnt0=this.m_accands.ccnt0
+								}
 								var sname=this.m_accands.at(id).name
+								if(doc.plugin_language_desc.default_hyphenator_name){
+									sname=UI.ED_CopyCase(sname,sname.toLowerCase(),sname.toUpperCase(),s_prefix)
+								}
 								var lg2=Duktape.__byte_length(sname);
 								doc.HookedEdit([ccnt0,lg,sname])
 								if(!this.m_accands.m_common_prefix){
@@ -2511,7 +2527,7 @@ W.CodeEditor=function(id,attrs){
 						UI.Refresh()
 					}
 					if(!obj.show_find_bar){
-						if(acctx.m_n_cands>1){
+						if(acctx.m_n_cands>0){
 							if(ac_was_actiavted){
 								acctx.Activate()
 							}
@@ -2607,6 +2623,34 @@ W.CodeEditor=function(id,attrs){
 				if(got_overlay_before&&!doc.ed.m_other_overlay){
 					UI.InvalidateCurrentFrame()
 					UI.Refresh()
+				}
+				////////////////
+				//the top hint, do it after since its Render screws the spell checks
+				if(top_hint_bbs.length){
+					var y_top_hint=y_top_hint_scroll;
+					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
+						var y0=top_hint_bbs[bbi]
+						var y1=top_hint_bbs[bbi+1]
+						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
+						if(hh>=0){
+							doc.ed.Render({x:0,y:y0,w:w_obj_area-w_line_numbers-w_scrolling_area,h:hh,
+								scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
+							//also draw the line numbers
+							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
+						}
+						y_top_hint+=y1-y0;
+					}
+					UI.PushCliprect(obj.x,obj.y+h_top_hint,w_obj_area-w_scrolling_area,h_obj_area-h_top_hint)
+					//a (shadowed) separation bar
+					UI.RoundRect({
+						x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_top_hint-obj.top_hint_shadow_size, w:w_obj_area-w_scrolling_area+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+						round:obj.top_hint_shadow_size,
+						border_width:-obj.top_hint_shadow_size,
+						color:obj.top_hint_shadow_color})
+					UI.RoundRect({
+						x:obj.x, y:obj.y+h_top_hint, w:w_obj_area-w_scrolling_area, h:obj.top_hint_border_width,
+						color:obj.top_hint_border_color})
+					UI.PopCliprect()
 				}
 			}
 			if(obj.show_find_bar){
@@ -2844,8 +2888,11 @@ W.CodeEditor=function(id,attrs){
 				var h_minimap=h_scrolling_area/minimap_scale
 				var scroll_y_minimap=sbar_value*Math.max(ytot-h_minimap,0)
 				UI.PushSubWindow(x_minimap,y_scrolling_area,obj.w_minimap,h_scrolling_area,minimap_scale)
+					var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+					renderer.m_temporarily_disable_spell_check=1
 					doc.ed.Render({x:0,y:scroll_y_minimap,w:obj.w_minimap/minimap_scale,h:h_minimap,
 						scr_x:0,scr_y:0, scale:UI.pixels_per_unit, obj:doc});
+					renderer.m_temporarily_disable_spell_check=0
 				UI.PopSubWindow()
 				var minimap_page_y0=(effective_scroll_y-scroll_y_minimap)*minimap_scale
 				var minimap_page_y1=(effective_scroll_y+h_scrolling_area-scroll_y_minimap)*minimap_scale

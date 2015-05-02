@@ -359,7 +359,7 @@ g_arabic_table=[1536,1536,1536,1536,1537,1537,1537,1537,1538,1538,1538,1538,1539
 inline isArabic(ch){return u32(ch-0x600)<0x100u}
 
 inline spaceBadness(w){return ((w*w)>>12)*w}
-auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line)
+auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line,int is_greedy)
 	//////////////////////////////
 	//the real DP
 	//start from max-greedy, stop when the current line clearly makes it suboptimal
@@ -423,6 +423,10 @@ auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line)
 				if best_i>cost:
 					best_i=cost
 					blast_i=j
+					if is_greedy:
+						cost-=spaceBadness(w_tail)
+						if !cost:
+							break
 			w_tail+=atoms[j].w+atoms[j].tail_kerning
 		best[i]=best_i+base_badness
 		blast[i]=blast_i

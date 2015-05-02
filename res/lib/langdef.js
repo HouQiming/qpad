@@ -223,6 +223,9 @@ LanguageDefinition.prototype={
 			}
 		}
 	},
+	SetSpellCheckedColor:function(color){
+		this.m_color_id_spell_check=color
+	},
 };
 
 exports.Define=function(frules,owner){
