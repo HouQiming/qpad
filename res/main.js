@@ -304,7 +304,7 @@ UI.Theme_CustomWidget=function(C){
 			bookmark_scroll_bar_marker_size:2,
 			///////
 			show_minimap:1,
-			minimap_font_height:5,
+			minimap_font_height:6,
 			minimap_page_shadow:0x1f000000,
 			minimap_page_border_width:2,
 			minimap_page_border_color:0xffaaaaaa,

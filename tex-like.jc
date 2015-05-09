@@ -359,7 +359,7 @@ g_arabic_table=[1536,1536,1536,1536,1537,1537,1537,1537,1538,1538,1538,1538,1539
 inline isArabic(ch){return u32(ch-0x600)<0x100u}
 
 inline spaceBadness(w){return ((w*w)>>12)*w}
-auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line,int is_greedy)
+auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line)
 	//////////////////////////////
 	//the real DP
 	//start from max-greedy, stop when the current line clearly makes it suboptimal
@@ -377,17 +377,7 @@ auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line,int is_greedy)
 		w0=atoms[i-1].w_extra_eol
 		base_badness=atoms[i-1].eol_badness
 		if i<n:
-			//if atoms[i].flags&FLAG_BAD_BOL:
-			//	base_badness=BAD_BOLEOL_BADNESS(atoms[i].style_id)
-			//if atoms[i].flags&FLAG_IS_SPACE:
-			//	base_badness+=LEADING_SPACE_BADNESS
 			base_badness+=atoms[i].bol_badness
-		//if atoms[i-1].flags&FLAG_HYPHENATE_AFTER:
-		//	w0=charWidth(m_styles[atoms[i-1].style_id],'-')
-		//	base_badness+=HYPHEN_BADNESS(atoms[i-1].style_id)
-		//if atoms[i-1].flags&FLAG_BAD_EOL:
-		//	base_badness+=BAD_BOLEOL_BADNESS(atoms[i-1].style_id)
-		//greedy first, extend to i and advance j_min_last
 		if atoms[i-1].flags&FLAG_IS_SPACE:
 			//it's a trailing space, advance *after* taking the current values
 			j_min=j_min_last
@@ -423,10 +413,6 @@ auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line,int is_greedy)
 				if best_i>cost:
 					best_i=cost
 					blast_i=j
-					if is_greedy:
-						cost-=spaceBadness(w_tail)
-						if !cost:
-							break
 			w_tail+=atoms[j].w+atoms[j].tail_kerning
 		best[i]=best_i+base_badness
 		blast[i]=blast_i
@@ -441,6 +427,45 @@ auto DPLayoutGeneral(TLayoutAtom[] atoms,i64 w_line,int is_greedy)
 	line_breaks=new int[lbreaks_backward.n]
 	for i=0:lbreaks_backward.n-1
 		line_breaks[lbreaks_backward.n-1-i]=i64(lbreaks_backward[i])
+	return line_breaks
+
+auto GreedyLayoutGeneral(TLayoutAtom[] atoms,i64 w_line)
+	//////////////////////////////
+	n=int(atoms.n)
+	j_min_last=0
+	wsum_last=0LL
+	//need O(n) j_min
+	line_breaks=new int[]
+	for(p=0;p<n;)
+		line_breaks.push(p)
+		best_p=1LL<<62
+		bnext_p=p+1
+		wsum=0LL
+		for i=p+1:n
+			w0=atoms[i-1].w_extra_eol
+			base_badness=atoms[i-1].eol_badness
+			if i<n:
+				base_badness+=atoms[i].bol_badness
+			w=wsum
+			if i>p+1:
+				wsum+=atoms[i-2].tail_kerning
+			wsum+=atoms[i-1].w
+			if !(atoms[i-1].flags&FLAG_IS_SPACE):
+				//exclude trailing spaces from the width
+				w=wsum
+			w_tail=w_line-w
+			if w_tail>=0LL:
+				cost=base_badness
+				if i!=n:
+					cost+=spaceBadness(w_tail)
+				if best_p>cost:
+					best_p=cost
+					bnext_p=i
+			else
+				break
+		p=bnext_p
+	if n:
+		line_breaks.push(n)
 	return line_breaks
 
 //function(int,int):i64 charWidth,int n_styles
@@ -542,6 +567,8 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int enable_meta_chars, CStyleHold
 				prev_arabic=(J>0&&isArabic(su32[J-1]))
 				next_arabic=(J<su32.n-1&&isArabic(su32[J+1]))
 				su32[J]=g_arabic_table[(su32[J]-0x600)*4+next_arabic*2+prev_arabic]
+			else if su32[J]==9:
+				su32[J]=32
 		return Unicode32ToUtf8(su32).Replace(styles.GetLigatures(style_id))
 	//a font should be all we need
 	//we need caching, even map-based is faster than the bsearch

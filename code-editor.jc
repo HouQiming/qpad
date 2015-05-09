@@ -20,7 +20,7 @@ auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
 	foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 		n0=ret.n
 		(atoms,eatoms,tail_style_id)=TextToLayoutAtom(hyp,s,0,styles,CEmbededObject[].NULL)
-		line_breaks=DPLayoutGeneral(atoms,w_line,1)
+		line_breaks=GreedyLayoutGeneral(atoms,w_line)
 		GenerateTextLayout(
 			styles,
 			s,atoms,eatoms,line_breaks,tail_style_id,
@@ -185,6 +185,7 @@ class CLayouter_programmer
 	//////////////
 	int[] m_char_width_cache_ascii
 	int[int] m_char_width_cache
+	int[int] m_char_kerning_cache
 	/////////////////
 	//todo: compare speed with inline ver
 	charWidth=function(int ch){
@@ -199,6 +200,15 @@ class CLayouter_programmer
 				ret=int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch))))+1
 				m_char_width_cache[ch]=ret
 		return ret-1
+	}
+	charKerning=function(int ch0,int ch1){
+		if u32(ch0)>=65536u||u32(ch1)>=65536u:return 0
+		key=(ch0<<16)+ch1
+		ret=m_char_kerning_cache[key]
+		if !ret:
+			//we can get negative/0/positive, use 0x80000000 as the improbable
+			ret=int(float2fixed(g_renderer.GetKerning(m_font,ch0,ch1)))^0x80000000
+		return ret^0x80000000
 	}
 	charHeight=inline(){
 		return float2fixed(g_renderer.GetCharacterHeight(m_font))
@@ -362,6 +372,7 @@ class CLayouter_programmer
 		m_font_emboldened=obj["font_emboldened"].as(TFont)
 		m_char_width_cache_ascii=new int[128]
 		m_char_width_cache=new int[int]
+		m_char_kerning_cache=new int[int]
 		m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width=obj["wrap_width"].or(0.f)
 		m_tab_width_in_fp=i64(m_tab_width)*charWidth(int(' '))
@@ -443,7 +454,8 @@ class CLayouter_programmer
 			foreach chj,J in Utf8Chars(s_overlay)
 				dx_j=charWidth(chj)
 				prj_xo=projectXY(xo)
-				g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+				//g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+				g_renderer.FastDrawChar(prj_xo.x,prj_xo.y,m_color_overlay, chj)
 				xo+=dx_j
 		else if m_overlay_obj["type"].as(string)=="AC":
 			//auto-complete
@@ -451,7 +463,8 @@ class CLayouter_programmer
 			foreach chj,J in Utf8Chars(s_overlay)
 				dx_j=charWidth(chj)
 				prj_xo=projectXY(xo)
-				g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+				//g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+				g_renderer.FastDrawChar(prj_xo.x,prj_xo.y,m_color_overlay, chj)
 				xo+=dx_j
 		else
 			assert(0)
@@ -593,6 +606,7 @@ class CLayouter_programmer
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
 		x_right_clip=scroll_x+clip_w
+		g_renderer.SetFastDrawCharFont(fnt_scaled)
 		if m_enable_advanced_wrapping:
 			//we won't need x_right_clip here anyway
 			_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n, color_ids, scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
@@ -622,7 +636,8 @@ class CLayouter_programmer
 				dx_i=charWidth(ch)
 				if ix<x_right_clip:
 					prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
-					g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
+					//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
+					g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 				x+=dx_i
 				ix+=dx_i
 				if ix>=wrap_width:
@@ -685,7 +700,7 @@ class CLayouter_programmer
 				dx_i=charWidth(ch)
 				x+=dx_i
 				if m_enable_advanced_wrapping:
-					x+=float2fixed(g_renderer.GetKerning(m_font,ch_prev,ch))
+					x+=charKerning(ch_prev,ch)
 					ch_prev=ch
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
@@ -762,10 +777,11 @@ class CLayouter_programmer
 	MODE_BB=0
 	MODE_SEEK=1
 	MODE_RENDER=2
-	_RenderText=function(int mode,i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
+	_RenderText=function(int mode,i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs0, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		//use flat x
 		hc=charHeight()
 		wrap_width=m_wrap_width_in_fp
+		ofs=ofs0
 		inline projectX(i64 x)
 			return fixed2float(x-scroll_x)*scale+screen_x
 		inline projectY(i64 y)
@@ -805,7 +821,7 @@ class CLayouter_programmer
 		}
 		SeekCheck=__inline_loop_body(ccnt){
 			if mode==MODE_SEEK:
-				y_real=y*hc
+				auto y_real=y*hc
 				if y_real>scroll_y||scroll_y>=y_real&&scroll_y<y_real+h_line&&x>scroll_x:
 					return i64(ccnt)
 		}
@@ -820,7 +836,7 @@ class CLayouter_programmer
 				x+=m_caret_overlay.z
 			if ch32!=int(' '):
 				dy_flags=0LL
-				g_renderer.DrawChar(fnt_scaled, projectX(x),projectY(y+dy_baseline+dy_flags),color, ch32)
+				g_renderer.FastDrawChar(projectX(x),projectY(y+dy_baseline+dy_flags),color, ch32)
 		}
 		NewlineCheck=inline(){
 			if mode==MODE_RENDER:myDrawChar(int(' '))
@@ -831,7 +847,30 @@ class CLayouter_programmer
 				x=0LL
 				y++
 		}
-		foreach atom_i in pp
+		//skip to the line
+		i_start=0L
+		if mode==MODE_BB:
+			for i=0L:pp.n-1
+				if int(pp[i]>>32)==-1:
+					//found a line
+					value0=int(pp[i])
+					if (value0&ATOM_MASK_CCNT)>=ofs:break
+					i_start=i+1
+					NewlineCheck()
+					newline_flags=(value0&(ATOM_FLAG_NEWLINE|ATOM_FLAG_HYPHEN))
+		else if mode==MODE_SEEK:
+			for i=0L:pp.n-1
+				if int(pp[i]>>32)==-1:
+					//found a line
+					value0=int(pp[i])
+					NewlineCheck()
+					auto y_real=y*hc
+					if y_real>scroll_y||scroll_y>=y_real&&scroll_y<y_real+h_line&&x>scroll_x:
+						y--
+						break
+					i_start=i+1
+					newline_flags=(value0&(ATOM_FLAG_NEWLINE|ATOM_FLAG_HYPHEN))
+		foreach atom_i in pp[i_start:]
 			value1=int(atom_i>>32)
 			value0=int(atom_i)
 			if value1==-1:
@@ -872,10 +911,11 @@ class CLayouter_programmer
 							next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
 							ch32=g_arabic_table[(ch32-0x600)*4+next_arabic*2+prev_arabic]
 						//ch32
-						x+=float2fixed(g_renderer.GetKerning(m_font,ch32_prev,ch32))
+						if ch32=='\t':ch32=int(' ')
+						x+=charKerning(ch32_prev,ch32)
 						OfsCheck(su32[J].y)
 						if mode==MODE_RENDER:
-							if ch32!=' '&&ch32!='\t'&&ch32!='\r'&&ch32!='\n':
+							if ch32!=' '&&ch32!='\r'&&ch32!='\n':
 								color=m_cached_colors[int(color_ids[su32[J].y])]
 								myDrawChar(ch32)
 						x+=charWidth(ch32)
@@ -901,20 +941,21 @@ class CLayouter_programmer
 				//			if ccnt0+j>=ofs:return x+dx*i64(j)/i64(nc)+y*wrap_width
 				//	x+=dx
 				//	ch32_prev=ch32
-				spart=s[value0:value1-1]
-				//ligatures=m_styles[current_style_id].ligatures
-				//ligature_poses=spart.FindAll(ligatures)
-				//p_last=0L
-				//for i=0:2:ligature_poses.n-2
-				//	p=ligature_poses[i]
-				//	id=ligature_poses[i+1]
-				//	if p_last<p:
-				//		TranslateArabic(value0+p_last,spart[p_last:p-1])
-				//	p_last=p+ligatures[id*2+0].n
-				//	AddLigature(value0+p,p_last-p,ligatures[id*2+1])
-				//if p_last<spart.n:
-				//	TranslateArabic(value0+p_last,spart[p_last:])
-				TranslateArabic(value0,spart)
+				if mode!=MODE_RENDER||y*hc+hc>scroll_y:
+					spart=s[value0:value1-1]
+					//ligatures=m_styles[current_style_id].ligatures
+					//ligature_poses=spart.FindAll(ligatures)
+					//p_last=0L
+					//for i=0:2:ligature_poses.n-2
+					//	p=ligature_poses[i]
+					//	id=ligature_poses[i+1]
+					//	if p_last<p:
+					//		TranslateArabic(value0+p_last,spart[p_last:p-1])
+					//	p_last=p+ligatures[id*2+0].n
+					//	AddLigature(value0+p,p_last-p,ligatures[id*2+1])
+					//if p_last<spart.n:
+					//	TranslateArabic(value0+p_last,spart[p_last:])
+					TranslateArabic(value0,spart)
 		NewlineCheck()
 		if mode==MODE_SEEK:
 			return i64(s.n)

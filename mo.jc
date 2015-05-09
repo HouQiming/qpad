@@ -19,6 +19,26 @@ __generate_json("icon_file","icon256.png")
 __generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
 
+c_system=__c_function(int,"system","stdlib.h")
+
+auto genString(string s0)
+	s=new string
+	hex="0123456789ABCDEF"
+	foreach ch0 in s0
+		ch=int(u8(ch0))
+		if ch>=0:
+			if ch=='"':
+				s.push('\\')
+				s.push('"')
+			else if ch>=32&&ch<127:
+				s.push(char(ch))
+			else
+				s.push('\\')
+				s.push('x')
+				s.push(hex[(ch>>4)&15])
+				s.push(hex[ch&15])
+	return s
+
 (function(){
 	Gui2D.ProvideGLFunctions()
 	JS=new JSContext
@@ -58,6 +78,11 @@ __generate_json("include_js","build/make_new_docs.js")
 		else
 			return 0
 	}
+	jsio["DeleteFile"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		if !fn:return 0
+		return JS.Return(System.IO.DeleteFile(fn))
+	}
 	jsio["GetFileTimestamp"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
 		foreach fn,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
@@ -96,6 +121,8 @@ __generate_json("include_js","build/make_new_docs.js")
 		fn_base=JS.Param(0).as(string)
 		s_ext=JS.Param(1).as(string)
 		s_path_hint=JS.Param(2).or("document")
+		if s_path_hint=="temp":
+			return JS.Return(System.Env.GetTempFileName(s_ext))
 		//todo: per-platform s_path_hint translation
 		if Platform.IS_WINDOWS:
 			s_userdir=System.Env.ExpandEnvironmentStrings(string("%USERPROFILE%"))
@@ -124,6 +151,7 @@ __generate_json("include_js","build/make_new_docs.js")
 	jsio["GetExecutablePath"]=function(JSContext JS){
 		return JS.Return(System.Env.GetExecutablePath())
 	}
+	jsio["m_my_name"]=System.Env.GetExecutableName()
 	jsio["GetStoragePath"]=function(JSContext JS){
 		return JS.Return(System.Env.GetStoragePath())
 	}
@@ -167,6 +195,36 @@ __generate_json("include_js","build/make_new_docs.js")
 		}
 	else
 		//todo
+	/////////////
+	auto shellcmd(JSObject shell_args,int do_system)
+		if !shell_args:
+			return JS.ReturnError("invalid shell arguments - it must be an object")
+		//properly quote the args
+		n=shell_args.length()
+		if !(n>0):
+			return JS.ReturnError("invalid shell arguments - it must be an array object of positive length")
+		scmd=new string
+		for i=0:n-1
+			s_args_i=shell_args[i].as(string)
+			if Platform.IS_WINDOWS:
+				if !i:s_args_i=s_args_i.Replace(["/","\\"])
+			if s_args_i.IndexOf(' ')>=0:
+				s_args_i="\""+genString(s_args_i)+"\""
+			if i:scmd.push(' ')
+			scmd.push(s_args_i)
+		if do_system:
+			scmd.push(char(0))
+			return JS.Return(c_system(scmd))
+		else
+			return JS.Return(scmd)
+	jsio["Shell"]=function(JSContext JS){
+		auto shell_args=JS.Param(0).as(JSObject)
+		return shellcmd(shell_args,1)
+	}
+	jsio["ShellCmd"]=function(JSContext JS){
+		auto shell_args=JS.Param(0).as(JSObject)
+		return shellcmd(shell_args,0)
+	}
 	/////////////
 	Duktape=JS.GetGlobal()["Duktape"]
 	Duktape["__utf8_fromCharCode"]=function(JSContext JS){

@@ -474,7 +474,96 @@ Language.Register({
 });
 
 /////////////////////////////////////////////
+var g_compiler_by_ext={}
+Language.RegisterCompiler=function(s_ext,obj){
+	var s_ext_lower=s_ext.toLowerCase()
+	var ret=g_compiler_by_ext[s_ext_lower]
+	if(!ret){
+		ret={m_hash:{},m_array:[]}
+		g_compiler_by_ext[s_ext_lower]=ret
+	}
+	ret.m_array.push(obj)
+	ret.m_hash[obj.name]=obj
+	return obj
+}
 
+var GetCompiler=function(doc){
+	if(!doc.m_file_name){return undefined}
+	var s_ext=UI.GetFileNameExtension(doc.m_file_name)
+	if(!s_ext){return undefined}
+	var compilers=g_compiler_by_ext[s_ext.toLowerCase()]
+	if(!compilers){return undefined}
+	if(doc.m_compiler_name){
+		return compilers.m_hash[doc.m_compiler_name];
+	}else{
+		doc.m_compiler_name=compilers.m_array[0].name
+		return compilers.m_array[0]
+	}
+}
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	UI.RegisterCodeEditorPersistentMember("m_compiler_name")
+	this.AddEventHandler('menu',function(){
+		var compiler=GetCompiler(this)
+		if(!compiler){return 1}
+		var menu_run=UI.BigMenu("&Run")
+		var doc=this
+		menu_run.AddNormalItem({text:"&Compile",enable_hotkey:1,key:"F7",action:function(){
+			compiler.make(doc)
+		}})
+		menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+			compiler.make(doc)
+			compiler.run(doc)
+		}})
+	})
+}).prototype.name="Compilation";
+
+IO.AsyncShell=function(cmdline){
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		IO.Shell(["start"," ","/b"].concat(cmdline))
+	}else{
+		IO.Shell(cmdline.concat(["&"]))
+	}
+}
+
+UI.CallPMJS=function(cmd,desc){
+	//todo: redirect and parse the output, waiting
+	desc.delete_json_file=1
+	var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
+	IO.CreateFile(fn_json,JSON.stringify(desc))
+	IO.AsyncShell(["pmjs",cmd,fn_json])
+}
+
+//todo: output redirection
+//we don't need to redirect the output for tex! it's crap anyway!
+//todo: forward / inverse seek
+UI.RegisterCodeEditorPersistentMember("m_latex_sync")
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.m_latex_sync=1;
+});
+Language.RegisterCompiler("tex",{
+	name:"pdftexify",
+	GetDesc:function(doc){
+		return {
+			Platform_BUILD:["release"],
+			Platform_ARCH:[UI.Platform.ARCH],
+			include_js:["make_tex.js"],
+			input_files:[doc.m_file_name],
+			m_latex_sync:doc.m_latex_sync,
+			m_editor_exe:IO.m_my_name,
+			m_line:doc.GetLC(doc.sel1.ccnt)[0]+1,
+		}
+	},
+	make:function(doc){
+		UI.CallPMJS("make",this.GetDesc(doc))
+	},
+	run:function(doc){
+		UI.CallPMJS("run",this.GetDesc(doc))
+	},
+})
+
+/////////////////////////////////////////////
 UI.RegisterEditorPlugin(function(){
 	//enhanced enter
 	this.AddEventHandler('\n',function(){
@@ -486,7 +575,119 @@ UI.RegisterEditorPlugin(function(){
 		this.OnTextInput({"text":"\n"+this.ed.GetText(ccnt_lhome,ccnt_ehome-ccnt_lhome),"is_paste":1})
 		return 0;
 	})
-});
+}).prototype.name="New-line indentation";
+
+//cut line / delete word
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddSeparator()
+			menu_edit.AddNormalItem({text:"Cut &line",enable_hotkey:1,key:"CTRL+L",action:function(){
+				var ed=this.ed;
+				var sel=this.GetSelection();
+				sel[0]=this.SeekLC(this.GetLC(sel[0])[0],0)
+				sel[1]=this.SeekLC(this.GetLC(sel[1])[0]+1,0)
+				if(sel[0]<sel[1]){
+					this.sel0.ccnt=sel[0]
+					this.sel1.ccnt=sel[1]
+					this.Cut()
+					return 0
+				}else{
+					return 1
+				}
+			}.bind(this)})
+			menu_edit.AddNormalItem({text:"Delete word",enable_hotkey:1,key:"CTRL+T",action:function(){
+				var ed=this.ed;
+				var sel=this.GetSelection();
+				sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
+				sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
+				if(sel[0]<sel[1]){
+					this.HookedEdit([sel[0],sel[1]-sel[0],undefined])
+					this.CallOnChange()
+					this.SetCaretTo(sel[0])
+					return 0
+				}else{
+					return 1
+				}
+			}.bind(this)})
+		}
+	})
+}).prototype.name="Line / word deletion";
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	var fcomment=function(){
+		var lang=this.plugin_language_desc
+		var ed=this.ed;
+		var sel=this.GetSelection();
+		var line0=this.GetLC(sel[0])[0];
+		var line1=this.GetLC(sel[1])[0];
+		if(line0==line1&&sel[0]<sel[1]&&lang.paired_comment||!lang.line_comment){
+			var s0=lang.paired_comment[0]
+			var s1=lang.paired_comment[1]
+			var lg0=Duktape.__byte_length(s0)
+			var lg1=Duktape.__byte_length(s1)
+			if(ed.GetText(sel[0],lg0)==s0&&ed.GetText(sel[1]-lg1,lg1)==s1){
+				this.HookedEdit([sel[0],lg0,undefined,sel[1]-lg1,lg1,undefined])
+				this.CallOnChange()
+				this.SetSelection(sel[0],sel[1]-lg0-lg1)
+			}else{
+				this.HookedEdit([sel[0],0,s0,sel[1],0,s1])
+				this.CallOnChange()
+			}
+			UI.Refresh();
+			return 0;
+		}
+		if(!lang.line_comment){
+			return 1
+		}
+		if(this.SeekLC(line1,0)<sel[1]){line1++;}
+		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
+		var ops=[];
+		var is_decomment=1
+		var s0=lang.line_comment
+		var lg0=Duktape.__byte_length(s0)
+		for(var i=0;i<line_ccnts.length-1;i++){
+			var ccnt0=line_ccnts[i];
+			var ccnt_eh=ed.MoveToBoundary(ccnt0,1,"space")
+			line_ccnts[i]=ccnt_eh
+			if(is_decomment&&ed.GetText(ccnt_eh,lg0)!=s0){
+				is_decomment=0
+			}
+		}
+		for(var i=0;i<line_ccnts.length-1;i++){
+			var ccnt0=line_ccnts[i];
+			if(is_decomment){
+				ops.push(ccnt0,lg0,undefined)
+			}else{
+				ops.push(ccnt0,0,s0)
+			}
+		}
+		if(ops.length){
+			this.HookedEdit(ops)
+			this.CallOnChange()
+			UI.Refresh();
+			return 0;
+		}else{
+			return 1;
+		}
+		return 1
+	}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			var obj=this
+			menu_edit.AddSeparator()
+			menu_edit.AddNormalItem({text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:function(){
+				fcomment.call(obj)
+			}})
+		}
+	})
+}).prototype.name="Comment / uncomment";
 
 UI.RegisterEditorPlugin(function(){
 	//tab indent, shift+tab dedent
@@ -528,12 +729,13 @@ UI.RegisterEditorPlugin(function(){
 			var sel=this.GetSelection();
 			if(sel[0]<sel[1]){
 				var menu_edit=UI.BigMenu("&Edit")
+				var obj=this
 				menu_edit.AddSeparator()
 				menu_edit.AddNormalItem({text:"&Indent selection",enable_hotkey:0,key:"TAB",action:function(){
-					return indentText.call(this,1)
+					return indentText.call(obj,1)
 				}})
 				menu_edit.AddNormalItem({text:"&Dedent selection",enable_hotkey:0,key:"SHIFT+TAB",action:function(){
-					return indentText.call(this,-1)
+					return indentText.call(obj,-1)
 				}})
 				this.AddEventHandler('TAB',function(){
 					return indentText.call(this,1)
@@ -544,7 +746,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 		}
 	})
-})
+}).prototype.name="Tab indent/dedent"
 
 UI.RegisterEditorPlugin(function(){
 	//alt+pgup/pgdn
@@ -620,7 +822,7 @@ UI.RegisterEditorPlugin(function(){
 				}}])
 		}
 	})
-});
+}).prototype.name="Scope-related cursor movement";
 
 //control up/down
 UI.RegisterEditorPlugin(function(){
@@ -644,7 +846,7 @@ UI.RegisterEditorPlugin(function(){
 		UI.Refresh();
 		return 0
 	})
-});
+}).prototype.name="Keyboard scrolling";
 
 //bookmarking
 UI.RegisterEditorPlugin(function(){
@@ -706,7 +908,7 @@ UI.RegisterEditorPlugin(function(){
 		this.SetCaretTo(bm.ccnt)
 		return 0;
 	})
-});
+}).prototype.name="Bookmarks";
 
 ////////////////////////////////////
 //C-like
@@ -846,7 +1048,7 @@ UI.RegisterEditorPlugin(function(){
 	})
 	this.AddEventHandler('CTRL+SHIFT+P',function(){goto_matching_bracket.call(this,0)})
 	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,1)})
-});
+}).prototype.name="Parenthesis matching";
 
 var CountSpacesAfter=function(ed,ccnt){
 	return ed.MoveToBoundary(ccnt,1,"space")-ccnt;
@@ -913,7 +1115,8 @@ UI.RegisterEditorPlugin(function(){
 		}
 		if(did){
 			var sel=this.GetSelection()
-			ed.Edit([sel[0],sel[1]-sel[0],snewline])
+			this.HookedEdit([sel[0],sel[1]-sel[0],snewline])
+			this.CallOnChange()
 			this.SetCaretTo(ccnt_pos+delta_ccnt)
 			return 0
 		}
@@ -944,7 +1147,8 @@ UI.RegisterEditorPlugin(function(){
 					snewline=snewline+';'
 				}
 				var sel=this.GetSelection()
-				ed.Edit([sel[0],sel[1]-sel[0],snewline])
+				this.HookedEdit([sel[0],sel[1]-sel[0],snewline])
+				this.CallOnChange()
 				this.SetCaretTo(ccnt_pos+delta_ccnt)
 				return 0
 			}else{
@@ -973,7 +1177,8 @@ UI.RegisterEditorPlugin(function(){
 					snewline=";"+snewline
 					delta_ccnt=Duktape.__byte_length(snewline)
 					var sel=this.GetSelection()
-					ed.Edit([sel[0],sel[1]-sel[0],snewline])
+					this.HookedEdit([sel[0],sel[1]-sel[0],snewline])
+					this.CallOnChange()
 					this.SetCaretTo(ccnt_pos+delta_ccnt)
 					return 0
 				}
@@ -1002,7 +1207,8 @@ UI.RegisterEditorPlugin(function(){
 		var nspaces_lbra=CountSpacesAfter(ed,ccnt_lh_lbra)
 		if(nspaces_ours<=nspaces_lbra){return 1}
 		if(ed.GetText(ccnt_lh,nspaces_lbra)!=ed.GetText(ccnt_lh_lbra,nspaces_lbra)){return 1;}
-		ed.Edit([ccnt_lh+nspaces_lbra,nspaces_ours-nspaces_lbra,null, ccnt_pos,0,C])
+		this.HookedEdit([ccnt_lh+nspaces_lbra,nspaces_ours-nspaces_lbra,null, ccnt_pos,0,C])
+		this.CallOnChange()
 		this.SetSelection(ccnt_lh+nspaces_lbra+Duktape.__byte_length(C),this.sel0.ccnt)
 		return 0;
 	}
@@ -1013,7 +1219,7 @@ UI.RegisterEditorPlugin(function(){
 			this.AddEventHandler(C,function(){return f_key_test.call(this,C)})
 		}).call(this,C);
 	}
-});
+}).prototype.name="Auto-indent";
 
 var bracket_context_prototype={
 	PopBacStack:function(){
@@ -1079,7 +1285,8 @@ UI.RegisterEditorPlugin(function(){
 					//but any auto-completion should continue normally
 					var sel=this.GetSelection()
 					var ops=[bad_curly_ac_ccnt,1,null, sel[0],sel[1]-sel[0],'}']
-					ed.Edit(ops)
+					this.HookedEdit(ops)
+					this.CallOnChange()
 					this.SetCaretTo(sel[0])
 					return 0
 				}
@@ -1118,7 +1325,8 @@ UI.RegisterEditorPlugin(function(){
 		if(ctx.current_bracket_ac_ccnt_range&&ccnt0==ccnt1&&ccnt1==ctx.current_bracket_ac_ccnt_range[0].ccnt+1){
 			if(ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt){
 				var ccnt_lbra=ccnt1-1
-				ed.Edit([ccnt_lbra,2,null])
+				this.HookedEdit([ccnt_lbra,2,null])
+				this.CallOnChange()
 				this.SetCaretTo(ccnt_lbra)
 				ctx.PopBacStack()
 				return 0
@@ -1251,7 +1459,8 @@ UI.RegisterEditorPlugin(function(){
 							}
 						}
 					}
-					ed.Edit([sel[0],sel[1]-sel[0],str])
+					this.HookedEdit([sel[0],sel[1]-sel[0],str])
+					this.CallOnChange()
 					//only record the starting ccnt
 					ctx.current_bracket_ac_ccnt_range=[ed.CreateLocator(ccnt_pos,-1), ed.CreateLocator(ccnt_pos+Duktape.__byte_length(str),1), ed.CreateLocator(ccnt_pos+Duktape.__byte_length(C),1)]
 					//get the level AFTER insertion
@@ -1272,7 +1481,8 @@ UI.RegisterEditorPlugin(function(){
 		if(C==ctx.current_bracket_ac){
 			var ccnt1=this.sel1.ccnt
 			if(ccnt1+Duktape.__byte_length(C)==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
-				ed.Edit([ccnt1,Duktape.__byte_length(C),C])
+				this.HookedEdit([ccnt1,Duktape.__byte_length(C),C])
+				this.CallOnChange()
 				this.SetCaretTo(ccnt1+Duktape.__byte_length(C))
 				ctx.PopBacStack()
 				return 0
@@ -1288,7 +1498,7 @@ UI.RegisterEditorPlugin(function(){
 			this.AddEventHandler(C,function(){return f_key_test.call(this,C)})
 		}).call(this,C);
 	}
-});
+}).prototype.name="Bracket completion";
 
 //ignoring trailing spaces
 UI.RegisterEditorPlugin(function(){
@@ -1298,7 +1508,8 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_reend=this.GetEnhancedEnd(this.sel1.ccnt)
 		if(ccnt_reend<ccnt_lend&&this.sel1.ccnt!=ccnt_reend){
 			//auto-strip the trailing space
-			this.ed.Edit([ccnt_reend,ccnt_lend-ccnt_reend,null])
+			this.HookedEdit([ccnt_reend,ccnt_lend-ccnt_reend,null])
+			this.CallOnChange()
 			this.SetCaretTo(ccnt_reend)
 			return 0
 		}
@@ -1315,4 +1526,4 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 1
 	})
-})
+}).prototype.name="Auto-strip trailing spaces";

@@ -429,7 +429,7 @@ W.CFancyMenuDesc.prototype={
 		}
 		children.push({type:'newline',action:attrs.action})
 	},
-	//todo: selection widget
+	//todo: selection widget - bind to some property
 	AddButtonRow:function(attrs,buttons){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
