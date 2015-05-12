@@ -1527,3 +1527,61 @@ UI.RegisterEditorPlugin(function(){
 		return 1
 	})
 }).prototype.name="Auto-strip trailing spaces";
+
+//hiding
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddSeparator()
+			menu_edit.AddNormalItem({text:"Fo&ld",enable_hotkey:1,key:"ALT+LEFT",action:function(){
+				var ed=this.ed;
+				var sel=this.GetSelection();
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				if(sel[0]==sel[1]){
+					//todo: indentation: alt+down
+					//bracket: end, ctrl+p
+					//do bracket if possible
+					var ccnt=sel[0]
+					var line=this.GetLC(ccnt)[0]
+					var ccnt_l0=this.SeekLC(line,0)
+					var ccnt_outer0=this.FindOuterBracket(ccnt,-1)
+					var range=undefined
+					if(ccnt_outer0>=ccnt_l0){
+						//found bracket on the line
+						var ccnt_outer1=this.FindOuterBracket(ccnt,1)
+						if(ccnt_outer1>ccnt_outer0){
+							range=[ccnt_outer0,ccnt_outer1]
+						}
+					}else{
+						var id_indent=ed.m_handler_registration["seeker_indentation"]
+						var my_level=this.GetIndentLevel(ccnt);
+						var ccnt_l1=this.SeekLC(line+1)
+						var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
+						if(ccnt_new>ccnt_l1){
+							ccnt_new--
+							if(ccnt_l1>ccnt_l0){
+								ccnt_l1--
+							}
+							range=[ccnt_l1,ccnt_new]
+						}
+					}
+					sel=range
+				}
+				if(sel){
+					renderer.HideRange(ed,sel[0],sel[1])
+					UI.Refresh()
+				}
+			}.bind(this)})
+			menu_edit.AddNormalItem({text:"U&nfold",enable_hotkey:1,key:"ALT+RIGHT",action:function(){
+				var ed=this.ed;
+				var sel=this.GetSelection();
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				renderer.ShowRange(ed,sel[0],sel[1])
+				UI.Refresh()
+			}.bind(this)})
+		}
+	})
+}).prototype.name="Text hiding";

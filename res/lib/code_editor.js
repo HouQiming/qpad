@@ -870,6 +870,8 @@ W.CodeEditorWidget_prototype={
 				obj.m_ac_context.m_ccnt=-1;
 			}
 			obj.m_is_brand_new=0
+			var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+			renderer.m_hidden_ranges_prepared=0
 		})
 		doc.AddEventHandler('ESC',function(){
 			obj.m_notifications=[]
@@ -2601,8 +2603,8 @@ W.CodeEditor=function(id,attrs){
 							for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
 								ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
 							}
-							var ed_caret=doc.GetCaretXY();
-							var x_caret=(ed_caret.x-doc.visible_scroll_x+doc.ed.m_caret_offset);
+							var ed_caret=doc.GetIMECaretXY();
+							var x_caret=(ed_caret.x-doc.visible_scroll_x);
 							var y_caret=(ed_caret.y-doc.visible_scroll_y);
 							x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
 							var hc=UI.GetCharacterHeight(doc.font)

@@ -156,6 +156,7 @@ auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
 
 HL_DISPLAY_MODE_EMBOLDEN=1
 HL_DISPLAY_MODE_TILDE=2
+U_ELLIPSIS=0x2026
 class CLayouter_programmer
 	FLAG_HAS_TAB=1
 	FLAG_HAS_ENTER=2
@@ -186,6 +187,8 @@ class CLayouter_programmer
 	int[] m_char_width_cache_ascii
 	int[int] m_char_width_cache
 	int[int] m_char_kerning_cache
+	/////////////////
+	m_hidden_ranges=new CLocator[]
 	/////////////////
 	//todo: compare speed with inline ver
 	charWidth=function(int ch){
@@ -326,17 +329,19 @@ class CLayouter_programmer
 	}
 	/////////////////
 	//compare known-positive doubles as ints
-	Compare=function(i64[] a,i64[] b){
-		return __C_compare(GetFlatX(a),XYToX(b[0],b[1]))
+	Compare=function(CEditableText ed,i64[] a,i64[] b){
+		return __C_compare(GetFlatX(a),AddHiddenRanges(ed,XYToX(b[0],b[1])))
 	}
-	SeekInBlock=function(i64 ccnt_base,i64[] a,i64[] pp,string s,i64[] b){
+	SeekInBlock=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s,i64[] b){
 		if m_enable_advanced_wrapping:
 			return iptr(_RenderText(MODE_SEEK,0LL,a,pp,s,s.n, u8[].NULL, b[0],b[1],0LL,0LL,0.f,0.f,0.f))
 		x_goal=XYToX(b[0],b[1])
+		x_goal=AddHiddenRanges(ed,x_goal)
 		x=GetFlatX(a)
 		if b.n>2:
 			//hint
 			x_last_known=XYToX(b[2],b[3])
+			x_last_known=AddHiddenRanges(ed,x_last_known)
 			ccnt_last_known=b[4]
 			if u64(ccnt_last_known-ccnt_base)<u64(s.n):
 				p=iptr(ccnt_last_known-ccnt_base)
@@ -599,7 +604,7 @@ class CLayouter_programmer
 			auto x=x0-y*wrap_width
 			y*=hc
 			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
-		auto testOverlay()
+		inline testOverlay()
 			if m_overlay_obj&&x==m_caret_overlay.x:
 				DrawOverlay(fnt_scaled,scale,x,projectXY)
 				x+=m_caret_overlay.z
@@ -611,16 +616,18 @@ class CLayouter_programmer
 			//we won't need x_right_clip here anyway
 			_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n, color_ids, scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 			return 
+		HideChars(ed,ccnt_base,color_ids)
 		for ch,I in Utf8Chars(s)
 			testOverlay()
-			if ch=='\n':
+			cidi=color_ids[I]
+			if cidi==u8(255):continue
+			if ch=='\r':
+				//nothing
+			else if ch=='\n':
 				x=(x/wrap_width+1LL)*wrap_width
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
 				if iy*hc-scroll_y>=clip_h:break
-			else if ch=='\r':
-				//nothing
-				continue
 			else if ch==' ':
 				dx_i=charWidth(ch)
 				x+=dx_i
@@ -637,7 +644,20 @@ class CLayouter_programmer
 				if ix<x_right_clip:
 					prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
 					//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
-					g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
+					g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[int(cidi)&127], ch)
+				x+=dx_i
+				ix+=dx_i
+				if ix>=wrap_width:
+					ix-=wrap_width
+					iy++
+					if iy*hc-scroll_y>=clip_h:break
+			if int(cidi)&128:
+				cidi&=u8(127)
+				dx_i=charWidth(U_ELLIPSIS)
+				if ix<x_right_clip:
+					//grey it out to mark it as "hidden"
+					prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
+					g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[cidi]&0x7fffffff, U_ELLIPSIS)
 				x+=dx_i
 				ix+=dx_i
 				if ix>=wrap_width:
@@ -674,6 +694,16 @@ class CLayouter_programmer
 						DrawTilde(fnt_tilde,screen_x,screen_x+wf*scale,y+dy_baseline, C_tilde)
 					DrawTilde(fnt_tilde,screen_x,max(xy1.x,screen_x),xy1.y+dy_baseline, C_tilde)
 			//m_current_frame_spell_errors=long2[].NULL
+		else
+			fnt_scaled=m_font
+			fnt_scaled.h*=scale
+			if m_enable_hidden:
+				if !m_hidden_ranges_prepared:
+					PrepareHiddenRanges(ed)
+				if m_hidden_ccnts.n&&m_hidden_ccnts[0]==0LL:
+					//draw ... at the zeroth text, if it's visible
+					g_renderer.DrawChar(fnt_scaled, fixed2float(-scroll_x)*scale+screen_x,fixed2float(-scroll_y)+screen_y,
+						m_cached_colors[0], U_ELLIPSIS)
 	}
 	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		hid=ed.m_handler_registration["renderer"].as(int)
@@ -709,8 +739,9 @@ class CLayouter_programmer
 	GetDefaultFont=function(){
 		return m_font
 	}
-	GetXYFromState=function(i64[] a){
+	GetXYFromState=function(CEditableText ed,i64[] a){
 		x0=GetFlatX(a)
+		x0=SubHiddenRanges(ed,x0)
 		y=x0/m_wrap_width_in_fp
 		x=x0-y*m_wrap_width_in_fp
 		y*=charHeight()
@@ -767,11 +798,6 @@ class CLayouter_programmer
 				ret["ccnt0"]=word_pos.x
 				return JS.Return(ret)
 		return 0
-	}
-	__JS_prototype=function(JSObject proto){
-		proto.ExportMethod(this,"HunspellAddWord",JS_AddWord)
-		proto.ExportMethod(this,"HunspellSuggest",JS_Suggest)
-		proto.ExportProperty(this,"m_temporarily_disable_spell_check")
 	}
 	//////////////////////////////
 	MODE_BB=0
@@ -961,6 +987,137 @@ class CLayouter_programmer
 			return i64(s.n)
 		else
 			return y*wrap_width+x
+	}
+	///////////////////////
+	//call onchange in js
+	m_hidden_ranges_prepared=0
+	long2[] m_hidden_dx_sub
+	long2[] m_hidden_dx_add
+	i64[] m_hidden_ccnts
+	m_enable_hidden=1
+	PrepareHiddenRanges=function(CEditableText ed){
+		//they must be x-addressible
+		m_hidden_ranges_prepared=1
+		raw_ccnts=[loc.ccnt*2LL+i64(I&1) foreach loc,I in m_hidden_ranges]
+		ccnts=new i64[]
+		raw_ccnts.Sort()
+		//sort and merge
+		cvg=0
+		foreach e in raw_ccnts
+			if e&1:
+				cvg--
+				if !cvg:
+					if ccnts.back()==(e>>1):
+						ccnts.pop()
+					else
+					ccnts.push(e>>1)
+			else
+				if !cvg:
+					ccnts.push(e>>1)
+				cvg++
+		hid=ed.m_handler_registration["renderer"].as(int)
+		m_enable_hidden=0
+		a=ed.GetStateEnMasse(hid,ccnts)
+		m_enable_hidden=1
+		all_x=[GetFlatX(a[i:]) for i=0:4:a.n-4]
+		dx_add=new long2[all_x.n>>1]
+		dx_sub=new long2[all_x.n>>1]
+		m_hidden_dx_add=dx_add
+		m_hidden_dx_sub=dx_sub
+		m_hidden_ccnts=ccnts
+		tot_sub=0LL
+		w_hidden=charWidth(U_ELLIPSIS)
+		for i=0:2:all_x.n-2
+			tot_sub+=all_x[i+1]-all_x[i]-w_hidden
+			dx_add[i>>1]=long2(all_x[i+1]-tot_sub,tot_sub)
+			dx_sub[i>>1]=long2(all_x[i+1],tot_sub)
+	}
+	AddHiddenRanges=function(CEditableText ed,i64 x){
+		if !m_enable_hidden:return x
+		if !m_hidden_ranges_prepared:
+			PrepareHiddenRanges(ed)
+		p=m_hidden_dx_add.Bisect(function(long2 a){return a.x<=x})-1L
+		if p>=0:
+			return x+m_hidden_dx_add[p].y
+		else
+			return x
+	}
+	SubHiddenRanges=function(CEditableText ed,i64 x){
+		if !m_enable_hidden:return x
+		if !m_hidden_ranges_prepared:
+			PrepareHiddenRanges(ed)
+		p=m_hidden_dx_sub.Bisect(function(long2 a){return a.x<=x})-1L
+		if p>=0:
+			return x-m_hidden_dx_sub[p].y
+		else
+			return x
+	}
+	IsRangeHidden=function(CEditableText ed,i64 ccnt0,i64 ccnt1){
+		if !m_enable_hidden:return 0
+		if !m_hidden_ranges_prepared:
+			PrepareHiddenRanges(ed)
+		p0=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt0})
+		p1=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt1})
+		return p0==p1&&(p0&1)
+	}
+	HideChars=function(CEditableText ed,i64 ccnt0,u8[] color_ids){
+		if !m_enable_hidden:return
+		if !m_hidden_ranges_prepared:
+			PrepareHiddenRanges(ed)
+		p=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt0})
+		if p>=m_hidden_ccnts.n:
+			return
+		ccnt_next=m_hidden_ccnts[p]-ccnt0
+		for i=0L:color_ids.n-1
+			if i==ccnt_next:
+				if i:color_ids[i-1]|=u8(128)
+				p++
+				if p>=m_hidden_ccnts.n:
+					return
+				ccnt_next=m_hidden_ccnts[p]-ccnt0
+			if p&1:
+				color_ids[i]=u8(255)
+		if color_ids.n==ccnt_next&&color_ids.n:
+			color_ids[color_ids.n-1]|=u8(128)
+	}
+	JS_HideRange=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		loc0=ed.CreateLocator(ccnt0,1)
+		loc1=ed.CreateLocator(ccnt1,-1)
+		m_hidden_ranges.push(loc0)
+		m_hidden_ranges.push(loc1)
+		m_hidden_ranges_prepared=0
+		return 0
+	}
+	JS_ShowRange=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		ranges0=m_hidden_ranges
+		ranges1=new CLocator[]
+		for i=0:2:ranges0.n-2
+			if ranges0[i].ccnt<=ccnt1&&ccnt0<=ranges0[i+1].ccnt:
+				//drop it
+			else
+				ranges1.push(ranges0[i])
+				ranges1.push(ranges0[i+1])
+		m_hidden_ranges=ranges1
+		m_hidden_ranges_prepared=0
+		return 0
+	}
+	///////////////////////
+	__JS_prototype=function(JSObject proto){
+		proto.ExportMethod(this,"HunspellAddWord",JS_AddWord)
+		proto.ExportMethod(this,"HunspellSuggest",JS_Suggest)
+		proto.ExportProperty(this,"m_temporarily_disable_spell_check")
+		////////////////////
+		proto.ExportProperty(this,"m_hidden_ranges_prepared")
+		proto.ExportMethod(this,"HideRange",JS_HideRange)
+		proto.ExportMethod(this,"ShowRange",JS_ShowRange)
 	}
 
 class CColorer_programmer
