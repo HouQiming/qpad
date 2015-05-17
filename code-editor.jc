@@ -335,13 +335,11 @@ class CLayouter_programmer
 	SeekInBlock=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s,i64[] b){
 		if m_enable_advanced_wrapping:
 			return iptr(_RenderText(MODE_SEEK,0LL,a,pp,s,s.n, u8[].NULL, b[0],b[1],0LL,0LL,0.f,0.f,0.f))
-		x_goal=XYToX(b[0],b[1])
-		x_goal=AddHiddenRanges(ed,x_goal)
+		x_goal=AddHiddenRanges(ed,XYToX(b[0],b[1]))
 		x=GetFlatX(a)
 		if b.n>2:
 			//hint
-			x_last_known=XYToX(b[2],b[3])
-			x_last_known=AddHiddenRanges(ed,x_last_known)
+			x_last_known=AddHiddenRanges(ed,XYToX(b[2],b[3]))
 			ccnt_last_known=b[4]
 			if u64(ccnt_last_known-ccnt_base)<u64(s.n):
 				p=iptr(ccnt_last_known-ccnt_base)
@@ -616,6 +614,8 @@ class CLayouter_programmer
 			//we won't need x_right_clip here anyway
 			_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n, color_ids, scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 			return 
+		!? //disable hidden for ctrl+f and friends - just show faded-out text
+		!? //and the \t\n ignorant hiding
 		HideChars(ed,ccnt_base,color_ids)
 		for ch,I in Utf8Chars(s)
 			testOverlay()
@@ -740,10 +740,7 @@ class CLayouter_programmer
 		return m_font
 	}
 	GetXYFromState=function(CEditableText ed,i64[] a){
-		x0=GetFlatX(a)
-		x0=SubHiddenRanges(ed,x0)
-		y=x0/m_wrap_width_in_fp
-		x=x0-y*m_wrap_width_in_fp
+		(x,y)=SubHiddenRanges(ed,GetFlatX(a))
 		y*=charHeight()
 		return long2(x,y)
 	}
@@ -991,8 +988,8 @@ class CLayouter_programmer
 	///////////////////////
 	//call onchange in js
 	m_hidden_ranges_prepared=0
-	long2[] m_hidden_dx_sub
-	long2[] m_hidden_dx_add
+	long4[] m_hidden_dx_add
+	long3[] m_hidden_dx_sub
 	i64[] m_hidden_ccnts
 	m_enable_hidden=1
 	PrepareHiddenRanges=function(CEditableText ed){
@@ -1020,37 +1017,72 @@ class CLayouter_programmer
 		a=ed.GetStateEnMasse(hid,ccnts)
 		m_enable_hidden=1
 		all_x=[GetFlatX(a[i:]) for i=0:4:a.n-4]
-		dx_add=new long2[all_x.n>>1]
-		dx_sub=new long2[all_x.n>>1]
+		dx_add=new long4[all_x.n>>1]
+		dx_sub=new long3[all_x.n>>1]
 		m_hidden_dx_add=dx_add
 		m_hidden_dx_sub=dx_sub
 		m_hidden_ccnts=ccnts
 		tot_sub=0LL
 		w_hidden=charWidth(U_ELLIPSIS)
+		x_new_cur=0LL;y_new_cur=0LL;flatx_ori_cur=0LL
+		wrap_width=m_wrap_width_in_fp
 		for i=0:2:all_x.n-2
+			y_ori_cur=flatx_ori_cur/wrap_width
+			if flatx_ori_cur<all_x[i]:
+				//honor and only honor the *original* newlines
+				y_ori_next=all_x[i]/wrap_width
+				if y_ori_next>y_ori_cur:
+					y_new_cur+=y_ori_next-y_ori_cur
+					x_new_cur=all_x[i]-y_ori_next*wrap_width
+				else
+					x_new_cur+=(all_x[i]-flatx_ori_cur)
+			flatx_ori_cur=all_x[i+1]
+			dx=x_new_cur-(flatx_ori_cur-y_ori_next*wrap_width)
+			assert(dx>=0LL)
+			dfx=all_x[i+1]-((x_new_cur-dx)+y_new_cur*wrap_width)
+			assert(dfx>=0LL)
+			////////////
 			tot_sub+=all_x[i+1]-all_x[i]-w_hidden
-			dx_add[i>>1]=long2(all_x[i+1]-tot_sub,tot_sub)
-			dx_sub[i>>1]=long2(all_x[i+1],tot_sub)
+			dx_add[i>>1]=long4(x_new_cur,y_new_cur,dx,dfx)
+			dx_sub[i>>1]=long3(all_x[i+1],dx,dfx)
 	}
-	AddHiddenRanges=function(CEditableText ed,i64 x){
-		if !m_enable_hidden:return x
+	AddHiddenRanges=function(CEditableText ed,i64 x,i64 y){
+		//it's not necessarily an 'add'
+		//test: are we on the last line? same line as last hidden should be enough
+		//then again, we can't easily get flat X for the bsearch - precompute needs to be in xy pairs
+		if !m_enable_hidden:return XYToX(x,y)
 		if !m_hidden_ranges_prepared:
 			PrepareHiddenRanges(ed)
-		p=m_hidden_dx_add.Bisect(function(long2 a){return a.x<=x})-1L
+		hc=charHeight()
+		y_real=y/hc
+		p=m_hidden_dx_add.Bisect(function(long4 a){return a.y<y_real||a.y==y_real&&a.x<=x})-1L
 		if p>=0:
-			return x+m_hidden_dx_add[p].y
+			dxitem=m_hidden_dx_add[p]
+			x_real=x
+			if y_real==dxitem.y:
+				x_real-=dxitem.z
+			return max(min(x_real,m_wrap_width_in_fp-1LL),0LL)+(y_real)*m_wrap_width_in_fp+dxitem.w
 		else
-			return x
+			return XYToX(x,y)
 	}
-	SubHiddenRanges=function(CEditableText ed,i64 x){
-		if !m_enable_hidden:return x
-		if !m_hidden_ranges_prepared:
-			PrepareHiddenRanges(ed)
-		p=m_hidden_dx_sub.Bisect(function(long2 a){return a.x<=x})-1L
-		if p>=0:
-			return x-m_hidden_dx_sub[p].y
-		else
-			return x
+	SubHiddenRanges=function(CEditableText ed,i64 fx){
+		y=fx/m_wrap_width_in_fp
+		x=fx-y*m_wrap_width_in_fp
+		if m_enable_hidden:
+			if !m_hidden_ranges_prepared:
+				PrepareHiddenRanges(ed)
+			p=m_hidden_dx_sub.Bisect(function(long3 a){return a.x<=fx})-1L
+			if p>=0:
+				dxitem=m_hidden_dx_sub[p]
+				wrap_width=m_wrap_width_in_fp
+				dx=0LL
+				if dxitem.x/wrap_width==y:
+					dx=dxitem.y
+				fx-=dxitem.z
+				y=fx/m_wrap_width_in_fp
+				x=fx-y*m_wrap_width_in_fp
+				x+=dx
+		return (x,y)
 	}
 	IsRangeHidden=function(CEditableText ed,i64 ccnt0,i64 ccnt1){
 		if !m_enable_hidden:return 0
@@ -1102,6 +1134,8 @@ class CLayouter_programmer
 		for i=0:2:ranges0.n-2
 			if ranges0[i].ccnt<=ccnt1&&ccnt0<=ranges0[i+1].ccnt:
 				//drop it
+				ranges0[i].discard()
+				ranges0[i+1].discard()
 			else
 				ranges1.push(ranges0[i])
 				ranges1.push(ranges0[i+1])
