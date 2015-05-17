@@ -1396,11 +1396,13 @@ W.CodeEditorWidget_prototype={
 			m_match_reported:0,
 			ReportMatch:function(ccnt0,ccnt1){
 				if(direction>0){
-					doc.sel0.ccnt=ccnt0
-					doc.sel1.ccnt=ccnt1
+					//doc.sel0.ccnt=ccnt0
+					//doc.sel1.ccnt=ccnt1
+					doc.SetSelection(ccnt0,ccnt1)
 				}else{
-					doc.sel0.ccnt=ccnt1
-					doc.sel1.ccnt=ccnt0
+					//doc.sel0.ccnt=ccnt1
+					//doc.sel1.ccnt=ccnt0
+					doc.SetSelection(ccnt1,ccnt0)
 				}
 				this.m_match_reported=1
 				doc.AutoScroll("center_if_hidden")
@@ -1489,16 +1491,16 @@ W.CodeEditorWidget_prototype={
 		this.AcquireEditLock();
 		rctx.m_ccnt0=ccnt0
 		rctx.m_ccnt1=ccnt1
-		rctx.m_frontier=ccnt0
+		rctx.m_frontier=(is_first<0?ccnt1:ccnt0)
 		rctx.m_match_cost=(is_first?1048576:64)
 		rctx.m_s_replace=s_replace
 		rctx.m_owner=this
 		var ffind_next=function(){
 			//print("replace: ffind_next ",rctx.m_frontier)
-			rctx.m_frontier=UI.ED_Search(doc.ed,rctx.m_frontier,1,rctx.m_needle,rctx.m_flags,1048576, undefined,rctx)
+			rctx.m_frontier=UI.ED_Search(doc.ed,rctx.m_frontier,is_first||1,rctx.m_needle,rctx.m_flags,1048576, undefined,rctx)
 			//print("search finished ",s_replace)
 			var ccnt_frontier=UI.GetSearchFrontierCcnt(rctx.m_frontier)
-			if(ccnt_frontier<0||ccnt_frontier>=rctx.m_ccnt1||rctx.m_current_replace_job&&is_first){
+			if(ccnt_frontier<0||(is_first<0?(ccnt_frontier<rctx.m_ccnt0):(ccnt_frontier>=rctx.m_ccnt1))||rctx.m_current_replace_job&&is_first){
 				var need_onchange=0
 				rctx.m_owner.ReleaseEditLock();
 				if(rctx.m_current_replace_job){
@@ -1508,7 +1510,17 @@ W.CodeEditorWidget_prototype={
 				}else{
 					rctx.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?UI._("Nothing replaced above"):UI._("Nothing replaced below"))})
 				}
-				rctx.m_owner.DestroyReplacingContext(0);
+				if(!is_first){
+					rctx.m_owner.DestroyReplacingContext(0);
+				}else{
+					var sel_new=rctx.m_current_replace_job.GetLastMatch()
+					if(is_first<0){
+						doc.SetSelection(sel_new[1],sel_new[0])
+					}else{
+						doc.SetSelection(sel_new[0],sel_new[1])
+					}
+					rctx.m_current_replace_job=undefined
+				}
 				if(need_onchange){doc.CallOnChange();}
 			}else{
 				UI.NextTick(ffind_next);
@@ -1526,8 +1538,13 @@ W.CodeEditorWidget_prototype={
 			ccnt0=sel[0]
 			ccnt1=sel[1]
 		}else{
-			ccnt0=sel[0]
-			ccnt1=doc.ed.GetTextSize()
+			if(is_first<0){
+				ccnt0=0
+				ccnt1=sel[0]
+			}else{
+				ccnt0=sel[0]
+				ccnt1=doc.ed.GetTextSize()
+			}
 		}
 		var srep_ccnt0=rctx.m_locators[0].ccnt
 		var srep_ccnt1=rctx.m_locators[1].ccnt
@@ -2945,7 +2962,9 @@ W.CodeEditor=function(id,attrs){
 				if(obj.m_replace_context){
 					menu_search.AddSeparator()
 					menu_search.AddButtonRow({text:"Replace"},[
-						{key:"CTRL+D",text:"next",tooltip:'CTRL+D',action:function(){
+						{key:"CTRL+SHIFT+D",text:"prev",tooltip:'CTRL+SHIFT+D',action:function(){
+							obj.DoReplaceFromUI(-1)
+						}},{key:"CTRL+D",text:"next",tooltip:'CTRL+D',action:function(){
 							obj.DoReplaceFromUI(1)
 						}},{key:"ALT+A",text:"all",tooltip:'ALT+A',action:function(){
 							obj.DoReplaceFromUI(0)

@@ -1949,6 +1949,24 @@ class CReplaceJob
 	m_ops=new TEditop[]
 	string m_s_replace
 	m_match_cost=64
+	m_direction=1
+	JS_GetLastMatch=function(JSContext JS){
+		if !m_ops.n:return 0
+		delta=0LL
+		if m_direction<0:
+			op=m_ops[0]
+		else
+			op=m_ops[m_ops.n-1]
+			for i=0:m_ops.n-2
+				delta+=m_ops[i].s.n-m_ops[i].sz
+		ret=JS.New()
+		ret[0]=delta+op.ccnt
+		ret[1]=delta+op.ccnt+op.s.n
+		return JS.Return(ret)
+	}
+	__JS_prototype=function(JSObject proto){
+		proto.ExportMethod(this,"GetLastMatch",JS_GetLastMatch)
+	}
 	
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
@@ -2063,6 +2081,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				rjob=new CReplaceJob
 				rjob.m_match_cost=js_this["m_match_cost"].or(rjob.m_match_cost)
 				rjob.m_s_replace=js_this["m_s_replace"].as(string)
+				rjob.m_direction=direction
 				js_this["m_current_replace_job"]=rjob
 			ops=rjob.m_ops
 			//replace mode
