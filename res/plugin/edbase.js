@@ -1505,7 +1505,7 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('END',function(){
 		var ed_caret=this.GetCaretXY();
 		var ccnt_lend=this.SeekXY(1e17,ed_caret.y);
-		var ccnt_reend=this.GetEnhancedEnd(this.sel1.ccnt)
+		var ccnt_reend=this.GetEnhancedEnd(ccnt_lend)
 		if(ccnt_reend<ccnt_lend&&this.sel1.ccnt!=ccnt_reend){
 			//auto-strip the trailing space
 			this.HookedEdit([ccnt_reend,ccnt_lend-ccnt_reend,null])
@@ -1532,7 +1532,7 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
+		if(UI.HasFocus(this)&&!this.hyphenator){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddSeparator()
@@ -1541,7 +1541,6 @@ UI.RegisterEditorPlugin(function(){
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				if(sel[0]==sel[1]){
-					//todo: indentation: alt+down
 					//bracket: end, ctrl+p
 					//do bracket if possible
 					var ccnt=sel[0]
@@ -1562,8 +1561,8 @@ UI.RegisterEditorPlugin(function(){
 						var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
 						if(ccnt_new>ccnt_l1){
 							ccnt_new--
-							if(ccnt_l1>ccnt_l0){
-								ccnt_l1--
+							if(ccnt_new>ccnt_l1){
+								ccnt_new--
 							}
 							range=[ccnt_l1,ccnt_new]
 						}
@@ -1579,6 +1578,31 @@ UI.RegisterEditorPlugin(function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				if(sel[0]==sel[1]){
+					var ccnt=sel[0]
+					var line=this.GetLC(ccnt)[0]
+					var ccnt_l0=this.SeekLC(line,0)
+					var ccnt_outer0=this.FindOuterBracket(ccnt,-1)
+					if(ccnt_outer0>=ccnt_l0){
+						//found bracket on the line
+						var ccnt_outer1=this.FindOuterBracket(ccnt,1)
+						if(ccnt_outer1>ccnt_outer0){
+							sel=[ccnt_l0,ccnt_outer1]
+						}
+					}else{
+						var id_indent=ed.m_handler_registration["seeker_indentation"]
+						var my_level=this.GetIndentLevel(ccnt);
+						var ccnt_l1=this.SeekLC(line+1)
+						var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
+						if(ccnt_new>ccnt_l1){
+							ccnt_new--
+							if(ccnt_new>ccnt_l1){
+								ccnt_new--
+							}
+							sel=[ccnt_l0,ccnt_new]
+						}
+					}
+				}
 				renderer.ShowRange(ed,sel[0],sel[1])
 				UI.Refresh()
 			}.bind(this)})

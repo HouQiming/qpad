@@ -242,14 +242,12 @@ UI.Theme_CustomWidget=function(C){
 		},
 		code_editor:{
 			editor_style:{
-				//todo
 				wrap_width:1024,
 				font:UI.Font("res/fonts/inconsolata.ttf",28),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
 				font_tilde:UI.Font(UI.icon_font_name,28,100),
-				//todo
 				//font:UI.Font("res/fonts/inconsolata.ttf",24),
 				//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
 				//tex_font:UI.Font("res/fonts/cmunss.ttf",24),
@@ -271,6 +269,11 @@ UI.Theme_CustomWidget=function(C){
 				color_tilde_spell_error:0xff1c1aa3,
 				/////////////
 				color_completing_bracket:0x80999999,
+				/////////////
+				bgcolor_ellipsis:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
+				w_ellipsis:28,
+				h_ellipsis:20,
+				/////////////
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
 				scroll_transition_dt:0.075,

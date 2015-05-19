@@ -156,7 +156,10 @@ auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
 
 HL_DISPLAY_MODE_EMBOLDEN=1
 HL_DISPLAY_MODE_TILDE=2
-U_ELLIPSIS=0x2026
+//U_ELLIPSIS=0x2026
+struct TEllipsisItem
+	float x,y,scale
+	int color
 class CLayouter_programmer
 	FLAG_HAS_TAB=1
 	FLAG_HAS_ENTER=2
@@ -189,6 +192,8 @@ class CLayouter_programmer
 	int[int] m_char_kerning_cache
 	/////////////////
 	m_hidden_ranges=new CLocator[]
+	i64 m_w_ellipsis
+	m_ellipsis_items=new TEllipsisItem[]
 	/////////////////
 	//todo: compare speed with inline ver
 	charWidth=function(int ch){
@@ -330,16 +335,17 @@ class CLayouter_programmer
 	/////////////////
 	//compare known-positive doubles as ints
 	Compare=function(CEditableText ed,i64[] a,i64[] b){
-		return __C_compare(GetFlatX(a),AddHiddenRanges(ed,XYToX(b[0],b[1])))
+		return __C_compare(GetFlatX(a),AddHiddenRanges(ed,b[0],b[1]))
 	}
 	SeekInBlock=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s,i64[] b){
 		if m_enable_advanced_wrapping:
 			return iptr(_RenderText(MODE_SEEK,0LL,a,pp,s,s.n, u8[].NULL, b[0],b[1],0LL,0LL,0.f,0.f,0.f))
-		x_goal=AddHiddenRanges(ed,XYToX(b[0],b[1]))
+		//seeked into hidden text?
+		x_goal=AddHiddenRanges(ed,b[0],b[1])
 		x=GetFlatX(a)
 		if b.n>2:
 			//hint
-			x_last_known=AddHiddenRanges(ed,XYToX(b[2],b[3]))
+			x_last_known=AddHiddenRanges(ed,b[2],b[3])
 			ccnt_last_known=b[4]
 			if u64(ccnt_last_known-ccnt_base)<u64(s.n):
 				p=iptr(ccnt_last_known-ccnt_base)
@@ -411,6 +417,8 @@ class CLayouter_programmer
 		m_cached_color_virtual_hyphen=int(obj["color_hyphen"].or(u32(m_cached_color_virtual_hyphen)))
 		if m_spell_checker:
 			m_current_frame_spell_errors=new long2[]
+		m_w_ellipsis=float2fixed(obj["w_ellipsis"].as(float))
+		m_ellipsis_items.clear()
 	}
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
 		m_overlay_obj=obj
@@ -597,73 +605,104 @@ class CLayouter_programmer
 		wrap_width=m_wrap_width_in_fp
 		iy=x/wrap_width
 		ix=x-iy*wrap_width
+		dx_extra=0LL
+		dy_extra=0LL
 		inline projectXY(i64 x0)
 			auto y=x0/wrap_width
-			auto x=x0-y*wrap_width
-			y*=hc
+			auto x=x0-y*wrap_width+dx_extra
+			y=(y+dy_extra)*hc
 			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 		inline testOverlay()
 			if m_overlay_obj&&x==m_caret_overlay.x:
 				DrawOverlay(fnt_scaled,scale,x,projectXY)
-				x+=m_caret_overlay.z
-				iy=x/wrap_width
-				ix=x-iy*wrap_width
+				dx_extra+=m_caret_overlay.z
 		x_right_clip=scroll_x+clip_w
 		g_renderer.SetFastDrawCharFont(fnt_scaled)
 		if m_enable_advanced_wrapping:
 			//we won't need x_right_clip here anyway
 			_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n, color_ids, scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 			return 
-		!? //disable hidden for ctrl+f and friends - just show faded-out text
-		!? //and the \t\n ignorant hiding
+		//the \t\n ignorant hiding
 		HideChars(ed,ccnt_base,color_ids)
+		enable_hidden=m_enable_hidden
+		//it's OK to have a negative dx_extra
+		//maintain x normally
+		if enable_hidden:
+			(ix_visual,iy_visual)=SubHiddenRanges(ed,x)
+			dx_extra=ix_visual-ix
+			dy_extra=iy_visual-iy
 		for ch,I in Utf8Chars(s)
 			testOverlay()
 			cidi=color_ids[I]
-			if cidi==u8(255):continue
 			if ch=='\r':
 				//nothing
 			else if ch=='\n':
+				if cidi==u8(255):
+					dy_extra--
+					dx_extra+=ix
+				else
+					dx_extra=0LL
 				x=(x/wrap_width+1LL)*wrap_width
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
-				if iy*hc-scroll_y>=clip_h:break
+				if (iy+dy_extra)*hc-scroll_y>=clip_h:break
 			else if ch==' ':
 				dx_i=charWidth(ch)
 				x+=dx_i
 				ix+=dx_i
+				if cidi==u8(255):
+					dx_extra-=dx_i
 				if ix>=wrap_width:
+					if cidi==u8(255):
+						dy_extra--
+						dx_extra+=ix
+					else
+						dx_extra=0LL
 					ix-=wrap_width
 					iy++
 			else if ch=='\t':
-				x=(x/tab_width+1LL)*tab_width
+				if cidi==u8(255):
+					dx_extra+=x
+					x=(x/tab_width+1LL)*tab_width
+					dx_extra-=x
+				else
+					x=(x/tab_width+1LL)*tab_width
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
 			else
 				dx_i=charWidth(ch)
 				if ix<x_right_clip:
-					prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
-					//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
-					g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[int(cidi)&127], ch)
+					if cidi!=u8(255):
+						prj_x=float2(fixed2float(ix+dx_extra-scroll_x)*scale+screen_x,fixed2float((iy+dy_extra)*hc-scroll_y)*scale+screen_y)
+						//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
+						color=m_cached_colors[int(cidi)&127]
+						if !enable_hidden&&(int(cidi)&128):
+							color&=0x55ffffff
+						g_renderer.FastDrawChar(prj_x.x,prj_x.y,color, ch)
+					else
+						dx_extra-=dx_i
 				x+=dx_i
 				ix+=dx_i
 				if ix>=wrap_width:
+					if cidi==u8(255):
+						dy_extra--
+						dx_extra+=ix
+					else
+						dx_extra=0LL
 					ix-=wrap_width
 					iy++
-					if iy*hc-scroll_y>=clip_h:break
-			if int(cidi)&128:
-				cidi&=u8(127)
-				dx_i=charWidth(U_ELLIPSIS)
-				if ix<x_right_clip:
-					//grey it out to mark it as "hidden"
-					prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
-					g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[cidi]&0x7fffffff, U_ELLIPSIS)
-				x+=dx_i
-				ix+=dx_i
-				if ix>=wrap_width:
-					ix-=wrap_width
-					iy++
-					if iy*hc-scroll_y>=clip_h:break
+					if (iy+dy_extra)*hc-scroll_y>=clip_h:break
+			if (int(cidi)&128)&&enable_hidden:
+				if cidi!=u8(255):
+					cidi&=u8(127)
+					//dx_i=charWidth(U_ELLIPSIS)
+					dx_i=m_w_ellipsis
+					if ix<x_right_clip:
+						//grey it out to mark it as "hidden"
+						prj_x=float2(fixed2float(ix+dx_extra-scroll_x)*scale+screen_x,fixed2float((iy+dy_extra)*hc-scroll_y)*scale+screen_y)
+						//g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[cidi]&0x55ffffff, U_ELLIPSIS)
+						m_ellipsis_items.push(TEllipsisItem(){x:prj_x.x,y:prj_x.y,scale:scale,color:m_cached_colors[cidi]})
+					dx_extra+=dx_i
 		testOverlay()
 	}
 	EndRender=function(JSObject obj,CEditableText ed, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
@@ -695,15 +734,22 @@ class CLayouter_programmer
 					DrawTilde(fnt_tilde,screen_x,max(xy1.x,screen_x),xy1.y+dy_baseline, C_tilde)
 			//m_current_frame_spell_errors=long2[].NULL
 		else
-			fnt_scaled=m_font
-			fnt_scaled.h*=scale
+			//fnt_scaled=m_font
+			//fnt_scaled.h*=scale
 			if m_enable_hidden:
 				if !m_hidden_ranges_prepared:
 					PrepareHiddenRanges(ed)
 				if m_hidden_ccnts.n&&m_hidden_ccnts[0]==0LL:
 					//draw ... at the zeroth text, if it's visible
-					g_renderer.DrawChar(fnt_scaled, fixed2float(-scroll_x)*scale+screen_x,fixed2float(-scroll_y)+screen_y,
-						m_cached_colors[0], U_ELLIPSIS)
+					//g_renderer.DrawChar(fnt_scaled, fixed2float(-scroll_x)*scale+screen_x,fixed2float(-scroll_y)+screen_y,
+					//	m_cached_colors[0], U_ELLIPSIS)
+					m_ellipsis_items.push(TEllipsisItem(){
+							x:fixed2float(-scroll_x)*scale+screen_x,
+							y:fixed2float(-scroll_y)+screen_y,
+							scale:scale,color:m_cached_colors[0]})
+				js_callback=obj["DrawEllipsis"].as(JSObject)
+				foreach ei in m_ellipsis_items
+					js_callback.CallAsMethod(int,obj,ei.x,ei.y,ei.scale,ei.color)
 	}
 	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		hid=ed.m_handler_registration["renderer"].as(int)
@@ -989,7 +1035,7 @@ class CLayouter_programmer
 	//call onchange in js
 	m_hidden_ranges_prepared=0
 	long4[] m_hidden_dx_add
-	long3[] m_hidden_dx_sub
+	long4[] m_hidden_dx_sub
 	i64[] m_hidden_ccnts
 	m_enable_hidden=1
 	PrepareHiddenRanges=function(CEditableText ed){
@@ -1007,23 +1053,23 @@ class CLayouter_programmer
 					if ccnts.back()==(e>>1):
 						ccnts.pop()
 					else
-					ccnts.push(e>>1)
+						ccnts.push(e>>1)
 			else
 				if !cvg:
 					ccnts.push(e>>1)
 				cvg++
+		assert(!(ccnts.n&1))
 		hid=ed.m_handler_registration["renderer"].as(int)
 		m_enable_hidden=0
 		a=ed.GetStateEnMasse(hid,ccnts)
 		m_enable_hidden=1
 		all_x=[GetFlatX(a[i:]) for i=0:4:a.n-4]
 		dx_add=new long4[all_x.n>>1]
-		dx_sub=new long3[all_x.n>>1]
+		dx_sub=new long4[all_x.n>>1]
 		m_hidden_dx_add=dx_add
 		m_hidden_dx_sub=dx_sub
 		m_hidden_ccnts=ccnts
-		tot_sub=0LL
-		w_hidden=charWidth(U_ELLIPSIS)
+		w_hidden=m_w_ellipsis//charWidth(U_ELLIPSIS)
 		x_new_cur=0LL;y_new_cur=0LL;flatx_ori_cur=0LL
 		wrap_width=m_wrap_width_in_fp
 		for i=0:2:all_x.n-2
@@ -1036,15 +1082,16 @@ class CLayouter_programmer
 					x_new_cur=all_x[i]-y_ori_next*wrap_width
 				else
 					x_new_cur+=(all_x[i]-flatx_ori_cur)
+			x_new_cur+=w_hidden
 			flatx_ori_cur=all_x[i+1]
-			dx=x_new_cur-(flatx_ori_cur-y_ori_next*wrap_width)
-			assert(dx>=0LL)
-			dfx=all_x[i+1]-((x_new_cur-dx)+y_new_cur*wrap_width)
+			dx=x_new_cur-(flatx_ori_cur-flatx_ori_cur/wrap_width*wrap_width)
+			//assert(dx>=0LL)
+			//this is just dy
+			dfx=(all_x[i+1]/wrap_width-y_new_cur)*wrap_width
 			assert(dfx>=0LL)
 			////////////
-			tot_sub+=all_x[i+1]-all_x[i]-w_hidden
 			dx_add[i>>1]=long4(x_new_cur,y_new_cur,dx,dfx)
-			dx_sub[i>>1]=long3(all_x[i+1],dx,dfx)
+			dx_sub[i>>1]=long4(all_x[i],all_x[i+1],dx,dfx)
 	}
 	AddHiddenRanges=function(CEditableText ed,i64 x,i64 y){
 		//it's not necessarily an 'add'
@@ -1056,6 +1103,7 @@ class CLayouter_programmer
 		hc=charHeight()
 		y_real=y/hc
 		p=m_hidden_dx_add.Bisect(function(long4 a){return a.y<y_real||a.y==y_real&&a.x<=x})-1L
+		//todo: not working?
 		if p>=0:
 			dxitem=m_hidden_dx_add[p]
 			x_real=x
@@ -1071,14 +1119,14 @@ class CLayouter_programmer
 		if m_enable_hidden:
 			if !m_hidden_ranges_prepared:
 				PrepareHiddenRanges(ed)
-			p=m_hidden_dx_sub.Bisect(function(long3 a){return a.x<=fx})-1L
+			p=m_hidden_dx_sub.Bisect(function(long4 a){return a.x<fx})-1L
 			if p>=0:
 				dxitem=m_hidden_dx_sub[p]
 				wrap_width=m_wrap_width_in_fp
 				dx=0LL
-				if dxitem.x/wrap_width==y:
-					dx=dxitem.y
-				fx-=dxitem.z
+				if dxitem.y/wrap_width==y:
+					dx=dxitem.z
+				fx=max(fx,dxitem.y)-dxitem.w
 				y=fx/m_wrap_width_in_fp
 				x=fx-y*m_wrap_width_in_fp
 				x+=dx
@@ -1093,23 +1141,27 @@ class CLayouter_programmer
 		return p0==p1&&(p0&1)
 	}
 	HideChars=function(CEditableText ed,i64 ccnt0,u8[] color_ids){
-		if !m_enable_hidden:return
+		//if !m_enable_hidden:return
 		if !m_hidden_ranges_prepared:
 			PrepareHiddenRanges(ed)
 		p=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt0})
 		if p>=m_hidden_ccnts.n:
 			return
 		ccnt_next=m_hidden_ccnts[p]-ccnt0
+		enable_hidden=m_enable_hidden
 		for i=0L:color_ids.n-1
 			if i==ccnt_next:
-				if i:color_ids[i-1]|=u8(128)
+				if i&&enable_hidden:color_ids[i-1]|=u8(128)
 				p++
 				if p>=m_hidden_ccnts.n:
 					return
 				ccnt_next=m_hidden_ccnts[p]-ccnt0
 			if p&1:
-				color_ids[i]=u8(255)
-		if color_ids.n==ccnt_next&&color_ids.n:
+				if enable_hidden:
+					color_ids[i]=u8(255)
+				else
+					color_ids[i]|=u8(128)
+		if enable_hidden&&color_ids.n==ccnt_next&&color_ids.n:
 			color_ids[color_ids.n-1]|=u8(128)
 	}
 	JS_HideRange=function(JSContext JS){
@@ -1134,14 +1186,31 @@ class CLayouter_programmer
 		for i=0:2:ranges0.n-2
 			if ranges0[i].ccnt<=ccnt1&&ccnt0<=ranges0[i+1].ccnt:
 				//drop it
-				ranges0[i].discard()
-				ranges0[i+1].discard()
+				ranges0[i].discarded=i8(1)
+				ranges0[i+1].discarded=i8(1)
 			else
 				ranges1.push(ranges0[i])
 				ranges1.push(ranges0[i+1])
 		m_hidden_ranges=ranges1
 		m_hidden_ranges_prepared=0
 		return 0
+	}
+	JS_SnapToShown=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		ccnt=JS.Param(1).as(i64)
+		direction=JS.Param(2).or(1)
+		if !m_hidden_ranges_prepared:
+			PrepareHiddenRanges(ed)
+		p0=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt})
+		if p0<0||!(p0&1):
+			//do nothing
+		else
+			if direction<0:
+				ccnt=m_hidden_ccnts[p0-1]
+			else
+				ccnt=m_hidden_ccnts[p0]
+		return JS.Return(ccnt)
 	}
 	///////////////////////
 	__JS_prototype=function(JSObject proto){
@@ -1150,8 +1219,10 @@ class CLayouter_programmer
 		proto.ExportProperty(this,"m_temporarily_disable_spell_check")
 		////////////////////
 		proto.ExportProperty(this,"m_hidden_ranges_prepared")
+		proto.ExportProperty(this,"m_enable_hidden")
 		proto.ExportMethod(this,"HideRange",JS_HideRange)
 		proto.ExportMethod(this,"ShowRange",JS_ShowRange)
+		proto.ExportMethod(this,"SnapToShown",JS_SnapToShown)
 	}
 
 class CColorer_programmer

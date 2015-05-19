@@ -719,6 +719,26 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		W.Edit_prototype.Cut.call(this)
 	},
+	///////////////////////////////////////
+	SnapToValidLocation:function(ccnt,side){
+		var ccnt_ret=W.Edit_prototype.SnapToValidLocation.call(this,ccnt,side)
+		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		return renderer.SnapToShown(this.ed,ccnt_ret,side)
+	},
+	DrawEllipsis:function(x,y,scale,color){
+		if(!this.m_ellipsis_font){
+			this.m_ellipsis_font=UI.Font(UI.icon_font_name,this.h_ellipsis)
+			this.m_ellipsis_delta_x=(this.w_ellipsis-UI.GetCharacterAdvance(this.m_ellipsis_font,0x2026))*0.5
+			this.m_ellipsis_delta_y=(UI.GetCharacterHeight(this.font)-this.h_ellipsis)*0.5
+		}
+		UI.RoundRect({x:x,y:y+this.m_ellipsis_delta_y*scale,w:this.w_ellipsis*scale,h:this.h_ellipsis*scale,
+			color:this.bgcolor_ellipsis,
+			round:this.h_ellipsis*0.5,
+			border_width:2,border_color:color})
+		UI.DrawChar(this.m_ellipsis_font,
+			x+this.m_ellipsis_delta_x*scale,y+this.m_ellipsis_delta_y*scale,color,
+			0x2026)
+	}
 })
 
 W.MinimapThingy_prototype={
@@ -2466,6 +2486,8 @@ W.CodeEditor=function(id,attrs){
 				var h_expand_max=hc*obj.find_item_expand_current
 				var render_secs=0,ln_secs=0;
 				//DrawItem
+				var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+				renderer.m_enable_hidden=0
 				obj.RenderVisibleFindItems(w_line_numbers+obj.padding,w_find_items,h_find_items,function(find_item_i,find_scroll_x,find_scroll_y,h_expand){
 					var doc_h=find_item_i.shared_h+h_expand
 					var doc_scroll_y=Math.max(Math.min(find_item_i.scroll_y-h_expand*0.5,ytot-doc_h),0)
@@ -2481,6 +2503,7 @@ W.CodeEditor=function(id,attrs){
 					ln_secs+=Duktape.__ui_seconds_between_ticks(tick1,tick2)
 					DrawFindItemHighlight(find_item_i.visual_y-find_scroll_y-h_expand*0.5,doc_h,h_expand/h_expand_max)
 				})
+				renderer.m_enable_hidden=1
 				//print(render_secs*1000,ln_secs*1000)
 				UI.PopSubWindow()
 			}else{
@@ -2714,6 +2737,8 @@ W.CodeEditor=function(id,attrs){
 				//the top hint, do it after since its Render screws the spell checks
 				if(top_hint_bbs.length){
 					var y_top_hint=y_top_hint_scroll;
+					var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+					renderer.m_enable_hidden=0
 					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
 						var y0=top_hint_bbs[bbi]
 						var y1=top_hint_bbs[bbi+1]
@@ -2726,6 +2751,7 @@ W.CodeEditor=function(id,attrs){
 						}
 						y_top_hint+=y1-y0;
 					}
+					renderer.m_enable_hidden=1
 					UI.PushCliprect(obj.x,obj.y+h_top_hint,w_obj_area-w_scrolling_area,h_obj_area-h_top_hint)
 					//a (shadowed) separation bar
 					UI.RoundRect({
