@@ -271,7 +271,8 @@ UI.Theme_CustomWidget=function(C){
 				color_completing_bracket:0x80999999,
 				/////////////
 				bgcolor_ellipsis:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
-				w_ellipsis:28,
+				w_ellipsis:32,
+				padding_ellipsis:2,
 				h_ellipsis:20,
 				/////////////
 				bgcolor_selection:C[0]&0x3fffffff,

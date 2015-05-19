@@ -730,8 +730,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			this.m_ellipsis_font=UI.Font(UI.icon_font_name,this.h_ellipsis)
 			this.m_ellipsis_delta_x=(this.w_ellipsis-UI.GetCharacterAdvance(this.m_ellipsis_font,0x2026))*0.5
 			this.m_ellipsis_delta_y=(UI.GetCharacterHeight(this.font)-this.h_ellipsis)*0.5
+			this.m_ellipsis_draw_w=this.w_ellipsis-this.padding_ellipsis*2
 		}
-		UI.RoundRect({x:x,y:y+this.m_ellipsis_delta_y*scale,w:this.w_ellipsis*scale,h:this.h_ellipsis*scale,
+		UI.RoundRect({
+			x:x+this.padding_ellipsis*scale,
+			y:y+this.m_ellipsis_delta_y*scale,
+			w:this.m_ellipsis_draw_w*scale,h:this.h_ellipsis*scale,
 			color:this.bgcolor_ellipsis,
 			round:this.h_ellipsis*0.5,
 			border_width:2,border_color:color})
