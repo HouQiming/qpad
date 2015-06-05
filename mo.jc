@@ -93,6 +93,14 @@ auto genString(string s0)
 		fn=JS.Param(0).or(new string)
 		return JS.Return(System.IO.FileExists(fn))
 	}
+	jsio["ProcessUnixFileName"]=function(JSContext JS){
+		fn0=JS.Param(0).as(string)
+		if !fn0:return 0
+		if Platform.IS_UNIX:
+			if fn0.StartsWith("~"):
+				fn0="${HOME}"+fn0[1:]
+		return JS.Return(System.Env.ExpandEnvironmentStrings(fn0))
+	}
 	jsio["CreateEnumFileContext"]=function(JSContext JS){
 		fn0=JS.Param(0).as(string)
 		flags=JS.Param(1).or(0)

@@ -1,3 +1,7 @@
+//todo: degrading performance - could be AC
+//could somehow optimize the current gui2d pipeline - the packing, the rgba8, the vbo gen
+//todo: find state should be global
+//todo: auto-wrap-around in search
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
@@ -881,6 +885,10 @@ W.CodeEditorWidget_prototype={
 					}
 				}
 			}
+			if(this.saved_point>this.ed.GetUndoQueueLength()){
+				//undo beyond save point, then edit sth else, the save point is lost permanently
+				this.saved_point=-1;
+			}
 			this.ed.Edit(ops);
 		}
 		doc.AddEventHandler('change',function(){
@@ -1530,18 +1538,25 @@ W.CodeEditorWidget_prototype={
 				if(rctx.m_current_replace_job){
 					var n_replaced=UI.ED_ApplyReplaceOps(doc.ed,rctx.m_current_replace_job)
 					need_onchange=1
-					rctx.m_owner.CreateNotification({id:'find_result',icon:'对',text:UI._("Replaced @1 matches").replace("@1",n_replaced.toString())})
-				}else{
-					rctx.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?UI._("Nothing replaced above"):UI._("Nothing replaced below"))})
+					if(n_replaced){
+						rctx.m_owner.CreateNotification({id:'find_result',icon:'对',text:UI._("Replaced @1 matches").replace("@1",n_replaced.toString())})
+					}else{
+						var direction=(is_first||1)
+						rctx.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?UI._("Nothing replaced above"):UI._("Nothing replaced below"))})
+					}
 				}
 				if(!is_first){
 					rctx.m_owner.DestroyReplacingContext(0);
 				}else{
-					var sel_new=rctx.m_current_replace_job.GetLastMatch()
-					if(is_first<0){
-						doc.SetSelection(sel_new[1],sel_new[0])
-					}else{
-						doc.SetSelection(sel_new[0],sel_new[1])
+					if(rctx.m_current_replace_job){
+						var sel_new=rctx.m_current_replace_job.GetLastMatch()
+						if(sel_new){
+							if(is_first<0){
+								doc.SetSelection(sel_new[1],sel_new[0])
+							}else{
+								doc.SetSelection(sel_new[0],sel_new[1])
+							}
+						}
 					}
 					rctx.m_current_replace_job=undefined
 				}
@@ -1558,7 +1573,7 @@ W.CodeEditorWidget_prototype={
 		if(!rctx){return;}
 		var sel=doc.GetSelection()
 		var ccnt0,ccnt1;
-		if(sel[0]<sel[1]){
+		if(sel[0]<sel[1]&&!is_first){
 			ccnt0=sel[0]
 			ccnt1=sel[1]
 		}else{
@@ -1566,7 +1581,7 @@ W.CodeEditorWidget_prototype={
 				ccnt0=0
 				ccnt1=sel[0]
 			}else{
-				ccnt0=sel[0]
+				ccnt0=sel[1]
 				ccnt1=doc.ed.GetTextSize()
 			}
 		}
@@ -1846,6 +1861,7 @@ var FormatRelativeTime=function(then,now){
 
 var FileItem_prototype={
 	OnDblClick:function(event){
+		if(this.name_to_find){return;}
 		if(this.is_dir){
 			var obj=this.owner
 			var fbar=obj.find_bar_edit
@@ -1869,44 +1885,52 @@ var FileItem_prototype={
 }
 W.FileItem=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"file_item",FileItem_prototype);
+	var parent_list_view=UI.context_parent;
 	UI.Begin(obj)
 		//icon, name, meta-info
 		//hopefully go without a separator line
-		var s_ext=UI.GetFileNameExtension(obj.name)
-		var language_id=Language.GetNameByExt(s_ext)
-		var desc=Language.GetDescObjectByName(language_id)
-		var ext_color=(desc.file_icon_color||obj.file_icon_color)
-		var icon_code=(desc.file_icon||'档').charCodeAt(0)
-		if(obj.is_dir){
-			ext_color=0xffb4771f
-			icon_code='开'.charCodeAt(0)
-		}
-		var sel_bgcolor=ext_color
-		//////////////
-		var icon_font=UI.Font(UI.icon_font_name,obj.h_icon)
-		var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
-		if(obj.selected){
-			ext_color=obj.sel_file_icon_color
-			UI.RoundRect({
-				x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
-				color:sel_bgcolor})
-		}
-		UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
-		W.Text("",{x:obj.x+w_icon,y:obj.y+4,
-			font:obj.name_font,text:GetSmartFileName(obj),
-			color:obj.selected?obj.sel_name_color:obj.name_color})
-		var s_misc_text=[obj.is_dir?UI._("Folder"):FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
-		W.Text("",{x:obj.x+w_icon,y:obj.y+30,
-			font:obj.misc_font,text:s_misc_text,
-			color:obj.selected?obj.sel_misc_color:obj.misc_color})
-		s_ext=s_ext.toUpperCase()
-		if(!desc.file_icon&&!obj.is_dir){
-			var ext_dims=UI.MeasureText(UI.Font(UI.font_name,24),s_ext)
-			var ext_font=UI.Font(UI.font_name,Math.min(24*28/ext_dims.w,24))
-			ext_dims=UI.MeasureText(ext_font,s_ext)
-			W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
-				font:ext_font,text:s_ext,
-				color:ext_color})
+		if(obj.name_to_find){
+			//display a searching... text
+			W.Text("",{x:obj.x+w_icon,y:obj.y+4,
+				font:obj.name_font,text:UI._("Searching @1...").replace("@1",obj.name_to_find),
+				color:obj.misc_color})
+		}else if(obj.y<parent_list_view.y+parent_list_view.h&&obj.y+obj.h>parent_list_view.y){
+			var s_ext=UI.GetFileNameExtension(obj.name)
+			var language_id=Language.GetNameByExt(s_ext)
+			var desc=Language.GetDescObjectByName(language_id)
+			var ext_color=(desc.file_icon_color||obj.file_icon_color)
+			var icon_code=(desc.file_icon||'档').charCodeAt(0)
+			if(obj.is_dir){
+				ext_color=0xffb4771f
+				icon_code='开'.charCodeAt(0)
+			}
+			var sel_bgcolor=ext_color
+			//////////////
+			var icon_font=UI.Font(UI.icon_font_name,obj.h_icon)
+			var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
+			if(obj.selected){
+				ext_color=obj.sel_file_icon_color
+				UI.RoundRect({
+					x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
+					color:sel_bgcolor})
+			}
+			UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
+			W.Text("",{x:obj.x+w_icon,y:obj.y+4,
+				font:obj.name_font,text:obj.selected?obj.name:GetSmartFileName(obj),
+				color:obj.selected?obj.sel_name_color:obj.name_color})
+			var s_misc_text=[obj.is_dir?UI._("Folder"):FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
+			W.Text("",{x:obj.x+w_icon,y:obj.y+30,
+				font:obj.misc_font,text:s_misc_text,
+				color:obj.selected?obj.sel_misc_color:obj.misc_color})
+			s_ext=s_ext.toUpperCase()
+			if(!desc.file_icon&&!obj.is_dir){
+				var ext_dims=UI.MeasureText(UI.Font(UI.font_name,24),s_ext)
+				var ext_font=UI.Font(UI.font_name,Math.min(24*28/ext_dims.w,24))
+				ext_dims=UI.MeasureText(ext_font,s_ext)
+				W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
+					font:ext_font,text:s_ext,
+					color:ext_color})
+			}
 		}
 	UI.End()
 	return obj
@@ -1951,10 +1975,9 @@ var fnewpage_findbar_plugin=function(){
 }
 
 var g_regexp_backslash=new RegExp("\\\\","g");
-var g_regexp_abspath=new RegExp("(([a-zA-Z]:/)|(/)).*");
+var g_regexp_abspath=new RegExp("(([a-zA-Z]:/)|(/)|[~]).*");
 W.SXS_NewPage=function(id,attrs){
 	//todo: proper refreshing on metadata change
-	//todo: left-window preview... how? initiate a weak load, core ready
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
 	UI.Begin(obj)
 		UI.RoundRect(obj)
@@ -1976,6 +1999,7 @@ W.SXS_NewPage=function(id,attrs){
 			x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 			owner:obj,
 			plugins:[fnewpage_findbar_plugin],
+			default_focus:2,
 		});
 		if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 			W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
@@ -2020,7 +2044,7 @@ W.SXS_NewPage=function(id,attrs){
 			//file system part
 			var s_path=s_search_text
 			if(s_path.length||!files.length){
-				s_path=s_path.replace(g_regexp_backslash,"/")
+				s_path=IO.ProcessUnixFileName(s_path.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
 				if(s_path.match(g_regexp_abspath)){
 					//do nothing: it's absolute
 				}else{
@@ -2152,7 +2176,7 @@ W.CodeEditor=function(id,attrs){
 			var ccnt_tot=doc.ed.GetTextSize()
 			var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 			if(h_obj_area<ytot&&!obj.m_is_preview){
-				w_scrolling_area=obj.w_scroll_bar+4
+				w_scrolling_area=obj.w_scroll_bar
 				if(obj.show_minimap){
 					w_scrolling_area+=obj.w_minimap+obj.padding
 				}
@@ -2221,17 +2245,18 @@ W.CodeEditor=function(id,attrs){
 				UI.Refresh()
 			}
 			obj.h_top_hint=h_top_hint
-			if(h_top_hint-prev_h_top_hint){
-				if(doc.scrolling_animation){
-					var anim=doc.scrolling_animation
-					if(anim.transition_current_frame){anim.transition_current_frame.scroll_y+=h_top_hint-prev_h_top_hint;}
-					if(anim.transition_frame0){anim.transition_frame0.scroll_y+=h_top_hint-prev_h_top_hint;}
-					if(anim.transition_frame1){anim.transition_frame1.scroll_y+=h_top_hint-prev_h_top_hint;}
-				}
-				doc.scroll_y+=h_top_hint-prev_h_top_hint
-				doc.h=h_obj_area-h_top_hint
-				if(!UI.nd_captured){doc.AutoScroll("show");}
-			}
+			doc.h_top_hint=h_top_hint
+			//if(h_top_hint-prev_h_top_hint){
+			//	if(doc.scrolling_animation){
+			//		var anim=doc.scrolling_animation
+			//		if(anim.transition_current_frame){anim.transition_current_frame.scroll_y+=h_top_hint-prev_h_top_hint;}
+			//		if(anim.transition_frame0){anim.transition_frame0.scroll_y+=h_top_hint-prev_h_top_hint;}
+			//		if(anim.transition_frame1){anim.transition_frame1.scroll_y+=h_top_hint-prev_h_top_hint;}
+			//	}
+			//	doc.scroll_y+=h_top_hint-prev_h_top_hint
+			//	doc.h=h_obj_area-h_top_hint
+			//	if(!UI.nd_captured){doc.AutoScroll("show");}
+			//}
 			//current line highlight
 			if(!doc.cur_line_hl){
 				var hl_items=doc.CreateTransientHighlight({'depth':-100,'color':obj.color_cur_line_highlight,'invertible':0});
@@ -2424,7 +2449,7 @@ W.CodeEditor=function(id,attrs){
 					style:editor_style,
 					wrap_width:obj.m_is_preview?w_obj_area-w_line_numbers-obj.padding-w_scrolling_area:obj.m_wrap_width,
 					///////////////
-					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_hint+h_top_find,w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,h:h_obj_area-h_top_hint-h_top_find-h_bottom_find,
+					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_find,w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,h:h_obj_area-h_top_find-h_bottom_find,
 					///////////////
 					m_is_preview:obj.m_is_preview,
 					m_file_name:obj.file_name,
@@ -2438,12 +2463,12 @@ W.CodeEditor=function(id,attrs){
 					var x_shadow_size_max=obj.x_scroll_shadow_size
 					var x_shadow_size=Math.min(doc.visible_scroll_x/8,x_shadow_size_max)
 					if(x_shadow_size>0){
-						UI.PushCliprect(obj.x+w_line_numbers,obj.y+h_top_hint,w_obj_area-w_scrolling_area-w_line_numbers,h_obj_area-h_top_hint)
+						UI.PushCliprect(obj.x+w_line_numbers,obj.y,w_obj_area-w_scrolling_area-w_line_numbers,h_obj_area)
 						UI.RoundRect({
 							x:obj.x+w_line_numbers-x_shadow_size_max*2+x_shadow_size,
-							y:obj.y+h_top_hint-x_shadow_size_max,
+							y:obj.y-x_shadow_size_max,
 							w:2*x_shadow_size_max, 
-							h:h_obj_area-h_top_hint+x_shadow_size_max*2,
+							h:h_obj_area+x_shadow_size_max*2,
 							round:x_shadow_size_max,
 							border_width:-x_shadow_size_max,
 							color:obj.x_scroll_shadow_color})
@@ -2741,6 +2766,8 @@ W.CodeEditor=function(id,attrs){
 				//the top hint, do it after since its Render screws the spell checks
 				if(top_hint_bbs.length){
 					var y_top_hint=y_top_hint_scroll;
+					UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:h_top_hint})
+					UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_obj_area-w_line_numbers,h:h_top_hint})
 					var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
 					renderer.m_enable_hidden=0
 					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
@@ -2898,9 +2925,11 @@ W.CodeEditor=function(id,attrs){
 				menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",enable_hotkey:0,key:"CTRL+X",action:function(){
 					doc.Cut()
 				}})
-				menu_edit.AddNormalItem({text:"&Paste",icon:"粘",enable_hotkey:0,key:"CTRL+V",action:function(){
-					doc.Paste()
-				}})
+				if(UI.SDL_HasClipboardText()){
+					menu_edit.AddNormalItem({text:"&Paste",enable_hotkey:0,key:"CTRL+V",action:function(){
+						doc.Paste()
+					}})
+				}
 				///////////////////////
 				var acctx=obj.m_ac_context
 				if(acctx&&acctx.m_n_cands){
@@ -3009,7 +3038,7 @@ W.CodeEditor=function(id,attrs){
 		//minimap / scroll bar
 		if(doc&&w_scrolling_area>0){
 			var y_scrolling_area=obj.y
-			var effective_scroll_y=doc.visible_scroll_y-h_top_hint
+			var effective_scroll_y=doc.visible_scroll_y
 			var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
 			if(obj.show_minimap){
 				var x_minimap=obj.x+w_obj_area-w_scrolling_area+obj.padding*0.5
@@ -3048,7 +3077,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//scrollbar background
-			var sbar=UI.RoundRect({x:obj.x+w_obj_area-obj.w_scroll_bar-4, y:y_scrolling_area, w:obj.w_scroll_bar+4, h:h_scrolling_area,
+			var sbar=UI.RoundRect({x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area,
 				color:obj.line_number_bgcolor
 			})
 			//at-scrollbar bookmark marker
@@ -3069,7 +3098,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//the actual bar
-			W.ScrollBar("sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar-4, y:y_scrolling_area+4, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
+			W.ScrollBar("sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
 				page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
 				OnChange:function(value){
 					doc.scroll_y=value*(this.total_size-this.page_size)
@@ -3140,7 +3169,7 @@ UI.NewCodeEditorTab=function(fname0){
 				body.title=UI.RemovePath(body.file_name)
 			}
 			this.need_save=0
-			if(doc&&(doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
+			if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
 				body.title=body.title+'*'
 				this.need_save=1
 			}
@@ -3179,4 +3208,4 @@ UI.NewCodeEditorTab=function(fname0){
 };
 
 UI.RegisterLoaderForExtension("*",function(fname){return UI.NewCodeEditorTab(fname)})
-//UI.enable_timing=1
+UI.enable_timing=1//todo

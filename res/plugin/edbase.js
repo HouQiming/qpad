@@ -577,6 +577,55 @@ UI.RegisterEditorPlugin(function(){
 	})
 }).prototype.name="New-line indentation";
 
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)&&UI.SDL_HasClipboardText()){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"CTRL+SHIFT+V",action:function(){
+				var sel=this.GetSelection();
+				var ed=this.ed;
+				/*
+				indent handling
+				line head: nothing/less (tell from the last line), good
+					if it's nothing / less, compensate to the correct ind first: move last line to first
+				match minimal indent with current line
+					ignore paste location as long as it's inside the indent
+				*/
+				var ccnt_corrected=ed.MoveToBoundary(sel[1],1,"space");
+				if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]==10){
+					var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
+					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_corrected){
+						//empty line: simply paste before this line, do nothing
+					}else{
+						//paste to the next line if called on at eoln
+						ccnt_corrected++;
+						ccnt_corrected=ed.MoveToBoundary(ccnt_corrected,1,"space")
+					}
+				}else{
+					ccnt_corrected=sel[0];
+				}
+				var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
+				var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
+				var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
+				var ccnt_new=ccnt_lh;
+				if(ccnt_lh<=sel[0]){
+					this.HookedEdit([ccnt_lh,0,sinsert,sel[0],sel[1]-sel[0],undefined])
+				}else{
+					this.HookedEdit([sel[0],sel[1]-sel[0],undefined,ccnt_lh,0,sinsert])
+					ccnt_new-=(sel[1]-sel[0])
+				}
+				this.CallOnChange()
+				ccnt_new=ed.MoveToBoundary(ccnt_new+Duktape.__byte_length(sinsert),1,"space")
+				this.SetCaretTo(ccnt_new)
+				UI.Refresh()
+			}.bind(this)})
+		}
+	})
+}).prototype.name="Smart paste";
+
+
 //cut line / delete word
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
@@ -625,7 +674,7 @@ UI.RegisterEditorPlugin(function(){
 		var sel=this.GetSelection();
 		var line0=this.GetLC(sel[0])[0];
 		var line1=this.GetLC(sel[1])[0];
-		if(line0==line1&&sel[0]<sel[1]&&lang.paired_comment||!lang.line_comment){
+		if((line0==line1&&sel[0]<sel[1]||!lang.line_comment)&&lang.paired_comment){
 			var s0=lang.paired_comment[0]
 			var s1=lang.paired_comment[1]
 			var lg0=Duktape.__byte_length(s0)
@@ -650,9 +699,14 @@ UI.RegisterEditorPlugin(function(){
 		var is_decomment=1
 		var s0=lang.line_comment
 		var lg0=Duktape.__byte_length(s0)
+		var min_n_spaces=undefined;
 		for(var i=0;i<line_ccnts.length-1;i++){
 			var ccnt0=line_ccnts[i];
 			var ccnt_eh=ed.MoveToBoundary(ccnt0,1,"space")
+			if(min_n_spaces==undefined||min_n_spaces>(ccnt_eh-ccnt0)){
+				min_n_spaces=ccnt_eh-ccnt0;
+			}
+			ccnt_eh=Math.min(ccnt_eh,ccnt0+min_n_spaces);
 			line_ccnts[i]=ccnt_eh
 			if(is_decomment&&ed.GetText(ccnt_eh,lg0)!=s0){
 				is_decomment=0
@@ -925,7 +979,7 @@ var MatchingBracket=function(c){
 }
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	if(!this.plugin_language_desc||this.plugin_language_desc.name=="Plain text"){return;}
 	//bracket auto-matching with bold bracket highlighting
 	this.AddEventHandler('editorCreate',function(){
@@ -1031,6 +1085,7 @@ UI.RegisterEditorPlugin(function(){
 			//return;
 		}
 		this.SetSelection(is_sel?ccnt:ccnt_new,ccnt_new)
+		this.CallOnSelectionChange();
 	}
 	this.AddEventHandler('menu',function(){
 		var enabled=(this.m_lbracket_p0.ccnt<this.m_lbracket_p1.ccnt)
@@ -1046,8 +1101,8 @@ UI.RegisterEditorPlugin(function(){
 				}}])
 		}
 	})
-	this.AddEventHandler('CTRL+SHIFT+P',function(){goto_matching_bracket.call(this,0)})
-	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,1)})
+	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,0)})
+	this.AddEventHandler('CTRL+SHIFT+P',function(){goto_matching_bracket.call(this,1)})
 }).prototype.name="Parenthesis matching";
 
 var CountSpacesAfter=function(ed,ccnt){
@@ -1056,7 +1111,7 @@ var CountSpacesAfter=function(ed,ccnt){
 
 UI.RegisterEditorPlugin(function(){
 	//bracket-related auto-indent
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('RETURN RETURN2',function(){
 		var ed=this.ed;
 		var lang=this.plugin_language_desc
@@ -1109,8 +1164,18 @@ UI.RegisterEditorPlugin(function(){
 				snewline=snewline+snewline0+ed.GetText(ccnt_lh,nspaces);
 				did=1;
 			}else{
-				//Case 2.5: we're just putting the } on the next line, do nothing
-				return 0
+				//Case 2.5: we're putting the } on the next line, indent it to the { level
+				if(ccnt_lbra>=0){
+					var lineno_lbra=this.GetLC(ccnt_lbra)[0]
+					var ccnt_lh_lbra=this.SeekLC(lineno_lbra,0);
+					var nspaces=CountSpacesAfter(ed,ccnt_lh_lbra);
+					snewline=snewline0+ed.GetText(ccnt_lh_lbra,nspaces);
+					delta_ccnt=Duktape.__byte_length(snewline)
+					did=1;
+				}else{
+					//continue with the normal action
+					return 1;
+				}
 			}
 		}
 		if(did){
@@ -1154,7 +1219,7 @@ UI.RegisterEditorPlugin(function(){
 			}else{
 				//test left { and stuff, add ; if found
 				var ccnt_left_bra=this.FindBracket(blevel-1,ccnt_pos,-1)
-				if((ccnt_left_bra<0||ed.Get8bitChar(ccnt_left_bra)=='{')&&ch_lineend!='{'&&ch_lineend!='}'&&ch_lineend!=':'&&ch_lineend!=';'&&ch_lineend!=','&&ch_lineend!='\n'&&ch_lineend!='\\'&&ch_lineend){
+				if((ccnt_left_bra<0||ed.GetUtf8CharNeighborhood(ccnt_left_bra)[1]=='{')&&ch_lineend!='{'&&ch_lineend!='}'&&ch_lineend!=':'&&ch_lineend!=';'&&ch_lineend!=','&&ch_lineend!='\n'&&ch_lineend!='\\'&&ch_lineend){
 					if(lang.paired_comment){
 						var paired_comment1=lang.paired_comment[1]
 						if(ccnt_pos>=Duktape.__byte_length(paired_comment1)){
@@ -1200,7 +1265,7 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_lbra=this.FindBracket(blevel-1,ccnt_pos,-1)
 		if(ccnt_lbra<0){return 1;}
 		var C_other=MatchingBracket(C)
-		if(ed.GetUtf8CharNeighborhood(ccnt_lbra)[1]!=C_other){return 1;}
+		if(ed.GetUtf8CharNeighborhood(ccnt_lbra)[1]!=C_other.charCodeAt(0)){return 1;}
 		//dedent it
 		var ccnt_lh_lbra=this.SeekLC(this.GetLC(ccnt_lbra)[0],0)
 		var nspaces_ours=CountSpacesAfter(ed,ccnt_lh)
@@ -1209,7 +1274,7 @@ UI.RegisterEditorPlugin(function(){
 		if(ed.GetText(ccnt_lh,nspaces_lbra)!=ed.GetText(ccnt_lh_lbra,nspaces_lbra)){return 1;}
 		this.HookedEdit([ccnt_lh+nspaces_lbra,nspaces_ours-nspaces_lbra,null, ccnt_pos,0,C])
 		this.CallOnChange()
-		this.SetSelection(ccnt_lh+nspaces_lbra+Duktape.__byte_length(C),this.sel0.ccnt)
+		this.SetCaretTo(ccnt_lh+nspaces_lbra+Duktape.__byte_length(C))
 		return 0;
 	}
 	var listening_keys=[")","]","}"]
@@ -1243,7 +1308,7 @@ var bracket_context_prototype={
 
 UI.RegisterEditorPlugin(function(){
 	//bracket completion
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.m_bracket_ctx={
 		bac_stack:[],
 		isin:0,
@@ -1420,7 +1485,7 @@ UI.RegisterEditorPlugin(function(){
 					is_fcall_like=1
 					//avoid ++ --
 					if(chnext_nonspace=='+'||chnext_nonspace=='-'){
-						if(ed.GetChar(ccnt_next_nonspace+1)==chnext_nonspace){
+						if(ed.GetUtf8CharNeighborhood(ccnt_next_nonspace+1)[1]==chnext_nonspace){
 							is_fcall_like=0
 						}
 					}
@@ -1517,11 +1582,24 @@ UI.RegisterEditorPlugin(function(){
 	})
 	this.AddEventHandler('DELETE',function(){
 		if(this.sel0.ccnt==this.sel1.ccnt){
+			//auto-delete spaces before enter
 			var ccnt=this.sel1.ccnt
+			var ccnt_original=ccnt;
 			var ccnt_after=this.ed.MoveToBoundary(ccnt,1,"space")
 			if(ccnt<ccnt_after&&this.ed.GetUtf8CharNeighborhood(ccnt_after)[1]==10&&ccnt_after<this.ed.GetTextSize()){
 				this.sel1.ccnt=ccnt_after+1
-				return 1
+				ccnt=ccnt_after+1;
+			}else{
+				ccnt=this.sel1.ccnt+1;
+			}
+			//auto-delete spaces after enter
+			var ed=this.ed;
+			if(this.plugin_class=="code_editor"&&this.m_is_main_editor){
+				if(String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt)[0])=='\n'){
+					if(ccnt_original>=this.GetEnhancedHome(ccnt_original)){
+						this.sel1.ccnt=this.ed.MoveToBoundary(ccnt,1,"space")
+					}
+				}
 			}
 		}
 		return 1
@@ -1541,6 +1619,7 @@ UI.RegisterEditorPlugin(function(){
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				if(sel[0]==sel[1]){
+					//todo: this is totally shit
 					//bracket: end, ctrl+p
 					//do bracket if possible
 					var ccnt=sel[0]
@@ -1560,17 +1639,20 @@ UI.RegisterEditorPlugin(function(){
 						var ccnt_l1=this.SeekLC(line+1)
 						var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
 						if(ccnt_new>ccnt_l1){
-							ccnt_new--
+							ccnt_new=this.SeekLC(this.GetLC(ccnt_new)[0],0)-1
 							if(ccnt_new>ccnt_l1){
-								ccnt_new--
+								range=[ccnt_l1,ccnt_new]
 							}
-							range=[ccnt_l1,ccnt_new]
 						}
 					}
 					sel=range
 				}
 				if(sel){
 					renderer.HideRange(ed,sel[0],sel[1])
+					this.SetSelection(
+						renderer.SnapToShown(this.ed,this.sel0.ccnt,this.sel0.ccnt>=sel[1]?1:-1),
+						renderer.SnapToShown(this.ed,this.sel1.ccnt,this.sel1.ccnt>=sel[1]?1:-1))
+					this.CallOnSelectionChange();
 					UI.Refresh()
 				}
 			}.bind(this)})
@@ -1604,6 +1686,7 @@ UI.RegisterEditorPlugin(function(){
 					}
 				}
 				renderer.ShowRange(ed,sel[0],sel[1])
+				this.CallOnSelectionChange();
 				UI.Refresh()
 			}.bind(this)})
 		}

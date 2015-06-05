@@ -321,6 +321,7 @@ W.TabbedDocument=function(id,attrs){
 			}})
 		})(i)}
 	}
+	UI.m_the_document_area=obj
 	return obj
 }
 
@@ -779,7 +780,6 @@ W.FancyMenu=function(id,attrs){
 		}
 	}
 	UI.End()
-	UI.m_the_document_area=obj
 	return obj
 }
 

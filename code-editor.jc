@@ -507,9 +507,11 @@ class CLayouter_programmer
 		s_word=new string
 		for(;;)
 			//Writeln(word_ccnt0)
+			ch_first=0
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
 				if isWordChar(ch):
+					ch_first=ch
 					break
 				ch_before_word=ch
 				word_ccnt0=I2
@@ -548,9 +550,11 @@ class CLayouter_programmer
 				if color_id==color_id_spell_check:
 					s_word.n=0
 					need_spell_check=1
+			is_number=(u32(ch_first-int('0'))<10u)
+			//. inside numbers
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
-				if isWordChar(ch):
+				if isWordChar(ch)||is_number&&ch=='.':
 					ofs=iptr(word_ccnt0-ccnt_base)
 					if uptr(ofs)<uptr(color_ids.n):
 						if color_id>0:
@@ -768,9 +772,11 @@ class CLayouter_programmer
 			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
 			if x>=m_caret_overlay.x&&x<m_caret_overlay.y:
 				x+=m_caret_overlay.z
+			//todo: hiding - SubHiddenRanges
 			foreach ch in Utf8Chars(s_embolden)
-				iy=x/wrap_width
-				ix=x-iy*wrap_width
+				//iy=x/wrap_width
+				//ix=x-iy*wrap_width
+				(ix,iy)=SubHiddenRanges(ed,x)
 				prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
 				g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,hl.color, ch)
 				dx_i=charWidth(ch)
@@ -2243,5 +2249,47 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		n=rjob.m_ops.n
 		ed.Edit(rjob.m_ops)
 		return JS.Return(n)
+	}
+	//smart paste - it's slow, do it natively
+	JS_UI["ED_GetClipboardTextSmart"]=function(JSContext JS){
+		MAX_INDENT=256
+		s_pchar=__pointer(SDL.detail.SDL_GetClipboardText())
+		if !s_pchar:return 0
+		str=System.detail.pcharToString(s_pchar)
+		s_target_indent=JS.Param(0).as(string)
+		p_trailing_space=str.n
+		while p_trailing_space>0&&(str[p_trailing_space-1]==' '||str[p_trailing_space-1]=='\t')&&p_trailing_space>str.n-MAX_INDENT:
+			p_trailing_space--
+		if p_trailing_space>0&&str[p_trailing_space-1]=='\n':
+			//gotta rearrange it
+			str2=str[p_trailing_space:]+str[:p_trailing_space-1]
+		else
+			str2=str
+		if str2.n&&str2.back()=='\n':
+			str2=str2[:str2.n-2]
+		got_first_indent=0
+		pindent_first=0
+		sinsert=new string
+		foreach sline,I0,I1 in str2.TokenizeEx("\n",str2.TOKENIZE_ALLOW_EMPTY)
+			pindent=0
+			while pindent<sline.n&&pindent<MAX_INDENT&&(sline[pindent]==' '||sline[pindent]=='\t'):
+				pindent++
+			if !got_first_indent:
+				pindent_first=pindent
+				got_first_indent=1
+			if pindent<pindent_first:
+				if !pindent:
+					//empty line, keep it empty but add the full indent
+					sinsert.push(s_target_indent)
+				else
+					//subtract something
+					sinsert.push(s_target_indent[:max(s_target_indent.n+pindent-pindent_first,0)-1])
+					sinsert.push(sline[pindent:])
+			else
+				sinsert.push(s_target_indent)
+				sinsert.push(sline[pindent_first:])
+			sinsert.push('\n')
+		//sinsert.pop()
+		return JS.Return(sinsert)
 	}
 })

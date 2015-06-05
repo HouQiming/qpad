@@ -687,7 +687,7 @@ auto ComputeIDOrderingMaps(int[] just_ids)
 	just_ids.Sort()
 	ids=new int2[]
 	foreach id,duplicates in just_ids.Groupby(inline(a){return a})
-		ids.push(int2(id,duplicates.getForEachRepeatCount()))
+		ids.push(int2(id,int(duplicates.getForEachRepeatCount())))
 	just_ids.discard()
 	ids.Sort(inline(id0,id1){
 		sym0=g_symbols[id0.x]
@@ -770,13 +770,13 @@ auto parseAsCLike(string sdata,JSObject options)
 		n0=int(ppm_pool.n)
 		members=[a foreach a in members0]
 		foreach id,duplicates in members.Groupby(byMember("y"))
-			ppm_pool.push(int2(id,duplicates.getForEachRepeatCount()))
+			ppm_pool.push(int2(id,int(duplicates.getForEachRepeatCount())))
 		name_dot_index[name]=int2(n0,int(ppm_pool.n))
 	foreach key,members0 in func_param_entries.Groupby(inline(a){return int2(a.x,a.y)})
 		n0=int(ppm_pool.n)
 		members=[a foreach a in members0]
 		foreach id,duplicates in members.Groupby(byMember("z"))
-			ppm_pool.push(int2(id,duplicates.getForEachRepeatCount()))
+			ppm_pool.push(int2(id,int(duplicates.getForEachRepeatCount())))
 		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
 	return new CFileIndex(){
 		m_ids:unique_ids,
@@ -819,7 +819,7 @@ auto parseAsText(string sdata,JSObject options)
 		foreach id0,members_inner in members.Groupby(inline(a){return ids[a]})
 			if id0>=TOK_ID:
 				weight=members_inner.getForEachRepeatCount()
-				ppm_pool.push(int2(id0-TOK_ID,weight))
+				ppm_pool.push(int2(id0-TOK_ID,int(weight)))
 		ppm1_index[id1]=int2(n0,int(ppm_pool.n))
 	return new CFileIndex(){
 		m_ids:unique_ids,

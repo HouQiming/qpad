@@ -307,7 +307,7 @@ UI.Theme_CustomWidget=function(C){
 			bookmark_border_color:C[0],
 			bookmark_scroll_bar_marker_size:2,
 			///////
-			show_minimap:1,
+			show_minimap:(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="android"||UI.Platform.ARCH=="ios")?0:1,
 			minimap_font_height:6,
 			minimap_page_shadow:0x1f000000,
 			minimap_page_border_width:2,
@@ -674,6 +674,10 @@ UI.Application=function(id,attrs){
 			//todo: drag-loading
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:function(){
+				var active_document=UI.m_the_document_area.active_tab
+				if(active_document&&active_document.doc&&active_document.doc.m_is_brand_new){
+					return;
+				}
 				UI.UpdateNewDocumentSearchPath()
 				UI.NewCodeEditorTab().auto_focus_file_search=1
 				UI.Refresh()
