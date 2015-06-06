@@ -942,6 +942,12 @@ W.CodeEditorWidget_prototype={
 			var name_i=UI.m_code_editor_persistent_members_doc[i]
 			this.doc[name_i]=(loaded_metadata[name_i]||this.doc[name_i])
 		}
+		var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+		if(loaded_metadata.m_hidden_ranges){
+			for(var i=0;i<loaded_metadata.m_hidden_ranges.length;i+=2){
+				renderer.HideRange(doc.ed,loaded_metadata.m_hidden_ranges[i],loaded_metadata.m_hidden_ranges[i+1])
+			}
+		}
 		//this.m_current_needle=loaded_metadata.m_current_needle
 		//this.m_find_flags=(loaded_metadata.m_find_flags||0)
 		//this.m_wrap_width=(loaded_metadata.m_wrap_width||0)
@@ -978,6 +984,8 @@ W.CodeEditorWidget_prototype={
 				new_metadata.m_unkeyed_bookmarks.push(bm.ccnt)
 			}
 		}
+		var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+		new_metadata.m_hidden_ranges=renderer.GetHiddenRanges();
 		UI.m_ui_metadata[this.file_name]=new_metadata
 	},
 	OnSave:function(){

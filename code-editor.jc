@@ -1234,6 +1234,12 @@ class CLayouter_programmer
 				ccnt=m_hidden_ccnts[p0]
 		return JS.Return(ccnt)
 	}
+	JS_GetHiddenRanges=function(JSContext JS){
+		ret=JS.NewArray()
+		foreach loc,I in m_hidden_ranges
+			ret[I]=loc.ccnt
+		return JS.Return(ret)
+	}
 	///////////////////////
 	__JS_prototype=function(JSObject proto){
 		proto.ExportMethod(this,"HunspellAddWord",JS_AddWord)
@@ -1245,6 +1251,7 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"HideRange",JS_HideRange)
 		proto.ExportMethod(this,"ShowRange",JS_ShowRange)
 		proto.ExportMethod(this,"SnapToShown",JS_SnapToShown)
+		proto.ExportMethod(this,"GetHiddenRanges",JS_GetHiddenRanges)
 	}
 
 class CColorer_programmer
