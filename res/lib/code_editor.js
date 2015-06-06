@@ -1,5 +1,6 @@
 //todo: degrading performance - could be AC
-//could somehow optimize the current gui2d pipeline - the packing, the rgba8, the vbo gen
+//could somehow optimize the current gui2d pipeline - the packing, *the vbo gen*: they are related
+//cacheglyph for composite font
 //todo: find state should be global
 //todo: auto-wrap-around in search
 var UI=require("gui2d/ui");
@@ -2346,10 +2347,11 @@ W.CodeEditor=function(id,attrs){
 				var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
 				var line0=doc.GetLC(rendering_ccnt0)[0];
 				var line1=doc.GetLC(rendering_ccnt1)[0];
-				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1);
+				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1,"valid_only");
 				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
 				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
 				for(var i=0;i<line_ccnts.length;i++){
+					if(line_ccnts[i]<0){continue;}
 					if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
 					var s_line_number=(line0+i+1).toString();
 					var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
@@ -3208,4 +3210,4 @@ UI.NewCodeEditorTab=function(fname0){
 };
 
 UI.RegisterLoaderForExtension("*",function(fname){return UI.NewCodeEditorTab(fname)})
-UI.enable_timing=1//todo
+//UI.enable_timing=1

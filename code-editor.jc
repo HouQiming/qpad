@@ -195,7 +195,6 @@ class CLayouter_programmer
 	i64 m_w_ellipsis
 	m_ellipsis_items=new TEllipsisItem[]
 	/////////////////
-	//todo: compare speed with inline ver
 	charWidth=function(int ch){
 		if u32(ch)<u32(0x80):
 			ret=m_char_width_cache_ascii[ch]
@@ -457,7 +456,7 @@ class CLayouter_programmer
 						(x_sel0,x_sel1)=(x_sel1,x_sel0)
 					//selection - pre-draw the highlight
 					if x_sel0<x_sel1:
-						g_renderer.DrawBitmap(0, prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
+						g_renderer.DrawRectangle(prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
 				else
 					x_sel0=0.
 					x_sel1=0.
@@ -482,7 +481,7 @@ class CLayouter_programmer
 		if m_overlay_obj["type"].as(string)=="IME":
 			//draw the underline
 			y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
-			g_renderer.DrawBitmap(0, prj_x.x,y_underline,fixed2float(m_caret_overlay.z)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
+			g_renderer.DrawRectangle(prj_x.x,y_underline,fixed2float(m_caret_overlay.z)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
 	
 	}
 	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
@@ -631,13 +630,30 @@ class CLayouter_programmer
 		enable_hidden=m_enable_hidden
 		//it's OK to have a negative dx_extra
 		//maintain x normally
+		I_query_valid_point=-1LL
 		if enable_hidden:
+			//todo: query at the first non-hidden char
+			if !m_hidden_ranges_prepared:
+				PrepareHiddenRanges(ed)
+			p=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt_base})
+			if p<m_hidden_ccnts.n:
+				if p&1:
+					I_query_valid_point=m_hidden_ccnts[p]-ccnt_base
+			///////////
 			(ix_visual,iy_visual)=SubHiddenRanges(ed,x)
 			dx_extra=ix_visual-ix
 			dy_extra=iy_visual-iy
 		for ch,I in Utf8Chars(s)
-			testOverlay()
+			if I==I_query_valid_point:
+				//the head query was invalid, reset the stuff
+				(ix_visual,iy_visual)=SubHiddenRanges(ed,x)
+				dx_extra=ix_visual-ix
+				dy_extra=iy_visual-iy
 			cidi=color_ids[I]
+			if cidi!=u8(255):
+				testOverlay()
+			//if ccnt_base+I>=980&&ccnt_base+I<=990:
+			//	Writeln('  ',ccnt_base+I,' ',dx_extra,' ',dy_extra,' ',cidi,' ',ch)
 			if ch=='\r':
 				//nothing
 			else if ch=='\n':
@@ -675,16 +691,16 @@ class CLayouter_programmer
 				ix=x-iy*wrap_width
 			else
 				dx_i=charWidth(ch)
-				if ix<x_right_clip:
-					if cidi!=u8(255):
+				if cidi!=u8(255):
+					if ix+dx_extra<x_right_clip:
 						prj_x=float2(fixed2float(ix+dx_extra-scroll_x)*scale+screen_x,fixed2float((iy+dy_extra)*hc-scroll_y)*scale+screen_y)
 						//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 						color=m_cached_colors[int(cidi)&127]
 						if !enable_hidden&&(int(cidi)&128):
 							color&=0x55ffffff
 						g_renderer.FastDrawChar(prj_x.x,prj_x.y,color, ch)
-					else
-						dx_extra-=dx_i
+				else
+					dx_extra-=dx_i
 				x+=dx_i
 				ix+=dx_i
 				if ix>=wrap_width:
@@ -707,6 +723,8 @@ class CLayouter_programmer
 						//g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[cidi]&0x55ffffff, U_ELLIPSIS)
 						m_ellipsis_items.push(TEllipsisItem(){x:prj_x.x,y:prj_x.y,scale:scale,color:m_cached_colors[cidi]})
 					dx_extra+=dx_i
+		//if ccnt_base+s.n>=980&&ccnt_base+s.n<=990:
+		//	Writeln('      ',ccnt_base+s.n,' ',dx_extra,' ',dy_extra)
 		testOverlay()
 	}
 	EndRender=function(JSObject obj,CEditableText ed, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
@@ -772,7 +790,6 @@ class CLayouter_programmer
 			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
 			if x>=m_caret_overlay.x&&x<m_caret_overlay.y:
 				x+=m_caret_overlay.z
-			//todo: hiding - SubHiddenRanges
 			foreach ch in Utf8Chars(s_embolden)
 				//iy=x/wrap_width
 				//ix=x-iy*wrap_width
@@ -1109,7 +1126,6 @@ class CLayouter_programmer
 		hc=charHeight()
 		y_real=y/hc
 		p=m_hidden_dx_add.Bisect(function(long4 a){return a.y<y_real||a.y==y_real&&a.x<=x})-1L
-		//todo: not working?
 		if p>=0:
 			dxitem=m_hidden_dx_add[p]
 			x_real=x

@@ -163,7 +163,7 @@ class CEmbeddedImageManager
 				uv=uv_vert;
 				gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
 			}")
-			if g_renderer.m_srgb_supported&&!g_renderer.m_tex_is_srgb:
+			if g_renderer.m_srgb_supported:
 				m_tech.SetFragmentShader("void main(){vec4 C_tex=texture2D(tex0,uv);gl_FragColor=vec4(pow(C_tex.xyz,vec3("+formatNumber(g_renderer.m_gamma,{frac:7})+")),C_tex.w);}")
 			else
 				m_tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
@@ -199,18 +199,18 @@ class CEmbeddedImageManager
 					mipmap_img.is_used=1
 					m_cached_images.push(mipmap_img)
 			else
-				mipmap_img.texid=glCreateTexture(g_renderer.m_tex_is_srgb?GL_SRGB_ALPHA:GL_RGBA8,
+				mipmap_img.texid=glCreateTexture(g_renderer.m_srgb_supported?GL_SRGB_ALPHA:GL_RGBA8,
 					mipmap_img.w,mipmap_img.h,GL_LINEAR,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,__pointer(mipmap_img.rgba.d))
 				mipmap_img.u_max=1.f
 				mipmap_img.v_max=1.f
 				//the power of 2 limitation...
 				if !mipmap_img.texid:
-					mipmap_img.texid=glCreateTexture(g_renderer.m_tex_is_srgb?GL_SRGB_ALPHA:GL_RGBA8,
+					mipmap_img.texid=glCreateTexture(g_renderer.m_srgb_supported?GL_SRGB_ALPHA:GL_RGBA8,
 						promoteToTextureSize(mipmap_img.w),promoteToTextureSize(mipmap_img.h),
 						GL_LINEAR,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,NULL)
 					if mipmap_img.texid:
-						glTexSubImage2D(GL_TEXTURE_2D,0,0,0,mipmap_img.w,mipmap_img.h,g_renderer.texsubimage_format(),GL_UNSIGNED_BYTE,__pointer(mipmap_img.rgba.d))
-						if g_renderer.texsubimage_format()!=GL_RGBA&&g_renderer.m_srgb_supported&&glGetError()!=GL_NO_ERROR:
+						glTexSubImage2D(GL_TEXTURE_2D,0,0,0,mipmap_img.w,mipmap_img.h,g_renderer.m_srgb_supported?GL_SRGB_ALPHA:GL_RGBA8,GL_UNSIGNED_BYTE,__pointer(mipmap_img.rgba.d))
+						if g_renderer.m_srgb_supported&&glGetError()!=GL_NO_ERROR:
 							glTexSubImage2D(GL_TEXTURE_2D,0,0,0,mipmap_img.w,mipmap_img.h,GL_RGBA,GL_UNSIGNED_BYTE,__pointer(mipmap_img.rgba.d))
 						mipmap_img.u_max=float(mipmap_img.w)/float(promoteToTextureSize(mipmap_img.w))
 						mipmap_img.v_max=float(mipmap_img.h)/float(promoteToTextureSize(mipmap_img.h))
