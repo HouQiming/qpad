@@ -534,7 +534,7 @@ UI.CallPMJS=function(cmd,desc){
 	IO.AsyncShell(["pmjs",cmd,fn_json])
 }
 
-//todo: output redirection
+///////////////////////
 //we don't need to redirect the output for tex! it's crap anyway!
 //todo: forward / inverse seek
 UI.RegisterCodeEditorPersistentMember("m_latex_sync")

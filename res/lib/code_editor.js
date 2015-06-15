@@ -1,3 +1,4 @@
+//todo: long file list perf - "ready" state - begin/end auto-delete
 //todo: degrading performance - could be AC
 //could somehow optimize the current gui2d pipeline - the packing, *the vbo gen*: they are related
 //cacheglyph for composite font
@@ -1751,8 +1752,98 @@ var ffindbar_plugin=function(){
 	})
 }
 
+var g_repo_from_file={}
+var g_repo_list={}
+var ParseGit=function(spath){
+	var my_repo={name:spath,is_parsing:1,files:[]}
+	g_repo_list[spath]=my_repo
+	IO.RunTool(["git","ls-files"],spath, ".*",function(match){
+		if(match[0].indexOf(':')>=0){
+			return;
+		}
+		var fname=spath+"/"+match[0]
+		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			fname=fname.toLowerCase()
+		}
+		var repos=g_repo_from_file[fname]
+		if(!repos){
+			repos={};
+			g_repo_from_file[fname]=repos
+		}
+		//repo -> status map
+		repos[spath]=0
+		my_repo.files.push(fname)
+	},function(){
+		IO.RunTool(["git","ls-files","--modified"],spath, ".*",function(match){
+			if(match[0].indexOf(':')>=0){
+				return;
+			}
+			var fname=spath+"/"+match[0]
+			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				fname=fname.toLowerCase()
+			}
+			var repos=g_repo_from_file[fname]
+			if(!repos){
+				repos={};
+				g_repo_from_file[fname]=repos
+			}
+			//repo -> status map
+			repos[spath]=1
+		},function(){
+			my_repo.is_parsing=0
+			UI.Refresh()
+		}, 30)
+	}, 30)
+	return my_repo
+}
+
+var g_is_repo_detected={}
+var DetectRepository=function(fname){
+	var spath=UI.GetPathFromFilename(fname)
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		spath=spath.toLowerCase()
+	}
+	if(spath){
+		if(g_is_repo_detected[spath]){return g_repo_list[spath]?spath:undefined;}
+		g_is_repo_detected[spath]=1;
+	}
+	///////////////////
+	if(spath!='.'&&IO.DirExists(spath+"/.git")){
+		ParseGit(spath)
+		return spath
+	}
+	///////////////////
+	return DetectRepository(spath)
+}
+
 var FILE_LISTING_BUDGET=100
 W.FileItemOnDemand=function(){
+	if(this.git_repo_to_list){
+		var repo=g_repo_list[this.git_repo_to_list]
+		if(repo.is_parsing){
+			return "keep";
+		}
+		var hist_keywords=this.search_text.split(" ");
+		var ret=[]
+		for(var i=0;i<repo.files.length;i++){
+			var fname_i=repo.files[i]
+			if(UI.m_current_file_list.m_appeared_full_names[fname_i]){continue;}
+			var is_invalid=0;
+			for(var j=0;j<hist_keywords.length;j++){
+				if(fname_i.indexOf(hist_keywords[j])<0){
+					is_invalid=1
+					break;
+				}
+			}
+			if(is_invalid){continue;}
+			//ret.push({name_to_find:fname_i})
+			var ret2=W.FileItemOnDemand.call({name_to_find:fname_i})
+			for(var j=0;j<ret2.length;j++){
+				ret.push(ret2[j])
+			}
+		}
+		return ret
+	}
 	if(!this.name_to_find){
 		return "keep"
 	}
@@ -1767,8 +1858,13 @@ W.FileItemOnDemand=function(){
 			this.m_find_context=undefined;
 			return ret
 		}
+		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			fnext.name=fnext.name.toLowerCase()
+		}
 		if(UI.m_current_file_list.m_appeared_full_names[fnext.name]){continue;}
 		UI.m_current_file_list.m_appeared_full_names[fnext.name]=1
+		DetectRepository(fnext.name)
+		//avoid duplicate
 		ret.push({
 			name:fnext.name,
 			size:fnext.size,
@@ -1898,47 +1994,81 @@ W.FileItem=function(id,attrs){
 	UI.Begin(obj)
 		//icon, name, meta-info
 		//hopefully go without a separator line
-		if(obj.name_to_find){
-			//display a searching... text
-			W.Text("",{x:obj.x+w_icon,y:obj.y+4,
-				font:obj.name_font,text:UI._("Searching @1...").replace("@1",obj.name_to_find),
-				color:obj.misc_color})
-		}else if(obj.y<parent_list_view.y+parent_list_view.h&&obj.y+obj.h>parent_list_view.y){
-			var s_ext=UI.GetFileNameExtension(obj.name)
-			var language_id=Language.GetNameByExt(s_ext)
-			var desc=Language.GetDescObjectByName(language_id)
-			var ext_color=(desc.file_icon_color||obj.file_icon_color)
-			var icon_code=(desc.file_icon||'档').charCodeAt(0)
-			if(obj.is_dir){
-				ext_color=0xffb4771f
-				icon_code='开'.charCodeAt(0)
-			}
-			var sel_bgcolor=ext_color
-			//////////////
-			var icon_font=UI.Font(UI.icon_font_name,obj.h_icon)
-			var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
-			if(obj.selected){
-				ext_color=obj.sel_file_icon_color
-				UI.RoundRect({
-					x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
-					color:sel_bgcolor})
-			}
-			UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
-			W.Text("",{x:obj.x+w_icon,y:obj.y+4,
-				font:obj.name_font,text:obj.selected?obj.name:GetSmartFileName(obj),
-				color:obj.selected?obj.sel_name_color:obj.name_color})
-			var s_misc_text=[obj.is_dir?UI._("Folder"):FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
-			W.Text("",{x:obj.x+w_icon,y:obj.y+30,
-				font:obj.misc_font,text:s_misc_text,
-				color:obj.selected?obj.sel_misc_color:obj.misc_color})
-			s_ext=s_ext.toUpperCase()
-			if(!desc.file_icon&&!obj.is_dir){
-				var ext_dims=UI.MeasureText(UI.Font(UI.font_name,24),s_ext)
-				var ext_font=UI.Font(UI.font_name,Math.min(24*28/ext_dims.w,24))
-				ext_dims=UI.MeasureText(ext_font,s_ext)
-				W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
-					font:ext_font,text:s_ext,
-					color:ext_color})
+		if(obj.y<parent_list_view.y+parent_list_view.h&&obj.y+obj.h>parent_list_view.y){
+			if(obj.git_repo_to_list){
+				//display a searching... text
+				W.Text("",{x:obj.x+4,y:obj.y+4,
+					font:obj.name_font,text:UI._("Parsing git repo @1...").replace("@1",obj.git_repo_to_list),
+					color:obj.misc_color})
+			}else if(obj.name_to_find){
+				//display a searching... text
+				W.Text("",{x:obj.x+4,y:obj.y+4,
+					font:obj.name_font,text:UI._("Searching @1...").replace("@1",obj.name_to_find),
+					color:obj.misc_color})
+			}else{
+				var s_ext=UI.GetFileNameExtension(obj.name)
+				var language_id=Language.GetNameByExt(s_ext)
+				var desc=Language.GetDescObjectByName(language_id)
+				var ext_color=(desc.file_icon_color||obj.file_icon_color)
+				var icon_code=(desc.file_icon||'档').charCodeAt(0)
+				if(obj.is_dir){
+					ext_color=0xffb4771f
+					icon_code='开'.charCodeAt(0)
+				}
+				var sel_bgcolor=ext_color
+				//////////////
+				var icon_font=UI.Font(UI.icon_font_name,obj.h_icon)
+				var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
+				if(obj.selected){
+					ext_color=obj.sel_file_icon_color
+					UI.RoundRect({
+						x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
+						color:sel_bgcolor})
+				}
+				UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
+				W.Text("",{x:obj.x+w_icon,y:obj.y+4,
+					font:obj.name_font,text:obj.selected?obj.name:GetSmartFileName(obj),
+					color:obj.selected?obj.sel_name_color:obj.name_color})
+				var s_misc_text=[obj.is_dir?UI._("Folder"):FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
+				W.Text("",{x:obj.x+w_icon,y:obj.y+30,
+					font:obj.misc_font,text:s_misc_text,
+					color:obj.selected?obj.sel_misc_color:obj.misc_color})
+				s_ext=s_ext.toUpperCase()
+				if(!desc.file_icon&&!obj.is_dir){
+					var ext_dims=UI.MeasureText(UI.Font(UI.font_name,24),s_ext)
+					var ext_font=UI.Font(UI.font_name,Math.min(24*28/ext_dims.w,24))
+					ext_dims=UI.MeasureText(ext_font,s_ext)
+					W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
+						font:ext_font,text:s_ext,
+						color:ext_color})
+				}
+				/////////////////////////
+				var x_tag=obj.x+w_icon+UI.MeasureText(obj.misc_font,s_misc_text).w+obj.tag_padding*2
+				var DrawTag=function(sname){
+					var tag_dims=UI.MeasureText(obj.misc_font,sname)
+					UI.RoundRect({
+						color:obj.selected?obj.sel_misc_color:obj.misc_color,border_width:0,
+						x:x_tag,y:obj.y+30,w:tag_dims.w+obj.tag_round*2,h:tag_dims.h,
+						round:obj.tag_round,
+						//color:0,
+					})
+					W.Text("",{x:x_tag+obj.tag_round,y:obj.y+30,
+						font:obj.misc_font,text:sname,
+						color:obj.selected?sel_bgcolor:0xffffffff})
+					x_tag+=tag_dims.w+obj.tag_padding+obj.tag_round*2
+				}
+				var repos=g_repo_from_file[obj.name]
+				if(repos){
+					//git tags
+					for(var spath in repos){
+						var sname=GetSmartFileName(g_repo_list[spath])
+						if(repos[spath]==1){
+							DrawTag(sname+'*')
+						}else{
+							DrawTag(sname)
+						}
+					}
+				}
 			}
 		}
 	UI.End()
@@ -2024,6 +2154,7 @@ W.SXS_NewPage=function(id,attrs){
 				m_now:IO.WallClockTime(),
 				m_appeared_names:{},
 				m_appeared_full_names:{},
+				m_listed_git_repos:{},
 			}
 			UI.m_current_file_list=obj.m_current_file_list
 			files=[]
@@ -2032,24 +2163,24 @@ W.SXS_NewPage=function(id,attrs){
 			//it's more of a smart interpretation of the user-typed string, not a full-blown explorer
 			//history mode
 			//only do space split for hist mode
-			if(s_search_text.indexOf('/')<0){
-				var hist=UI.m_ui_metadata["<history>"].filter(function(a){return a.toUpperCase()})
-				if(hist){
-					var hist_keywords=s_search_text.split(" ");
-					for(var i=hist.length-1;i>=0;i--){
-						var fn_i=hist[i],fn_i_search=fn_i.toUpperCase()
-						var is_invalid=0;
-						for(var j=0;j<hist_keywords.length;j++){
-							if(fn_i.indexOf(hist_keywords[j])<0){
-								is_invalid=1
-								break;
-							}
+			//if(s_search_text.indexOf('/')<0){
+			var hist=UI.m_ui_metadata["<history>"].filter(function(a){return a.toUpperCase()})
+			if(hist){
+				var hist_keywords=s_search_text.split(" ");
+				for(var i=hist.length-1;i>=0;i--){
+					var fn_i=hist[i],fn_i_search=fn_i.toUpperCase()
+					var is_invalid=0;
+					for(var j=0;j<hist_keywords.length;j++){
+						if(fn_i.indexOf(hist_keywords[j])<0){
+							is_invalid=1
+							break;
 						}
-						if(is_invalid){continue;}
-						files.push({name_to_find:fn_i})
 					}
+					if(is_invalid){continue;}
+					files.push({name_to_find:fn_i})
 				}
 			}
+			//}
 			//file system part
 			var s_path=s_search_text
 			if(s_path.length||!files.length){
@@ -2058,17 +2189,25 @@ W.SXS_NewPage=function(id,attrs){
 					//do nothing: it's absolute
 				}else{
 					s_path=UI.m_new_document_search_path+"/"+s_path
+					//git project part
+					var spath_repo=DetectRepository(s_path+"*")
+					if(spath_repo){
+						if(!UI.m_current_file_list.m_listed_git_repos[spath_repo]){
+							UI.m_current_file_list.m_listed_git_repos[spath_repo]=1
+							files.push({git_repo_to_list:spath_repo, search_text:s_search_text})
+						}
+					}
 				}
 				files.push({
 					name_to_find:s_path+"*"
 				})
 			}
-			//coulddo: git project part
+			//////////////
 			obj.m_file_list=files
 			obj.file_list=undefined
 			first_time=1
 		}
-		W.ListView('file_list',{
+		UI.m_current_file_list.m_ui_obj=W.ListView('file_list',{
 			x:obj.x+4,y:obj.y+obj.h_find_bar+4,w:obj.w-8,h:obj.h-obj.h_find_bar-4,
 			mouse_wheel_speed:80,
 			dimension:'y',layout_spacing:0,layout_align:'fill',

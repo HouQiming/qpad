@@ -93,6 +93,10 @@ auto genString(string s0)
 		fn=JS.Param(0).or(new string)
 		return JS.Return(System.IO.FileExists(fn))
 	}
+	jsio["DirExists"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		return JS.Return(System.IO.DirExists(fn))
+	}
 	jsio["ProcessUnixFileName"]=function(JSContext JS){
 		fn0=JS.Param(0).as(string)
 		if !fn0:return 0
@@ -232,6 +236,37 @@ auto genString(string s0)
 	jsio["ShellCmd"]=function(JSContext JS){
 		auto shell_args=JS.Param(0).as(JSObject)
 		return shellcmd(shell_args,0)
+	}
+	/////////////
+	class CProcessWrapper
+		System.Processes.CProcess proc
+		JS_Read=function(JSContext JS){
+			auto n=JS.Param(0).as(iptr)
+			if proc.pipe.WouldBlock():return 0
+			//line-based parsing? do it in JS
+			s=proc.pipe.Read(n)
+			return JS.Return(s)
+		}
+		JS_IsRunning=function(JSContext JS){
+			return JS.Return(proc.isRunning())
+		}
+		JS_Terminate=function(JSContext JS){
+			proc.Terminate()
+			return 0
+		}
+		__JS_prototype=function(JSObject proto){
+			proto.ExportMethod(this,"Read",JS_Read)
+			proto.ExportMethod(this,"IsRunning",JS_IsRunning)
+			proto.ExportMethod(this,"Terminate",JS_Terminate)
+		}
+	jsio["RunToolRedirected"]=function(JSContext JS){
+		auto scmd=JS.Param(0).as(string)
+		auto spath=JS.Param(1).or(".")
+		auto show=JS.Param(2).or(1)
+		pproc=System.Processes.RunPiped(scmd,spath,show,"new_job,output,error")
+		if !pproc:
+			return 0
+		return JS.Return(new CProcessWrapper(){proc:pproc})
 	}
 	/////////////
 	Duktape=JS.GetGlobal()["Duktape"]

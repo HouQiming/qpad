@@ -450,3 +450,60 @@ UI.BumpHistory=function(file_name){
 	hist.push(file_name)
 	UI.SaveMetaData();
 }
+
+////////////////////////////////////
+var g_utility_procs=[];
+var freadOnTimer=function(){
+	var new_procs=[]
+	var tick_now=Duktape.__ui_get_tick();
+	for(var i=0;i<g_utility_procs.length;i++){
+		var proc_i=g_utility_procs[i]
+		if(Duktape.__ui_seconds_between_ticks(proc_i.tick0,tick_now)>proc_i.t_timeout){
+			//it timed out, kill and abandon
+			proc_i.Terminate()
+			proc_i.ffinalize()
+			continue
+		}
+		var s=proc_i.Read(65536)
+		if(s&&s.length>0){
+			var lines=(proc_i.buf+s).split("\n")
+			for(var j=0;j<lines.length-1;j++){
+				var match_j=lines[j].match(proc_i.sregex)
+				if(match_j){
+					proc_i.fparse(match_j);
+				}
+			}
+			proc_i.buf=lines[lines.length-1]
+			new_procs.push(proc_i)
+		}else{
+			if(proc_i.IsRunning()){
+				new_procs.push(proc_i)
+			}else{
+				proc_i.ffinalize()
+			}
+		}
+	}
+	g_utility_procs=new_procs;
+	if(g_utility_procs.length>0){
+		UI.setTimeout(freadOnTimer,100)
+	}
+};
+IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){
+	//segment by line, then test regexp
+	var proc=IO.RunToolRedirected(IO.ShellCmd(args),work_dir,0)
+	if(!proc){
+		return 0;
+	}
+	if(!g_utility_procs.length){
+		UI.setTimeout(freadOnTimer,100)
+	}
+	proc.sregex=new RegExp(sregex,"");
+	proc.fparse=fparse;
+	proc.ffinalize=ffinalize;
+	proc.t_timeout=t_timeout;
+	proc.tick0=Duktape.__ui_get_tick();
+	proc.buf="";
+	g_utility_procs.push(proc)
+	return 1;
+};
+

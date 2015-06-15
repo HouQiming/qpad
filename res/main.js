@@ -456,6 +456,9 @@ UI.Theme_CustomWidget=function(C){
 			sel_file_icon_color:0xffffffff,
 			sel_name_color:0xffffffff,
 			sel_misc_color:0xffcccccc,
+			tag_padding:4,
+			tag_round:8,
+			tag_border_width:0,
 		},
 		top_menu:{
 			//nothing
@@ -670,10 +673,31 @@ UI.Application=function(id,attrs){
 				UI.OpenFile(fn.replace(new RegExp("\\\\","g"),"/"));
 				UI.Refresh()
 			}});
-			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",enable_hotkey:1,action:function(){
+			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
 				app.document_area.SaveCurrent();
 			}});
 			//todo: drag-loading
+			if(!UI.Platform.IS_MOBILE){
+				//OS shell
+				menu_file.AddSeparator();
+				menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:function(){
+					UI.UpdateNewDocumentSearchPath()
+					if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+						IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
+					}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+						IO.Shell(["xterm",
+							"-e",'cd '+UI.m_new_document_search_path+'; bash'])
+					}else{
+						//mac
+						//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
+						IO.Shell(["osascript",
+							"-e",'tell application "Terminal" to activate',
+							"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down',
+							"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'
+						])
+					}
+				}})
+			}
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:function(){
 				var active_document=UI.m_the_document_area.active_tab
