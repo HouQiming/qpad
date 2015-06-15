@@ -398,6 +398,11 @@ UI.Theme_CustomWidget=function(C){
 			///////
 			sxs_shadow_size:6,
 			sxs_shadow_color:0xaa000000,
+			///////
+			status_bar_bgcolor:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffd0d0d0}],
+			status_bar_font:UI.Font("res/fonts/opensans.ttf",20,-50),
+			status_bar_padding:4,
+			status_bar_text_color:0xff444444,
 		},
 		code_editor_notification:{
 			transition_dt:0.1,

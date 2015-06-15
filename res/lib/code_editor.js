@@ -2624,6 +2624,48 @@ W.CodeEditor=function(id,attrs){
 						UI.PopCliprect()
 					}
 				}
+				//status overlay
+				if(doc){
+					var sel=doc.GetSelection()
+					var lcinfo0=doc.GetLC(sel[0])
+					var s_status="";
+					if(sel[0]<sel[1]){
+						var lcinfo1=doc.GetLC(sel[1])
+						var n_lines=lcinfo1[0]-lcinfo0[0]
+						var n_chars=lcinfo1[2]-lcinfo0[2]
+						var n_words=(lcinfo1[3]>>1)-(lcinfo0[3]>>1)
+						if(n_chars==1){
+							//unicode
+							s_status=UI.Format("U+@1",
+								ZeroPad(doc.ed.GetUtf8CharNeighborhood(sel[0])[1].toString(16).toUpperCase(),4))
+						}else{
+							//wc
+							if(lcinfo0[3]&1){
+								var ch=doc.ed.GetUtf8CharNeighborhood(sel[0])[1]
+								if(ch>32){
+									n_words++;
+								}
+							}
+							s_status=UI.Format("@1 lines, @2 words, @3 chars, @4 bytes",n_lines.toString(),n_words.toString(),n_chars.toString(),(sel[1]-sel[0]).toString())
+						}
+					}else{
+						//lc
+						s_status=UI.Format("Ln @1,@2",(lcinfo0[0]+1).toString(),(lcinfo0[1]+1).toString())
+					}
+					//todo: s_status, status_bar_font
+					var status_dims=UI.MeasureText(obj.status_bar_font,s_status)
+					var status_x=obj.x+w_obj_area-w_scrolling_area-status_dims.w-obj.status_bar_padding*2;
+					var status_y=obj.y+h_obj_area-status_dims.h-obj.status_bar_padding*2;
+					UI.RoundRect({
+						color:obj.status_bar_bgcolor,
+						x:status_x,y:status_y,w:status_dims.w+obj.status_bar_padding*2,h:status_dims.h+obj.status_bar_padding*2,
+						round:obj.status_bar_padding,
+						border_width:0})
+					W.Text("",{
+						x:status_x+obj.status_bar_padding,y:status_y+obj.status_bar_padding,
+						font:obj.status_bar_font,color:obj.status_bar_text_color,
+						text:s_status})
+				}
 			}
 			if(!doc){
 				//initiate progressive loading
@@ -3052,10 +3094,10 @@ W.CodeEditor=function(id,attrs){
 			//	color:obj.separator_color})
 			if(UI.HasFocus(doc)){
 				var menu_edit=UI.BigMenu("&Edit")
-				menu_edit.AddNormalItem({text:"&Undo",enable_hotkey:0,key:"CTRL+Z",action:function(){
+				menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:0,key:"CTRL+Z",action:function(){
 					doc.Undo()
 				}})
-				menu_edit.AddNormalItem({text:"&Redo",enable_hotkey:0,key:"CTRL+SHIFT+Z",action:function(){
+				menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:0,key:"CTRL+SHIFT+Z",action:function(){
 					doc.Redo()
 				}})
 				///////////////////////

@@ -1614,7 +1614,7 @@ UI.RegisterEditorPlugin(function(){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({text:"Fo&ld",enable_hotkey:1,key:"ALT+LEFT",action:function(){
+			menu_edit.AddNormalItem({text:"Fo&ld",icon:"叠",enable_hotkey:1,key:"ALT+LEFT",action:function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
@@ -1656,7 +1656,7 @@ UI.RegisterEditorPlugin(function(){
 					UI.Refresh()
 				}
 			}.bind(this)})
-			menu_edit.AddNormalItem({text:"U&nfold",enable_hotkey:1,key:"ALT+RIGHT",action:function(){
+			menu_edit.AddNormalItem({text:"U&nfold",icon:"展",enable_hotkey:1,key:"ALT+RIGHT",action:function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
@@ -1692,3 +1692,78 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 }).prototype.name="Text hiding";
+
+//unicode
+var ZeroPad=function(n,w){
+	var s=n.toString();
+	if(s.length<w){
+		var a=[]
+		for(var i=s.length;i<w;i++){
+			a.push('0')
+		}
+		a.push(s)
+		s=a.join("")
+	}
+	return s
+}
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)&&!this.hyphenator){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			if(sel[0]<sel[1]){
+				menu_edit.AddSeparator()
+				menu_edit.AddNormalItem({text:"Wide char ↔ \\u",icon:"Ｕ",enable_hotkey:1,key:"CTRL+SHIFT+U",action:function(){
+					var ed=this.ed;
+					var sel=this.GetSelection();
+					if(sel[0]<sel[1]){
+						var s0=ed.GetText(sel[0],sel[1]-sel[0])
+						var n=s0.length;
+						var nnxt=0
+						var surrogate_high=0
+						var sret=[]
+						for(var i=0;i<n;i++){
+							var ch=s0.charCodeAt(i)
+							if(ch>=128){
+								//add \u
+								if(ch>=65536){
+									ch=ch-0x10000
+									var chx=0xd800+((ch>>10)&0x3ff)
+									sret.push("\\u"+ZeroPad(chx.toString(16),4))
+									ch=ch&0x3ff
+									ch=ch+0xdc00
+								}
+								sret.push("\\u"+ZeroPad(ch.toString(16),4))
+							}else{
+								if(ch==0x5C&&i<n-1&&s0[i+1]=='u'){
+									//enter \u mode
+									ch=parseInt(s0.substr(i+2,4),16)
+									sret.push(String.fromCharCode(ch))
+									//var surrogate_high=0;
+									//if(ch>=0xd800&&ch<=0xdc00){
+									//	surrogate_high=(ch&0x3ff)
+									//}else{
+									//	if(ch>=0xdc00&&ch<=0xe000){
+									//		ch=(surrogate_high<<10)+(ch&0x3ff)+0x10000
+									//		surrogate_high=0
+									//	}
+									//}
+									i=i+5
+									continue
+								}
+								sret.push(String.fromCharCode(ch))
+							}
+						}
+						var ssret=sret.join("")
+						this.HookedEdit([sel[0],sel[1]-sel[0],ssret])
+						this.SetSelection(sel[0],sel[0]+Duktape.__byte_length(ssret))
+						this.AutoScroll(0)
+						UI.Refresh()
+					}
+				}.bind(this)})
+			}
+		}
+	})
+}).prototype.name="Unicode conversion";
