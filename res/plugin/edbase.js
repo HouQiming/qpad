@@ -1710,7 +1710,7 @@ var ZeroPad=function(n,w){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)&&!this.hyphenator){
+		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			if(sel[0]<sel[1]){
@@ -1771,17 +1771,22 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)&&!this.hyphenator){
+		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddSeparator()
 			//todo: check item
-			menu_edit.AddNormalItem({text:"Auto &wrap",enable_hotkey:1,key:"CTRL+SHIFT+W",action:function(){
+			menu_edit.AddNormalItem({text:"Auto &wrap",icon:this.owner.m_enable_wrapping?"对":undefined,enable_hotkey:1,key:"CTRL+SHIFT+W",action:function(){
 				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				var ed_caret_original=this.GetCaretXY();
+				var scroll_y_original=this.scroll_y;
 				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
 				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+				var ed_caret_new=this.GetCaretXY();
+				this.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
 				this.AutoScroll("show")
+				this.scrolling_animation=undefined
 				UI.Refresh()
 			}.bind(this)})
 		}

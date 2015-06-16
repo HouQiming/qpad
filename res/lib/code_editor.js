@@ -593,10 +593,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	StartLoading:function(fn){
 		var ed=this.ed;
 		var is_preview=this.m_is_preview
-		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:undefined)
+		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216))
 		//abandonment should work as is...
 		var floadNext=(function(){
-			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:undefined)
+			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?131072:4194304))
 			if(is_preview){
 				var rendering_ccnt1=this.SeekXY(0,this.h)
 				if(rendering_ccnt1<ed.GetTextSize()){
@@ -2593,6 +2593,14 @@ W.CodeEditor=function(id,attrs){
 				doc.visible_scroll_x=anim.scroll_x
 				doc.visible_scroll_y=anim.scroll_y
 			}else{
+				if(!doc){
+					//early meta-data load for wrap_width
+					var loaded_metadata=(UI.m_ui_metadata[obj.file_name]||{})
+					for(var i=0;i<UI.m_code_editor_persistent_members.length;i++){
+						var name_i=UI.m_code_editor_persistent_members[i]
+						obj[name_i]=(loaded_metadata[name_i]||obj[name_i])
+					}
+				}
 				W.Edit("doc",{
 					///////////////
 					language:Language.GetDefinitionByName(obj.m_language_id),
