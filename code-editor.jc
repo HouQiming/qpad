@@ -1240,6 +1240,14 @@ class CLayouter_programmer
 			ret[I]=loc.ccnt
 		return JS.Return(ret)
 	}
+	JS_ResetWrapping=function(JSContext JS){
+		m_wrap_width=JS.Param(0).or(0.f)
+		if !(m_wrap_width>0.f):
+			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
+		else
+			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
+		return 0
+	}
 	///////////////////////
 	__JS_prototype=function(JSObject proto){
 		proto.ExportMethod(this,"HunspellAddWord",JS_AddWord)
@@ -1252,6 +1260,7 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"ShowRange",JS_ShowRange)
 		proto.ExportMethod(this,"SnapToShown",JS_SnapToShown)
 		proto.ExportMethod(this,"GetHiddenRanges",JS_GetHiddenRanges)
+		proto.ExportMethod(this,"ResetWrapping",JS_ResetWrapping)
 	}
 
 class CColorer_programmer

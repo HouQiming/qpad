@@ -248,7 +248,6 @@ UI.Theme_CustomWidget=function(C){
 				//tex_font:UI.Font("res/fonts/cmunrm.ttf",36),
 				//tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",36,200),
 				//font_tilde:UI.Font(UI.icon_font_name,36,100),
-				wrap_width:1024,
 				font:UI.Font("res/fonts/inconsolata.ttf",28),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
@@ -570,7 +569,7 @@ UI.Application=function(id,attrs){
 	UI.Begin(attrs);
 		///////////////////
 		var app=UI.Begin(W.Window('app',{
-				title:'UI Editor',w:1280,h:720,bgcolor:0xfff0f0f0,
+				title:'UI Editor',w:1280,h:720,bgcolor:0xfff0f0f0,icon:"res/icon256.png",
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1,
 				OnWindowBlur:function(){

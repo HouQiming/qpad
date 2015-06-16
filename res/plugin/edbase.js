@@ -1759,7 +1759,7 @@ UI.RegisterEditorPlugin(function(){
 						var ssret=sret.join("")
 						this.HookedEdit([sel[0],sel[1]-sel[0],ssret])
 						this.SetSelection(sel[0],sel[0]+Duktape.__byte_length(ssret))
-						this.AutoScroll(0)
+						this.AutoScroll("show")
 						UI.Refresh()
 					}
 				}.bind(this)})
@@ -1767,3 +1767,23 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 }).prototype.name="Unicode conversion";
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)&&!this.hyphenator){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddSeparator()
+			//todo: check item
+			menu_edit.AddNormalItem({text:"Auto &wrap",enable_hotkey:1,key:"CTRL+SHIFT+W",action:function(){
+				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
+				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+				this.AutoScroll("show")
+				UI.Refresh()
+			}.bind(this)})
+		}
+	})
+}).prototype.name="Wrapping";

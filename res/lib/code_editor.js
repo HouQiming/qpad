@@ -13,7 +13,8 @@ var MAX_PARSABLE=33554432
 UI.m_code_editor_persistent_members=[
 	"m_current_needle",
 	"m_find_flags",
-	"m_wrap_width",
+	"m_current_wrap_width",
+	"m_enable_wrapping",
 	"m_hyphenator_name",
 	"m_spell_checker",
 ]
@@ -860,7 +861,8 @@ UI.SEARCH_FLAG_WHOLE_WORD=2
 UI.SEARCH_FLAG_REGEXP=4
 W.CodeEditorWidget_prototype={
 	m_find_flags:0,
-	m_wrap_width:0,
+	m_current_wrap_width:1024,
+	m_enable_wrapping:0,
 	OnEditorCreate:function(){
 		var doc=this.doc
 		var obj=this
@@ -951,7 +953,7 @@ W.CodeEditorWidget_prototype={
 		}
 		//this.m_current_needle=loaded_metadata.m_current_needle
 		//this.m_find_flags=(loaded_metadata.m_find_flags||0)
-		//this.m_wrap_width=(loaded_metadata.m_wrap_width||0)
+		//this.m_current_wrap_width=(loaded_metadata.m_current_wrap_width||0)
 		doc.AutoScroll("center")
 		doc.scrolling_animation=undefined
 		doc.CallHooks("selectionChange")
@@ -2596,10 +2598,11 @@ W.CodeEditor=function(id,attrs){
 					language:Language.GetDefinitionByName(obj.m_language_id),
 					plugin_language_desc:Language.GetDescObjectByName(obj.m_language_id),
 					style:editor_style,
-					wrap_width:obj.m_is_preview?w_obj_area-w_line_numbers-obj.padding-w_scrolling_area:obj.m_wrap_width,
+					wrap_width:obj.m_is_preview?w_obj_area-w_line_numbers-obj.padding-w_scrolling_area:(obj.m_enable_wrapping?obj.m_current_wrap_width:0),
 					///////////////
 					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_find,w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,h:h_obj_area-h_top_find-h_bottom_find,
 					///////////////
+					owner:obj,
 					m_is_preview:obj.m_is_preview,
 					m_file_name:obj.file_name,
 					m_is_main_editor:1,
