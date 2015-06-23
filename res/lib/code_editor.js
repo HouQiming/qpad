@@ -890,9 +890,10 @@ W.CodeEditorWidget_prototype={
 				}
 			}
 			if(this.saved_point>this.ed.GetUndoQueueLength()){
-				//undo beyond save point, then edit sth else, the save point is lost permanently
+				//undo beyond the saved point, then edit sth else, the save point is lost permanently
 				this.saved_point=-1;
 			}
+			doc.CallHooks("beforeEdit")
 			this.ed.Edit(ops);
 		}
 		doc.AddEventHandler('change',function(){

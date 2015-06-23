@@ -1775,7 +1775,6 @@ UI.RegisterEditorPlugin(function(){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddSeparator()
-			//todo: check item
 			menu_edit.AddNormalItem({text:"Auto &wrap",icon:this.owner.m_enable_wrapping?"对":undefined,enable_hotkey:1,key:"CTRL+SHIFT+W",action:function(){
 				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
@@ -1792,3 +1791,50 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 }).prototype.name="Wrapping";
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.AddEventHandler('selectionChange',function(){
+		!? //todo: could render the stuff - gives some structural understanding
+		//still-in-range test? search above?
+		//could allow multi-exampling this
+		var ed=this.ed;
+		var ln=this.GetLC(this.GetSelection()[0])[0]
+		var ccnt_lh=this.SeekLC(ln,0)
+		if(this.m_autoedit_locators){
+			var locs=this.m_autoedit_locators
+			for(var i=0;i<loc.length;i++){
+				locs[i].discard()
+			}
+			this.m_autoedit_locators=undefined
+		}
+		var ctx=UI.ED_AutoEdit_Detect(ed,ccnt_lh)
+		this.m_autoedit_context=ctx
+		if(ctx){
+			var cclines=ctx.m_cclines
+			var locs=[]
+			this.m_autoedit_locators=locs;
+			for(var i=0;i<cclines.length;i++){
+				//create locators
+				locs[i]=ed.CreateLocator(cclines[i],-1)
+			}
+		}
+	})
+	this.AddEventHandler('beforeEdit',function(){
+		var ctx=this.m_autoedit_context
+		if(!ctx){return}
+		var locs=this.m_autoedit_locators
+		var ed=this.ed
+		if(!UI.ED_AutoEdit_SetExample(ctx,ed.GetText(locs[0],locs[1]-locs[0]))){
+			return;
+		}
+		!? //do after editing?
+	})
+}).prototype.name="Auto-edit";
+/*
+ED_AutoEdit_Detect
+ED_AutoEdit_SetExample
+ED_AutoEdit_Evaluate
+general highlighting
+beforeEdit
+*/

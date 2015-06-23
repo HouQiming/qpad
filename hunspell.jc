@@ -1,0 +1,124 @@
+import "gui2d.jc"
+import "system.jc"
+import Gui2D.detail.*
+import System.Algorithm.*
+import System.Console.*
+
+//for iPad... we need to be static
+HSPELLER=__pointer
+if Platform.IS_WINDOWS:
+	__generate_json("search_paths","ROOT")
+	if sizeof(iptr)==4:
+		__generate_json("lib_files","osslib/src/win_api/Release_dll/libhunspell/libhunspell.lib")
+		__generate_json("dll_files","osslib/src/win_api/Release_dll/libhunspell/libhunspell.dll")
+	else
+		__generate_json("lib_files","osslib/src/win_api/x64/Release_dll/libhunspell64.lib")
+		__generate_json("dll_files","osslib/src/win_api/x64/Release_dll/libhunspell64.dll")
+	__generate_json("h_files","osslib/src/hunspell/hunvisapi.h")
+	__generate_json("h_files","osslib/src/hunspell/hunspell.h")
+	Hunspell_create=__c_function(HSPELLER,"Hunspell_create","hunspell.h")
+	Hunspell_add=__c_function(int,"Hunspell_add","hunspell.h")
+	Hunspell_remove=__c_function(int,"Hunspell_remove","hunspell.h")
+	Hunspell_spell=__c_function(int,"Hunspell_spell","hunspell.h")
+	Hunspell_suggest=__c_function(int,"Hunspell_suggest","hunspell.h")
+	Hunspell_destroy=__c_function(int,"Hunspell_destroy","hunspell.h")
+else
+	//dummy hunspell
+	Hunspell_create=inline(){return NULL}
+	Hunspell_add=inline(){return 0}
+	Hunspell_remove=inline(){return 0}
+	Hunspell_spell=inline(){return 0}
+	Hunspell_suggest=inline(){return 0}
+	Hunspell_destroy=inline(){return 0}
+
+//__C(int,'@global:
+//typedef void* HSPELLER;
+//static HSPELLER(*PFHunspell_create)(char*,char*);
+//static int(*PFHunspell_add)(HSPELLER,char*);
+//static int(*PFHunspell_remove)(HSPELLER,char*);
+//static int(*PFHunspell_spell)(HSPELLER,char*);
+//static int(*PFHunspell_suggest)(HSPELLER,char***,char*);
+//static int(*PFHunspell_destroy)(HSPELLER);
+//');
+
+g_suggs=NULL
+g_tried_to_init=0
+g_spellers=new HSPELLER[string]
+
+//auto isAvailable()
+//	if !g_tried_to_init:
+//		g_tried_to_init=1
+//		if Platform.IS_WINDOWS:
+//			if sizeof(iptr)==8:
+//				dllname=System.Env.GetExecutablePath()+string("libhunspell64.dll")
+//			else
+//				dllname=System.Env.GetExecutablePath()+string("libhunspell.dll")
+//			hdll=System.Windows.LoadLibraryA(dllname.c_str())
+//			dlsym=
+//		else
+//			dllname="libhunspell.so"
+//		gcKeepHere(dllname)
+//		if hdll:
+//			$Hunspell_create=(void*)System.Windows.GetProcAddress(hdll,"Hunspell_create")
+//			$Hunspell_add=(void*)System.Windows.GetProcAddress(hdll,"Hunspell_add")
+//			$Hunspell_remove=(void*)System.Windows.GetProcAddress(hdll,"Hunspell_remove")
+//			$Hunspell_spell=(void*)System.Windows.GetProcAddress(hdll,"Hunspell_spell")
+//			$Hunspell_suggest=(void*)System.Windows.GetProcAddress(hdll,"Hunspell_suggest")
+//			$Hunspell_destroy=(void*)System.Windows.GetProcAddress(hdll,"Hunspell_destroy")
+//	return !!$Hunspell_create
+
+auto getSpeller(string lang)
+	if !lang||!lang.n:return NULL
+	//if !isAvailable():return NULL
+	ret=g_spellers[lang]
+	if !ret:
+		exepath=System.Env.GetExecutablePath()+("dict/")
+		sa=exepath+lang+(".aff\0")
+		sb=exepath+lang+(".dic\0")
+		ret=Hunspell_create(sa,sb)
+		g_spellers[lang]=ret
+		if ret:
+			sc=exepath+lang+(".user_dic")
+			s2=System.IO.ReadAll(sc)
+			if s2:
+				foreach s3_real in s2.Tokenize(" \t\n")
+					s3=s3_real+"\0"
+					if s3[0]=='-':
+						Hunspell_remove(ret,__pointer(s3.d+1L))
+					else
+						Hunspell_add(ret,s3)
+	return ret
+
+auto spell(HSPELLER hun,string s)
+	//allow: LaTeX '', numberic starter, asian starter
+	//if s[0]>='0'&&s[0]<='9'||s=="'"||s.n>=2&&s[s.n-1]=='\''&&s[s.n-2]=='\'':return 1
+	if s[0]>='0'&&s[0]<='9':return 1
+	return Hunspell_spell(hun,s)
+
+auto addWord(HSPELLER hun,string lang,string s0)
+	exepath=System.Env.GetExecutablePath()+("dict\\")
+	sc=exepath+lang+(".user_dic")
+	f=System.IO.OpenFile(sc,System.IO.OPEN_READ+System.IO.OPEN_WRITE)
+	if !f:f=System.IO.CreateFile(sc)
+	if !f:
+		return 0
+	else
+		f.SeekFromEnd(0)
+		f.Write(s0+"\n")
+		f.Close()
+	s=s0+"\0"
+	if s[0]=='-':
+		ret=!Hunspell_remove(hun,__pointer(s.d+1L))
+	else
+		ret=!Hunspell_add(hun,s)
+	return ret
+
+auto remove(HSPELLER hun,string lang,string s)
+	return addWord(hun,lang,string("-")+s)
+
+auto suggest(HSPELLER hun,string s)
+	n=Hunspell_suggest(hun,__C(__pointer,"(char***)(@1)",&g_suggs),s+"\0")
+	ret=new string[n]
+	for i=0:n-1
+		ret[i]=System.detail.pcharToString(__memory(__pointer,iptr(g_suggs)+sizeof(iptr)*i))
+	return ret

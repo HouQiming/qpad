@@ -1,0 +1,992 @@
+import "text-box.jc"
+import "javascript.jc"
+import "gui2d.jc"
+import System.Algorithm.*
+import System.Console.*
+import System.Math.*
+import TextBox.*
+import TextBox.detail.*
+
+inline EscapedChars(string s)
+	return {forEach:inline(fbody){
+		in_slash=0
+		in_unicode=0
+		chu=0
+		II=0L
+		foreach ch,I in Utf8Chars(s)
+			chi=ch
+			if in_unicode:
+				in_unicode--
+				if chi>='a':chi-=0x20
+				chi-=0x30
+				if chi>=10:
+					chi-=int('A'-':')
+				//Write((char)ch,'-',chi,' ')
+				chu+=(chi&15)<<(in_unicode*4)
+				if in_unicode:
+					continue
+				else
+					chi=chu
+			else if in_slash:
+				in_slash=0
+				switch(ch){
+				case 't':
+					chi='\t'
+					break
+				case 'n':
+					chi='\n'
+					break
+				case 'r':
+					chi='\r'
+					break
+				case 'b':
+					chi='\b'
+					break
+				case 'u':
+					in_unicode=4
+					chu=0
+					continue
+				case 'U':
+					in_unicode=5
+					chu=0
+					continue
+				}
+			else
+				II=I
+				if ch=='\\':
+					in_slash=1
+					continue
+			fbody(chi,II)
+	}}
+
+module detail
+	DEBUG_DUMP_PROGRAM=0
+	TOK_CHARSET=0x200000
+	TOK_SUBSTRING=0x300000
+	TOK_DONTCARE=-1
+	NBRA0_DONTCARE=0x80000000
+	
+	auto StartsWith(i32[] a,i32[] b)
+		return a.n>=b.n&&__basic_api.memcmp(__pointer(a.d),__pointer(b.d),b.n*sizeof(i32))==0
+	auto EndsWith(i32[] a,i32[] b)
+		return a.n>=b.n&&__basic_api.memcmp(__pointer(iptr(a.d)+(a.n-b.n)*sizeof(i32)),__pointer(b.d),b.n*sizeof(i32))==0
+	
+	struct TPositionDescriptor
+		int tok0,tok1
+		int nbra0
+		auto Matches(CReplaceContext owner,i32[] s,iptr I,iptr nbra)
+			//int ch0,int ch1
+			if nbra0!=nbra&&nbra0!=NBRA0_DONTCARE:return 0
+			if tok0>=TOK_SUBSTRING:
+				if !EndsWith(s[:I-1],owner.GetSubString(tok0)):return 0
+			else if !SF.TokenMatchesChar(tok0,s[I-1]):return 0
+			if tok1>=TOK_SUBSTRING:
+				if !StartsWith(s[I:],owner.GetSubString(tok1)):return 0
+			else if !SF.TokenMatchesChar(tok1,s[I]):return 0
+			return 1
+		auto Search(CReplaceContext owner,i32[] s,int[] nbras,iptr id)
+			if id<0:
+				seq=~id
+				nbra0=0L
+				foreach ch,I in s.ReverseOrder()
+					if I<s.n-1:
+						if Matches(owner,s,I+1,nbra0):
+							if !seq--:return I+1
+					nbra0=nbras[I]
+			else
+				seq=id
+				foreach ch,I in s
+					if I:
+						if Matches(owner,s,I,nbras[I]):
+							if !seq--:return I
+			return -1
+	
+	(TPositionDescriptor<TPositionDescriptor)=inline(a,b){
+		return a.tok0<b.tok0||a.tok0==b.tok0&&(a.tok1<b.tok1||a.tok1==b.tok1&&a.nbra0<b.nbra0)
+	};
+	(TPositionDescriptor==TPositionDescriptor)=inline(a,b){
+		return a.tok0==b.tok0&&a.tok1==b.tok1&&a.nbra0==b.nbra0
+	};
+	struct TReplaceInput
+		//s should include the prev/next chars
+		i32[] s_unicode
+		int[] nbras
+	////////////////
+	struct TReplaceMatch
+		TRuleMatch[] pos0
+		TRuleMatch[] pos1
+		//just a cache
+		TRuleMatch bp0,bp1
+	struct TRuleMatch
+		iptr id
+		iptr cnt
+	(TRuleMatch<TRuleMatch)=inline(a,b){
+		return a.id<b.id||a.id==b.id&&a.cnt<b.cnt
+	}
+	(TRuleMatch==TRuleMatch)=inline(a,b){
+		return a.id==b.id&&a.cnt==b.cnt
+	}
+	struct TProgramItem
+		i32[] sconst
+		iptr match_id0,match_id1
+		i8[] new_case
+		TPositionDescriptor pos0,pos1
+		int numerical_delta,numerical_base
+		//char is_left0,is_left1
+	
+	inline LCPLength(auto a,auto b)
+		//if !a:return b.n
+		n=min(a.n,b.n)
+		for i=0:n-1
+			if a[i]!=b[i]:
+				return i
+		return n
+	
+	inline EquICase(int a,int b)
+		ch0=a
+		ch1=b
+		if u32(ch0-'A')<26u:ch0+=0x20
+		if u32(ch1-'A')<26u:ch1+=0x20
+		return ch0==ch1
+	
+	struct TPosPair
+		TPositionDescriptor a
+		iptr b
+	inline make_pair(a,b)
+		return TPosPair(){a:a,b:b}
+	
+	class CReplaceContext
+		TPosPair[] m_poses_union
+		TReplaceInput[] m_inputs
+		int[][] m_all_substrs
+		//CReplaceGraph[] gs
+		TProgramItem[] m_prg
+		int m_enable_numericals
+		auto SubstrLength(int[] s)
+			all_substrs=m_all_substrs
+			p=all_substrs.Bisect(function(int[] s0){return s0<=s})
+			lg=0L
+			if p+1<all_substrs.n:lg=max(lg,LCPLength(all_substrs[p+1],s))
+			if p<all_substrs.n:lg=max(lg,LCPLength(all_substrs[p],s))
+			return int(lg)
+		auto PreCompute(TReplaceInput[] inputs)
+			m_inputs=inputs
+			//.gs=new CReplaceGraph[inputs.n]
+			//substrings: sort-and-merge
+			//ignore nbras here
+			//merge: search longest
+			substrs=int[][].NULL
+			foreach ri,I in inputs
+				if !I:
+					ss=ri.s_unicode
+					substrs=[ss[j:] for j=0:ss.n-1]
+					substrs.Sort()
+					continue
+				foreach s0 in substrs
+					//KMP
+					if s0.n<=1:continue
+					next=new int[s0.n]
+					next[0]=-1
+					next[1]=0
+					for j=2:s0.n-1
+						p=next[j-1]
+						while p>=0:
+							if s0[j-1]==s0[p]:
+								break
+							p=next[p]
+						next[j]=p+1
+					p=0
+					pmax=0
+					foreach C,J in ri.s_unicode
+						while p>=0&&C!=s0[p]:
+							p=next[p]
+						p++
+						if pmax<p:
+							pmax=p
+							if pmax>=s0.n:
+								break
+					s0.resize(pmax)
+				substrs=[s0 foreach s0 in substrs if s0.n>1]
+				substrs.Sort()
+				substrs.Unique()
+			//remove entirely-contained cases... 1st example only
+			m_all_substrs=substrs
+			//.all_substrs=[substrs[id] foreach id in chowner if id>=0]
+			//Writeln(.all_substrs)
+			//compute candidate position sets
+			/*
+			combos:
+				0,1: ignore, charset, char
+				bra: ignore?
+				can't ignore both chars
+				2*((n+2)^2-1) choices per position
+			but there are only so many possible choices
+			we need locations that appeared in every input
+			a few uniques, and we're done
+			*/
+			//substring: merge local ssort results
+			auto GetCharChoices(int ch)
+				ret=[TOK_DONTCARE,ch]
+				//if ch==9&&SF.type_to_cset[SF.char_types[ch]].n:
+				//	Write('>> ',ch,' >> ')
+				foreach csetid in SF.type_to_cset[SF.char_types[ch]]
+					ret.push(TOK_CHARSET+csetid)
+					//if ch==9:Write(csetid,' ')
+				//if ch==9&&SF.type_to_cset[SF.char_types[ch]].n:
+				//	Writeln()
+				return ret
+			poses_union=TPosPair[].NULL
+			foreach ri,I in inputs
+				posesi=new TPositionDescriptor[]
+				chs1=GetCharChoices(ri.s_unicode[0])
+				struct TSubstrMatches
+					iptr id0,lg0
+					iptr id1,lg1
+				ssmatches=new TSubstrMatches[ri.s_unicode.n]
+				for i=0:ri.s_unicode.n-1
+					s_i=ri.s_unicode[i:]
+					p=m_all_substrs.Bisect(function(s0){return s0<s_i})
+					if p>=m_all_substrs.n:
+						lcp1=0L
+					else
+						lcp1=LCPLength(s_i,m_all_substrs[p])
+					if p<=0:
+						lcp0=0L
+					else
+						lcp0=LCPLength(s_i,m_all_substrs[p-1])
+					p--
+					if lcp0<lcp1:
+						lcp0=lcp1
+						p++
+					ssmatches[i].lg1=lcp0
+					ssmatches[i].id1=p
+					assert(i+lcp0<=ri.s_unicode.n)
+					for j=1:min(lcp0,ri.s_unicode.n-1-i)
+						if ssmatches[i+j].lg0<j:
+							ssmatches[i+j].lg0=j
+							ssmatches[i+j].id0=p
+				for i=1:ri.s_unicode.n-1
+					chs0=chs1
+					chs1=GetCharChoices(ri.s_unicode[i])
+					//substr match: substr overrides all charsets
+					chs1_n0=chs1.n
+					if ssmatches[i].lg1:
+						chs1.push(TOK_SUBSTRING+int(ssmatches[i].lg1*m_all_substrs.n+ssmatches[i].id1))
+					if ssmatches[i].lg0:
+						chs0.push(TOK_SUBSTRING+int(ssmatches[i].lg0*m_all_substrs.n+ssmatches[i].id0))
+					foreach c0 in chs0
+						foreach c1 in chs1
+							if c0==TOK_DONTCARE&&c1==TOK_DONTCARE:continue
+							for has_nbra=0:1
+								posesi.push(TPositionDescriptor(){tok0:c0,tok1:c1,nbra0:int(has_nbra?ri.nbras[i]:NBRA0_DONTCARE)})
+					chs1.resize(chs1_n0)
+				//state - we could use nbra=0 to tell a comment
+				posesi.Sort()
+				//counting unique
+				posesi_u=new TPosPair[]
+				i_last=-1L
+				for i=0:posesi.n-1
+					if !i||!(posesi[i]==posesi[i-1]):
+						cnt_i=i-i_last
+						if posesi_u.n:posesi_u.back().b=cnt_i
+						posesi_u.push(make_pair(posesi[i],posesi.n-i))
+						i_last=i
+				//Writeln(posesi_u.n,' ',posesi.n)
+				//for i=0:posesi_u.n-1
+				//	Write(posesi_u[i].b,' ')
+				//Writeln()
+				//posesi.Unique()
+				//foreach pd in posesi
+				//	Writeln(pd.tok0,' ',pd.tok1,' ',pd.nbra0)
+				//System.IO.stdin.ReadLine()
+				if !I:
+					poses_union=posesi_u
+				else
+					poses_union2=new TPosPair[]
+					ai=0;bi=0
+					for(;ai<poses_union.n&&bi<posesi_u.n;)
+						pd0=poses_union[ai]
+						pd1=posesi_u[bi]
+						if pd0.a==pd1.a:
+							pdx=pd0
+							if pdx.b!=pd1.b:
+								pdx.b=-1L
+							poses_union2.push(pdx)
+							ai++
+							bi++
+						else if pd0.a<pd1.a:
+							ai++
+						else
+							bi++
+					poses_union=poses_union2
+				if !poses_union.n:break
+			m_poses_union=poses_union
+			//special rule for the head and the tail
+			m_poses_union.push(make_pair(TPositionDescriptor(){tok0:TOK_DONTCARE,tok1:TOK_DONTCARE,nbra0:NBRA0_DONTCARE},2L))
+		/////////////////////////////////////////
+		COST_BASE=5.f
+		//COST_SCONST_BASE_NUMBER=12.f//10
+		//COST_SCONST_CH_NUMBER=10.f//6
+		COST_SCONST_BASE=12.f//10
+		COST_SCONST_CH=10.f//6
+		COST_SUBSTR=5.f
+		COST_ID_ABS=8.f
+		//COST_LEFT_POSITION=5.f
+		COST_SPECIFIC_TOKEN=4.f
+		COST_CSET_TOKEN=1.9f
+		COST_SUBSTRING_TOKEN=4.5f
+		COST_NBRA0=5.f
+		COST_VARIABLE_COUNT=6.f
+		COST_ONE_END=0.f
+		COST_BREAKING_CHARSET_SWITCH=15.f
+		COST_BREAKING_CHARSET_SRC=10.f
+		COST_CASE_MODIFICATION=20.f
+		COST_SYMBOL_MATCH_PENALTY=10.f
+		COST_NUMERICAL_ONE=10.f
+		COST_NUMERICAL_WEIRD=11.f
+		COST_NUMERICAL_WEIRD_CH=9.f
+		auto tokCost(int tok)
+			if tok==TOK_DONTCARE:return 0.f
+			if tok>=TOK_SUBSTRING:return COST_SUBSTRING_TOKEN
+			if tok>=TOK_CHARSET:return COST_CSET_TOKEN
+			return COST_SPECIFIC_TOKEN
+		auto GetBestDescriptor(TRuleMatch[] rmatches)
+			auto bcost=0.f
+			auto best=-1L
+			foreach bp0,I in rmatches
+				auto cost=0.f
+				if bp0.cnt>0||bp0.cnt<-1:cost+=COST_ID_ABS//*(f32)max(bp0.cnt,~bp0.cnt)
+				//if bp0.id&0x80000000:
+				//	cost+=COST_LEFT_POSITION
+				auto pd0=m_poses_union[bp0.id].a
+				if m_poses_union[bp0.id].b==-1L:
+					cost+=COST_VARIABLE_COUNT
+				if pd0.nbra0!=NBRA0_DONTCARE:
+					cost+=COST_NBRA0
+				cost+=tokCost(pd0.tok0)+tokCost(pd0.tok1)
+				if pd0.tok0==TOK_DONTCARE&&pd0.tok1==TOK_DONTCARE&&pd0.nbra0==NBRA0_DONTCARE&&(bp0.cnt==0||bp0.cnt==-1):
+					cost=COST_ONE_END
+				if bcost>cost||best<0:
+					bcost=cost
+					best=I
+			return ((best<0L?TRuleMatch(){id:-1,cnt:-1}:rmatches[best]),bcost)
+		/////////////////////////////////////////
+		auto SetReplaceExample(iptr input_id,int[] target_unicode,function(int):int isalnum)
+			//Gui.Managed.UI.TBegin("SetReplaceExample")
+			s0=m_inputs[input_id].s_unicode
+			nbras0=m_inputs[input_id].nbras
+			s1=target_unicode
+			best_rule_for_pos=new TRuleMatch[]
+			bcost_rule_for_pos=new float[]
+			counts=new int[m_poses_union.n]
+			//best descriptor for each position
+			for i=1:s0.n-1
+				//ch0=s0[i-1]
+				//ch1=s0[i]
+				nbra=nbras0[i]
+				matched_rules=new TRuleMatch[]
+				foreach ppd,J in m_poses_union
+					if ppd.a.Matches(this,s0,i,nbra):
+						if J==m_poses_union.n-1:
+							if !(i==1||i==s0.n-1):continue
+						matched_rules.push(TRuleMatch(){id:J,cnt:counts[J]})
+						//Write(J,' ')
+						counts[J]++
+				//Writeln()
+				(ma,cost)=GetBestDescriptor(matched_rules)
+				if i&&SF.char_types[s0[i]]==SF.char_types[s0[i-1]]&&SF.char_types[s0[i]]!=SF.char_types[int('?')]:
+					cost+=COST_BREAKING_CHARSET_SRC
+				best_rule_for_pos.push(ma)
+				bcost_rule_for_pos.push(cost)
+			//number matching
+			auto ParseNumbers(int[] s)
+				auto ret=new iptr[]
+				pnum0=-1L
+				foreach ch,I in s
+					if ch>='0'&&ch<='9':
+						if pnum0<0L:
+							pnum0=I
+					else
+						if pnum0>=0L&&(!pnum0||!isalnum(s[pnum0-1])&&s[pnum0-1]!='.')&&(s[pnum0]!='0'||I-pnum0==1):
+							ret.push(pnum0)
+							ret.push(I)
+						pnum0=-1L
+				if pnum0>=0L&&(!pnum0||!isalnum(s[pnum0-1])&&s[pnum0-1]!='.')&&(s[pnum0]!='0'||s.n-pnum0==1):
+					ret.push(pnum0)
+					ret.push(s.n)
+				return ret
+			nums0=ParseNumbers(s0[1:s0.n-2])
+			nums1=ParseNumbers(s1)
+			numerical_edges=new int3[s1.n]
+			//Writeln(nums0,' ',nums1)
+			if m_enable_numericals&&nums0.n==nums1.n:
+				//matches should still override it
+				//check for number changes!
+				for i=0:2:nums0.n-2
+					//the char context must be the same
+					if !(nums1[i]<=0&&s0[nums0[i]-1 +1]=='\n'||nums1[i]>0&&s0[nums0[i]-1 +1]==s1[nums1[i]-1]):continue
+					if !(nums1[i+1]>=s1.n&&s0[nums0[i+1] +1]=='\n'||nums1[i+1]<s1.n&&s0[nums0[i+1] +1]==s1[nums1[i+1]]):continue
+					sn0=Unicode32ToUtf8(s0[nums0[i]+1:nums0[i+1]])
+					sn1=Unicode32ToUtf8(s1[nums1[i]:nums1[i+1]-1])
+					i0=sn0.as(int)
+					i1=sn1.as(int)
+					if i0!=i1&&string(i0)==sn0&&string(i1)==sn1:
+						//they must valid ints
+						//we found a potential numerical change
+						//Writeln(nums1[i],' ',nums1[i+1],' ',i0,' ',i1)
+						numerical_edges[nums1[i]]=int3(int(nums1[i+1]-nums1[i]),i1-i0,i1)
+			//the main DP
+			inline GetDescriptorAt(iptr p0)
+				if p0-1<best_rule_for_pos.n:
+					ret0=best_rule_for_pos[p0-1]
+					ret1=bcost_rule_for_pos[p0-1]
+				else
+					ret0=TRuleMatch(){id:-1,cnt:-1}
+					ret1=0.f
+				return (ret0,ret1)
+			costs=new float[s1.n+1]
+			hows=new int2[s1.n+1]
+			hows[0]=int2(-1,0)
+			for i=0:s1.n-1
+				//longest substr match at each pos
+				lgsubstr=SubstrLength(s1[i:])
+				//we must start in a matchable place...
+				//one pass, for icase, repeat the last case
+				candidates=new iptr[]
+				for k=1:s0.n-1
+					if GetDescriptorAt(k).id>=0:
+						if s0[k]==s1[i]:
+							candidates.push(k)
+						else if EquICase(s0[k],s1[i]):
+							candidates.push(k+0x80000000)
+				//we should restrict switch computation to one end
+				switch_cost=0.f
+				if i&&SF.char_types[s1[i]]==SF.char_types[s1[i-1]]&&SF.char_types[s1[i]]!=SF.char_types[int('?')]:
+					//switch cost at i
+					switch_cost+=COST_BREAKING_CHARSET_SWITCH
+				nedge=i+numerical_edges[i].x
+				is_all_symbol=1
+				for j=i+1:s1.n
+					best=-1
+					if j-i>1&&j-i<=lgsubstr&&j!=nedge:
+						bcost=COST_SUBSTR
+					else
+						//if s1[j-1]>='0'&&s1[j-1]<='9':
+						//	bcost=COST_SCONST_CH_NUMBER*(f32)(j-i)+COST_SCONST_BASE_NUMBER
+						//else
+						bcost=COST_SCONST_CH*f32(j-i)+COST_SCONST_BASE
+					if isalnum(s1[j-1]):is_all_symbol=0
+					if j==nedge:
+						//always override conststr
+						if abs(numerical_edges[i].y)==1:
+							cost=COST_NUMERICAL_ONE
+						else
+							cost=COST_NUMERICAL_WEIRD+COST_NUMERICAL_WEIRD_CH*(f32)(j-i-1)
+						if bcost>cost:
+							best=-2
+							bcost=cost
+					if j>i+1:
+						candidates2=new iptr[]
+						foreach kk in candidates
+							k=(kk&0x7fffffff)
+							if k+j-i<s0.n:
+								if s0[k+j-i-1]==s1[j-1]:
+									candidates2.push(kk)
+								else if EquICase(s0[k+j-i-1],s1[j-1]):
+									candidates2.push(kk|0x80000000)
+						candidates=candidates2
+					foreach cand0 in candidates
+						cand=(cand0&0x7fffffff)
+						if cand+j-i-1>=best_rule_for_pos.n:continue
+						(pids0,cost0)=GetDescriptorAt(cand)
+						if pids0.id<0:continue
+						(pids1,cost1)=GetDescriptorAt(cand+j-i)
+						if pids1.id<0:continue
+						cost=cost0+cost1
+						if cand0&0x80000000:
+							cost+=COST_CASE_MODIFICATION
+						if is_all_symbol:
+							cost+=COST_SYMBOL_MATCH_PENALTY
+						if bcost>cost:
+							bcost=cost
+							best=int(cand0)
+					bcost+=costs[i]+switch_cost
+					if costs[j]>bcost||!hows[j].y:
+						costs[j]=bcost
+						hows[j]=int2(best,int(j-i))
+			ret=new TProgramItem[]
+			p=s1.n
+			while p>0:
+				hi=hows[p]
+				p0=p-hi.y
+				if hi.x==-1:
+					//const
+					ret.push(TProgramItem(){sconst:s1[p0:p-1]})
+				else if hi.x==-2:
+					ret.push(TProgramItem(){numerical_delta:numerical_edges[p0].y,numerical_base:numerical_edges[p0].z,sconst:s1[p0:p-1]})
+				else
+					pmatch=(hi.x&0x7fffffff)
+					(bp0,dummy)=GetDescriptorAt(pmatch)
+					(bp1,dummy)=GetDescriptorAt(pmatch+hi.y)
+					if hi.x&0x80000000:
+						//Writeln('^_^')
+						cases=new i8[hi.y]
+						for j=0:hi.y-1
+							ch=target_unicode[p0+j]
+							if u32(ch-'A')<26u:
+								cases[j]=0
+							else if u32(ch-'a')<26u:
+								cases[j]=1
+							else
+								cases[j]=2
+						//cases[cases.n-2]==2
+						while cases.n>=2&&(cases[cases.n-1]==2||cases[cases.n-1]==cases[cases.n-2]):
+							cases.pop()
+					else
+						cases=NULL
+					ret.push(TProgramItem(){
+						pos0:this.poses_union[bp0.id].a,
+						pos1:this.poses_union[bp1.id].a,
+						match_id0:bp0.cnt,
+						match_id1:bp1.cnt,
+						new_case:cases,
+					})
+				p=p0
+			//if ret.n==1&&ret[0].sconst:return NULL//disallow trivial programs
+			if DEBUG_DUMP_PROGRAM:
+				Writeln('>>> ',Unicode32ToUtf8(target_unicode))
+				foreach pi in ret.ReverseOrder()
+					auto dumpTok(int a)
+						if a==TOK_DONTCARE:
+							Write('*')
+						else if a>=TOK_SUBSTRING:
+							Write('"',UnicodeToUtf8([i16(aa) foreach aa in GetSubString(a)]),'"')
+						else if a>=TOK_CHARSET:
+							Write('[',SF.tmp_charsets[a-TOK_CHARSET],']')
+						else
+							Write("'",UnicodeToUtf8([i16(a)]),"'")
+					auto dumpPos(TPositionDescriptor pd,iptr id,char is_left)
+						Write(is_left?'matchLeft(':'match(')
+						dumpTok(pd.tok0)
+						Write(',')
+						dumpTok(pd.tok1)
+						Write(', ')
+						if pd.nbra0==NBRA0_DONTCARE:
+							Write('any-level')
+						else
+							Write('level=',pd.nbra0)
+						Write(", ",id,')')
+					if pi.sconst:
+						//if .owner.IsSubstr(es[eid].sconst):
+						//	Write('(substr) ')
+						Writeln("'",UnicodeToUtf8([i16(ch) foreach ch in pi.sconst]),"'")
+					else
+						dumpPos(pi.pos0, pi.match_id0, char(0))
+						Write(' --> ')
+						dumpPos(pi.pos1, pi.match_id1, char(0))
+						if pi.new_case:
+							Write(' ')
+							foreach cid in pi.new_case
+								Write(int(cid))
+						Writeln()
+			return [pi foreach pi in ret.ReverseOrder()]
+		auto RebaseReplaceProgram(TProgramItem[] prg,int d)
+			foreach pi,I in prg
+				if pi.numerical_delta:
+					prg[I].numerical_base+=d*pi.numerical_delta
+		//ret,errs,longest match sequence
+		struct TProgramMatch
+			iptr pm0,pm1
+			iptr pret
+		auto ApplyReplaceProgram(TProgramItem[] prg,int[] s,int[] nbras,int line_id, int compute_matchseq)
+			WEIGHT_PROGRAM_MATCH=256
+			struct TMatchDPState
+				iptr best
+				iptr how
+			if compute_matchseq:
+				raw_matches=new TProgramMatch[]
+			errors=iptr[].NULL
+			ret=new i32[]
+			foreach pi,I in prg
+				if pi.numerical_delta:
+					//force non-match
+					ret.push(Utf8ToUnicode32(string(pi.numerical_base+pi.numerical_delta*line_id)))
+					continue
+				if pi.sconst:
+					if compute_matchseq:
+						raw_matches.push(TProgramMatch(){pm0:-1L,pm1:pi.sconst.n,pret:ret.n})
+					ret.push(pi.sconst)
+					continue
+				pm0=pi.pos0.Search(this,s,nbras,pi.match_id0)
+				pm1=pi.pos1.Search(this,s,nbras,pi.match_id1)
+				if pm0<0||pm1<0||pm0>=pm1:
+					//not found, ignore... it's an error
+					if !errors:errors=new iptr[]
+					errors.push(I)
+					continue
+				smatch=s[pm0:pm1-1]
+				if pi.new_case:
+					//change the case
+					cases=pi.new_case
+					smatch=new(smatch)
+					foreach ch,I2 in smatch
+						ci=cases[min(I2,cases.n-1)]
+						if ci==0&&u32(ch-'a')<26u:
+							smatch[I2]-=0x20
+						else if ci==1&&u32(ch-'A')<26u:
+							smatch[I2]+=0x20
+					//force non-match
+					//if compute_matchseq:
+					//	raw_matches.push(TProgramMatch{.pm0=-1L;.pm1=pm1-pm0;.pret=ret.n})
+				else
+					if compute_matchseq:
+						raw_matches.push(TProgramMatch(){pm0:pm0,pm1:pm1,pret:ret.n})
+						//Writeln('raw: ',pm0,' ',pm1,' ',ret.n)
+				ret.push(smatch)
+			matches=TProgramMatch[].NULL
+			if compute_matchseq:
+				//dp on output n^2 states
+				//-2: carry
+				//-1+: take and goto
+				st=new TMatchDPState[(raw_matches.n+1)*s.n]
+				st[0].how=0
+				for i=0:raw_matches.n
+					pst=i*s.n+1+!i
+					for j=1+!i:s.n-1
+						/*
+						src fwd
+						dst fwd
+						match
+						*/
+						bestij=0L
+						howij=0L
+						if j>1:
+							cand=st[pst-1].best
+							if bestij<cand:
+								bestij=cand
+								howij=2
+						if i:
+							cand=st[pst-s.n].best
+							if bestij<cand:
+								bestij=cand
+								howij=1
+							if raw_matches[i-1].pm0<0L:
+								//sconst, cmp
+								if j>1://&&s[j-raw_matches[i-1].pm1:j-1]==ret[raw_matches[i-1].pret:raw_matches[i-1].pret+raw_matches[i-1].pm1-1]:
+									//const match
+									lgconst=raw_matches[i-1].pm1
+									ctail=raw_matches[i-1].pret+lgconst
+									for k=1:lgconst
+										if s[j-k]!=ret[ctail-k]:break
+										cand=st[pst-s.n-k].best+(k==lgconst?k*WEIGHT_PROGRAM_MATCH:k)
+										if bestij<cand:
+											bestij=cand
+											howij=3+(k<<2)
+							else
+								//if j==raw_matches[i-1].pm1://&&j>raw_matches[i-1].pm0:
+								if j<=raw_matches[i-1].pm1&&j>raw_matches[i-1].pm0:
+									lgmatch=(raw_matches[i-1].pm1-raw_matches[i-1].pm0)
+									for k=1:min(lgmatch,j-raw_matches[i-1].pm0)
+										cand=st[pst-s.n-k].best+(k==lgmatch?k*WEIGHT_PROGRAM_MATCH:k)
+										if bestij<cand:
+											bestij=cand
+											howij=3+(k<<2)
+						st[pst].best=bestij
+						st[pst].how=howij
+						pst++
+				matches0=new TProgramMatch[]
+				p=raw_matches.n*s.n+s.n-1
+				while p>=0L:
+					if st[p].how==0:
+						//assert(!p)
+						break
+					else if st[p].how==1:
+						p-=s.n
+					else if st[p].how==2:
+						p-=1
+					else
+						assert((st[p].how&3)==3)
+						lg=st[p].how>>2
+						mid=p/s.n-1
+						ppos=p-(mid+1)*s.n
+						rmi=raw_matches[mid]
+						if rmi.pm0>=0L:
+							//matches0.push(rmi)
+							matches0.push(TProgramMatch(){pm0:ppos-lg,pm1:ppos,pret:rmi.pret+ppos-lg-rmi.pm0})
+							//p=mid*s.n+rmi.pm0
+						else
+							matches0.push(TProgramMatch(){pm0:ppos-lg,pm1:ppos,pret:rmi.pret+rmi.pm1-lg})
+						p-=s.n+lg//rmi.pm1
+					//else
+					//	break
+				//Writeln('matches0: ',[mid foreach mid in matches0.ReverseOrder()])
+				//we need the src pointers
+				//matches=[raw_matches[mid] foreach mid in matches0.ReverseOrder()]
+				matches=[rmi foreach rmi in matches0.ReverseOrder()]
+			return (ret,errors,matches)
+		inline GetSubString(int tok)
+			assert(tok>=TOK_SUBSTRING)
+			a=tok-TOK_SUBSTRING
+			lg=a/m_all_substrs.n
+			id=a-lg*m_all_substrs.n
+			return m_all_substrs[id][:lg-1]
+		
+	////////////////
+	inline isspace(int ch)
+		return ch==' '||ch=='\t'||ch=='\r'
+	class CSmartFinder
+		i32[i32] m_char_types
+		int m_n_types
+		int[] m_cset_sizes
+		int[][] m_chars_by_type
+		int[][] m_type_sets
+		int[][] m_type_to_cset
+		string[] m_tmp_charsets
+		auto GetAllCharsOfType(int tid)
+			ret=m_chars_by_type[tid]
+			if !ret:
+				ret=[I foreach tp,I in m_char_types if tp==tid]
+				m_chars_by_type[tid]=ret
+			return ret
+		auto AddCharSet(string stemplate)
+			//Writeln('+set ',stemplate)
+			e=[ch foreach ch in EscapedChars(stemplate)]
+			cc=m_char_types
+			n=m_n_types
+			cmap=new int[int]
+			inline MarkCharset(int ch)
+				auto chmp=cmap[cc[ch]]
+				if !chmp:
+					chmp=n++
+					cmap[cc[ch]]=chmp
+				cc[ch]=chmp
+			s=0
+			for(;s<e.n;s++)
+				if s+1<e.n&&e[s+1]=='-':
+					for(i=e[s];i<=e[s+2];i++)
+						MarkCharset(i)
+					s+=2
+				else
+					MarkCharset(e[s])
+			m_n_types=n
+			m_tmp_charsets.push(stemplate)
+		auto BeginCharSet()
+			m_char_types=new int[int]//new int[0x110000]
+			m_n_types=1
+			m_tmp_charsets=new string[]
+		auto EndCharSet()
+			cc=m_char_types
+			n=m_n_types
+			app=new int[n]
+			//for i=0:cc.n-1
+			//	app[cc[i]]=1
+			foreach cci in cc
+				app[cci]=1
+			n2=0
+			for i=0:app.n-1
+				v=app[i]
+				app[i]=n2
+				n2+=v
+			szs=new int[n2]
+			m_cset_sizes=szs
+			foreach cci,i in cc
+				cci2=app[cci]
+				cc[i]=cci2
+				szs[cci2]++
+			//for i=0:cc.n-1
+			//	cc[i]=app[cc[i]]
+			//	szs[cc[i]]++
+			m_n_types=n2
+			m_chars_by_type=new int[][n2]
+			m_type_sets=new int[][]
+			foreach stemplate in m_tmp_charsets
+				e=[ch foreach ch in EscapedChars(stemplate)]
+				gotit=new int[int]
+				type_seti=new int[]
+				s=0
+				for(;s<e.n;s++)
+					if s+1<e.n&&e[s+1]=='-':
+						for(i=e[s];i<=e[s+2];i++)
+							if !gotit[cc[i]]:
+								gotit[cc[i]]=1
+								type_seti.push(cc[i])
+						s+=2
+					else
+						if !gotit[cc[e[s]]]:
+							gotit[cc[e[s]]]=1
+							type_seti.push(cc[e[s]])
+				m_type_sets.push(type_seti)
+			m_type_to_cset=[new int[] for i=0:m_n_types-1]
+			foreach type_seti,I in m_type_sets
+				foreach ti in type_seti
+					m_type_to_cset[ti].push(int(I))
+			if DEBUG_DUMP_PROGRAM:
+				return
+			m_tmp_charsets=NULL
+		auto CreateReplaceInstance(TReplaceInput[] inputs)
+			ret=new CReplaceContext
+			ret.PreCompute(inputs)
+			return ret
+		//int[] ApplyReplaceProgramToInput(int id)
+		//	return .ApplyReplaceProgram(prg,.inputs[id].s_unicode,.inputs[id].nbras)
+		auto TokenMatchesChar(int tok0,int ch0)
+			if tok0==TOK_DONTCARE:return 1
+			if tok0>=TOK_SUBSTRING:
+				assert(0)
+			if tok0>=TOK_CHARSET:
+				csidt=tok0-TOK_CHARSET
+				csets_0=m_type_to_cset[m_char_types[ch0]]
+				foreach csidc in csets_0
+					if csidc==csidt:return 1
+				return 0
+			return tok0==ch0
+		//////////////////////////////
+		//chbonus=[0,1,1,2,3,4]
+		WEIGHT_SYMBOL=8
+		WEIGHT_SPACE=1
+		WEIGHT_WORD_CHAR=2 >>1
+		auto WeightedGapMerge(int[] s0,int[] s1,function(int):int isalnum)
+			//returns: ret, score, wt_covered_sym, weight_sym, wt_covered_alnum, weight_alnum
+			chbonus=[0,1*2,1*2,2*2,3*2,4*2]
+			n0=s0.n
+			n1=s1.n
+			gains=new int[(n0+1)*(n1+1)]
+			hows=new int[(n0+1)*(n1+1)]
+			w0=n0+1
+			//w1=n1+1
+			for j=0:s1.n
+				for i=!j:s0.n
+					best=-1
+					bhow=0
+					if i:
+						gain=gains[j*w0+(i-1)]
+						//if !isalnum(s0[i-1]):
+						//	gain-=PENALTY_SYMBOL_MISS
+						if best<gain:
+							best=gain 
+							bhow=-1
+					if j:
+						gain=gains[(j-1)*w0+i]
+						//if !isalnum(s1[j-1]):
+						//	gain-=PENALTY_SYMBOL_MISS
+						if best<gain:
+							best=gain
+							bhow=-2
+					if i&&j:
+						//breaking sth up should never give a benefit
+						bonus=1//shouldn't be 0 even for 1 char matches
+						for(k=1;k<=i&&k<=j;k++)
+							if s0[i-k]!=s1[j-k]:break
+							bonus+=chbonus[min(k,chbonus.n)-1]
+							gain=gains[(j-k)*w0+(i-k)]+bonus
+							if !isalnum(s1[j-k])&&!isspace(s1[j-k]):
+								gain+=WEIGHT_SYMBOL*2
+							if bonus&&best<gain:
+								best=gain
+								bhow=k
+					gains[j*w0+i]=best
+					hows[j*w0+i]=bhow
+			total=gains[n1*w0+n0]
+			p0=n0
+			p1=n1
+			tail_skip=0
+			rgs=new int2[]
+			s1_covered=new int[s1.n]
+			while p0&&p1:
+				lg=hows[p1*w0+p0]
+				if lg==-1:
+					p0--
+					if !rgs.n:tail_skip=1
+				else if lg==-2:
+					p1--
+					if !rgs.n:tail_skip=1
+				else
+					assert(lg>0)
+					p0-=lg
+					p1-=lg
+					rgs.push(int2(int(p1),lg))
+					for j=0:lg-1
+						s1_covered[p1+j]=1
+			//percentage, weight, w.r.t s1
+			//merge words to non-half-fully-covered
+			I_word0=-1L
+			wt_covered_sym=0
+			wt_total_sym=0
+			wt_covered_alnum=0
+			wt_total_alnum=0
+			s1x=new int[s1.n+1]
+			copy(s1x,s1)
+			s1x[s1.n]=0
+			foreach ch,I in s1x
+				if isalnum(ch)&&I!=s1.n:
+					if I_word0<0L:
+						I_word0=I
+				else
+					if I_word0>=0L:
+						n_covered=0
+						for j=I_word0:I-1
+							n_covered+=s1_covered[j]
+						wt_word=(I-I_word0)*WEIGHT_WORD_CHAR*2
+						if !n_covered:
+							//do nothing
+						else if n_covered==I-I_word0:
+							wt_covered_alnum+=wt_word
+						else
+							wt_covered_alnum+=n_covered*WEIGHT_WORD_CHAR
+							//*2
+						wt_total_alnum+=wt_word
+					I_word0=-1L
+					if I<s1.n:
+						//WEIGHT_SPACE
+						if isspace(s1[I]):
+							if s1_covered[I]:wt_covered_sym+=WEIGHT_SPACE
+							wt_total_sym+=WEIGHT_SPACE
+						else
+							if s1_covered[I]:wt_covered_sym+=WEIGHT_SYMBOL
+							wt_total_sym+=WEIGHT_SYMBOL
+			head_skip=!!(p0||p1)
+			ret=new int[]
+			foreach rg in rgs.ReverseOrder()
+				if ret.n||head_skip:ret.push(-1)
+				ret.push(s1[rg.x:rg.x+rg.y-1])
+			if tail_skip:ret.push(-1)
+			return (ret,total,wt_covered_sym,wt_total_sym,wt_covered_alnum,wt_total_alnum)
+		auto ComputeWeightForString(int[] s1,function(int):int isalnum)
+			I_word0=-1L
+			wt_total_sym=0
+			wt_total_alnum=0
+			s1x=new int[s1.n+1]
+			copy(s1x,s1)
+			s1x[s1.n]=0
+			foreach ch,I in s1x
+				if isalnum(ch)&&I!=s1.n:
+					if I_word0<0L:
+						I_word0=I
+				else
+					if I_word0>=0L:
+						wt_word=(I-I_word0)*WEIGHT_WORD_CHAR*2
+						wt_total_alnum+=wt_word
+					I_word0=-1L
+					if I<s1.n:
+						//WEIGHT_SPACE
+						if isspace(s1[I]):
+							wt_total_sym+=WEIGHT_SPACE
+						else
+							wt_total_sym+=WEIGHT_SYMBOL
+			return (wt_total_sym,wt_total_alnum)
+
+SF=new SmartFind.detail.CSmartFinder
+CReplaceContext=detail.CReplaceContext
+TReplaceInput=detail.TReplaceInput
+TProgramItem=detail.TProgramItem
+(function(){
+	SF.BeginCharSet()
+	SF.AddCharSet("0-9")
+	SF.AddCharSet("a-z")
+	SF.AddCharSet("A-Z")
+	SF.AddCharSet("0-9A-Za-z_")
+	SF.AddCharSet(" \t\r\n")
+	SF.AddCharSet("\n")
+	SF.AddCharSet("\t\r\n\u0020-\u007e")
+	SF.EndCharSet()
+})
