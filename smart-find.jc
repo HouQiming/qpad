@@ -31,16 +31,16 @@ inline EscapedChars(string s)
 				in_slash=0
 				switch(ch){
 				case 't':
-					chi='\t'
+					chi=int('\t')
 					break
 				case 'n':
-					chi='\n'
+					chi=int('\n')
 					break
 				case 'r':
-					chi='\r'
+					chi=int('\r')
 					break
 				case 'b':
-					chi='\b'
+					chi=int('\b')
 					break
 				case 'u':
 					in_unicode=4
@@ -155,6 +155,10 @@ module detail
 	inline make_pair(a,b)
 		return TPosPair(){a:a,b:b}
 	
+	struct TProgramMatch
+		iptr pm0,pm1
+		iptr pret
+	
 	class CReplaceContext
 		TPosPair[] m_poses_union
 		TReplaceInput[] m_inputs
@@ -163,9 +167,9 @@ module detail
 		TProgramItem[] m_prg
 		int m_enable_numericals
 		auto SubstrLength(int[] s)
-			all_substrs=m_all_substrs
-			p=all_substrs.Bisect(function(int[] s0){return s0<=s})
-			lg=0L
+			auto all_substrs=m_all_substrs
+			auto p=all_substrs.InlineBisect(inline(int[] s0){return s0<=s})
+			auto lg=0L
 			if p+1<all_substrs.n:lg=max(lg,LCPLength(all_substrs[p+1],s))
 			if p<all_substrs.n:lg=max(lg,LCPLength(all_substrs[p],s))
 			return int(lg)
@@ -205,7 +209,8 @@ module detail
 							pmax=p
 							if pmax>=s0.n:
 								break
-					s0.resize(pmax)
+					//s0.resize(pmax)
+					s0.n=pmax
 				substrs=[s0 foreach s0 in substrs if s0.n>1]
 				substrs.Sort()
 				substrs.Unique()
@@ -227,12 +232,13 @@ module detail
 			//substring: merge local ssort results
 			auto GetCharChoices(int ch)
 				ret=[TOK_DONTCARE,ch]
-				//if ch==9&&SF.type_to_cset[SF.char_types[ch]].n:
+				//if ch==9&&SF.type_to_cset[SF.m_char_types[ch]].n:
 				//	Write('>> ',ch,' >> ')
-				foreach csetid in SF.type_to_cset[SF.char_types[ch]]
+				//Writeln(iptr(SF.m_char_types),' ',iptr(SF.m_char_types.m_hash))
+				foreach csetid in SF.m_type_to_cset[SF.m_char_types[ch]]
 					ret.push(TOK_CHARSET+csetid)
 					//if ch==9:Write(csetid,' ')
-				//if ch==9&&SF.type_to_cset[SF.char_types[ch]].n:
+				//if ch==9&&SF.type_to_cset[SF.m_char_types[ch]].n:
 				//	Writeln()
 				return ret
 			poses_union=TPosPair[].NULL
@@ -245,7 +251,7 @@ module detail
 				ssmatches=new TSubstrMatches[ri.s_unicode.n]
 				for i=0:ri.s_unicode.n-1
 					s_i=ri.s_unicode[i:]
-					p=m_all_substrs.Bisect(function(s0){return s0<s_i})
+					p=m_all_substrs.InlineBisect(inline(s0){return s0<s_i})
 					if p>=m_all_substrs.n:
 						lcp1=0L
 					else
@@ -372,6 +378,7 @@ module detail
 			return ((best<0L?TRuleMatch(){id:-1,cnt:-1}:rmatches[best]),bcost)
 		/////////////////////////////////////////
 		auto SetReplaceExample(iptr input_id,int[] target_unicode,function(int):int isalnum)
+			//todo: multi-exampling, better numbering
 			//Gui.Managed.UI.TBegin("SetReplaceExample")
 			s0=m_inputs[input_id].s_unicode
 			nbras0=m_inputs[input_id].nbras
@@ -394,7 +401,7 @@ module detail
 						counts[J]++
 				//Writeln()
 				(ma,cost)=GetBestDescriptor(matched_rules)
-				if i&&SF.char_types[s0[i]]==SF.char_types[s0[i-1]]&&SF.char_types[s0[i]]!=SF.char_types[int('?')]:
+				if i&&SF.m_char_types[s0[i]]==SF.m_char_types[s0[i-1]]&&SF.m_char_types[s0[i]]!=SF.m_char_types[int('?')]:
 					cost+=COST_BREAKING_CHARSET_SRC
 				best_rule_for_pos.push(ma)
 				bcost_rule_for_pos.push(cost)
@@ -454,14 +461,14 @@ module detail
 				//one pass, for icase, repeat the last case
 				candidates=new iptr[]
 				for k=1:s0.n-1
-					if GetDescriptorAt(k).id>=0:
+					if GetDescriptorAt(k)[0].id>=0:
 						if s0[k]==s1[i]:
 							candidates.push(k)
 						else if EquICase(s0[k],s1[i]):
 							candidates.push(k+0x80000000)
 				//we should restrict switch computation to one end
 				switch_cost=0.f
-				if i&&SF.char_types[s1[i]]==SF.char_types[s1[i-1]]&&SF.char_types[s1[i]]!=SF.char_types[int('?')]:
+				if i&&SF.m_char_types[s1[i]]==SF.m_char_types[s1[i-1]]&&SF.m_char_types[s1[i]]!=SF.m_char_types[int('?')]:
 					//switch cost at i
 					switch_cost+=COST_BREAKING_CHARSET_SWITCH
 				nedge=i+numerical_edges[i].x
@@ -543,10 +550,10 @@ module detail
 						while cases.n>=2&&(cases[cases.n-1]==2||cases[cases.n-1]==cases[cases.n-2]):
 							cases.pop()
 					else
-						cases=NULL
+						cases=i8[].NULL
 					ret.push(TProgramItem(){
-						pos0:this.poses_union[bp0.id].a,
-						pos1:this.poses_union[bp1.id].a,
+						pos0:this.m_poses_union[bp0.id].a,
+						pos1:this.m_poses_union[bp1.id].a,
 						match_id0:bp0.cnt,
 						match_id1:bp1.cnt,
 						new_case:cases,
@@ -595,9 +602,6 @@ module detail
 				if pi.numerical_delta:
 					prg[I].numerical_base+=d*pi.numerical_delta
 		//ret,errs,longest match sequence
-		struct TProgramMatch
-			iptr pm0,pm1
-			iptr pret
 		auto ApplyReplaceProgram(TProgramItem[] prg,int[] s,int[] nbras,int line_id, int compute_matchseq)
 			WEIGHT_PROGRAM_MATCH=256
 			struct TMatchDPState
@@ -742,6 +746,7 @@ module detail
 		int[][] m_type_sets
 		int[][] m_type_to_cset
 		string[] m_tmp_charsets
+		//////
 		auto GetAllCharsOfType(int tid)
 			ret=m_chars_by_type[tid]
 			if !ret:
@@ -822,7 +827,7 @@ module detail
 					m_type_to_cset[ti].push(int(I))
 			if DEBUG_DUMP_PROGRAM:
 				return
-			m_tmp_charsets=NULL
+			m_tmp_charsets=string[].NULL
 		auto CreateReplaceInstance(TReplaceInput[] inputs)
 			ret=new CReplaceContext
 			ret.PreCompute(inputs)
@@ -976,9 +981,10 @@ module detail
 			return (wt_total_sym,wt_total_alnum)
 
 SF=new SmartFind.detail.CSmartFinder
-CReplaceContext=detail.CReplaceContext
-TReplaceInput=detail.TReplaceInput
-TProgramItem=detail.TProgramItem
+CReplaceContext=SmartFind.detail.CReplaceContext
+TReplaceInput=SmartFind.detail.TReplaceInput
+TProgramItem=SmartFind.detail.TProgramItem
+TProgramMatch=SmartFind.detail.TProgramMatch
 (function(){
 	SF.BeginCharSet()
 	SF.AddCharSet("0-9")
@@ -989,4 +995,4 @@ TProgramItem=detail.TProgramItem
 	SF.AddCharSet("\n")
 	SF.AddCharSet("\t\r\n\u0020-\u007e")
 	SF.EndCharSet()
-})
+})()

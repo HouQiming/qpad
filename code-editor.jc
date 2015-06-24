@@ -2112,6 +2112,9 @@ class CReplaceJob
 	__JS_prototype=function(JSObject proto){
 		proto.ExportMethod(this,"GetLastMatch",JS_GetLastMatch)
 	}
+
+inline isSpaceOrNewline(int ch)
+	return u32(ch-9)<=4u||ch==32||ch==160||ch==5760||u32(ch-8192)<=10u||ch==8239||ch==8287||ch==12288
 	
 //this just returns a list of ccnts indicating the ccnt range for each "line" (if they are similar enough)
 //everything works within stext
@@ -2123,7 +2126,7 @@ AUTO_EDIT_MAX_LINE_LENGTH=512//256
 AUTO_EDIT_MAX_TOTAL_LENGTH=40960
 AUTO_EDIT_MAX_NLINES=256
 AUTO_EDIT_MIN_LINE_LENGTH=5
-auto AutoEdit_Detect(string stext)
+auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 	cur_gapprg=int[].NULL
 	cclines=iptr[].NULL
 	best_covered_sym=0
@@ -2138,85 +2141,118 @@ auto AutoEdit_Detect(string stext)
 	test_sameline_fix=0
 	fisalnum=TextBox.detail.isWordChar
 	line_seps=[i for i=0:stext.n if !i||stext[i-1]=='\n']
+	pl_middle=line_seps.Bisect(function(iptr ccnt_i){return ccnt_i<=ccnt_middle})-1
+	if pl_middle<0:
+		pl_middle=0
+	else if pl_middle>=line_seps.n:
+		pl_middle=line_seps.n-1
 	auto ComputeOptimalGapProgram(string stext,int delta_line)
 		nsstd=0
 		//min_covered=0
 		sum_total_sym=0
 		sum_total_alnum=0
 		//foreach sline,cc0,cc1 in stext.Tokenize("\n")
-		for line_i=0:delta_line:line_seps.n-delta_line-1
-			nl++
-			if nl>AUTO_EDIT_MAX_NLINES:break
-			cc0=line_seps[line_i]
-			cc1=line_seps[line_i+delta_line]-1
-			sline=stext[cc0:cc1-1]
-			cclines.push(cc0)
-			cclines.push(cc1)
-			uline=Utf8ToUnicode32(sline)
-			if !uline.n:break
-			if uline.n>AUTO_EDIT_MAX_LINE_LENGTH:break
-			if !cur_gapprg:
-				cur_gapprg=uline
-				(wt_sym,wt_alnum)=SF.ComputeWeightForString(uline,fisalnum)
-				sum_total_sym=wt_sym
-				sum_total_alnum=wt_alnum
-				//min_covered=wt
-			else
-				ns0=0
-				for i=0:cur_gapprg.n-1
-					if isSpaceOrNewline(cur_gapprg[i]):
-						ns0++
-					else
+		cclines=new iptr[]
+		for side=-1:2:1
+			for(line_i=0;;line_i+=delta_line)
+				nl++
+				if nl>AUTO_EDIT_MAX_NLINES:break
+				if side<0:
+					if pl_middle-line_i<0:
+						nl--
 						break
-				ns1=0
-				for i=0:uline.n-1
-					if isSpaceOrNewline(uline[i]):
-						ns1++
-					else
+					if pl_middle-line_i+delta_line>=line_seps.n:
+						nl--
 						break
-				if ns0!=ns1||cur_gapprg[:ns1-1]!=uline[:ns1-1]:
-					//Writeln('break: ',ns0,' ',ns1,' ',cur_gapprg[:ns1-1],' ',uline[:ns1-1])
+					cc0=line_seps[pl_middle-line_i]
+					cc1=line_seps[pl_middle-line_i+delta_line]-1
+				else
+					if pl_middle+line_i+delta_line*2>=line_seps.n:
+						nl--
+						break
+					cc0=line_seps[pl_middle+line_i+delta_line]
+					cc1=line_seps[pl_middle+line_i+delta_line*2]-1
+				sline=stext[cc0:cc1-1]
+				uline=Utf8ToUnicode32(sline)
+				if !uline.n:
+					nl--
 					break
-				nsstd=ns0
-				if nl==2&&uline==cur_gapprg:
-					is_completely_equal=1
-				(cur_gapprg,wgt,wt_covered_sym,wt_total_sym,wt_covered_alnum,wt_total_alnum)=SF.WeightedGapMerge(cur_gapprg,uline,fisalnum)
-				wgt++//dodge the warning
-				//Writeln('>> ',wt_covered_alnum,' ',wt_total_alnum)
-				//min_covered=min(min_covered,wt_covered)
-				sum_total_sym+=wt_total_sym
-				sum_total_alnum+=wt_total_alnum
-				//dmp_prg0=new string[]
-				//dmp_sprg=new string
-				//foreach ch in cur_gapprg
-				//	if ch<0:
-				//		if !dmp_prg0.n||dmp_sprg.n:
-				//			dmp_prg0.push(dmp_sprg)
-				//			dmp_sprg=new string
-				//	else
-				//		dmp_sprg.push(Unicode32ToUtf8([ch]))
-				//dmp_prg0.push(dmp_sprg)
-				//Writeln(wgt*nl>best?"(BEST) ":"",nl,' ',wgt,' ',dmp_prg0)
-				//percentage_sym=f32(wt_covered_sym*nl)/f32(sum_total_sym+1)
-				//percentage_alnum=f32(wt_covered_alnum*nl)/f32(sum_total_alnum+1)
-				//use valid percentage + area best
-				//if wgt*nl>best:
-				//if !best||wt_covered_alnum&&percentage_sym>=AUTO_EDIT_SIMILARITY_THRESHOLD_SYM&&percentage_alnum>=AUTO_EDIT_SIMILARITY_THRESHOLD:
-				//	if !(cur_gapprg.n&&cur_gapprg[0]==-1&&cur_gapprg.back()==-1):
-				if !best||_isGapProgramOK(cur_gapprg,wt_covered_sym*nl,sum_total_sym, wt_covered_alnum*nl,sum_total_alnum):
-					if wgt*nl>best:
-						best=wgt*nl
-						//best=percentage
-						bnl=nl
-						best_gapprg=cur_gapprg
-						best_covered_sym=wt_covered_sym*nl
-						best_covered_alnum=wt_covered_alnum*nl
-						best_total_sym=sum_total_sym
-						best_total_alnum=sum_total_alnum
-				if wgt*AUTO_EDIT_MAX_NLINES<=best:
+				if uline.n>AUTO_EDIT_MAX_LINE_LENGTH:
+					nl--
 					break
-				//if f32(wt_covered_sym*AUTO_EDIT_MAX_NLINES)/f32(sum_total_sym+1)<AUTO_EDIT_SIMILARITY_THRESHOLD_SYM:
-				//	break
+				if !cur_gapprg:
+					cur_gapprg=uline
+					(wt_sym,wt_alnum)=SF.ComputeWeightForString(uline,fisalnum)
+					sum_total_sym=wt_sym
+					sum_total_alnum=wt_alnum
+					//min_covered=wt
+				else
+					ns0=0
+					for i=0:cur_gapprg.n-1
+						if isSpaceOrNewline(cur_gapprg[i]):
+							ns0++
+						else
+							break
+					ns1=0
+					for i=0:uline.n-1
+						if isSpaceOrNewline(uline[i]):
+							ns1++
+						else
+							break
+					if ns0!=ns1||cur_gapprg[:ns1-1]!=uline[:ns1-1]:
+						//Writeln('break: ',ns0,' ',ns1,' ',cur_gapprg[:ns1-1],' ',uline[:ns1-1])
+						nl--
+						break
+					nsstd=ns0
+					if nl==2&&uline==cur_gapprg:
+						is_completely_equal=1
+					(cur_gapprg,wgt,wt_covered_sym,wt_total_sym,wt_covered_alnum,wt_total_alnum)=SF.WeightedGapMerge(cur_gapprg,uline,fisalnum)
+					wgt++//dodge the warning
+					//Writeln('>> ',wt_covered_alnum,' ',wt_total_alnum)
+					//min_covered=min(min_covered,wt_covered)
+					sum_total_sym+=wt_total_sym
+					sum_total_alnum+=wt_total_alnum
+					//dmp_prg0=new string[]
+					//dmp_sprg=new string
+					//foreach ch in cur_gapprg
+					//	if ch<0:
+					//		if !dmp_prg0.n||dmp_sprg.n:
+					//			dmp_prg0.push(dmp_sprg)
+					//			dmp_sprg=new string
+					//	else
+					//		dmp_sprg.push(Unicode32ToUtf8([ch]))
+					//dmp_prg0.push(dmp_sprg)
+					//Writeln(wgt*nl>best?"(BEST) ":"",nl,' ',wgt,' ',dmp_prg0)
+					//percentage_sym=f32(wt_covered_sym*nl)/f32(sum_total_sym+1)
+					//percentage_alnum=f32(wt_covered_alnum*nl)/f32(sum_total_alnum+1)
+					//use valid percentage + area best
+					//if wgt*nl>best:
+					//if !best||wt_covered_alnum&&percentage_sym>=AUTO_EDIT_SIMILARITY_THRESHOLD_SYM&&percentage_alnum>=AUTO_EDIT_SIMILARITY_THRESHOLD:
+					//	if !(cur_gapprg.n&&cur_gapprg[0]==-1&&cur_gapprg.back()==-1):
+					if !best||_isGapProgramOK(cur_gapprg,wt_covered_sym*nl,sum_total_sym, wt_covered_alnum*nl,sum_total_alnum):
+						if wgt*nl>best:
+							best=wgt*nl
+							//best=percentage
+							bnl=nl
+							best_gapprg=cur_gapprg
+							best_covered_sym=wt_covered_sym*nl
+							best_covered_alnum=wt_covered_alnum*nl
+							best_total_sym=sum_total_sym
+							best_total_alnum=sum_total_alnum
+					if wgt*AUTO_EDIT_MAX_NLINES<=best:
+						nl--
+						break
+					//if f32(wt_covered_sym*AUTO_EDIT_MAX_NLINES)/f32(sum_total_sym+1)<AUTO_EDIT_SIMILARITY_THRESHOLD_SYM:
+					//	break
+				cclines.push(cc0)
+				cclines.push(cc1)
+			if side<0:
+				//reverse the reverse merge
+				cclines2=new int[cclines.n]
+				for i=0:2:cclines.n-2
+					cclines2[cclines.n-2-i]=cclines[i]
+					cclines2[cclines.n-2-i+1]=cclines[i+1]
+				cclines=cclines2
 		return nsstd
 	inline _isGapProgramOK(int[] best_gapprg,int best_covered_sym,int best_total_sym,int best_covered_alnum,int best_total_alnum)
 		if best_gapprg.n&&best_gapprg[0]==-1&&best_gapprg.back()==-1:
@@ -2239,6 +2275,19 @@ auto AutoEdit_Detect(string stext)
 	//stext.resize(plastline+1)
 	//test 2/3 lines too
 	for delta_line=1:3
+		cur_gapprg=int[].NULL
+		cclines=iptr[].NULL
+		best_covered_sym=0
+		best_total_sym=0
+		best_covered_alnum=0
+		best_total_alnum=0
+		best=0
+		bnl=0
+		best_gapprg=int[].NULL
+		nl=0
+		is_completely_equal=0
+		test_sameline_fix=0
+		/////////////
 		nsstd=ComputeOptimalGapProgram(stext,delta_line)
 		//if is_completely_equal:test_sameline_fix=1
 		if !best_gapprg||bnl<2:
@@ -2247,13 +2296,13 @@ auto AutoEdit_Detect(string stext)
 		foreach ch in best_gapprg
 			if ch==-1:
 				nsegs++
-		cclines.resize(bnl*2)
 		if !isGapProgramOK():
 			continue
+		//Writeln(Unicode32ToUtf8([ch<0?0x2026:ch foreach ch in best_gapprg]))
 		return cclines
 	return iptr[].NULL
 
-auto TextToAutoEditText(string stext)
+auto TextToAutoEditText(int is_bof,int is_eof,string stext)
 	nbra=0
 	s_unicode=new int[]
 	nbras=new int[]
@@ -2282,54 +2331,54 @@ auto AutoEdit_Precompute(string stext0,iptr[] cclines)
 			ccnt0--
 		else
 			is_bof=1
-		if ccnt1<stext.n:
+		if ccnt1<stext0.n:
 			ccnt1++
 		else
 			is_eof=1
 		stext=stext0[ccnt0:ccnt1-1]
-		return TextToAutoEditText(stext)
+		return TextToAutoEditText(is_bof,is_eof,stext)
 	if !cclines.n:return CReplaceContext.NULL
 	assert(cclines.n%2==0)
 	inputs=new TReplaceInput[]
 	for i=0:2:cclines.n-2
 		ccnt0=cclines[i]
 		ccnt1=cclines[i+1]
-		(s_unicode,nbras)=SmartReplace_GetText(ccnt0,ccnt1)
+		(s_unicode,nbras)=AutoEdit_GetText(ccnt0,ccnt1)
 		//Writeln('<<<',Unicode32ToUtf8(s_unicode),'>>>')
 		inputs.push(TReplaceInput(){s_unicode:s_unicode,nbras:nbras})
 	return SF.CreateReplaceInstance(inputs)
 
-auto AutoEdit_SetExample(CReplaceContext ctx,string s_new)
+auto AutoEdit_SetExample(CReplaceContext ctx,int input_id,string s_new)
 	return ctx.SetReplaceExample(
 		input_id,Utf8ToUnicode32(s_new),
 		function(int a){return isWordChar(a)})
 
-auto ProcessEditDistance(CReplaceContext.TProgramMatch[] matches,int[] ssrc,int[] sret)
+auto ProcessEditDistance(TProgramMatch[] matches,int[] ssrc,int[] sret)
 	ccntmap=new int[ssrc.n]
 	c=0
 	for i=1:ssrc.n-1
 		ccntmap[i]=c
 		c+=Utf8Length(ssrc[i])
-	ret=new TEditOp[]
+	ret=new TEditop[]
 	psrc=1L
 	ptar=0L
 	foreach pm in matches
-		op=TEditOp(){ccnt:ccntmap[psrc]}
+		op=TEditop(){ccnt:ccntmap[psrc]}
 		if pm.pm0>psrc:
-			ret.push(TEditOp(){ccnt:ccntmap[psrc],sz:ccntmap[pm.pm0]-ccntmap[psrc]})
+			ret.push(TEditop(){ccnt:ccntmap[psrc],sz:ccntmap[pm.pm0]-ccntmap[psrc]})
 		psrc=pm.pm0
 		if pm.pret>ptar:
-			ret.push(TEditOp(){ccnt:ccntmap[psrc],s:Unicode32ToUtf8(sret[ptar:pm.pret-1])})
+			ret.push(TEditop(){ccnt:ccntmap[psrc],s:Unicode32ToUtf8(sret[ptar:pm.pret-1])})
 		ptar=pm.pret+pm.pm1-pm.pm0
 		psrc=pm.pm1
 	if ssrc.n-1>psrc:
-		ret.push(TEditOp(){ccnt:ccntmap[psrc],sz:ccntmap[ssrc.n-1]-ccntmap[psrc]})
+		ret.push(TEditop(){ccnt:ccntmap[psrc],sz:ccntmap[ssrc.n-1]-ccntmap[psrc]})
 		psrc=ssrc.n-1
 	if sret.n>ptar:
-		ret.push(TEditOp(){ccnt:ccntmap[psrc],s:Unicode32ToUtf8(sret[ptar:])})
+		ret.push(TEditop(){ccnt:ccntmap[psrc],s:Unicode32ToUtf8(sret[ptar:])})
 	return ret
 
-auto AutoEdit_Evaluate(TEditOp[] ops,i64 ccnt_base, CReplaceContext ctx, TProgramItem[] prg, int line_id,int[] s_unicode,int[] nbras_old)
+auto AutoEdit_Evaluate(TEditop[] ops,i64 ccnt_base, CReplaceContext ctx, TProgramItem[] prg, int line_id,int[] s_unicode,int[] nbras_old)
 	//just return the edit ops?
 	(s_replaced,errs,edhint0)=ctx.ApplyReplaceProgram(prg,s_unicode,nbras_old,line_id, 1)
 	if errs&&errs.n:
@@ -2559,8 +2608,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ed=JS.Param(0).as(CEditableText)
 		if !ed:return JS.ReturnError("invalid editor")
 		ccnt_lh=JS.Param(1).as(i64)
-		stext=ed.GetText(ccnt_lh,AUTO_EDIT_MAX_TOTAL_LENGTH)
-		cclines=AutoEdit_Detect(stext)
+		ccnt_get=max(ccnt_lh-(AUTO_EDIT_MAX_TOTAL_LENGTH>>1),0LL)
+		stext=ed.GetText(ccnt_get,i64(min(AUTO_EDIT_MAX_TOTAL_LENGTH,ed.GetTextSize()-ccnt_get)))
+		cclines=AutoEdit_Detect(stext,iptr(ccnt_lh-ccnt_get))
 		if !cclines:
 			return 0
 		else
@@ -2569,7 +2619,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				return 0
 			else
 				ret=JS.New()
-				ret["m_cclines"]=[ccnt+ccnt_lh foreach ccnt in cclines]
+				ret["m_cclines"]=[ccnt+ccnt_get foreach ccnt in cclines]
 				ret["m_ctx"]=ctx
 				ret["m_owner"]=ed
 				return JS.Return(ret)
@@ -2579,9 +2629,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_AutoEdit_SetExample"]=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)
 		if !obj:return JS.ReturnError("invalid object")
-		s_new=JS.Param(1).as(string)
+		line_id=JS.Param(2).as(int)
+		s_new=JS.Param(2).as(string)
 		ctx=obj["m_ctx"].as(CReplaceContext)
-		prg=AutoEdit_SetExample(ctx,s_new)
+		prg=AutoEdit_SetExample(ctx,line_id,s_new)
 		if prg:
 			obj["m_prg"]=new CProgramWrapper(){prg:prg}
 			return JS.Return(1)
@@ -2595,14 +2646,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if !wprg:return JS.ReturnError("invalid program")
 		prg=wprg.prg
 		ctx=obj["m_ctx"].as(CReplaceContext)
-		cclines=JS.Param(1).as(JSObject)
-		ops=new TEditOp[]
+		ed=obj["m_owner"].as(CEditableText)
+		cclines=obj["m_cclines"].as(JSObject)
+		ops=new TEditop[]
 		n=cclines.length()
 		for i=0:2:n-2
-			ccnt0=cclines[i]
-			ccnt1=cclines[i+1]
-			(s_unicode,nbras_old)=TextToAutoEditText(ccnt0,ccnt1-ccnt0)
-			if !AutoEdit_Evaluate(ops,ccnt0, ctx, prg, i>>1,s_unicode,nbras_old):
+			ccnt0=cclines[i].as(i64)
+			ccnt1=cclines[i+1].as(i64)
+			(s_unicode,nbras_old)=TextToAutoEditText(1,1,ed.GetText(i64(ccnt0),i64(ccnt1-ccnt0)))
+			if !AutoEdit_Evaluate(ops,i64(ccnt0), ctx, prg, i>>1,s_unicode,nbras_old):
 				break
 		ret=JS.New()
 		foreach op,I in ops

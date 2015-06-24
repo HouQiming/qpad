@@ -1794,20 +1794,32 @@ UI.RegisterEditorPlugin(function(){
 
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
-	this.AddEventHandler('selectionChange',function(){
-		!? //todo: could render the stuff - gives some structural understanding
-		//still-in-range test? search above?
-		//could allow multi-exampling this
-		var ed=this.ed;
-		var ln=this.GetLC(this.GetSelection()[0])[0]
-		var ccnt_lh=this.SeekLC(ln,0)
+	var InvalidateAutoEdit=function(){
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
-			for(var i=0;i<loc.length;i++){
+			for(var i=0;i<locs.length;i++){
 				locs[i].discard()
 			}
 			this.m_autoedit_locators=undefined
 		}
+		if(this.m_autoedit_range_highlight){
+			this.m_autoedit_range_highlight.discard()
+			this.m_autoedit_range_highlight=undefined
+		}
+	}
+	this.AddEventHandler('selectionChange',function(){
+		var ed=this.ed;
+		var ln=this.GetLC(this.GetSelection()[0])[0]
+		var ccnt_lh=this.SeekLC(ln,0)
+		//still-in-range test
+		if(this.m_autoedit_locators){
+			var locs=this.m_autoedit_locators
+			if(ccnt_lh>=locs[0]&&ccnt_lh<locs[locs.length-1]){
+				return;
+			}
+		}
+		//could allow multi-exampling this
+		InvalidateAutoEdit.call(this)
 		var ctx=UI.ED_AutoEdit_Detect(ed,ccnt_lh)
 		this.m_autoedit_context=ctx
 		if(ctx){
@@ -1818,6 +1830,13 @@ UI.RegisterEditorPlugin(function(){
 				//create locators
 				locs[i]=ed.CreateLocator(cclines[i],-1)
 			}
+			//render the stuff - gives some structural understanding
+			var hlobj=ed.CreateHighlight(
+				locs[0],
+				locs[locs.length-1],1)
+			hlobj.color=this.color_auto_edit_range_highlight;
+			hlobj.invertible=0;
+			this.m_autoedit_range_highlight=hlobj;
 		}
 	})
 	this.AddEventHandler('beforeEdit',function(){
@@ -1825,16 +1844,37 @@ UI.RegisterEditorPlugin(function(){
 		if(!ctx){return}
 		var locs=this.m_autoedit_locators
 		var ed=this.ed
-		if(!UI.ED_AutoEdit_SetExample(ctx,ed.GetText(locs[0],locs[1]-locs[0]))){
+		var sel=this.GetSelection()
+		var line_id=-1;
+		//the line(s) intersected by ops... multi-line edit should cancel it
+		for(var i=0;i<locs.length;i+=2){
+			if(locs[i+1].ccnt>sel[1]){
+				if(locs[i+0].ccnt<=sel[1]){
+					line_id=i
+					break
+				}
+			}
+		}
+		this.m_autoedit_example_line_id=line_id
+		if(line_id<0){
+			//invalidate
+			InvalidateAutoEdit.call(this)
 			return;
 		}
-		!? //do after editing?
+	})
+	this.AddEventHandler('change',function(){
+		if(!(this.m_autoedit_example_line_id>0)){
+			return
+		}
+		var ctx=this.m_autoedit_context
+		if(!ctx){return}
+		var locs=this.m_autoedit_locators
+		var ed=this.ed
+		var line_id=this.m_autoedit_example_line_id
+		if(!UI.ED_AutoEdit_SetExample(ctx,line_id>>1,ed.GetText(locs[line_id],locs[line_id+1]-locs[line_id]))){
+			return;
+		}
+		var ops=ED_AutoEdit_Evaluate(ctx)
+		//todo: highlight ops
 	})
 }).prototype.name="Auto-edit";
-/*
-ED_AutoEdit_Detect
-ED_AutoEdit_SetExample
-ED_AutoEdit_Evaluate
-general highlighting
-beforeEdit
-*/

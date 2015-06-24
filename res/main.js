@@ -270,6 +270,7 @@ UI.Theme_CustomWidget=function(C){
 				color_tilde_spell_error:0xff1c1aa3,
 				/////////////
 				color_completing_bracket:0x80999999,
+				color_auto_edit_range_highlight:0x4099ffff,
 				/////////////
 				bgcolor_ellipsis:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
 				w_ellipsis:32,
