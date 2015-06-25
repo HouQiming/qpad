@@ -1875,6 +1875,6 @@ UI.RegisterEditorPlugin(function(){
 			return;
 		}
 		var ops=ED_AutoEdit_Evaluate(ctx)
-		//todo: highlight ops
+		//todo: highlight ops - fill out the overlay system
 	})
 }).prototype.name="Auto-edit";

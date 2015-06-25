@@ -867,14 +867,14 @@ module detail
 						gain=gains[j*w0+(i-1)]
 						//if !isalnum(s0[i-1]):
 						//	gain-=PENALTY_SYMBOL_MISS
-						if best<gain:
+						if best<gain&&s0[i-1]!='\n':
 							best=gain 
 							bhow=-1
 					if j:
 						gain=gains[(j-1)*w0+i]
 						//if !isalnum(s1[j-1]):
 						//	gain-=PENALTY_SYMBOL_MISS
-						if best<gain:
+						if best<gain&&s1[j-1]!='\n':
 							best=gain
 							bhow=-2
 					if i&&j:
@@ -882,8 +882,10 @@ module detail
 						bonus=1//shouldn't be 0 even for 1 char matches
 						for(k=1;k<=i&&k<=j;k++)
 							if s0[i-k]!=s1[j-k]:break
+							gain=gains[(j-k)*w0+(i-k)]
 							bonus+=chbonus[min(k,chbonus.n)-1]
-							gain=gains[(j-k)*w0+(i-k)]+bonus
+							if gain<0:continue
+							gain+=bonus
 							if !isalnum(s1[j-k])&&!isspace(s1[j-k]):
 								gain+=WEIGHT_SYMBOL*2
 							if bonus&&best<gain:
@@ -897,21 +899,24 @@ module detail
 			tail_skip=0
 			rgs=new int2[]
 			s1_covered=new int[s1.n]
-			while p0&&p1:
-				lg=hows[p1*w0+p0]
-				if lg==-1:
-					p0--
-					if !rgs.n:tail_skip=1
-				else if lg==-2:
-					p1--
-					if !rgs.n:tail_skip=1
-				else
-					assert(lg>0)
-					p0-=lg
-					p1-=lg
-					rgs.push(int2(int(p1),lg))
-					for j=0:lg-1
-						s1_covered[p1+j]=1
+			if total<0:
+				tail_skip=1
+			else
+				while p0&&p1:
+					lg=hows[p1*w0+p0]
+					if lg==-1:
+						p0--
+						if !rgs.n:tail_skip=1
+					else if lg==-2:
+						p1--
+						if !rgs.n:tail_skip=1
+					else
+						assert(lg>0)
+						p0-=lg
+						p1-=lg
+						rgs.push(int2(int(p1),lg))
+						for j=0:lg-1
+							s1_covered[p1+j]=1
 			//percentage, weight, w.r.t s1
 			//merge words to non-half-fully-covered
 			I_word0=-1L

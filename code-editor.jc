@@ -2122,8 +2122,8 @@ AUTO_EDIT_SIMILARITY_THRESHOLD=0.3f
 AUTO_EDIT_SIMILARITY_THRESHOLD_TWOLINER=0.5f
 AUTO_EDIT_SIMILARITY_THRESHOLD_SYM=0.5f
 AUTO_EDIT_SIMILARITY_THRESHOLD_SYM_TWOLINER=0.6f
-AUTO_EDIT_MAX_LINE_LENGTH=512//256
-AUTO_EDIT_MAX_TOTAL_LENGTH=40960
+AUTO_EDIT_MAX_LINE_LENGTH=400
+AUTO_EDIT_MAX_TOTAL_LENGTH=20480
 AUTO_EDIT_MAX_NLINES=256
 AUTO_EDIT_MIN_LINE_LENGTH=5
 auto AutoEdit_Detect(string stext,iptr ccnt_middle)
@@ -2180,11 +2180,15 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 				if uline.n>AUTO_EDIT_MAX_LINE_LENGTH:
 					nl--
 					break
+				//Writeln(side,' ',pl_middle,' ',line_i,'>> ',sline)
 				if !cur_gapprg:
 					cur_gapprg=uline
 					(wt_sym,wt_alnum)=SF.ComputeWeightForString(uline,fisalnum)
 					sum_total_sym=wt_sym
 					sum_total_alnum=wt_alnum
+					cclines.push(cc0)
+					cclines.push(cc1)
+					bnl=2//avoid resize failure
 					//min_covered=wt
 				else
 					ns0=0
@@ -2208,7 +2212,7 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 						is_completely_equal=1
 					(cur_gapprg,wgt,wt_covered_sym,wt_total_sym,wt_covered_alnum,wt_total_alnum)=SF.WeightedGapMerge(cur_gapprg,uline,fisalnum)
 					wgt++//dodge the warning
-					//Writeln('>> ',wt_covered_alnum,' ',wt_total_alnum)
+					//Writeln(side,' ',line_i,'>> ',wt_covered_alnum,' ',wt_total_alnum,' ',cur_gapprg)
 					//min_covered=min(min_covered,wt_covered)
 					sum_total_sym+=wt_total_sym
 					sum_total_alnum+=wt_total_alnum
@@ -2233,19 +2237,20 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 						if wgt*nl>best:
 							best=wgt*nl
 							//best=percentage
-							bnl=nl
+							bnl=cclines.n+2
 							best_gapprg=cur_gapprg
 							best_covered_sym=wt_covered_sym*nl
 							best_covered_alnum=wt_covered_alnum*nl
 							best_total_sym=sum_total_sym
 							best_total_alnum=sum_total_alnum
-					if wgt*AUTO_EDIT_MAX_NLINES<=best:
-						nl--
-						break
 					//if f32(wt_covered_sym*AUTO_EDIT_MAX_NLINES)/f32(sum_total_sym+1)<AUTO_EDIT_SIMILARITY_THRESHOLD_SYM:
 					//	break
-				cclines.push(cc0)
-				cclines.push(cc1)
+					cclines.push(cc0)
+					cclines.push(cc1)
+					if wgt*AUTO_EDIT_MAX_NLINES<=best:
+						break
+			//Writeln(side,' ',best,' ',bnl,' ',cclines.n)
+			cclines.resize(bnl)
 			if side<0:
 				//reverse the reverse merge
 				cclines2=new int[cclines.n]
@@ -2299,6 +2304,11 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 		if !isGapProgramOK():
 			continue
 		//Writeln(Unicode32ToUtf8([ch<0?0x2026:ch foreach ch in best_gapprg]))
+		//for i=0:2:cclines.n-2
+		//	cc0=cclines[i]
+		//	cc1=cclines[i+1]
+		//	sline=stext[cc0:cc1-1]
+		//	Writeln(i>>1,'>>> ',sline)
 		return cclines
 	return iptr[].NULL
 
