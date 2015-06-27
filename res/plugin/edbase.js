@@ -1840,9 +1840,11 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 	this.AddEventHandler('beforeEdit',function(){
+		this.m_autoedit_example_line_id=-1
 		var ctx=this.m_autoedit_context
 		if(!ctx){return}
 		var locs=this.m_autoedit_locators
+		if(!locs){return}
 		var ed=this.ed
 		var sel=this.GetSelection()
 		var line_id=-1;
@@ -1871,10 +1873,15 @@ UI.RegisterEditorPlugin(function(){
 		var locs=this.m_autoedit_locators
 		var ed=this.ed
 		var line_id=this.m_autoedit_example_line_id
-		if(!UI.ED_AutoEdit_SetExample(ctx,line_id>>1,ed.GetText(locs[line_id],locs[line_id+1]-locs[line_id]))){
+		if(!UI.ED_AutoEdit_SetExample(ctx,line_id>>1,ed.GetText(locs[line_id].ccnt,locs[line_id+1].ccnt-locs[line_id].ccnt))){
 			return;
 		}
-		var ops=ED_AutoEdit_Evaluate(ctx)
-		//todo: highlight ops - fill out the overlay system
+		var ops=UI.ED_AutoEdit_Evaluate(ctx,locs)
+		//highlight ops - fill out the overlay system
+		//print(JSON.stringify(ops),ops.length)
+		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		renderer.m_tentative_editops=ops
+		renderer.ResetTentativeOps()
+		UI.Refresh()
 	})
 }).prototype.name="Auto-edit";

@@ -162,6 +162,12 @@ HL_DISPLAY_MODE_TILDE=2
 struct TEllipsisItem
 	float x,y,scale
 	int color
+struct TOverlayItem
+	i64 flatx
+	i64 y,delta_x
+	string s_text,s_type
+	int sel0,sel1
+	i64 w_strikeout
 class CLayouter_programmer
 	FLAG_HAS_TAB=1
 	FLAG_HAS_ENTER=2
@@ -373,9 +379,12 @@ class CLayouter_programmer
 		return s.n
 	}
 	/////////////////
-	long3 m_caret_overlay
-	JSObject m_overlay_obj
+	//long3 m_caret_overlay
+	m_overlays=new TOverlayItem[]
+	//JSObject m_overlay_obj
 	i64 m_caret_offset
+	JSObject m_tentative_editops
+	TOverlayItem[] m_precomputed_overlays_for_tentative_editops//need to reset in JS
 	SetTextStyle=function(JSObject obj){
 		m_lang=obj["language"].as(CLanguageDescription)
 		m_font=obj["font"].as(TFont)
@@ -422,69 +431,124 @@ class CLayouter_programmer
 		m_ellipsis_items.clear()
 	}
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
-		m_overlay_obj=obj
+		m_overlays.clear()
+		//m_overlay_obj=obj
 		w_overlayd=0.
 		if obj:
 			s=obj["text"].as(string)
 			if s:
 				w_overlayd=GetStringWidth(m_font,s)
+			flatx=XYToX(x,y)
+			overlay_sel0=obj["start"].or(0L)
+			overlay_sel1=overlay_sel0+obj["length"].or(0L)
+			cmap=new iptr[]
+			foreach chj,J in Utf8Chars(s)
+				cmap.push(J)
+			cmap.push(s.n)
+			overlay_sel0=min(overlay_sel0,cmap.n-1)
+			overlay_sel1=min(overlay_sel1,cmap.n-1)
+			x_sel0=0LL
+			x_sel1=0LL
+			if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
+				//measuring
+				x_sel0=double2fixed(GetStringWidth(m_font,s[:cmap[overlay_sel0]-1]))
+				x_sel1=double2fixed(GetStringWidth(m_font,s[:cmap[overlay_sel1]-1]))
+			m_overlays.push(TOverlayItem(){
+				flatx:flatx,
+				y:(flatx+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp-1LL,
+				delta_x:double2fixed(w_overlayd),
+				s_text:s,
+				s_type:obj["type"].or("IME"),
+				sel0:x_sel0,
+				sel1:x_sel1,
+				w_strikeout:0LL,
+			})
+		if !m_precomputed_overlays_for_tentative_editops:
+			if m_tentative_editops:
+				prec_overlays=new TOverlayItem[]
+				m_precomputed_overlays_for_tentative_editops=prec_overlays
+				n3=m_tentative_editops.length()
+				n=n3/3
+				ccnts=new i64[]
+				for i=0:3:n3-3
+					ccnt_i=m_tentative_editops[i+0].as(i64)
+					ccnts.push(ccnt_i)
+					ccnts.push(ccnt_i+m_tentative_editops[i+1].as(i64))
+				//////
+				hid=caller.m_handler_registration["renderer"].as(int)
+				a=caller.GetStateEnMasse(hid,ccnts)
+				flatxs=[GetFlatX(a[i*4:]) for i=0:n*2-1]
+				for i=0:n-1
+					s_i=m_tentative_editops[i*3+2].as(string)
+					if !s_i:s_i=""
+					w_overlayd_i=GetStringWidth(m_font,s_i)
+					prec_overlays.push(TOverlayItem(){
+						flatx:flatxs[i*2+1],
+						y:(flatxs[i*2+1]+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp-1LL,
+						delta_x:double2fixed(w_overlayd_i),
+						s_text:s_i,
+						s_type:"AE",
+						sel0:0LL,
+						sel1:0LL,
+						w_strikeout:flatxs[i*2+1]-flatxs[i*2],
+					})
+		if m_precomputed_overlays_for_tentative_editops:
+			m_overlays.push(m_precomputed_overlays_for_tentative_editops)
+		m_overlays.Sortby(inline(item){return item.flatx})
 		w_overlay=double2fixed(w_overlayd)
-		m_caret_overlay=long3(XYToX(x,y),0LL,w_overlay)
-		m_caret_overlay.y=(m_caret_overlay.x+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp*m_wrap_width_in_fp
-		m_caret_offset=0LL
+		//m_caret_overlay=long3(,0LL,w_overlay)
+		//m_caret_overlay.y=(m_caret_overlay.x+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp*m_wrap_width_in_fp
+		//m_caret_offset=0LL
 		return w_overlay
 	}
 	GetCaretOffset=function(){
 		return m_caret_offset
 	}
-	DrawOverlay=inline(fnt_scaled,scale,x,projectXY){
-		s_overlay=m_overlay_obj["text"].as(string)
+	AddOverlayOffset=function(i64 x0,i64 y){
+		p=m_overlays.InlineBisect(inline(a){return a.flatx<x0})
+		p--
+		x=x0
+		for(;p>=0;p--)
+			if m_overlays[p].y==y:
+				x+=m_overlays[p].delta_x
+			else
+				break
+		return x
+	}
+	TestOverlay=inline(p_overlay, fnt_scaled,scale,x,projectXY){
+		if p_overlay>=m_overlays.n:return 0
+		oi=m_overlays[p_overlay]
+		if x!=oi.flatx:return 0
+		s_overlay=oi.s_text
 		auto prj_x=projectXY(x)
-		if s_overlay:
-			overlay_sel0=m_overlay_obj["start"].or(0L)
-			overlay_sel1=overlay_sel0+m_overlay_obj["length"].or(0L)
-			if m_overlay_obj["type"].as(string)=="IME":
-				cmap=new iptr[]
-				foreach chj,J in Utf8Chars(s_overlay)
-					cmap.push(J)
-				cmap.push(s_overlay.n)
-				overlay_sel0=min(overlay_sel0,cmap.n-1)
-				overlay_sel1=min(overlay_sel1,cmap.n-1)
-				if uptr(overlay_sel0)<uptr(cmap.n)&&uptr(overlay_sel1)<uptr(cmap.n):
-					x_sel0=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel0]-1])
-					x_sel1=GetStringWidth(m_font,s_overlay[:cmap[overlay_sel1]-1])
-					m_caret_offset=double2fixed(x_sel1)
-					if x_sel0>x_sel1:
-						(x_sel0,x_sel1)=(x_sel1,x_sel0)
-					//selection - pre-draw the highlight
-					if x_sel0<x_sel1:
-						g_renderer.DrawRectangle(prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
-				else
-					x_sel0=0.
-					x_sel1=0.
-			xo=x
-			foreach chj,J in Utf8Chars(s_overlay)
-				dx_j=charWidth(chj)
-				prj_xo=projectXY(xo)
-				//g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
-				g_renderer.FastDrawChar(prj_xo.x,prj_xo.y,m_color_overlay, chj)
-				xo+=dx_j
-		else if m_overlay_obj["type"].as(string)=="AC":
-			//auto-complete
-			xo=x
-			foreach chj,J in Utf8Chars(s_overlay)
-				dx_j=charWidth(chj)
-				prj_xo=projectXY(xo)
-				//g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
-				g_renderer.FastDrawChar(prj_xo.x,prj_xo.y,m_color_overlay, chj)
-				xo+=dx_j
-		else
-			assert(0)
-		if m_overlay_obj["type"].as(string)=="IME":
-			//draw the underline
+		x_sel0=fixed2double(oi.sel0)
+		x_sel1=fixed2double(oi.sel1)
+		if x_sel0>x_sel1:
+			(x_sel0,x_sel1)=(x_sel1,x_sel0)
+		if oi.w_strikeout:
+			auto dy_strikeout=fnt_scaled.h*fnt_scaled.pfnt.y_baseline_per_height*0.46875f
+			y_s0=(x-oi.w_strikeout)/m_wrap_width_in_fp
+			y_s1=(x)/m_wrap_width_in_fp
+			for yi=y_s0:y_s1
+				fx0=max(yi*m_wrap_width_in_fp,y_s0)
+				fx1=min((yi+1)*m_wrap_width_in_fp-1,y_s1)
+				auto prj_fx0=projectXY(fx0)
+				auto prj_fx1=projectXY(fx1)
+				g_renderer.DrawRectangle(prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
+		//selection - pre-draw the highlight
+		if x_sel0<x_sel1:
+			g_renderer.DrawRectangle(prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
+		xo=x
+		foreach chj,J in Utf8Chars(s_overlay)
+			dx_j=charWidth(chj)
+			prj_xo=projectXY(xo)
+			//g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
+			g_renderer.FastDrawChar(prj_xo.x,prj_xo.y,m_color_overlay, chj)
+			xo+=dx_j
+		if oi.s_type=="IME":
 			y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
-			g_renderer.DrawRectangle(prj_x.x,y_underline,fixed2float(m_caret_overlay.z)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
-	
+			g_renderer.DrawRectangle(prj_x.x,y_underline,fixed2float(oi.delta_x)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
+		return 1
 	}
 	RenderText=function(CEditableText ed,i64 ccnt_base,i64[] a,i64[] pp,string s, u8[] color_ids, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		//word coloring - update color_ids
@@ -604,23 +668,25 @@ class CLayouter_programmer
 			fnt_scaled.SmartEmbolden(0xff000000)
 		hc=charHeight()
 		x=GetFlatX(a)
-		if x>m_caret_overlay.x&&x<m_caret_overlay.y:
-			x+=m_caret_overlay.z
 		tab_width=m_tab_width_in_fp
 		wrap_width=m_wrap_width_in_fp
 		iy=x/wrap_width
 		ix=x-iy*wrap_width
 		dx_extra=0LL
 		dy_extra=0LL
+		p_overlay=m_overlays.InlineBisect(inline(a){return a.flatx<x})
 		inline projectXY(i64 x0)
 			auto y=x0/wrap_width
 			auto x=x0-y*wrap_width+dx_extra
 			y=(y+dy_extra)*hc
 			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 		inline testOverlay()
-			if m_overlay_obj&&x==m_caret_overlay.x:
-				DrawOverlay(fnt_scaled,scale,x,projectXY)
-				dx_extra+=m_caret_overlay.z
+			if TestOverlay(p_overlay, fnt_scaled,scale,x,projectXY):
+				dx_extra+=m_overlays[p_overlay].delta_x
+				p_overlay++
+			//if m_overlay_obj&&x==m_caret_overlay.x:
+			//	DrawOverlay(fnt_scaled,scale,x,projectXY)
+			//	dx_extra+=m_caret_overlay.z
 		x_right_clip=scroll_x+clip_w
 		g_renderer.SetFastDrawCharFont(fnt_scaled)
 		if m_enable_advanced_wrapping:
@@ -645,6 +711,10 @@ class CLayouter_programmer
 			(ix_visual,iy_visual)=SubHiddenRanges(ed,x)
 			dx_extra=ix_visual-ix
 			dy_extra=iy_visual-iy
+		//if x>m_caret_overlay.x&&x<m_caret_overlay.y:
+		//	x+=m_caret_overlay.z
+		ix_with_overlay=AddOverlayOffset(ix,iy)
+		dx_extra+=ix_with_overlay-ix
 		for ch,I in Utf8Chars(s)
 			if I==I_query_valid_point:
 				//the head query was invalid, reset the stuff
@@ -790,12 +860,15 @@ class CLayouter_programmer
 			s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
 			wrap_width=m_wrap_width_in_fp
 			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
-			if x>=m_caret_overlay.x&&x<m_caret_overlay.y:
-				x+=m_caret_overlay.z
+			//if x>=m_caret_overlay.x&&x<m_caret_overlay.y:
+			//	x+=m_caret_overlay.z
 			foreach ch in Utf8Chars(s_embolden)
-				//iy=x/wrap_width
-				//ix=x-iy*wrap_width
+				iy=x/wrap_width
+				ix=x-iy*wrap_width
+				ix_with_overlay=AddOverlayOffset(ix,iy)
+				dx_overlay=ix_with_overlay-ix
 				(ix,iy)=SubHiddenRanges(ed,x)
+				ix+=dx_overlay
 				prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
 				g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,hl.color, ch)
 				dx_i=charWidth(ch)
@@ -889,11 +962,13 @@ class CLayouter_programmer
 		flat_x=a[0]
 		y=flat_x/wrap_width
 		x=flat_x-y*wrap_width
-		if flat_x>m_caret_overlay.x&&flat_x<m_caret_overlay.y:
-			//it's an abuse of the separate x/y: we must avoid wrapping
-			x+=m_caret_overlay.z
-		y_overlay=m_caret_overlay.x/wrap_width
-		x_overlay=m_caret_overlay.x-y_overlay*wrap_width
+		x=AddOverlayOffset(x,y)
+		p_overlay=m_overlays.InlineBisect(inline(a){return a.flatx<flat_x})
+		//if flat_x>m_caret_overlay.x&&flat_x<m_caret_overlay.y:
+		//	//it's an abuse of the separate x/y: we must avoid wrapping
+		//	x+=m_caret_overlay.z
+		//y_overlay=m_caret_overlay.x/wrap_width
+		//x_overlay=m_caret_overlay.x-y_overlay*wrap_width
 		//////////////////////////////////
 		newline_flags=0
 		y_baseline=float2fixed(g_renderer.GetFontBaseline(m_font))
@@ -920,14 +995,17 @@ class CLayouter_programmer
 					return i64(ccnt)
 		}
 		myDrawChar=function(int ch32){
-			if m_overlay_obj&&x==x_overlay&&y==y_overlay:
-				flat_x=y*wrap_width+x
-				inline projectXY(i64 x0)
-					//DO NOT WRAP DURING DRAWOVERLAY!
-					auto x=x0-y*wrap_width
-					return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y*hc-scroll_y)*scale+screen_y)
-				DrawOverlay(fnt_scaled,scale,flat_x,projectXY)
-				x+=m_caret_overlay.z
+			inline projectXY(i64 x0)
+				//DO NOT WRAP DURING DRAWOVERLAY!
+				auto x=x0-y*wrap_width
+				return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y*hc-scroll_y)*scale+screen_y)
+			if TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+				x+=m_overlays[p_overlay].delta_x
+				p_overlay++
+			//if m_overlay_obj&&x==x_overlay&&y==y_overlay:
+			//	flat_x=y*wrap_width+x
+			//	DrawOverlay(fnt_scaled,scale,flat_x,projectXY)
+			//	x+=m_caret_overlay.z
 			if ch32!=int(' '):
 				dy_flags=0LL
 				g_renderer.FastDrawChar(projectX(x),projectY(y+dy_baseline+dy_flags),color, ch32)
@@ -1250,6 +1328,10 @@ class CLayouter_programmer
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
 		return 0
 	}
+	JS_ResetTentativeOps=function(JSContext JS){
+		m_precomputed_overlays_for_tentative_editops=TOverlayItem[].NULL
+		return 0
+	}
 	///////////////////////
 	__JS_prototype=function(JSObject proto){
 		proto.ExportMethod(this,"HunspellAddWord",JS_AddWord)
@@ -1263,6 +1345,9 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"SnapToShown",JS_SnapToShown)
 		proto.ExportMethod(this,"GetHiddenRanges",JS_GetHiddenRanges)
 		proto.ExportMethod(this,"ResetWrapping",JS_ResetWrapping)
+		////////////////////
+		proto.ExportProperty(this,"m_tentative_editops")
+		proto.ExportMethod(this,"ResetTentativeOps",JS_ResetTentativeOps)
 	}
 
 class CColorer_programmer
@@ -2632,6 +2717,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				ret["m_cclines"]=[ccnt+ccnt_get foreach ccnt in cclines]
 				ret["m_ctx"]=ctx
 				ret["m_owner"]=ed
+				ret["m_example_lines"]=JS.New()
 				return JS.Return(ret)
 	}
 	class CProgramWrapper
@@ -2639,12 +2725,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_AutoEdit_SetExample"]=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)
 		if !obj:return JS.ReturnError("invalid object")
-		line_id=JS.Param(2).as(int)
+		line_id=JS.Param(1).as(int)
 		s_new=JS.Param(2).as(string)
 		ctx=obj["m_ctx"].as(CReplaceContext)
+		example_lines=obj["m_example_lines"].as(JSObject)
 		prg=AutoEdit_SetExample(ctx,line_id,s_new)
 		if prg:
 			obj["m_prg"]=new CProgramWrapper(){prg:prg}
+			example_lines[line_id]=1
 			return JS.Return(1)
 		else
 			return 0
@@ -2654,19 +2742,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if !obj:return JS.ReturnError("invalid object")
 		wprg=obj["m_prg"].as(CProgramWrapper)
 		if !wprg:return JS.ReturnError("invalid program")
+		locs=JS.Param(1).as(JSObject)
+		if !locs:return JS.ReturnError("invalid locators")
 		prg=wprg.prg
 		ctx=obj["m_ctx"].as(CReplaceContext)
 		ed=obj["m_owner"].as(CEditableText)
-		cclines=obj["m_cclines"].as(JSObject)
+		example_lines=obj["m_example_lines"].as(JSObject)
 		ops=new TEditop[]
-		n=cclines.length()
+		n=locs.length()
 		for i=0:2:n-2
-			ccnt0=cclines[i].as(i64)
-			ccnt1=cclines[i+1].as(i64)
+			if example_lines[i>>1].as(int):continue
+			ccnt0=(locs[i].as(CLocator)).ccnt
+			ccnt1=(locs[i+1].as(CLocator)).ccnt
 			(s_unicode,nbras_old)=TextToAutoEditText(1,1,ed.GetText(i64(ccnt0),i64(ccnt1-ccnt0)))
 			if !AutoEdit_Evaluate(ops,i64(ccnt0), ctx, prg, i>>1,s_unicode,nbras_old):
 				break
-		ret=JS.New()
+		ret=JS.NewArray()
 		foreach op,I in ops
 			ret[I*3+0]=op.ccnt
 			ret[I*3+1]=op.sz

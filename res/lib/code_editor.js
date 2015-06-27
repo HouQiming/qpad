@@ -531,6 +531,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks['save']=[]
 		this.m_event_hooks['parse']=[]
 		this.m_event_hooks['menu']=[]
+		this.m_event_hooks['beforeEdit']=[]
 		//before creating the editor, try to call a language callback
 		var loaded_metadata=(this.file_name&&UI.m_ui_metadata[this.file_name]||{})
 		var hyp_name=(loaded_metadata.m_hyphenator_name||this.plugin_language_desc&&this.plugin_language_desc.default_hyphenator_name)
@@ -893,7 +894,7 @@ W.CodeEditorWidget_prototype={
 				//undo beyond the saved point, then edit sth else, the save point is lost permanently
 				this.saved_point=-1;
 			}
-			doc.CallHooks("beforeEdit")
+			this.CallHooks("beforeEdit")
 			this.ed.Edit(ops);
 		}
 		doc.AddEventHandler('change',function(){
