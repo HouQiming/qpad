@@ -434,6 +434,7 @@ class CLayouter_programmer
 		m_overlays.clear()
 		//m_overlay_obj=obj
 		w_overlayd=0.
+		m_caret_offset=0LL
 		if obj:
 			s=obj["text"].as(string)
 			if s:
@@ -453,6 +454,7 @@ class CLayouter_programmer
 				//measuring
 				x_sel0=double2fixed(GetStringWidth(m_font,s[:cmap[overlay_sel0]-1]))
 				x_sel1=double2fixed(GetStringWidth(m_font,s[:cmap[overlay_sel1]-1]))
+				m_caret_offset=max(x_sel0,x_sel1)
 			m_overlays.push(TOverlayItem(){
 				flatx:flatx,
 				y:(flatx+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp-1LL,
@@ -986,7 +988,7 @@ class CLayouter_programmer
 		OfsCheck=__inline_loop_body(ccnt){
 			if mode==MODE_BB&&h_line:
 				//never return before the first newline
-				if ccnt>=ofs:return y*wrap_width+x
+				if ccnt>=ofs:return flat_x
 		}
 		SeekCheck=__inline_loop_body(ccnt){
 			if mode==MODE_SEEK:
@@ -994,11 +996,11 @@ class CLayouter_programmer
 				if y_real>scroll_y||scroll_y>=y_real&&scroll_y<y_real+h_line&&x>scroll_x:
 					return i64(ccnt)
 		}
+		inline projectXY(i64 x0)
+			//DO NOT WRAP DURING DRAWOVERLAY!
+			auto x=x0-y*wrap_width
+			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y*hc-scroll_y)*scale+screen_y)
 		myDrawChar=function(int ch32){
-			inline projectXY(i64 x0)
-				//DO NOT WRAP DURING DRAWOVERLAY!
-				auto x=x0-y*wrap_width
-				return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y*hc-scroll_y)*scale+screen_y)
 			if TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
 				x+=m_overlays[p_overlay].delta_x
 				p_overlay++
@@ -1016,6 +1018,8 @@ class CLayouter_programmer
 				if mode==MODE_RENDER&&(newline_flags&ATOM_FLAG_HYPHEN):
 					color=m_cached_color_virtual_hyphen
 					myDrawChar(int('-'))
+				flat_x-=x
+				flat_x+=wrap_width
 				x=0LL
 				y++
 		}
@@ -1060,12 +1064,17 @@ class CLayouter_programmer
 						return i64(value0)
 					else
 						//if mode==MODE_BB:
-						return y*wrap_width+x
+						return flat_x
 			else if value1&0x80000000:
 				//space
+				if mode==MODE_RENDER:
+					if TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+						x+=m_overlays[p_overlay].delta_x
+						p_overlay++
 				value1&=0x7fffffff
 				OfsCheck(value1)
 				x+=i64(value0)
+				flat_x+=i64(value0)
 				SeekCheck(value1)
 				ch32_prev=int(' ')
 			else
@@ -1084,13 +1093,21 @@ class CLayouter_programmer
 							ch32=g_arabic_table[(ch32-0x600)*4+next_arabic*2+prev_arabic]
 						//ch32
 						if ch32=='\t':ch32=int(' ')
-						x+=charKerning(ch32_prev,ch32)
+						dx_temp=charKerning(ch32_prev,ch32)
+						x+=dx_temp
+						flat_x+=dx_temp
 						OfsCheck(su32[J].y)
 						if mode==MODE_RENDER:
 							if ch32!=' '&&ch32!='\r'&&ch32!='\n':
 								color=m_cached_colors[int(color_ids[su32[J].y])]
 								myDrawChar(ch32)
-						x+=charWidth(ch32)
+							else
+								if TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+									x+=m_overlays[p_overlay].delta_x
+									p_overlay++
+						dx_temp=charWidth(ch32)
+						x+=dx_temp
+						flat_x+=dx_temp
 						ch32_prev=ch32
 						SeekCheck(su32[J].y)
 				//__inline_loop_body AddLigature(iptr ccnt0,iptr nc,string s_ligature)
@@ -1132,7 +1149,7 @@ class CLayouter_programmer
 		if mode==MODE_SEEK:
 			return i64(s.n)
 		else
-			return y*wrap_width+x
+			return flat_x
 	}
 	///////////////////////
 	//call onchange in js

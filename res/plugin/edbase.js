@@ -1792,6 +1792,39 @@ UI.RegisterEditorPlugin(function(){
 	})
 }).prototype.name="Wrapping";
 
+var ApplyAutoEdit=function(obj,cur_autoedit_ops,line_id){
+	var locs=obj.m_autoedit_locators;
+	var ccnt0=locs[line_id+0].ccnt
+	var ccnt1=locs[line_id+1].ccnt
+	var ret=[]
+	var ops_now=[];
+	var delta=0;
+	for(var i=0;i<cur_autoedit_ops.length;i+=3){
+		var ccnt=cur_autoedit_ops[i];
+		if(ccnt>=ccnt0&&ccnt<ccnt1){
+			var s=cur_autoedit_ops[i+2];
+			var sz=cur_autoedit_ops[i+1];
+			ops_now.push(cur_autoedit_ops[i],sz,s)
+			delta-=sz;
+			if(s){delta+=Duktape.__byte_length(s)}
+		}else{
+			ret.push(cur_autoedit_ops[i]+delta,cur_autoedit_ops[i+1],cur_autoedit_ops[i+2])
+		}
+	}
+	if(ops_now.length>0){
+		var ccnt=ops_now[ops_now.length-3]
+		obj.SetSelection(ccnt,ccnt)
+		obj.ed.Edit(ops_now);
+		var s=ops_now[ops_now.length-1]
+		if(s){
+			var ccnt=obj.GetSelection()[0]
+			obj.SetSelection(ccnt,ccnt+Duktape.__byte_length(s))
+		}
+	}
+	//removed the processed edit ops
+	return ret
+}
+
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	var InvalidateAutoEdit=function(){
@@ -1814,7 +1847,7 @@ UI.RegisterEditorPlugin(function(){
 		//still-in-range test
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
-			if(ccnt_lh>=locs[0]&&ccnt_lh<locs[locs.length-1]){
+			if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt){
 				return;
 			}
 		}
@@ -1851,7 +1884,7 @@ UI.RegisterEditorPlugin(function(){
 		//the line(s) intersected by ops... multi-line edit should cancel it
 		for(var i=0;i<locs.length;i+=2){
 			if(locs[i+1].ccnt>sel[1]){
-				if(locs[i+0].ccnt<=sel[1]){
+				if(locs[i+0].ccnt<=sel[0]){
 					line_id=i
 					break
 				}
@@ -1865,7 +1898,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 	this.AddEventHandler('change',function(){
-		if(!(this.m_autoedit_example_line_id>0)){
+		if(!(this.m_autoedit_example_line_id>=0)){
 			return
 		}
 		var ctx=this.m_autoedit_context
@@ -1878,10 +1911,60 @@ UI.RegisterEditorPlugin(function(){
 		}
 		var ops=UI.ED_AutoEdit_Evaluate(ctx,locs)
 		//highlight ops - fill out the overlay system
-		//print(JSON.stringify(ops),ops.length)
 		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		renderer.m_tentative_editops=ops
 		renderer.ResetTentativeOps()
 		UI.Refresh()
+	})
+	//CTRL+D - return 1, the other end should be a hook...? just compete and adjust the priority
+	this.AddEventHandler('menu',function(){
+		var ed=this.ed
+		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		if(renderer.m_tentative_editops){
+			var locs=this.m_autoedit_locators
+			var sel=this.GetSelection()
+			var line_id=-1;
+			//the line(s) intersected by ops... multi-line edit should cancel it
+			for(var i=0;i<locs.length;i+=2){
+				if(locs[i+1].ccnt>sel[1]){
+					if(locs[i+0].ccnt<=sel[0]){
+						line_id=i
+						break
+					}
+				}
+			}
+			var cur_autoedit_ops=renderer.m_tentative_editops
+			var menu_edit=UI.BigMenu("&Edit")
+			var this_outer=this;
+			menu_edit.AddSeparator()
+			menu_edit.AddButtonRow({text:"Replace"},[
+				{key:"CTRL+SHIFT+D",text:"prev",tooltip:'CTRL+SHIFT+D',action:function(){
+					if(line_id>0){
+						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id-2)
+						renderer.ResetTentativeOps()
+					}
+				}},{key:"CTRL+D",text:"next",tooltip:'CTRL+D',action:function(){
+					if(line_id+2<locs.length){
+						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id+2)
+						renderer.ResetTentativeOps()
+					}
+				}},{key:"ALT+A",text:"all",tooltip:'ALT+A',action:function(){
+					if(cur_autoedit_ops.length>0){
+						var ccnt=cur_autoedit_ops[cur_autoedit_ops.length-3]
+						this_outer.SetSelection(ccnt,ccnt)
+					}
+					ed.Edit(cur_autoedit_ops);
+					if(cur_autoedit_ops.length>0){
+						var s=cur_autoedit_ops[cur_autoedit_ops.length-1]
+						if(s){
+							var ccnt=this_outer.GetSelection()[0]
+							this_outer.SetSelection(ccnt,ccnt+Duktape.__byte_length(s))
+						}
+					}
+					renderer.m_tentative_editops=undefined
+					renderer.ResetTentativeOps()
+				}}])
+			
+		}
 	})
 }).prototype.name="Auto-edit";
