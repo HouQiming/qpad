@@ -1839,6 +1839,9 @@ UI.RegisterEditorPlugin(function(){
 			this.m_autoedit_range_highlight.discard()
 			this.m_autoedit_range_highlight=undefined
 		}
+		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		renderer.m_tentative_editops=undefined
+		renderer.ResetTentativeOps()
 	}
 	this.AddEventHandler('selectionChange',function(){
 		var ed=this.ed;

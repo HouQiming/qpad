@@ -1,9 +1,9 @@
+//todo: find state should be global
 //todo: long file list perf - "ready" state - begin/end auto-delete
 //todo: degrading performance - could be AC
 //could somehow optimize the current gui2d pipeline - the packing, *the vbo gen*: they are related
 //cacheglyph for composite font
-//todo: find state should be global
-//todo: auto-wrap-around in search
+//wrap-around in search
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
