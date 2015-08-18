@@ -1,4 +1,4 @@
-//todo: find state should be global
+//todo: find state should be global - UI.m_ui_metadata
 //todo: long file list perf - "ready" state - begin/end auto-delete
 //todo: degrading performance - could be AC
 //could somehow optimize the current gui2d pipeline - the packing, *the vbo gen*: they are related
@@ -10,9 +10,16 @@ require("res/lib/boxdoc");
 var Language=require("res/lib/langdef");
 var MAX_PARSABLE=33554432
 
+if(!UI.m_ui_metadata.find_state){
+	UI.m_ui_metadata.find_state={
+		m_current_needle:"",
+		m_find_flags:0,
+	}
+}
+
 UI.m_code_editor_persistent_members=[
-	"m_current_needle",
-	"m_find_flags",
+	//"m_current_needle",
+	//"m_find_flags",
 	"m_current_wrap_width",
 	"m_enable_wrapping",
 	"m_hyphenator_name",
@@ -861,7 +868,6 @@ UI.SEARCH_FLAG_CASE_SENSITIVE=1
 UI.SEARCH_FLAG_WHOLE_WORD=2
 UI.SEARCH_FLAG_REGEXP=4
 W.CodeEditorWidget_prototype={
-	m_find_flags:0,
 	m_current_wrap_width:1024,
 	m_enable_wrapping:0,
 	OnEditorCreate:function(){
@@ -953,9 +959,6 @@ W.CodeEditorWidget_prototype={
 				renderer.HideRange(doc.ed,loaded_metadata.m_hidden_ranges[i],loaded_metadata.m_hidden_ranges[i+1])
 			}
 		}
-		//this.m_current_needle=loaded_metadata.m_current_needle
-		//this.m_find_flags=(loaded_metadata.m_find_flags||0)
-		//this.m_current_wrap_width=(loaded_metadata.m_current_wrap_width||0)
 		doc.AutoScroll("center")
 		doc.scrolling_animation=undefined
 		doc.CallHooks("selectionChange")
@@ -1057,10 +1060,11 @@ W.CodeEditorWidget_prototype={
 		}
 		if(!sneedle.length){
 			this.m_current_find_context=undefined
-			this.m_current_needle=undefined
+			//this.m_current_needle=undefined
+			UI.m_ui_metadata.find_state.m_current_needle=""
 			return;
 		}
-		this.m_current_needle=sneedle
+		UI.m_ui_metadata.find_state.m_current_needle=sneedle
 		var hc=UI.GetCharacterHeight(doc.font)
 		var ccnt_tot=doc.ed.GetTextSize()
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
@@ -1385,7 +1389,7 @@ W.CodeEditorWidget_prototype={
 			if(!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)){
 				s_bof_message=UI._("Searching @1%").replace("@1",((1-UI.GetSearchFrontierCcnt(ctx.m_backward_frontier)/ccnt_tot)*100).toFixed(0))
 			}else{
-				s_bof_message=UI._("No more matches above")
+				s_bof_message=UI._("No more '@1' above".replace("@1",ctx.m_needle))
 			}
 			var text_dim=UI.MeasureText(this.find_message_font,s_bof_message)
 			var y=ctx.m_y_extent_backward-find_scroll_y-h_bof_eof_message
@@ -1414,7 +1418,7 @@ W.CodeEditorWidget_prototype={
 			if(!UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){
 				s_eof_message=UI._("Searching @1%").replace("@1",((UI.GetSearchFrontierCcnt(ctx.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
 			}else{
-				s_eof_message=UI._("No more matches below")
+				s_eof_message=UI._("No more '@1' below").replace("@1",ctx.m_needle)
 			}
 			var text_dim=UI.MeasureText(this.find_message_font,s_eof_message)
 			var y=ctx.m_y_extent_forward-find_scroll_y+this.find_item_separation
@@ -1427,7 +1431,7 @@ W.CodeEditorWidget_prototype={
 	},
 	FindNext:function(direction){
 		UI.assert(!this.m_find_next_context,"panic: FindNext when there is another context")
-		if(!this.m_current_needle){
+		if(!UI.m_ui_metadata.find_state.m_current_needle){
 			//no needle, no find
 			return;
 		}
@@ -1437,8 +1441,8 @@ W.CodeEditorWidget_prototype={
 		var ctx={
 			m_frontier:ccnt,
 			m_owner:this,
-			m_needle:this.m_current_needle,
-			m_flags:this.m_find_flags,
+			m_needle:UI.m_ui_metadata.find_state.m_current_needle,
+			m_flags:UI.m_ui_metadata.find_state.m_find_flags,
 			m_match_reported:0,
 			ReportMatch:function(ccnt0,ccnt1){
 				if(direction>0){
@@ -1464,7 +1468,7 @@ W.CodeEditorWidget_prototype={
 					this.m_owner.m_find_next_context=undefined
 					if(!this.m_match_reported){
 						//notification
-						this.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?"No more matches above":"No more matches below")})
+						this.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?"No more '@1' above":"No more '@1' below").replace("@1",this.m_needle)})
 					}
 					UI.Refresh()
 				}else{
@@ -1494,9 +1498,9 @@ W.CodeEditorWidget_prototype={
 				this.m_current_find_context.Cancel()
 				this.m_current_find_context=undefined
 			}
-			this.m_current_needle=this.doc.ed.GetText(sel[0],sel[1]-sel[0])
-			if(this.m_find_flags&UI.SEARCH_FLAG_REGEXP){
-				this.m_current_needle=RegexpEscape(this.m_current_needle)
+			UI.m_ui_metadata.find_state.m_current_needle=this.doc.ed.GetText(sel[0],sel[1]-sel[0])
+			if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
+				UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
 			}
 		}
 	},
@@ -1685,7 +1689,7 @@ var ffindbar_plugin=function(){
 		obj.doc.sel0.ccnt=obj.m_sel0_before_find
 		obj.doc.sel1.ccnt=obj.m_sel1_before_find
 		obj.DestroyReplacingContext();
-		obj.ResetFindingContext(this.ed.GetText(),obj.m_find_flags)
+		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 	})
 	this.AddEventHandler('UP',function(){
 		var obj=this.owner
@@ -2422,7 +2426,7 @@ W.CodeEditor=function(id,attrs){
 			doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
 			doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
 			//find highlight
-			if(!obj.show_find_bar&&obj.m_current_needle){
+			if(!obj.show_find_bar&&UI.m_ui_metadata.find_state.m_current_needle){
 				//repeat the animation to get correct the correct scrolling information
 				UI.Begin(doc)
 					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
@@ -2437,7 +2441,7 @@ W.CodeEditor=function(id,attrs){
 				var area_h=doc.h
 				var rendering_ccnt0=doc.SeekXY(scroll_x,scroll_y)
 				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,scroll_y+area_h)
-				obj.ResetFindingContext(obj.m_current_needle,obj.m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
+				obj.ResetFindingContext(UI.m_ui_metadata.find_state.m_current_needle,UI.m_ui_metadata.find_state.m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
 				var ctx=obj.m_current_find_context
 				current_find_context=ctx
 				if(!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)&&UI.GetSearchFrontierCcnt(ctx.m_backward_frontier)>rendering_ccnt0){
@@ -3022,37 +3026,37 @@ W.CodeEditor=function(id,attrs){
 				W.Button("find_button_case",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 					font:UI.icon_font,text:"写",tooltip:"Case sensitive",
-					value:(obj.m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
+					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
 					OnChange:function(value){
-						obj.m_find_flags=(obj.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
+						UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
 						obj.DestroyReplacingContext();
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.m_find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 					}})
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_word",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 					font:UI.icon_font,text:"字",tooltip:"Whole word",
-					value:(obj.m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
+					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 					OnChange:function(value){
-						obj.m_find_flags=(obj.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
+						UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
 						obj.DestroyReplacingContext();
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.m_find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 					}})
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_regexp",{style:UI.default_styles.check_button,
 					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 					font:UI.icon_font,text:"正",tooltip:"Regular expression",
-					value:(obj.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
+					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 					OnChange:function(value){
-						obj.m_find_flags=(obj.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
+						UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
 						obj.DestroyReplacingContext();
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.m_find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 					}})
 				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				W.Button("find_button_close",{style:UI.default_styles.check_button,
 					x:x_button_right+2,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5+2,w:obj.find_bar_button_size-4,h:obj.find_bar_button_size-4,
 					font:UI.icon_font_20,text:"✕",tooltip:"Close - ESC",
-					value:(obj.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
+					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 					OnClick:function(){
 						obj.find_bar_edit.CancelFind();
 					}})
@@ -3082,11 +3086,11 @@ W.CodeEditor=function(id,attrs){
 					},
 				},W.CodeEditor_prototype);
 				if(!previous_edit){
-					if(obj.m_current_needle){
-						obj.find_bar_edit.ed.Edit([0,0,obj.m_current_needle],1)
+					if(UI.m_ui_metadata.find_state.m_current_needle){
+						obj.find_bar_edit.ed.Edit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
 						obj.find_bar_edit.sel0.ccnt=0
 						obj.find_bar_edit.sel1.ccnt=obj.find_bar_edit.ed.GetTextSize()
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),obj.m_find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 					}
 					UI.SetFocus(obj.find_bar_edit);
 					UI.InvalidateCurrentFrame();
@@ -3201,9 +3205,9 @@ W.CodeEditor=function(id,attrs){
 					obj.m_sel0_before_find=obj.doc.sel0.ccnt
 					obj.m_sel1_before_find=obj.doc.sel1.ccnt
 					if(sel[0]<sel[1]){
-						obj.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-						if(obj.m_find_flags&UI.SEARCH_FLAG_REGEXP){
-							obj.m_current_needle=RegexpEscape(obj.m_current_needle)
+						UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+						if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
+							UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
 						}
 					}
 					UI.Refresh()
