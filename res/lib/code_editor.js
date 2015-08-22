@@ -1,4 +1,3 @@
-//todo: find state should be global - UI.m_ui_metadata
 //todo: long file list perf - "ready" state - begin/end auto-delete
 //todo: degrading performance - could be AC
 //could somehow optimize the current gui2d pipeline - the packing, *the vbo gen*: they are related
@@ -1657,6 +1656,11 @@ W.CodeEditorWidget_prototype={
 	DismissNotification:function(id){
 		if(this.m_notifications){
 			this.m_notifications=this.m_notifications.filter(function(a){return a.id!=id})
+		}
+	},
+	DismissNotificationsByRegexp:function(re){
+		if(this.m_notifications){
+			this.m_notifications=this.m_notifications.filter(function(a){return a.id.match(re)})
 		}
 	},
 	////////////////////////////////
@@ -3357,6 +3361,7 @@ UI.NewCodeEditorTab=function(fname0){
 	return UI.NewTab({
 		file_name:file_name,
 		title:UI.RemovePath(file_name),
+		opening_callbacks:[],
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.doc;
@@ -3369,6 +3374,13 @@ UI.NewCodeEditorTab=function(fname0){
 			if(!this.doc){
 				this.doc=body;
 				body.m_is_brand_new=!fname0
+				if(this.opening_callbacks.length){
+					var cbs=this.opening_callbacks
+					for(var i=0;i<cbs.length;i++){
+						cbs[i].call(body);
+					}
+					this.opening_callbacks=[]
+				}
 			}
 			var doc=body.doc;
 			if(body.m_is_brand_new){
@@ -3416,4 +3428,25 @@ UI.NewCodeEditorTab=function(fname0){
 };
 
 UI.RegisterLoaderForExtension("*",function(fname){return UI.NewCodeEditorTab(fname)})
+
+UI.OpenEditorWindow=function(fname,fcallback){
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		fname=fname.toLowerCase()
+	}
+	var obj_tab=undefined;
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		if(UI.g_all_document_windows[i].file_name==fname){
+			obj_tab=UI.g_all_document_windows[i]
+			break
+		}
+	}
+	if(!obj_tab){
+		obj_tab=UI.NewCodeEditorTab(fname)
+	}
+	if(obj_tab.doc){
+		fcallback.call(obj_tab.doc)
+	}else{
+		obj_tab.opening_callbacks.push(fcallback)
+	}
+}
 //UI.enable_timing=1

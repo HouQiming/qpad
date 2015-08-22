@@ -273,6 +273,8 @@ UI.Theme_CustomWidget=function(C){
 				//virtual hyphen for tex-like files, should be even less obvious than normal symbols
 				color_hyphen:0xffaaaaaa,
 				color_tilde_spell_error:0xff1c1aa3,
+				color_tilde_compiler_error:0xff1c1aa3,
+				color_tilde_compiler_warning:0xff2ca033,
 				/////////////
 				color_completing_bracket:0x80999999,
 				color_auto_edit_range_highlight:0x4099ffff,
@@ -432,6 +434,13 @@ UI.Theme_CustomWidget=function(C){
 			x_min_shake:0.5,
 			dx_min_shake:0.5,
 		},
+		build_output:{
+			editor_style:{
+				font:UI.Font("res/fonts/inconsolata.ttf",24),
+				color:0xff000000,
+				read_only:1,
+			},
+		},
 		sxs_new_page:{
 			color:0xffffffff,
 			border_color:0xff000000,
@@ -564,6 +573,7 @@ UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
 UI.font_name="res/fonts/opensans.ttf"
 
 var g_all_document_windows=[];
+UI.g_all_document_windows=g_all_document_windows
 UI.NewTab=function(tab){
 	g_all_document_windows.push(tab)
 	UI.Refresh()

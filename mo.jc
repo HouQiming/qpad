@@ -245,10 +245,14 @@ auto genString(string s0)
 			if proc.pipe.WouldBlock():return 0
 			//line-based parsing? do it in JS
 			s=proc.pipe.Read(n)
+			//System.Algorithm.NativeToUtf8()
 			return JS.Return(s)
 		}
 		JS_IsRunning=function(JSContext JS){
 			return JS.Return(proc.isRunning())
+		}
+		JS_ExitCode=function(JSContext JS){
+			return JS.Return(proc.exit_code())
 		}
 		JS_Terminate=function(JSContext JS){
 			proc.Terminate()
@@ -256,14 +260,16 @@ auto genString(string s0)
 		}
 		__JS_prototype=function(JSObject proto){
 			proto.ExportMethod(this,"Read",JS_Read)
+			proto.ExportMethod(this,"GetExitCode",JS_ExitCode)
 			proto.ExportMethod(this,"IsRunning",JS_IsRunning)
 			proto.ExportMethod(this,"Terminate",JS_Terminate)
 		}
 	jsio["RunToolRedirected"]=function(JSContext JS){
-		auto scmd=JS.Param(0).as(string)
+		auto shell_args=JS.Param(0).as(JSObject)
 		auto spath=JS.Param(1).or(".")
 		auto show=JS.Param(2).or(1)
-		pproc=System.Processes.RunPiped(scmd,spath,show,"new_job,output,error")
+		//todo: unix - pass the array
+		pproc=System.Processes.RunPiped(shellcmd(shell_args,0),spath,show,"new_job,output,error")
 		if !pproc:
 			return 0
 		return JS.Return(new CProcessWrapper(){proc:pproc})

@@ -475,15 +475,17 @@ Language.Register({
 
 /////////////////////////////////////////////
 var g_compiler_by_ext={}
-Language.RegisterCompiler=function(s_ext,obj){
-	var s_ext_lower=s_ext.toLowerCase()
-	var ret=g_compiler_by_ext[s_ext_lower]
-	if(!ret){
-		ret={m_hash:{},m_array:[]}
-		g_compiler_by_ext[s_ext_lower]=ret
+Language.RegisterCompiler=function(s_exts,obj){
+	for(var i=0;i<s_exts.length;i++){
+		var s_ext_lower=s_exts[i].toLowerCase()
+		var ret=g_compiler_by_ext[s_ext_lower]
+		if(!ret){
+			ret={m_hash:{},m_array:[]}
+			g_compiler_by_ext[s_ext_lower]=ret
+		}
+		ret.m_array.push(obj)
+		ret.m_hash[obj.name]=obj
 	}
-	ret.m_array.push(obj)
-	ret.m_hash[obj.name]=obj
 	return obj
 }
 
@@ -509,40 +511,202 @@ UI.RegisterEditorPlugin(function(){
 		var menu_run=UI.BigMenu("&Run")
 		var doc=this
 		menu_run.AddNormalItem({text:"&Compile",enable_hotkey:1,key:"F7",action:function(){
+			UI.ClearCompilerErrors()
 			compiler.make(doc)
 		}})
 		menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+			UI.ClearCompilerErrors()
 			compiler.make(doc)
 			compiler.run(doc)
 		}})
 	})
 }).prototype.name="Compilation";
 
-IO.AsyncShell=function(cmdline){
-	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-		IO.Shell(["start"," ","/b"].concat(cmdline))
-	}else{
-		IO.Shell(cmdline.concat(["&"]))
+//IO.AsyncShell=function(cmdline){
+//	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+//		IO.Shell(["start"," ","/b"].concat(cmdline))
+//	}else{
+//		IO.Shell(cmdline.concat(["&"]))
+//	}
+//}
+
+UI.WriteBuildOutput=function(fparse,s){
+	if(!UI.g_build_output_editor){
+		var obj=Object.create(W.Edit_prototype)
+		var style=UI.default_styles.build_output.editor_style
+		for(var attr in style){
+			obj[attr]=style[attr]
+		}
+		obj.m_clickable_ranges=[]
+		obj.plugins=[function(){
+			this.AddEventHandler('selectionChange',function(){
+				var sel=this.GetSelection()
+				var l=0;
+				var r=this.m_clickable_ranges.length-1;
+				while(l<=r){
+					var m=(l+r)>>1;
+					if(this.m_clickable_ranges[m].loc0.ccnt<=sel[0]){
+						l=m+1
+					}else{
+						r=m-1
+					}
+				}
+				if(r>=0&&this.m_clickable_ranges[r].loc0.ccnt<=sel[0]&&sel[1]<=this.m_clickable_ranges[r].loc1.ccnt){
+					//yes, it's clickable
+					var crange=this.m_clickable_ranges[r]
+					crange.f.call(this,crange.loc0.ccnt,crange.loc1.ccnt)
+				}
+			})
+		}];
+		obj.Init()
+		UI.g_build_output_editor=obj
+	}
+	var obj=UI.g_build_output_editor;
+	var ccnt=obj.ed.GetTextSize()
+	var sel=obj.GetSelection()
+	obj.ed.Edit([ccnt,0,s])
+	if(sel[1]==ccnt&&sel[0]==ccnt){
+		obj.ed.SetSelection(ccnt,ccnt)
+	}
+	//do the parsing
+	var line=obj.GetLC(ccnt)[0]
+	var ccnt_lh=obj.SeekLC(line,0)
+	var ccnt_tot=obj.ed.GetTextSize()
+	for(;;){
+		var ccnt_next=obj.SeekLineBelowKnownPosition(ccnt_lh,line,line+1)
+		if(!(ccnt_next<ccnt_tot)){
+			if(!(obj.GetLC(ccnt_next)[0]>line)){break;}
+		}
+		var fclick_callback=fparse(obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
+		if(fclick_callback){
+			obj.m_clickable_ranges.push({loc0:ed.CreateLocator(ccnt_lh,1),loc1:ed.CreateLocator(ccnt_next,-1),f:fclick_callback})
+		}
+		ccnt_lh=ccnt_next;
+		line++;
 	}
 }
 
-UI.CallPMJS=function(cmd,desc){
-	//todo: redirect and parse the output, waiting
+W.SXS_BuildOutput=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
+	UI.Begin(obj)
+		UI.RoundRect(obj)
+		obj.doc=UI.g_build_output_editor;
+		W.Edit("doc",{
+			'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
+			'x':0,'y':0,
+		})
+	UI.End()
+	return obj
+}
+
+UI.CallPMJS=function(cmd,desc, doc,fparse){
+	//redirect and parse the output
 	desc.delete_json_file=1
 	var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
 	IO.CreateFile(fn_json,JSON.stringify(desc))
-	IO.AsyncShell(["pmjs",cmd,fn_json])
+	//IO.AsyncShell(["pmjs",cmd,fn_json])
+	var proc=IO.RunToolRedirected(["pmjs",cmd,fn_json],UI.GetPathFromFilename(doc.m_file_name),1)
+	if(proc){
+		var fpoll=function(){
+			var s=proc.Read(65536)
+			if(s){
+				UI.WriteBuildOutput(fparse,s)
+				UI.NextTick(fpoll)
+			}else if(proc.IsRunning()){
+				UI.setTimeOut(fpoll,100)
+			}else{
+				var code=proc.GetExitCode()
+				if(code!=0){
+					UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: build failed somehow\n")
+				}
+			}
+		}
+		UI.NextTick(fpoll)
+	}else{
+		UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: unable to invoke pmjs\n")
+	}
+}
+
+var g_re_errors=new RegExp("error_.*")
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.m_error_overlays=[]
+	this.PushError=function(err){
+		var hl_items=this.CreateTransientHighlight({
+			'depth':1,
+			'color':err.color||this.color_tilde_compiler_error,
+			'display_mode':UI.HL_DISPLAY_MODE_TILDE,
+			'invertible':0,
+		});
+		hl_items[0].ccnt=err.ccnt0;err.ccnt0=hl_items[0];
+		hl_items[1].ccnt=err.ccnt1;err.ccnt1=hl_items[1];
+		err.highlight=hl_items[2];
+		err.id=this.m_error_overlays.length
+		err.is_ready=1
+		////////////
+		this.m_error_overlays.push(err)
+	}
+	this.AddEventHandler('menu',function(){
+		var ed=this.ed;
+		var sel=this.GetSelection()
+		if(sel[0]==sel[1]){
+			var error_overlays=this.m_error_overlays
+			var ccnt=sel[0]
+			this.DismissNotificationsByRegexp(g_re_errors)
+			for(var i=0;i<error_overlays.length;i++){
+				var err=error_overlays[i]
+				if(ccnt>=err.ccnt0.ccnt&&ccnt<=err.ccnt1.ccnt){
+					this.CreateNotification({
+						id:"error_"+err.id.toString(),icon:'警',
+						text:err.message,
+						icon_color:err.color,
+						text_color:err.color,
+						color:UI.lerp_rgba(err.color,0xffffffff,0.9),
+					})
+				}
+			}
+		}
+		return 0;
+	})
+}).prototype.name="Error overlays";
+
+UI.ClearCompilerErrors=function(){
+	//keep the locators for seeking but remove the highlights
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var obj=UI.g_all_document_windows[i].doc
+		if(obj&&obj.m_error_overlays){
+			for(var j=0;j<obj.m_error_overlays.length;j++){
+				var err_j=obj.m_error_overlays[j]
+				if(err_j.highlight){err_j.highlight.discard()}
+			}
+			obj.m_error_overlays=[]
+		}
+	}
+}
+
+UI.CreateCompilerError=function(err){
+	UI.OpenEditorWindow(err.file_name,function(){
+		if(this.m_error_overlays){
+			this.PushError(err)
+		}
+	})
+	return function(){
+		if(!err.is_ready){return;}
+		UI.OpenEditorWindow(err.file_name,function(){
+			this.SetSelection(err.ccnt0.ccnt,err.ccnt1.ccnt)
+			this.CallOnSelectionChange();
+		})
+	}
 }
 
 ///////////////////////
-//we don't need to redirect the output for tex! it's crap anyway!
 //todo: forward / inverse seek
 UI.RegisterCodeEditorPersistentMember("m_latex_sync")
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	this.m_latex_sync=1;
 });
-Language.RegisterCompiler("tex",{
+Language.RegisterCompiler(["tex"],{
 	name:"pdftexify",
 	GetDesc:function(doc){
 		return {
@@ -555,11 +719,101 @@ Language.RegisterCompiler("tex",{
 			m_line:doc.GetLC(doc.sel1.ccnt)[0]+1,
 		}
 	},
+	m_regex:new RegExp('(.*?):([0-9]+): (.+)\r?\n'),
+	ParseOutput:function(sline){
+		var matches=sline.match(this.m_regex)
+		if(matches){
+			var name=matches[1]
+			var linea=parseInt(matches[2])
+			var message=matches[3]
+			var ccnts=this.SeekAllLinesBetween(linea-1,linea+1)
+			var ccnt0=ccnts[0]
+			var ccnt1=ccnts[1]
+			var err={
+				file_name:name,
+				color:this.color_tilde_compiler_error,
+				message:message,ccnt0:ccnt0,ccnt1:ccnt1
+			}
+			//another plugin for error overlay
+			return UI.CreateCompilerError(err)
+		}
+	},
 	make:function(doc){
-		UI.CallPMJS("make",this.GetDesc(doc))
+		UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
 	},
 	run:function(doc){
-		UI.CallPMJS("run",this.GetDesc(doc))
+		UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
+	},
+})
+
+///////////////////////
+UI.RegisterCodeEditorPersistentMember("m_cflags")
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.m_cflags={
+		build:"debug",
+	};
+	//coulddo: true cflags
+});
+Language.RegisterCompiler(["c","cpp","cxx","cc"],{
+	name:"cc",
+	GetDesc:function(doc){
+		var ret={
+			Platform_BUILD:[doc.m_cflags?doc.m_cflags.build:"debug"]
+			Platform_ARCH:[UI.Platform.ARCH],
+			c_files:[doc.m_file_name],
+		}
+		return ret
+	},
+	m_regex_cc:new RegExp('(.*?):([0-9]+):(([0-9]+):)? (("error"|"warning"): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*"fatal "?("error"|"warning")[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	ParseOutput:function(sline){
+		var matches=sline.match(this.m_regex_vc)
+		if(matches){
+			var name=matches[1]
+			var linea=parseInt(matches[2])
+			var message=matches[4]
+			var category=matches[3]
+			var ccnts=this.SeekAllLinesBetween(linea-1,linea+1)
+			var ccnt0=ccnts[0]
+			var ccnt1=ccnts[1]
+			var err={
+				file_name:name,
+				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				message:message,ccnt0:ccnt0,ccnt1:ccnt1
+			}
+			return UI.CreateCompilerError(err)
+		}
+		!?
+		matches=sline.match(this.m_regex_cc)
+		if(matches){
+			var name=matches[1]
+			var linea=parseInt(matches[2])
+			var message=matches[7]
+			var category=matches[5].toLowerCase()
+			var ccnt0,ccnt1
+			if(matches[3]){
+				var cola=parseInt(matches[3])
+				ccnt0=this.SeekLC(linea-1,cola-1)
+				ccnt1=ccnt0
+			}else{
+				var ccnts=this.SeekAllLinesBetween(linea-1,linea+1)
+				ccnt0=ccnts[0]
+				ccnt1=ccnts[1]
+			}
+			var err={
+				file_name:name,
+				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				message:message,ccnt0:ccnt0,ccnt1:ccnt1
+			}
+			return UI.CreateCompilerError(err)
+		}
+	},
+	make:function(doc){
+		UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
+	},
+	run:function(doc){
+		UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
 	},
 })
 
@@ -1966,6 +2220,7 @@ UI.RegisterEditorPlugin(function(){
 					}
 					renderer.m_tentative_editops=undefined
 					renderer.ResetTentativeOps()
+					this_outer.CallOnChange()
 				}}])
 			
 		}
