@@ -680,7 +680,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		for(var i=0;i<tokens.length;i++){
 			var s=tokens[i]
 			var lg=Duktape.__byte_length(s)
-			if(this.ed.GetText(ccnt+1-lg,lg)==s){
+			if(this.ed.GetText(side==0?ccnt:ccnt+1-lg,lg)==s){
 				return lg
 			}
 		}
@@ -688,7 +688,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	FindOuterBracket_SizeFriendly:function(ccnt,delta){
 		var ccnt_raw=this.FindOuterBracket(ccnt,delta)
-		return ccnt_raw+1-this.BracketSizeAt(ccnt_raw,0)
+		return delta<0?ccnt_raw:(ccnt_raw+1-this.BracketSizeAt(ccnt_raw,0))
 	},
 	FindOuterLevel:function(ccnt){
 		var ret=Math.max(this.FindOuterBracket_SizeFriendly(ccnt,-1),this.FindOuterIndentation(ccnt))
@@ -717,6 +717,14 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var bs=lang.m_rbracket_tokens
 		for(var i=0;i<bs.length;i++){
 			if(bs[i]==s){return 1;}
+		}
+		return 0;
+	},
+	IsRightBracketAt:function(ccnt){
+		var lang=this.plugin_language_desc
+		var bs=lang.m_rbracket_tokens
+		for(var i=0;i<bs.length;i++){
+			if(bs[i]==this.ed.GetText(ccnt,Duktape.__byte_length(bs[i]))){return 1;}
 		}
 		return 0;
 	},

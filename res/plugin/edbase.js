@@ -1939,28 +1939,30 @@ UI.RegisterEditorPlugin(function(){
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				if(sel[0]==sel[1]){
-					//todo: this is totally shit
 					//bracket: end, ctrl+p
 					//do bracket if possible
 					var ccnt=sel[0]
 					var line=this.GetLC(ccnt)[0]
 					var ccnt_l0=this.SeekLC(line,0)
-					var ccnt_outer0=this.FindOuterBracket(ccnt,-1)
+					var ccnt_outer0=this.FindOuterBracket_SizeFriendly(ccnt,-1)
 					var range=undefined
 					if(ccnt_outer0>=ccnt_l0){
 						//found bracket on the line
-						var ccnt_outer1=this.FindOuterBracket(ccnt,1)
+						var ccnt_outer1=this.FindOuterBracket_SizeFriendly(ccnt,1)
 						if(ccnt_outer1>ccnt_outer0){
-							range=[ccnt_outer0,ccnt_outer1]
+							range=[ccnt_outer0+this.BracketSizeAt(ccnt_outer0,0),ccnt_outer1-this.BracketSizeAt(ccnt_outer1,1)]
 						}
 					}else{
 						var id_indent=ed.m_handler_registration["seeker_indentation"]
-						var my_level=this.GetIndentLevel(ccnt);
+						var my_level=this.GetIndentLevel(this.ed.MoveToBoundary(ccnt,1,"space"));
 						var ccnt_l1=this.SeekLC(line+1)
 						var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
 						if(ccnt_new>ccnt_l1){
 							ccnt_new=this.SeekLC(this.GetLC(ccnt_new)[0],0)-1
 							if(ccnt_new>ccnt_l1){
+								if(this.IsRightBracketAt(ccnt_new+1)){
+									ccnt_new++
+								}
 								range=[ccnt_l1,ccnt_new]
 							}
 						}
