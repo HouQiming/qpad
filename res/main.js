@@ -438,8 +438,8 @@ UI.Theme_CustomWidget=function(C){
 			border_width:0,
 			color:0xffffffff,
 			editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",24),
-				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
+				font:UI.Font("res/fonts/inconsolata.ttf",16,-100),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,100),
 				scroll_transition_dt:0.1,
 				bgcolor_selection:C_sel,
 				color:0xff000000,
@@ -709,6 +709,9 @@ UI.Application=function(id,attrs){
 			}});
 			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
 				app.document_area.SaveCurrent();
+			}});
+			menu_file.AddNormalItem({text:"Save a&ll",action:function(){
+				app.document_area.SaveAll();
 			}});
 			//todo: drag-loading
 			if(!UI.Platform.IS_MOBILE){

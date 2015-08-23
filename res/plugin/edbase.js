@@ -486,6 +486,14 @@ Language.RegisterCompiler=function(s_exts,obj){
 		ret.m_array.push(obj)
 		ret.m_hash[obj.name]=obj
 	}
+	if(!obj.make){
+		obj.make=function(doc,run_it){
+			UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this),
+				run_it?function(){
+					UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this),undefined)
+				}.bind(this):undefined)
+		};
+	}
 	return obj
 }
 
@@ -511,26 +519,27 @@ UI.RegisterEditorPlugin(function(){
 		var menu_run=UI.BigMenu("&Run")
 		var doc=this
 		menu_run.AddNormalItem({text:"&Compile",enable_hotkey:1,key:"F7",action:function(){
+			if(!UI.top.app.document_area.SaveAll()){return;}
 			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
 			UI.ClearCompilerErrors()
-			compiler.make(doc)
+			compiler.make(doc,0)
 		}})
 		menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+			if(!UI.top.app.document_area.SaveAll()){return;}
 			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
 			UI.ClearCompilerErrors()
-			compiler.make(doc)
-			compiler.run(doc)
+			compiler.make(doc,1)
 		}})
 	})
 }).prototype.name="Compilation";
 
-//IO.AsyncShell=function(cmdline){
-//	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-//		IO.Shell(["start"," ","/b"].concat(cmdline))
-//	}else{
-//		IO.Shell(cmdline.concat(["&"]))
-//	}
-//}
+IO.AsyncShell=function(cmdline){
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		IO.Shell(["start"," ","/b"].concat(cmdline))
+	}else{
+		IO.Shell(cmdline.concat(["&"]))
+	}
+}
 
 UI.WriteBuildOutput=function(fparse,s){
 	if(!UI.g_build_output_editor){
@@ -588,7 +597,10 @@ UI.WriteBuildOutput=function(fparse,s){
 		if(!(ccnt_next<ccnt_tot)){
 			if(!(obj.GetLC(ccnt_next)[0]>line)){break;}
 		}
-		var fclick_callback=fparse(obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
+		var fclick_callback=undefined
+		try{
+			fclick_callback=fparse(obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
+		}catch(err){}
 		if(fclick_callback){
 			//print("*** ",fclick_callback,' ',obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
 			UI.got_any_error_this_run=1
@@ -627,14 +639,21 @@ W.SXS_BuildOutput=function(id,attrs){
 	return obj
 }
 
-UI.CallPMJS=function(cmd,desc, doc,fparse){
+UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 	//redirect and parse the output
 	desc.delete_json_file=1
+	if(cmd=="run"){
+		desc.pause_after_run=1
+	}
 	var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
 	IO.CreateFile(fn_json,JSON.stringify(desc))
 	//IO.AsyncShell(["pmjs",cmd,fn_json])
 	UI.got_any_error_this_run=0
-	var proc=IO.RunToolRedirected(["pmjs",cmd,fn_json],UI.GetPathFromFilename(doc.m_file_name),1)
+	if(cmd=="run"){
+		IO.RunProcess(["pmjs",cmd,fn_json],UI.GetPathFromFilename(doc.m_file_name),1)
+		return
+	}
+	var proc=IO.RunToolRedirected(["pmjs",cmd,fn_json],UI.GetPathFromFilename(doc.m_file_name),0)
 	if(proc){
 		var fpoll=function(){
 			var s=proc.Read(65536)
@@ -647,6 +666,16 @@ UI.CallPMJS=function(cmd,desc, doc,fparse){
 				var code=proc.GetExitCode()
 				if(code!=0&&!UI.got_any_error_this_run){
 					UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: build failed somehow\n")
+				}
+				if(cmd=="make"){
+					UI.WriteBuildOutput(function(){},code==0?"===== Build completed =====\n":"===== Build FAILED =====\n")
+				}else if(cmd=="run"){
+					UI.WriteBuildOutput(function(){},"===== Program terminated =====\n")
+				}
+				if(fcallback_completion){
+					fcallback_completion()
+				}else{
+					UI.WriteBuildOutput(function(){},"\n")
 				}
 			}
 		}
@@ -726,12 +755,12 @@ UI.ClearCompilerErrors=function(){
 	//keep the locators for seeking but remove the highlights
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj=UI.g_all_document_windows[i].doc
-		if(obj&&obj.m_error_overlays){
-			for(var j=0;j<obj.m_error_overlays.length;j++){
-				var err_j=obj.m_error_overlays[j]
+		if(obj&&obj.doc&&obj.doc.m_error_overlays){
+			for(var j=0;j<obj.doc.m_error_overlays.length;j++){
+				var err_j=obj.doc.m_error_overlays[j]
 				if(err_j.highlight){err_j.highlight.discard()}
 			}
-			obj.m_error_overlays=[]
+			obj.doc.m_error_overlays=[]
 		}
 	}
 }
@@ -789,12 +818,6 @@ Language.RegisterCompiler(["tex"],{
 			//another plugin for error overlay
 			return UI.CreateCompilerError(err)
 		}
-	},
-	make:function(doc){
-		UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
-	},
-	run:function(doc){
-		UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
 	},
 })
 
@@ -854,12 +877,6 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 			}
 			return UI.CreateCompilerError(err)
 		}
-	},
-	make:function(doc){
-		UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
-	},
-	run:function(doc){
-		UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this))
 	},
 })
 

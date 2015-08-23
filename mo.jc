@@ -264,6 +264,16 @@ auto genString(string s0)
 			proto.ExportMethod(this,"IsRunning",JS_IsRunning)
 			proto.ExportMethod(this,"Terminate",JS_Terminate)
 		}
+	jsio["RunProcess"]=function(JSContext JS){
+		auto shell_args=JS.Param(0).as(JSObject)
+		auto spath=JS.Param(1).or(".")
+		auto show=JS.Param(2).or(1)
+		n=shell_args.length()
+		pproc=System.Processes.Run([shell_args[i].as(string) for i=0:n-1],spath,show,"new_job,new_console")
+		if !pproc:
+			return 0
+		return JS.Return(new CProcessWrapper(){proc:pproc})
+	}
 	jsio["RunToolRedirected"]=function(JSContext JS){
 		auto shell_args=JS.Param(0).as(JSObject)
 		auto spath=JS.Param(1).or(".")

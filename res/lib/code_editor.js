@@ -2307,14 +2307,14 @@ W.CodeEditor=function(id,attrs){
 	}
 	if(sxs_visualizer){
 		if(w_obj_area>=h_obj_area){
-			w_obj_area>>=1
+			w_obj_area*=0.618
 			x_sxs_area=obj.x+w_obj_area
 			y_sxs_area=obj.y
 			w_sxs_area=obj.w-w_obj_area
 			h_sxs_area=obj.h
 			sxs_area_dim='x'
 		}else{
-			h_obj_area>>=1
+			h_obj_area*=0.618
 			x_sxs_area=obj.x
 			y_sxs_area=obj.y+h_obj_area
 			w_sxs_area=obj.w
