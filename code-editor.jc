@@ -168,6 +168,9 @@ struct TOverlayItem
 	string s_text,s_type
 	int sel0,sel1
 	i64 w_strikeout
+struct TTildeItem
+	i64 ccnt0,ccnt1
+	int color
 class CLayouter_programmer
 	FLAG_HAS_TAB=1
 	FLAG_HAS_ENTER=2
@@ -187,6 +190,7 @@ class CLayouter_programmer
 	__pointer m_spell_checker
 	string m_spell_checker_name
 	long2[] m_current_frame_spell_errors
+	TTildeItem[] m_current_frame_tildes
 	int m_temporarily_disable_spell_check
 	//////////////
 	JSObject m_style
@@ -427,6 +431,7 @@ class CLayouter_programmer
 		m_cached_color_virtual_hyphen=int(obj["color_hyphen"].or(u32(m_cached_color_virtual_hyphen)))
 		if m_spell_checker:
 			m_current_frame_spell_errors=new long2[]
+		m_current_frame_tildes=new TTildeItem[]
 		m_w_ellipsis=float2fixed(obj["w_ellipsis"].as(float))
 		m_ellipsis_items.clear()
 	}
@@ -803,20 +808,35 @@ class CLayouter_programmer
 	}
 	EndRender=function(JSObject obj,CEditableText ed, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		if m_current_frame_spell_errors:
-			//tilde for spell checks
+			C_spell_error=obj["color_tilde_spell_error"].as(int)
 			m_current_frame_spell_errors.Sort()
-			spell_error_ccnts=m_current_frame_spell_errors[0:].ConvertToAsBinary(i64)
-			xys=ed.GetXYEnMasse(spell_error_ccnts)
+			foreach se in m_current_frame_spell_errors
+				m_current_frame_tildes.push(TTildeItem(){ccnt0:se.x,ccnt1:se.y,color:C_spell_error})
+		if m_current_frame_tildes.n:
+			//tilde for spell checks / build errors
+			spell_error_ccnts=new i64[m_current_frame_tildes.n*2]
+			for i=0:m_current_frame_tildes.n-1
+				spell_error_ccnts[i*2+0]=m_current_frame_tildes[i].ccnt0
+				spell_error_ccnts[i*2+1]=m_current_frame_tildes[i].ccnt1
+			spell_error_ccnts_idx=[i for i=0:spell_error_ccnts.n-1]
+			spell_error_ccnts_idx.Sortby(inline(a){return spell_error_ccnts[a]})
+			spell_error_ccnts=[spell_error_ccnts[id] foreach id in spell_error_ccnts_idx]
+			xys_sorted=ed.GetXYEnMasse(spell_error_ccnts)
+			xys=new i64[xys_sorted.n]
+			foreach id,I in spell_error_ccnts_idx
+				xys[id*2+0]=xys_sorted[I*2+0]
+				xys[id*2+1]=xys_sorted[I*2+1]
 			dy_baseline=(g_renderer.GetFontBaseline(m_font)+0.04f*m_font.h)*scale
-			C_tilde=obj["color_tilde_spell_error"].as(int)
-			fnt_tilde=obj["font_tilde"].as(TFont)
-			fnt_tilde.h=m_font.h*scale
-			fnt_tilde.SmartEmbolden(C_tilde)
+			fnt_tilde0=obj["font_tilde"].as(TFont)
+			fnt_tilde0.h=m_font.h*scale
 			inline xyToFloat(x,y)
 				return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 			wf=fixed2float(clip_w)
 			hcf=g_renderer.GetCharacterHeight(m_font)*scale
 			for i=0:4:xys.n-4
+				C_tilde=m_current_frame_tildes[i>>2].color
+				fnt_tilde=fnt_tilde0
+				fnt_tilde.SmartEmbolden(C_tilde)
 				xy0=xyToFloat(xys[i+0],xys[i+1])
 				xy1=xyToFloat(xys[i+2],xys[i+3])
 				if xy0.y==xy1.y:
@@ -862,8 +882,6 @@ class CLayouter_programmer
 			s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
 			wrap_width=m_wrap_width_in_fp
 			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
-			//if x>=m_caret_overlay.x&&x<m_caret_overlay.y:
-			//	x+=m_caret_overlay.z
 			foreach ch in Utf8Chars(s_embolden)
 				iy=x/wrap_width
 				ix=x-iy*wrap_width
@@ -878,6 +896,8 @@ class CLayouter_programmer
 				if m_enable_advanced_wrapping:
 					x+=charKerning(ch_prev,ch)
 					ch_prev=ch
+		else if mode==HL_DISPLAY_MODE_TILDE:
+			m_current_frame_tildes.push(TTildeItem(){ccnt0:ccnt0,ccnt1:ccnt1,color:hl.color})
 	}
 	GetCharacterHeightAt=function(i64 ccnt_base,i64[] a,i64[] pp,string s,iptr ofs){
 		return charHeight()

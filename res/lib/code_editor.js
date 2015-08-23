@@ -875,6 +875,7 @@ W.CodeEditorWidget_prototype={
 		doc.OnLoad=obj.OnLoad.bind(obj)
 		doc.StartLoading(obj.file_name)
 		doc.HookedEdit=function(ops){
+			if(obj.read_only){return;}
 			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context){
 				var match_id=obj.BisectMatches(ops[0])
 				if(match_id){
@@ -1660,7 +1661,7 @@ W.CodeEditorWidget_prototype={
 	},
 	DismissNotificationsByRegexp:function(re){
 		if(this.m_notifications){
-			this.m_notifications=this.m_notifications.filter(function(a){return a.id.match(re)})
+			this.m_notifications=this.m_notifications.filter(function(a){return !a.id.match(re)})
 		}
 	},
 	////////////////////////////////
@@ -1983,7 +1984,7 @@ var FileItem_prototype={
 			var obj=this.owner
 			var fbar=obj.find_bar_edit
 			var ed=fbar.ed
-			ed.Edit([0,ed.GetTextSize(),this.name+'/'])
+			ed.HookedEdit([0,ed.GetTextSize(),this.name+'/'])
 			fbar.sel1.ccnt=ed.GetTextSize()
 			fbar.sel0.ccnt=fbar.sel1.ccnt
 			fbar.CallOnChange()
@@ -2226,7 +2227,7 @@ W.SXS_NewPage=function(id,attrs){
 			OnDemand:W.FileItemOnDemand,
 			OnChange:function(value){
 				W.ListView_prototype.OnChange.call(this,value)
-				this.OpenPreview(value)
+				this.OpenPreview(value,"explicit")
 			},
 			OpenPreview:function(value,is_explicit){
 				var editor_widget=obj.owner
@@ -3091,7 +3092,7 @@ W.CodeEditor=function(id,attrs){
 				},W.CodeEditor_prototype);
 				if(!previous_edit){
 					if(UI.m_ui_metadata.find_state.m_current_needle){
-						obj.find_bar_edit.ed.Edit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
+						obj.find_bar_edit.ed.HookedEdit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
 						obj.find_bar_edit.sel0.ccnt=0
 						obj.find_bar_edit.sel1.ccnt=obj.find_bar_edit.ed.GetTextSize()
 						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
@@ -3142,6 +3143,7 @@ W.CodeEditor=function(id,attrs){
 						doc.Paste()
 					}})
 				}
+				menu_edit.p_paste=menu_edit.$.length
 				///////////////////////
 				var acctx=obj.m_ac_context
 				if(acctx&&acctx.m_n_cands){
@@ -3377,7 +3379,7 @@ UI.NewCodeEditorTab=function(fname0){
 				if(this.opening_callbacks.length){
 					var cbs=this.opening_callbacks
 					for(var i=0;i<cbs.length;i++){
-						cbs[i].call(body);
+						cbs[i].call(body.doc);
 					}
 					this.opening_callbacks=[]
 				}
@@ -3444,7 +3446,7 @@ UI.OpenEditorWindow=function(fname,fcallback){
 		obj_tab=UI.NewCodeEditorTab(fname)
 	}
 	if(obj_tab.doc){
-		fcallback.call(obj_tab.doc)
+		fcallback.call(obj_tab.doc.doc)
 	}else{
 		obj_tab.opening_callbacks.push(fcallback)
 	}

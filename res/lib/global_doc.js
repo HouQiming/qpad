@@ -490,7 +490,7 @@ var freadOnTimer=function(){
 };
 IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){
 	//segment by line, then test regexp
-	var proc=IO.RunToolRedirected(IO.ShellCmd(args),work_dir,0)
+	var proc=IO.RunToolRedirected(args,work_dir,0)
 	if(!proc){
 		return 0;
 	}

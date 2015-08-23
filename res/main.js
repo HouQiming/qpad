@@ -400,7 +400,7 @@ UI.Theme_CustomWidget=function(C){
 				},
 			},
 			///////
-			w_notification:240,
+			w_notification:340,
 			dx_shake_notification:-300,
 			///////
 			sxs_shadow_size:6,
@@ -415,7 +415,7 @@ UI.Theme_CustomWidget=function(C){
 			transition_dt:0.1,
 			padding:6,
 			w_icon:24,
-			w_text:200,
+			w_text:300,
 			shadow_size:8,
 			shadow_color:0xff000000,
 			color:0xffffffff,
@@ -434,11 +434,25 @@ UI.Theme_CustomWidget=function(C){
 			x_min_shake:0.5,
 			dx_min_shake:0.5,
 		},
-		build_output:{
+		sxs_build_output:{
+			border_width:0,
+			color:0xffffffff,
 			editor_style:{
 				font:UI.Font("res/fonts/inconsolata.ttf",24),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",24,200),
+				scroll_transition_dt:0.1,
+				bgcolor_selection:C_sel,
 				color:0xff000000,
+				state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
 				read_only:1,
+				$:{
+					focus:{
+						bgcolor_selection:C_sel,
+					},
+					blur:{
+						bgcolor_selection:0xffcccccc,
+					},
+				}
 			},
 		},
 		sxs_new_page:{

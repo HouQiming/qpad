@@ -511,10 +511,12 @@ UI.RegisterEditorPlugin(function(){
 		var menu_run=UI.BigMenu("&Run")
 		var doc=this
 		menu_run.AddNormalItem({text:"&Compile",enable_hotkey:1,key:"F7",action:function(){
+			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
 			UI.ClearCompilerErrors()
 			compiler.make(doc)
 		}})
 		menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
 			UI.ClearCompilerErrors()
 			compiler.make(doc)
 			compiler.run(doc)
@@ -532,14 +534,16 @@ UI.RegisterEditorPlugin(function(){
 
 UI.WriteBuildOutput=function(fparse,s){
 	if(!UI.g_build_output_editor){
-		var obj=Object.create(W.Edit_prototype)
-		var style=UI.default_styles.build_output.editor_style
+		var obj=Object.create(W.CodeEditor_prototype)
+		var style=UI.default_styles.sxs_build_output.editor_style
+		obj.style=style
 		for(var attr in style){
 			obj[attr]=style[attr]
 		}
+		obj.w=9999;obj.h=9999//for initial scrolling
 		obj.m_clickable_ranges=[]
 		obj.plugins=[function(){
-			this.AddEventHandler('selectionChange',function(){
+			var fselchange=function(do_onfocus){
 				var sel=this.GetSelection()
 				var l=0;
 				var r=this.m_clickable_ranges.length-1;
@@ -554,19 +558,26 @@ UI.WriteBuildOutput=function(fparse,s){
 				if(r>=0&&this.m_clickable_ranges[r].loc0.ccnt<=sel[0]&&sel[1]<=this.m_clickable_ranges[r].loc1.ccnt){
 					//yes, it's clickable
 					var crange=this.m_clickable_ranges[r]
-					crange.f.call(this,crange.loc0.ccnt,crange.loc1.ccnt)
+					crange.f.call(this,do_onfocus,crange.loc0.ccnt,crange.loc1.ccnt)
+					return 1
 				}
+				return 0
+			};
+			this.AddEventHandler('selectionChange',function(){fselchange.call(this,0);})
+			this.AddEventHandler('doubleClick',function(){
+				fselchange.call(this,1);
 			})
 		}];
+		obj.language=Language.GetDefinitionByName("Plain text")
 		obj.Init()
 		UI.g_build_output_editor=obj
 	}
 	var obj=UI.g_build_output_editor;
 	var ccnt=obj.ed.GetTextSize()
 	var sel=obj.GetSelection()
-	obj.ed.Edit([ccnt,0,s])
+	obj.ed.Edit([ccnt,0,s])//hookededit discards: it's read_only
 	if(sel[1]==ccnt&&sel[0]==ccnt){
-		obj.ed.SetSelection(ccnt,ccnt)
+		obj.SetSelection(ccnt,ccnt)
 	}
 	//do the parsing
 	var line=obj.GetLC(ccnt)[0]
@@ -579,22 +590,39 @@ UI.WriteBuildOutput=function(fparse,s){
 		}
 		var fclick_callback=fparse(obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
 		if(fclick_callback){
-			obj.m_clickable_ranges.push({loc0:ed.CreateLocator(ccnt_lh,1),loc1:ed.CreateLocator(ccnt_next,-1),f:fclick_callback})
+			//print("*** ",fclick_callback,' ',obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
+			UI.got_any_error_this_run=1
+			var loc0=obj.ed.CreateLocator(ccnt_lh,1)
+			var loc1=obj.ed.CreateLocator(ccnt_next,-1)
+			var hlobj=obj.ed.CreateHighlight(loc0,loc1,-1)
+			hlobj.color=obj.color;
+			hlobj.display_mode=UI.HL_DISPLAY_MODE_EMBOLDEN
+			hlobj.invertible=0;
+			obj.m_clickable_ranges.push({
+				loc0:loc0,
+				loc1:loc1,
+				hlobj:hlobj,
+				f:fclick_callback})
 		}
 		ccnt_lh=ccnt_next;
 		line++;
 	}
+	UI.Refresh()
 }
 
 W.SXS_BuildOutput=function(id,attrs){
-	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
+	var obj=UI.Keep(id,attrs);
+	UI.StdStyling(id,obj,attrs, "sxs_build_output",(obj.doc&&UI.HasFocus(obj.doc))?"focus":"blur");
+	UI.StdAnchoring(id,obj);
 	UI.Begin(obj)
 		UI.RoundRect(obj)
-		obj.doc=UI.g_build_output_editor;
-		W.Edit("doc",{
-			'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
-			'x':0,'y':0,
-		})
+		if(UI.g_build_output_editor){
+			obj.doc=UI.g_build_output_editor;
+			W.Edit("doc",{
+				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
+				'x':4,'y':4,
+			})
+		}
 	UI.End()
 	return obj
 }
@@ -605,6 +633,7 @@ UI.CallPMJS=function(cmd,desc, doc,fparse){
 	var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
 	IO.CreateFile(fn_json,JSON.stringify(desc))
 	//IO.AsyncShell(["pmjs",cmd,fn_json])
+	UI.got_any_error_this_run=0
 	var proc=IO.RunToolRedirected(["pmjs",cmd,fn_json],UI.GetPathFromFilename(doc.m_file_name),1)
 	if(proc){
 		var fpoll=function(){
@@ -613,10 +642,10 @@ UI.CallPMJS=function(cmd,desc, doc,fparse){
 				UI.WriteBuildOutput(fparse,s)
 				UI.NextTick(fpoll)
 			}else if(proc.IsRunning()){
-				UI.setTimeOut(fpoll,100)
+				UI.setTimeout(fpoll,100)
 			}else{
 				var code=proc.GetExitCode()
-				if(code!=0){
+				if(code!=0&&!UI.got_any_error_this_run){
 					UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: build failed somehow\n")
 				}
 			}
@@ -632,6 +661,26 @@ UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.m_error_overlays=[]
 	this.PushError=function(err){
+		var go_prev_line=0
+		if(!err.line1){
+			err.line1=err.line0
+		}
+		if(!err.col0){
+			err.col0=0;
+			err.col1=0;
+			if(err.line0==err.line1){
+				err.line1++
+				go_prev_line=1
+			}
+		}else if(!err.col1){
+			err.col1=err.col0;
+		}
+		if(err.col0==err.col1&&err.line0==err.line1){
+			err.col1++;
+		}
+		err.ccnt0=this.SeekLC(err.line0,err.col0)
+		err.ccnt1=this.SeekLC(err.line1,err.col1)
+		if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
 		var hl_items=this.CreateTransientHighlight({
 			'depth':1,
 			'color':err.color||this.color_tilde_compiler_error,
@@ -649,20 +698,23 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('menu',function(){
 		var ed=this.ed;
 		var sel=this.GetSelection()
+		this.owner.DismissNotificationsByRegexp(g_re_errors)
 		if(sel[0]==sel[1]){
 			var error_overlays=this.m_error_overlays
-			var ccnt=sel[0]
-			this.DismissNotificationsByRegexp(g_re_errors)
-			for(var i=0;i<error_overlays.length;i++){
-				var err=error_overlays[i]
-				if(ccnt>=err.ccnt0.ccnt&&ccnt<=err.ccnt1.ccnt){
-					this.CreateNotification({
-						id:"error_"+err.id.toString(),icon:'警',
-						text:err.message,
-						icon_color:err.color,
-						text_color:err.color,
-						color:UI.lerp_rgba(err.color,0xffffffff,0.9),
-					})
+			if(error_overlays&&error_overlays.length){
+				var ccnt=sel[0]
+				for(var i=0;i<error_overlays.length;i++){
+					var err=error_overlays[i]
+					if(ccnt>=err.ccnt0.ccnt&&ccnt<=err.ccnt1.ccnt){
+						var color=(err.color||this.color_tilde_compiler_error)
+						this.owner.CreateNotification({
+							id:"error_"+err.id.toString(),icon:'警',
+							text:err.message,
+							icon_color:color,
+							//text_color:color,
+							color:UI.lerp_rgba(color,0xffffffff,0.95),
+						},"quiet")
+					}
 				}
 			}
 		}
@@ -690,11 +742,14 @@ UI.CreateCompilerError=function(err){
 			this.PushError(err)
 		}
 	})
-	return function(){
+	return function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
 		if(!err.is_ready){return;}
 		UI.OpenEditorWindow(err.file_name,function(){
 			this.SetSelection(err.ccnt0.ccnt,err.ccnt1.ccnt)
 			this.CallOnSelectionChange();
+			if(do_onfocus){
+				UI.SetFocus(this)
+			}
 		})
 	}
 }
@@ -726,13 +781,10 @@ Language.RegisterCompiler(["tex"],{
 			var name=matches[1]
 			var linea=parseInt(matches[2])
 			var message=matches[3]
-			var ccnts=this.SeekAllLinesBetween(linea-1,linea+1)
-			var ccnt0=ccnts[0]
-			var ccnt1=ccnts[1]
 			var err={
 				file_name:name,
 				color:this.color_tilde_compiler_error,
-				message:message,ccnt0:ccnt0,ccnt1:ccnt1
+				message:message,line0:linea-1,
 			}
 			//another plugin for error overlay
 			return UI.CreateCompilerError(err)
@@ -759,52 +811,46 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 	name:"cc",
 	GetDesc:function(doc){
 		var ret={
-			Platform_BUILD:[doc.m_cflags?doc.m_cflags.build:"debug"]
+			Platform_BUILD:[doc.m_cflags?doc.m_cflags.build:"debug"],
 			Platform_ARCH:[UI.Platform.ARCH],
 			c_files:[doc.m_file_name],
+			h_files:[],
+			input_files:[doc.m_file_name],
 		}
 		return ret
 	},
-	m_regex_cc:new RegExp('(.*?):([0-9]+):(([0-9]+):)? (("error"|"warning"): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*"fatal "?("error"|"warning")[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	m_regex_cc:new RegExp('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
 	ParseOutput:function(sline){
 		var matches=sline.match(this.m_regex_vc)
 		if(matches){
 			var name=matches[1]
 			var linea=parseInt(matches[2])
-			var message=matches[4]
-			var category=matches[3]
-			var ccnts=this.SeekAllLinesBetween(linea-1,linea+1)
-			var ccnt0=ccnts[0]
-			var ccnt1=ccnts[1]
+			var message=matches[7]
+			var category=matches[4]
 			var err={
 				file_name:name,
 				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
-				message:message,ccnt0:ccnt0,ccnt1:ccnt1
+				message:message,line0:linea-1,
 			}
 			return UI.CreateCompilerError(err)
 		}
-		!?
 		matches=sline.match(this.m_regex_cc)
 		if(matches){
 			var name=matches[1]
 			var linea=parseInt(matches[2])
-			var message=matches[7]
-			var category=matches[5].toLowerCase()
-			var ccnt0,ccnt1
-			if(matches[3]){
-				var cola=parseInt(matches[3])
-				ccnt0=this.SeekLC(linea-1,cola-1)
-				ccnt1=ccnt0
-			}else{
-				var ccnts=this.SeekAllLinesBetween(linea-1,linea+1)
-				ccnt0=ccnts[0]
-				ccnt1=ccnts[1]
-			}
+			var message=matches[8]
+			var category=(matches[5]?matches[5].toLowerCase():"error")
+			//for(var i=0;i<matches.length;i++){
+			//	print(i,matches[i])
+			//}
 			var err={
 				file_name:name,
 				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
-				message:message,ccnt0:ccnt0,ccnt1:ccnt1
+				message:message,line0:linea-1
+			}
+			if(matches[4]){
+				err.col0=parseInt(matches[4])-1
 			}
 			return UI.CreateCompilerError(err)
 		}
@@ -837,6 +883,9 @@ UI.RegisterEditorPlugin(function(){
 		if(UI.HasFocus(this)&&UI.SDL_HasClipboardText()){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
+			var menu_edit_children=menu_edit.$
+			var bk_children=menu_edit_children.slice(menu_edit.p_paste,menu_edit_children.length)
+			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste)
 			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"CTRL+SHIFT+V",action:function(){
 				var sel=this.GetSelection();
 				var ed=this.ed;
@@ -875,10 +924,10 @@ UI.RegisterEditorPlugin(function(){
 				this.SetCaretTo(ccnt_new)
 				UI.Refresh()
 			}.bind(this)})
+			menu_edit.$=menu_edit.$.concat(bk_children)
 		}
 	})
 }).prototype.name="Smart paste";
-
 
 //cut line / delete word
 UI.RegisterEditorPlugin(function(){
@@ -2068,7 +2117,7 @@ var ApplyAutoEdit=function(obj,cur_autoedit_ops,line_id){
 	if(ops_now.length>0){
 		var ccnt=ops_now[ops_now.length-3]
 		obj.SetSelection(ccnt,ccnt)
-		obj.ed.Edit(ops_now);
+		obj.HookedEdit(ops_now);
 		var s=ops_now[ops_now.length-1]
 		if(s){
 			var ccnt=obj.GetSelection()[0]
@@ -2210,7 +2259,7 @@ UI.RegisterEditorPlugin(function(){
 						var ccnt=cur_autoedit_ops[cur_autoedit_ops.length-3]
 						this_outer.SetSelection(ccnt,ccnt)
 					}
-					ed.Edit(cur_autoedit_ops);
+					this_outer.HookedEdit(cur_autoedit_ops);
 					if(cur_autoedit_ops.length>0){
 						var s=cur_autoedit_ops[cur_autoedit_ops.length-1]
 						if(s){
