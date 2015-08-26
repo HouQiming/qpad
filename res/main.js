@@ -278,6 +278,7 @@ UI.Theme_CustomWidget=function(C){
 				/////////////
 				color_completing_bracket:0x80999999,
 				color_auto_edit_range_highlight:0x4099ffff,
+				color_strikeout:0x80444444,
 				/////////////
 				bgcolor_ellipsis:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
 				w_ellipsis:32,
@@ -580,7 +581,11 @@ UI.Theme_CustomWidget=function(C){
 	}
 	s0.scroll_bar.middle_bar.color=0xff444444
 }
-UI.Theme_Minimalistic([0xffcc7733])
+if(UI.Platform.BUILD=="debug"){
+	UI.Theme_Minimalistic([0xff3377cc])
+}else{
+	UI.Theme_Minimalistic([0xffcc7733])
+}
 UI.icon_font=UI.Font(UI.icon_font_name,24);
 UI.icon_font_20=UI.Font(UI.icon_font_name,20);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])

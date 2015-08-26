@@ -641,19 +641,26 @@ W.SXS_BuildOutput=function(id,attrs){
 
 UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 	//redirect and parse the output
-	desc.delete_json_file=1
-	if(cmd=="run"){
-		desc.pause_after_run=1
+	var args
+	if(desc.is_jc_call){
+		//call jc
+		args=["jc"].concat(desc.args)
+	}else{
+		desc.delete_json_file=1
+		if(cmd=="run"){
+			desc.pause_after_run=1
+		}
+		var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
+		IO.CreateFile(fn_json,JSON.stringify(desc))
+		//IO.AsyncShell(["pmjs",cmd,fn_json])
+		UI.got_any_error_this_run=0
+		args=["pmjs",cmd,fn_json]
 	}
-	var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
-	IO.CreateFile(fn_json,JSON.stringify(desc))
-	//IO.AsyncShell(["pmjs",cmd,fn_json])
-	UI.got_any_error_this_run=0
 	if(cmd=="run"){
-		IO.RunProcess(["pmjs",cmd,fn_json],UI.GetPathFromFilename(doc.m_file_name),1)
+		IO.RunProcess(args,UI.GetPathFromFilename(doc.m_file_name),1)
 		return
 	}
-	var proc=IO.RunToolRedirected(["pmjs",cmd,fn_json],UI.GetPathFromFilename(doc.m_file_name),0)
+	var proc=IO.RunToolRedirected(args,UI.GetPathFromFilename(doc.m_file_name),0)
 	if(proc){
 		var fpoll=function(){
 			var s=proc.Read(65536)
@@ -681,7 +688,7 @@ UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 		}
 		UI.NextTick(fpoll)
 	}else{
-		UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: unable to invoke pmjs\n")
+		UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: unable to invoke the compiler\n")
 	}
 }
 
@@ -827,6 +834,7 @@ UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	this.m_cflags={
 		build:"debug",
+		arch:UI.Platform.ARCH,
 	};
 	//coulddo: true cflags
 });
@@ -834,8 +842,8 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 	name:"cc",
 	GetDesc:function(doc){
 		var ret={
-			Platform_BUILD:[doc.m_cflags?doc.m_cflags.build:"debug"],
-			Platform_ARCH:[UI.Platform.ARCH],
+			Platform_BUILD:[(doc.m_cflags?doc.m_cflags.build:undefined)||"debug"],
+			Platform_ARCH:[(doc.m_cflags?doc.m_cflags.arch:undefined)||UI.Platform.ARCH],
 			c_files:[doc.m_file_name],
 			h_files:[],
 			input_files:[doc.m_file_name],
@@ -878,6 +886,62 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 			return UI.CreateCompilerError(err)
 		}
 	},
+})
+
+/////////////////////////////////////////////
+Language.RegisterCompiler(["jc"],{
+	name:"jacy",
+	m_regex_cc:new RegExp('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	ParseOutput:function(sline){
+		var matches=sline.match(this.m_regex_vc)
+		if(matches){
+			var name=matches[1]
+			var linea=parseInt(matches[2])
+			var message=matches[7]
+			var category=matches[4]
+			var err={
+				file_name:name,
+				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				message:message,line0:linea-1,
+			}
+			return UI.CreateCompilerError(err)
+		}
+		matches=sline.match(this.m_regex_cc)
+		if(matches){
+			var name=matches[1]
+			var linea=parseInt(matches[2])
+			var message=matches[8]
+			var category=(matches[5]?matches[5].toLowerCase():"error")
+			//for(var i=0;i<matches.length;i++){
+			//	print(i,matches[i])
+			//}
+			var err={
+				file_name:name,
+				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				message:message,line0:linea-1
+			}
+			if(matches[4]){
+				err.col0=parseInt(matches[4])-1
+			}
+			return UI.CreateCompilerError(err)
+		}
+	},
+	make:function(doc,run_it){
+		var args=[]
+		if(doc.m_cflags){
+			args.push("--build="+doc.m_cflags.build)
+			args.push("--arch="+doc.m_cflags.arch)
+		}
+		args.push(doc.file_name)
+		if(run_it){
+			args.push("--run")
+		}
+		UI.CallPMJS("make",{
+			is_jc_call:1,
+			args:args,
+		}, doc,this.ParseOutput.bind(this),undefined)
+	}
 })
 
 /////////////////////////////////////////////
@@ -1217,6 +1281,9 @@ UI.RegisterEditorPlugin(function(){
 		var hc=this.GetCharacterHeightAtCaret();
 		var page_height=this.h;
 		this.scroll_y=Math.min(this.scroll_y+hc,ytot-page_height);
+		if(!(this.scroll_y>0)){
+			this.scroll_y=0;
+		}
 		UI.Refresh();
 		return 0
 	})
@@ -2091,7 +2158,7 @@ UI.RegisterEditorPlugin(function(){
 }).prototype.name="Unicode conversion";
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!="code_editor"||!this.owner){return;}
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();
@@ -2111,6 +2178,10 @@ UI.RegisterEditorPlugin(function(){
 				UI.Refresh()
 			}.bind(this)})
 		}
+	})
+	this.AddEventHandler('editorCreate',function(){
+		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
 	})
 }).prototype.name="Wrapping";
 

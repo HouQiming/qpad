@@ -191,6 +191,7 @@ class CLayouter_programmer
 	string m_spell_checker_name
 	long2[] m_current_frame_spell_errors
 	TTildeItem[] m_current_frame_tildes
+	float3[] m_current_frame_strikeouts
 	int m_temporarily_disable_spell_check
 	//////////////
 	JSObject m_style
@@ -432,6 +433,7 @@ class CLayouter_programmer
 		if m_spell_checker:
 			m_current_frame_spell_errors=new long2[]
 		m_current_frame_tildes=new TTildeItem[]
+		m_current_frame_strikeouts=new float3[]
 		m_w_ellipsis=float2fixed(obj["w_ellipsis"].as(float))
 		m_ellipsis_items.clear()
 	}
@@ -537,11 +539,11 @@ class CLayouter_programmer
 			y_s0=(x-oi.w_strikeout)/m_wrap_width_in_fp
 			y_s1=(x)/m_wrap_width_in_fp
 			for yi=y_s0:y_s1
-				fx0=max(yi*m_wrap_width_in_fp,y_s0)
-				fx1=min((yi+1)*m_wrap_width_in_fp-1,y_s1)
+				fx0=max(yi*m_wrap_width_in_fp,x-oi.w_strikeout)
+				fx1=min((yi+1)*m_wrap_width_in_fp-1,x)
 				auto prj_fx0=projectXY(fx0)
 				auto prj_fx1=projectXY(fx1)
-				g_renderer.DrawRectangle(prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
+				m_current_frame_strikeouts.push(float3(prj_fx0.x,prj_fx0.y,prj_fx1.x-prj_fx0.x))
 		//selection - pre-draw the highlight
 		if x_sel0<x_sel1:
 			g_renderer.DrawRectangle(prj_x.x+float(x_sel0)*scale,prj_x.y,float((x_sel1-x_sel0)*scale),g_renderer.GetCharacterHeight(fnt_scaled), m_bgcolor_selection)
@@ -866,6 +868,15 @@ class CLayouter_programmer
 				js_callback=obj["DrawEllipsis"].as(JSObject)
 				foreach ei in m_ellipsis_items
 					js_callback.CallAsMethod(int,obj,ei.x,ei.y,ei.scale,ei.color)
+		//draw strikeouts
+		if m_current_frame_strikeouts.n:
+			C_strikeout=obj["color_strikeout"].as(int)
+			fnt_scaled=m_font
+			fnt_scaled.h*=scale
+			hc=g_renderer.GetCharacterHeight(fnt_scaled)
+			h_strikeout=hc*0.1f
+			foreach job in m_current_frame_strikeouts
+				g_renderer.DrawRectangle(job.x,job.y+(hc-h_strikeout)*0.5f,job.z,h_strikeout,C_strikeout)
 	}
 	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		hid=ed.m_handler_registration["renderer"].as(int)
@@ -2279,6 +2290,7 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 			for(line_i=0;;line_i+=delta_line)
 				nl++
 				if nl>AUTO_EDIT_MAX_NLINES:break
+				if side<0&&nl>1:break//disable merge-above for now
 				if side<0:
 					if pl_middle-line_i<0:
 						nl--

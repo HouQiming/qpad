@@ -1992,7 +1992,7 @@ var FileItem_prototype={
 			var obj=this.owner
 			var fbar=obj.find_bar_edit
 			var ed=fbar.ed
-			ed.HookedEdit([0,ed.GetTextSize(),this.name+'/'])
+			fbar.HookedEdit([0,ed.GetTextSize(),this.name+'/'])
 			fbar.sel1.ccnt=ed.GetTextSize()
 			fbar.sel0.ccnt=fbar.sel1.ccnt
 			fbar.CallOnChange()
@@ -3100,7 +3100,7 @@ W.CodeEditor=function(id,attrs){
 				},W.CodeEditor_prototype);
 				if(!previous_edit){
 					if(UI.m_ui_metadata.find_state.m_current_needle){
-						obj.find_bar_edit.ed.HookedEdit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
+						obj.find_bar_edit.HookedEdit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
 						obj.find_bar_edit.sel0.ccnt=0
 						obj.find_bar_edit.sel1.ccnt=obj.find_bar_edit.ed.GetTextSize()
 						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
@@ -3433,7 +3433,7 @@ UI.NewCodeEditorTab=function(fname0){
 			if(this.doc){this.doc.SaveMetaData();}
 		},
 		property_windows:[],
-		color_theme:[0xffb4771f],
+		color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
 };
 
