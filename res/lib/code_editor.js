@@ -930,6 +930,10 @@ W.CodeEditorWidget_prototype={
 			obj.m_ac_context=undefined
 			doc.m_user_just_typed_char=0
 			obj.DestroyReplacingContext();
+			obj.hide_sxs_visualizer=!obj.hide_sxs_visualizer;
+			if(!obj.m_sxs_visualizer){
+				obj.hide_sxs_visualizer=0;
+			}
 			UI.Refresh()
 			return 1
 		})
@@ -2313,7 +2317,7 @@ W.CodeEditor=function(id,attrs){
 	if(obj.m_is_brand_new){
 		sxs_visualizer=W.SXS_NewPage
 	}
-	if(sxs_visualizer){
+	if(sxs_visualizer&&!obj.hide_sxs_visualizer){
 		if(w_obj_area>=h_obj_area){
 			w_obj_area*=0.618
 			x_sxs_area=obj.x+w_obj_area
@@ -2858,6 +2862,7 @@ W.CodeEditor=function(id,attrs){
 								}
 								doc.sel0.ccnt=ccnt0+lg2
 								doc.sel1.ccnt=ccnt0+lg2
+								//obj.m_ac_context=undefined
 								UI.Refresh()
 							},
 							IDFromX:function(x){
@@ -2879,10 +2884,11 @@ W.CodeEditor=function(id,attrs){
 							},
 						}
 						obj.m_ac_context=acctx
-						//UI.Refresh()
+						UI.InvalidateCurrentFrame()
+						UI.Refresh()
 					}
 					if(!obj.show_find_bar){
-						if(acctx.m_n_cands>0){
+						if(acctx.m_n_cands>1){
 							if(ac_was_actiavted){
 								acctx.Activate()
 							}
@@ -3342,7 +3348,7 @@ W.CodeEditor=function(id,attrs){
 				},items:obj.m_notifications})
 		}
 		///////////////////////////////////////
-		if(sxs_visualizer){
+		if(sxs_visualizer&&!obj.hide_sxs_visualizer){
 			//it could just get parent as owner
 			//separation shadow
 			var w_shadow=obj.sxs_shadow_size
@@ -3383,7 +3389,7 @@ UI.NewCodeEditorTab=function(fname0){
 			})
 			if(!this.doc){
 				this.doc=body;
-				body.m_is_brand_new=!fname0
+				body.m_is_brand_new=(!fname0&&this.auto_focus_file_search)
 				if(this.opening_callbacks.length){
 					var cbs=this.opening_callbacks
 					for(var i=0;i<cbs.length;i++){

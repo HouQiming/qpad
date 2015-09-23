@@ -756,7 +756,6 @@ UI.Application=function(id,attrs){
 			}});
 		UI.End();
 	UI.End();
-	//todo
 	if(!g_all_document_windows.length){
 		//UI.NewUIEditorTab()
 		//UI.NewCodeEditorTab()

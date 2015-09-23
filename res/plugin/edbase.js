@@ -475,6 +475,7 @@ Language.Register({
 
 /////////////////////////////////////////////
 var g_compiler_by_ext={}
+var CompilerDone=function(){UI.already_compiling=0}
 Language.RegisterCompiler=function(s_exts,obj){
 	for(var i=0;i<s_exts.length;i++){
 		var s_ext_lower=s_exts[i].toLowerCase()
@@ -488,10 +489,11 @@ Language.RegisterCompiler=function(s_exts,obj){
 	}
 	if(!obj.make){
 		obj.make=function(doc,run_it){
+			UI.already_compiling=1
 			UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this),
 				run_it?function(){
-					UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this),undefined)
-				}.bind(this):undefined)
+					UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this),CompilerDone)
+				}.bind(this):CompilerDone)
 		};
 	}
 	return obj
@@ -513,18 +515,35 @@ var GetCompiler=function(doc){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	UI.RegisterCodeEditorPersistentMember("m_compiler_name")
+	this.AddEventHandler('selectionChange',function(){
+		this.owner.DismissNotification("double_compilation")
+	})
 	this.AddEventHandler('menu',function(){
 		var compiler=GetCompiler(this)
 		if(!compiler){return 1}
 		var menu_run=UI.BigMenu("&Run")
 		var doc=this
 		menu_run.AddNormalItem({text:"&Compile",enable_hotkey:1,key:"F7",action:function(){
+			if(UI.already_compiling){
+				doc.owner.CreateNotification({
+					id:"double_compilation",icon:'警',
+					text:"Already compiling something else",
+				})
+				return;
+			}
 			if(!UI.top.app.document_area.SaveAll()){return;}
 			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
 			UI.ClearCompilerErrors()
 			compiler.make(doc,0)
 		}})
 		menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+			if(UI.already_compiling){
+				doc.owner.CreateNotification({
+					id:"double_compilation",icon:'警',
+					text:"Already compiling something else",
+				})
+				return;
+			}
 			if(!UI.top.app.document_area.SaveAll()){return;}
 			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
 			UI.ClearCompilerErrors()
@@ -576,6 +595,19 @@ UI.WriteBuildOutput=function(fparse,s){
 			this.AddEventHandler('doubleClick',function(){
 				fselchange.call(this,1);
 			})
+			this.AddEventHandler('ESC',function(){
+				var sztext=this.ed.GetTextSize()
+				this.ed.Edit([0,sztext,undefined])
+				this.SetSelection(0,0)
+				for(var i=0;i<this.m_clickable_ranges.length;i++){
+					var crange=this.m_clickable_ranges[i];
+					crange.loc0.discard()
+					crange.loc1.discard()
+					crange.hlobj.discard()
+				}
+				this.m_clickable_ranges=[]
+				UI.ClearCompilerErrors()
+			})
 		}];
 		obj.language=Language.GetDefinitionByName("Plain text")
 		obj.Init()
@@ -586,7 +618,8 @@ UI.WriteBuildOutput=function(fparse,s){
 	var sel=obj.GetSelection()
 	obj.ed.Edit([ccnt,0,s])//hookededit discards: it's read_only
 	if(sel[1]==ccnt&&sel[0]==ccnt){
-		obj.SetSelection(ccnt,ccnt)
+		var ccnt_end=obj.ed.GetTextSize()
+		obj.SetSelection(ccnt_end,ccnt_end)
 	}
 	//do the parsing
 	var line=obj.GetLC(ccnt)[0]
@@ -2243,7 +2276,7 @@ UI.RegisterEditorPlugin(function(){
 		//still-in-range test
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
-			if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt){
+			if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[1].ccnt){
 				return;
 			}
 		}
@@ -2359,7 +2392,11 @@ UI.RegisterEditorPlugin(function(){
 					}
 					renderer.m_tentative_editops=undefined
 					renderer.ResetTentativeOps()
+					var tmp=this_outer.m_autoedit_example_line_id;
+					this_outer.m_autoedit_example_line_id=-1;
 					this_outer.CallOnChange()
+					this_outer.m_autoedit_example_line_id=tmp;
+					InvalidateAutoEdit.call(this_outer)
 				}}])
 			
 		}
