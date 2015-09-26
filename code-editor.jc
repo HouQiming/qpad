@@ -2750,6 +2750,31 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				ret["m_example_lines"]=JS.New()
 				return JS.Return(ret)
 	}
+	JS_UI["ED_AutoEdit_Start"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		js_cclines=JS.Param(1).as(JSObject)
+		n=js_cclines["length"].as(iptr)
+		if n<=1L:return 0
+		cclines=new i64[(n-1)*2]
+		for i=0:n-2
+			cclines[i*2+0]=js_cclines[i].as(i64)
+			cclines[i*2+1]=js_cclines[i+1].as(i64)-1LL
+		ccnt_get=cclines[0]
+		lg_max=i64(min(AUTO_EDIT_MAX_TOTAL_LENGTH,ed.GetTextSize()-ccnt_get))
+		if cclines[cclines.n-1]-ccnt_get>lg_max:return 0
+		stext=ed.GetText(ccnt_get,lg_max)
+		ctx=AutoEdit_Precompute(stext,[iptr(ccnt-ccnt_get) foreach ccnt in cclines])
+		if !ctx:
+			return 0
+		else
+			ret=JS.New()
+			ret["m_cclines"]=cclines
+			ret["m_ctx"]=ctx
+			ret["m_owner"]=ed
+			ret["m_example_lines"]=JS.New()
+			return JS.Return(ret)
+	}
 	class CProgramWrapper
 		TProgramItem[] prg
 	JS_UI["ED_AutoEdit_SetExample"]=function(JSContext JS){

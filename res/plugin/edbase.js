@@ -756,8 +756,8 @@ UI.RegisterEditorPlugin(function(){
 			'display_mode':UI.HL_DISPLAY_MODE_TILDE,
 			'invertible':0,
 		});
-		hl_items[0].ccnt=err.ccnt0;err.ccnt0=hl_items[0];
-		hl_items[1].ccnt=err.ccnt1;err.ccnt1=hl_items[1];
+		hl_items[0].ccnt=err.ccnt0;err.ccnt0=hl_items[0];hl_items[0].undo_tracked=1
+		hl_items[1].ccnt=err.ccnt1;err.ccnt1=hl_items[1];hl_items[1].undo_tracked=1
 		err.highlight=hl_items[2];
 		err.id=this.m_error_overlays.length
 		err.is_ready=1
@@ -2269,15 +2269,45 @@ UI.RegisterEditorPlugin(function(){
 		renderer.m_tentative_editops=undefined
 		renderer.ResetTentativeOps()
 	}
+	var StartAutoEdit=function(cclines,mode){
+		var locs=[]
+		this.m_autoedit_locators=locs;
+		for(var i=0;i<cclines.length;i++){
+			//create locators
+			locs[i]=this.ed.CreateLocator(cclines[i],-1)
+		}
+		//render the stuff - gives some structural understanding
+		if(mode=="explicit"){
+			var hlobj=this.ed.CreateHighlight(
+				locs[0],
+				locs[locs.length-1],1)
+			hlobj.color=this.color_auto_edit_range_highlight;
+			hlobj.invertible=0;
+			this.m_autoedit_range_highlight=hlobj;
+		}
+		this.m_autoedit_mode=mode
+	}
 	this.AddEventHandler('selectionChange',function(){
+		if(this.is_in_vsel){return;}
 		var ed=this.ed;
 		var ln=this.GetLC(this.GetSelection()[0])[0]
 		var ccnt_lh=this.SeekLC(ln,0)
 		//still-in-range test
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
-			if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[1].ccnt){
-				return;
+			if(this.m_autoedit_example_line_id>=0){
+				var line_id=this.m_autoedit_example_line_id;
+				if(ccnt_lh>=locs[line_id+0].ccnt&&ccnt_lh<locs[line_id+1].ccnt){
+					return;
+				}
+			}else if(this.m_autoedit_mode=="explicit"){
+				if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt){
+					return;
+				}
+			}else{
+				if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[1].ccnt){
+					return;
+				}
 			}
 		}
 		//could allow multi-exampling this
@@ -2285,20 +2315,7 @@ UI.RegisterEditorPlugin(function(){
 		var ctx=UI.ED_AutoEdit_Detect(ed,ccnt_lh)
 		this.m_autoedit_context=ctx
 		if(ctx){
-			var cclines=ctx.m_cclines
-			var locs=[]
-			this.m_autoedit_locators=locs;
-			for(var i=0;i<cclines.length;i++){
-				//create locators
-				locs[i]=ed.CreateLocator(cclines[i],-1)
-			}
-			//render the stuff - gives some structural understanding
-			var hlobj=ed.CreateHighlight(
-				locs[0],
-				locs[locs.length-1],1)
-			hlobj.color=this.color_auto_edit_range_highlight;
-			hlobj.invertible=0;
-			this.m_autoedit_range_highlight=hlobj;
+			StartAutoEdit.call(this,ctx.m_cclines,"auto")
 		}
 	})
 	this.AddEventHandler('beforeEdit',function(){
@@ -2312,7 +2329,7 @@ UI.RegisterEditorPlugin(function(){
 		var line_id=-1;
 		//the line(s) intersected by ops... multi-line edit should cancel it
 		for(var i=0;i<locs.length;i+=2){
-			if(locs[i+1].ccnt>sel[1]){
+			if(locs[i+1].ccnt>=sel[1]){
 				if(locs[i+0].ccnt<=sel[0]){
 					line_id=i
 					break
@@ -2401,4 +2418,92 @@ UI.RegisterEditorPlugin(function(){
 			
 		}
 	})
+	///////////////
+	var EnterVSel=(function(){
+		if(this.is_in_vsel){
+			//this.vsel_display_hl.color=this.bgcolor_selection;
+			return;
+		}
+		this.is_in_vsel=1
+		if(!this.vsel_sel0){
+			this.vsel_sel0=this.ed.CreateLocator(this.sel1.ccnt,1)
+			var hl_items=this.CreateTransientHighlight({
+				'depth':0,
+				'color':this.bgcolor_selection,
+				'invertible':1,
+			});
+			//this.vsel_display_loc0=hl_items[0];
+			//this.vsel_display_loc1=hl_items[1];
+			//this.vsel_display_hl=hl_items[2]
+		}
+		//this.vsel_display_hl.color=this.bgcolor_selection
+		this.vsel_sel0.ccnt=this.sel1.ccnt
+		if(this.sel0.ccnt!=this.sel1.ccnt){
+			this.sel0.ccnt=this.sel1.ccnt
+		}
+	}).bind(this)
+	var UpdateVSel=(function(){
+		var ccnt0=this.vsel_sel0.ccnt
+		var ccnt1=this.sel1.ccnt
+		if(ccnt0>ccnt1){
+			var tmp=ccnt0
+			ccnt0=ccnt1
+			ccnt1=tmp
+		}
+		var line0=this.GetLC(ccnt0)[0]
+		var line1=this.GetLC(ccnt1)[0]
+		//this.vsel_display_loc0.ccnt=this.SeekLC(line0,0)
+		//this.vsel_display_loc1.ccnt=this.SeekLC(line1+1,0)
+		var line_ccnts=this.SeekAllLinesBetween(line0,line1+2);
+		InvalidateAutoEdit.call(this)
+		var ctx=UI.ED_AutoEdit_Start(this.ed,line_ccnts)
+		this.m_autoedit_context=ctx
+		if(ctx){
+			StartAutoEdit.call(this,ctx.m_cclines,"explicit")
+		}
+	}).bind(this)
+	this.AddEventHandler('selectionChange',function(){
+		if(this.vsel_skip_sel_change){this.vsel_skip_sel_change=0;return 1;}
+		if(!this.is_in_vsel){return 1;}//return 1 for "don't intercept"
+		//leave vsel
+		this.is_in_vsel=0
+		//this.vsel_display_loc0.ccnt=0
+		//this.vsel_display_loc1.ccnt=0
+		return 1;
+	})
+	this.AddEventHandler('change',function(){
+		if(!this.is_in_vsel){return 1;}//return 1 for "don't intercept"
+		//leave vsel
+		this.is_in_vsel=0
+		//this.vsel_display_loc0.ccnt=0
+		//this.vsel_display_loc1.ccnt=0
+		return 1;
+	})
+	this.AddEventHandler('ALT+SHIFT+UP',function(){
+		EnterVSel();
+		var ed_caret=this.GetCaretXY();
+		var bk=this.x_updown;
+		this.MoveCursorToXY(this.x_updown,ed_caret.y-1.0);
+		this.x_updown=bk;
+		this.sel0.ccnt=this.sel1.ccnt
+		this.AutoScroll("show")
+		this.vsel_skip_sel_change=1
+		UpdateVSel();
+	})
+	this.AddEventHandler('ALT+SHIFT+DOWN',function(){
+		EnterVSel();
+		var hc=this.GetCharacterHeightAtCaret();
+		var ed_caret=this.GetCaretXY();
+		var bk=this.x_updown;
+		this.MoveCursorToXY(this.x_updown,ed_caret.y+hc);
+		this.x_updown=bk;
+		this.sel0.ccnt=this.sel1.ccnt
+		this.AutoScroll("show")
+		this.vsel_skip_sel_change=1
+		UpdateVSel();
+	})
 }).prototype.name="Auto-edit";
+
+//UI.RegisterEditorPlugin(function(){
+//	if(this.plugin_class!="code_editor"){return;}
+//}).prototype.name="Vertical selection";

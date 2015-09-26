@@ -73,6 +73,7 @@ W.TabbedDocument_prototype={
 	CloseTab:function(tabid,forced){
 		if(tabid==undefined){tabid=this.current_tab_id}
 		var tab=this.items[tabid]
+		if(!tab){return;}
 		if(tab.need_save&&!forced){
 			this.current_tab_id=tabid
 			//dialog box
