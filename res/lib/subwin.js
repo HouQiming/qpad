@@ -453,12 +453,14 @@ W.CFancyMenuDesc.prototype={
 			button_i.action=WrapMenuAction(button_i.action);
 			children.push(button_i);
 			/////////////////
-			var p_and=button_i.text.indexOf('&')
-			if(p_and>=0){
-				//underlined hotkey
-				children.push(
-					{type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action},
-					{type:'hotkey',key:'ALT+'+button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
+			if(button_i.text){
+				var p_and=button_i.text.indexOf('&')
+				if(p_and>=0){
+					//underlined hotkey
+					children.push(
+						{type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action},
+						{type:'hotkey',key:'ALT+'+button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
+				}
 			}
 			if(button_i.key){
 				W.Hotkey("",{key:button_i.key,action:button_i.action})
@@ -654,7 +656,7 @@ W.FancyMenu=function(id,attrs){
 			if(s_type=='text'){
 				w_acc+=UI.MeasureText(obj.font,item_i.text.replace('&','')).w
 			}else if(s_type=='button'){
-				w_acc+=UI.MeasureText(obj.font,item_i.text).w
+				w_acc+=UI.MeasureText(obj.font,item_i.icon||item_i.text).w
 				w_acc+=obj.button_padding*2
 			}else if(s_type=='rubber'){
 				per_part_w[part_id]=Math.max(per_part_w[part_id]||0,w_acc)
@@ -693,7 +695,7 @@ W.FancyMenu=function(id,attrs){
 				item_i.x=w_acc
 				item_i.y=h_acc+(obj.h_menu_line-obj.h_button)*0.5
 				w_acc+=obj.button_padding
-				w_acc+=UI.MeasureText(obj.font,item_i.text).w
+				w_acc+=UI.MeasureText(obj.font,item_i.icon||item_i.text).w
 				w_acc+=obj.button_padding
 				item_i.w=w_acc-item_i.x
 				item_i.h=obj.h_button
@@ -751,7 +753,6 @@ W.FancyMenu=function(id,attrs){
 		}
 		sel_id0++
 	}
-	//todo: newline -> line
 	for(var i=0;i<items.length;i++){
 		var item_i=items[i]
 		var s_type=item_i.type
@@ -766,12 +767,14 @@ W.FancyMenu=function(id,attrs){
 		if(s_type=='text'){
 			W.Text("",{x:obj.x+item_i.x,y:obj.y+item_i.y+(obj.h_menu_line-hc)*0.5,font:obj.font,text:item_i.text,color:selected?item_i.sel_color:item_i.color,flags:8})
 			if(item_i.icon){
-				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font_20,text:item_i.icon,color:selected?item_i.sel_color:item_i.color})
+				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font_20,text:item_i.icon,
+					color:selected?item_i.sel_color:item_i.color})
 			}
 		}else if(s_type=='button'){
 			W.Button(item_i.text,{x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,
-				font:item_i.icon?UI.icon_font_20:obj.font,text:item_i.icon||item_i.text,OnClick:item_i.action,
+				font:item_i.icon?obj.button_style.icon_font:obj.button_style.font,text:item_i.icon||item_i.text,OnClick:item_i.action,
 				value:selected,
+				show_tooltip_override:selected,
 				style:obj.button_style,
 				tooltip:item_i.tooltip,
 				flags:8})

@@ -182,7 +182,7 @@ Language.Register({
 Language.Register({
 	name:'Javascript',parser:"C",
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1},
-	extensions:['js'],
+	extensions:['js','json'],
 	file_icon_color:0xffb4771f,
 	file_icon:'プ',
 	rules:function(lang){
@@ -491,8 +491,10 @@ Language.RegisterCompiler=function(s_exts,obj){
 		obj.make=function(doc,run_it){
 			UI.already_compiling=1
 			UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this),
-				run_it?function(){
-					UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this),CompilerDone)
+				run_it?function(code){
+					if(code==0){
+						UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this),CompilerDone)
+					}
 				}.bind(this):CompilerDone)
 		};
 	}
@@ -691,12 +693,14 @@ UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 	}
 	if(cmd=="run"){
 		IO.RunProcess(args,UI.GetPathFromFilename(doc.m_file_name),1)
+		if(fcallback_completion){fcallback_completion()}
 		return
 	}
 	var proc=IO.RunToolRedirected(args,UI.GetPathFromFilename(doc.m_file_name),0)
 	if(proc){
 		var fpoll=function(){
 			var s=proc.Read(65536)
+			//print('fpoll',cmd,!s,proc.IsRunning())
 			if(s){
 				UI.WriteBuildOutput(fparse,s)
 				UI.NextTick(fpoll)
@@ -713,7 +717,7 @@ UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 					UI.WriteBuildOutput(function(){},"===== Program terminated =====\n")
 				}
 				if(fcallback_completion){
-					fcallback_completion()
+					fcallback_completion(code)
 				}else{
 					UI.WriteBuildOutput(function(){},"\n")
 				}
@@ -1051,7 +1055,7 @@ UI.RegisterEditorPlugin(function(){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({text:"Cut &line",enable_hotkey:1,key:"CTRL+L",action:function(){
+			menu_edit.AddNormalItem({icon:"切",text:"Cut &line",enable_hotkey:1,key:"CTRL+L",action:function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				sel[0]=this.SeekLC(this.GetLC(sel[0])[0],0)
@@ -1103,6 +1107,7 @@ UI.RegisterEditorPlugin(function(){
 			}else{
 				this.HookedEdit([sel[0],0,s0,sel[1],0,s1])
 				this.CallOnChange()
+				this.SetSelection(sel[0],sel[1]+lg0+lg1)
 			}
 			UI.Refresh();
 			return 0;
@@ -1153,7 +1158,7 @@ UI.RegisterEditorPlugin(function(){
 			var menu_edit=UI.BigMenu("&Edit")
 			var obj=this
 			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:function(){
+			menu_edit.AddNormalItem({icon:"释",text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:function(){
 				fcomment.call(obj)
 			}})
 		}
@@ -1280,15 +1285,15 @@ UI.RegisterEditorPlugin(function(){
 			var doc=this;
 			menu_search.AddSeparator();
 			menu_search.AddButtonRow({text:"Scope"},[
-				{text:"&outer",tooltip:'ALT+PGUP',action:function(){
+				{text:"scope_outer",icon:"外",tooltip:'Outer - ALT+PGUP',action:function(){
 					fouter_scope.call(doc)
-				}},{text:"&inner",tooltip:'ALT+PGDN',action:function(){
+				}},{text:"scope_inner",icon:"内",tooltip:'Inner - ALT+PGDN',action:function(){
 					finner_scope.call(doc)
 				}}])
 			menu_search.AddButtonRow({text:"Lines of the same indentation"},[
-				{text:"up",tooltip:'ALT+UP',action:function(){
+				{text:"indent_up",icon:"上",tooltip:'Prev - ALT+UP',action:function(){
 					fscopeup.call(doc)
-				}},{text:"down",tooltip:'ALT+DOWN',action:function(){
+				}},{text:"indent_down",icon:"下",tooltip:'Next - ALT+DOWN',action:function(){
 					fscopedown.call(doc)
 				}}])
 		}
@@ -1513,10 +1518,10 @@ UI.RegisterEditorPlugin(function(){
 			var menu_search=UI.BigMenu("&Search")
 			var doc=this;
 			menu_search.AddSeparator();
-			menu_search.AddButtonRow({text:"Parenthesis"},[
-				{text:"&match",tooltip:'SHIFT+CTRL+P',action:function(){
+			menu_search.AddButtonRow({icon:"プ",text:"Parenthesis"},[
+				{text:"&match",tooltip:'CTRL+P',action:function(){
 					goto_matching_bracket.call(doc,0)
-				}},{text:"&select to",tooltip:'CTRL+P',action:function(){
+				}},{text:"&select to",tooltip:'SHIFT+CTRL+P',action:function(){
 					goto_matching_bracket.call(doc,1)
 				}}])
 		}
@@ -2197,7 +2202,11 @@ UI.RegisterEditorPlugin(function(){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({text:"Auto &wrap",icon:this.owner.m_enable_wrapping?"对":undefined,enable_hotkey:1,key:"CTRL+SHIFT+W",action:function(){
+			menu_edit.AddNormalItem({
+					text:"Auto &wrap",
+					icon:this.owner.m_enable_wrapping?"对":undefined,
+					enable_hotkey:1,key:"CTRL+SHIFT+W",
+					action:function(){
 				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				var ed_caret_original=this.GetCaretXY();
@@ -2345,15 +2354,16 @@ UI.RegisterEditorPlugin(function(){
 	})
 	this.AddEventHandler('change',function(){
 		if(!(this.m_autoedit_example_line_id>=0)){
-			return
+			return 1
 		}
+		if(this.owner&&this.owner.m_replace_context){return 1;}
 		var ctx=this.m_autoedit_context
 		if(!ctx){return}
 		var locs=this.m_autoedit_locators
 		var ed=this.ed
 		var line_id=this.m_autoedit_example_line_id
 		if(!UI.ED_AutoEdit_SetExample(ctx,line_id>>1,ed.GetText(locs[line_id].ccnt,locs[line_id+1].ccnt-locs[line_id].ccnt))){
-			return;
+			return 1;
 		}
 		var ops=UI.ED_AutoEdit_Evaluate(ctx,locs)
 		//highlight ops - fill out the overlay system
@@ -2361,6 +2371,7 @@ UI.RegisterEditorPlugin(function(){
 		renderer.m_tentative_editops=ops
 		renderer.ResetTentativeOps()
 		UI.Refresh()
+		return 1;
 	})
 	//CTRL+D - return 1, the other end should be a hook...? just compete and adjust the priority
 	this.AddEventHandler('menu',function(){
@@ -2502,8 +2513,39 @@ UI.RegisterEditorPlugin(function(){
 		this.vsel_skip_sel_change=1
 		UpdateVSel();
 	})
+	//coulddo: menu items
 }).prototype.name="Auto-edit";
 
-//UI.RegisterEditorPlugin(function(){
-//	if(this.plugin_class!="code_editor"){return;}
-//}).prototype.name="Vertical selection";
+UI.RegisterEditorPlugin(function(){
+	this.AddEventHandler('menu',function(){
+		var menu_search=UI.BigMenu("&Search")
+		var doc=this;
+		menu_search.AddSeparator();
+		menu_search.AddNormalItem({text:"Go to &definition",enable_hotkey:1,key:"F12",action:function(){
+			var sel=doc.GetSelection();
+			var ed=doc.ed
+			sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
+			sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
+			if(sel[0]<sel[1]){
+				var id=ed.GetText(sel[0],sel[1]-sel[0])
+				var ccnt0=doc.sel1.ccnt
+				var ccnt=ccnt0
+				for(;;){
+					ccnt=doc.FindOuterLevel(ccnt);
+					if(!(ccnt>=0)){ccnt=0;}
+					var ccnt_decl=UI.ED_QueryDecl(doc,ccnt,id)
+					if(ccnt_decl>=0&&ccnt_decl!=ccnt0){
+						doc.SetSelection(ccnt_decl,ccnt_decl)
+						UI.Refresh()
+						return;
+					}
+					if(!(ccnt>0)){break;}
+				}
+			}
+			//not found
+			//todo: check important decls in other files / other scopes
+			//todo: important decls - type/function-ish
+			//print(UI.ED_QueryDecl(doc,ccnt))
+		}})
+	})
+}).prototype.name="Definition searching";

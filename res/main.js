@@ -7,7 +7,12 @@ require("res/lib/subwin");
 require("res/lib/demo_doc");
 
 UI.ChooseScalingFactor({designated_screen_size:1080})
-UI.SetFontSharpening(1)
+UI.SetFontSharpening(1);
+(function(){
+	UI.pixels_per_unit_base=UI.pixels_per_unit
+	UI.pixels_per_unit*=(UI.m_ui_metadata.zoom||1)
+	UI.ResetRenderer(UI.pixels_per_unit);
+})();
 //UI.SetFontSharpening(0)
 UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
 UI.icon_font_name='res/fonts/iconfnt.ttf,!'
@@ -81,7 +86,7 @@ UI.Theme_CustomWidget=function(C){
 			w_menu_button:26,
 			h_menu_button:26,
 			padding:4,
-			menu_bar_color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe0e0e0}],
+			menu_bar_color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
 			menu_bar_border_width:1,
 			menu_bar_border_color:0xffaaaaaa,
 			menu_button_style:{
@@ -248,16 +253,16 @@ UI.Theme_CustomWidget=function(C){
 				//tex_font:UI.Font("res/fonts/cmunrm.ttf",36),
 				//tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",36,200),
 				//font_tilde:UI.Font(UI.icon_font_name,36,100),
-				//font:UI.Font("res/fonts/inconsolata.ttf",28),
-				//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
-				//tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
-				//tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
-				//font_tilde:UI.Font(UI.icon_font_name,28,100),
-				font:UI.Font("res/fonts/inconsolata.ttf",32),
-				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",32,200),
-				tex_font:UI.Font("res/fonts/cmunrm.ttf",32),
-				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",32,200),
-				font_tilde:UI.Font(UI.icon_font_name,32,100),
+				font:UI.Font("res/fonts/inconsolata.ttf",28),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
+				tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
+				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
+				font_tilde:UI.Font(UI.icon_font_name,28,100),
+				//font:UI.Font("res/fonts/inconsolata.ttf",32),
+				//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",32,200),
+				//tex_font:UI.Font("res/fonts/cmunrm.ttf",32),
+				//tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",32,200),
+				//font_tilde:UI.Font(UI.icon_font_name,32,100),
 				color:0xff000000,
 				color_normal:0xff000000,
 				color_overlay:0xff7f7f7f,
@@ -339,7 +344,8 @@ UI.Theme_CustomWidget=function(C){
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",20),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
-				font_tilde:UI.Font(UI.icon_font_name,28,100),
+				//font_tilde:UI.Font(UI.icon_font_name,28,100),
+				font_tilde:UI.Font(UI.icon_font_name,26,100),
 				color:0xff000000,
 				color_overlay:0xff000000,
 				color_string:0xff1c1aa3,
@@ -512,7 +518,7 @@ UI.Theme_CustomWidget=function(C){
 			},
 		},
 		fancy_menu:{
-			color:0xfff0f0f0,
+			color:0xffe8e8e8,
 			border_color:0xff444444,
 			border_width:1,round:1,
 			shadow_color:0xaa000000,
@@ -539,10 +545,12 @@ UI.Theme_CustomWidget=function(C){
 			button_style:{
 				transition_dt:0.1,
 				round:0.1,border_width:1,padding:0,
-				font:UI.Font(UI.font_name,24,-100),
+				font:UI.Font(UI.font_name,20,-100),
+				icon_font:UI.Font(UI.icon_font_name,18),
 				$:{
 					out:{
-						border_color:0xff444444,color:0xffffffff,
+						//border_color:0xff444444,color:0xffffffff,
+						border_color:0xff444444,color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
 						icon_color:0xff000000,
 						text_color:0xff000000,
 					},
@@ -590,6 +598,7 @@ UI.icon_font=UI.Font(UI.icon_font_name,24);
 UI.icon_font_20=UI.Font(UI.icon_font_name,20);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
 UI.font_name="res/fonts/opensans.ttf"
+UI.eng_font_name="res/fonts/opensans.ttf,!"
 
 var g_all_document_windows=[];
 UI.g_all_document_windows=g_all_document_windows
@@ -599,6 +608,20 @@ UI.NewTab=function(tab){
 	return tab;
 }
 
+var ZOOM_RATE=1.0625
+UI.UpdateZoom=function(){
+	UI.ResetRenderer(UI.pixels_per_unit);
+	UI.Refresh()
+	UI.m_ui_metadata.zoom=(UI.pixels_per_unit/UI.pixels_per_unit_base)
+}
+UI.ZoomRelative=function(rate){
+	UI.pixels_per_unit*=rate;
+	UI.UpdateZoom()
+}
+UI.ZoomReset=function(){
+	UI.pixels_per_unit=UI.pixels_per_unit_base
+	UI.UpdateZoom()
+}
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -715,9 +738,21 @@ UI.Application=function(id,attrs){
 			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
 				app.document_area.SaveCurrent();
 			}});
-			menu_file.AddNormalItem({text:"Save a&ll",action:function(){
+			menu_file.AddNormalItem({text:"Save a&ll",icon:'保',action:function(){
 				app.document_area.SaveAll();
 			}});
+			menu_file.AddSeparator();
+			W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
+			W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
+			W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
+			menu_file.AddButtonRow({icon:"扩",text:"Zoom"},[
+				{text:"-",tooltip:'CTRL -',action:function(){
+					UI.ZoomRelative(1/ZOOM_RATE)
+				}},{text:"reset",tooltip:'CTRL+0',action:function(){
+					UI.ZoomReset()
+				}},{text:"+",tooltip:'CTRL +',action:function(){
+					UI.ZoomRelative(ZOOM_RATE)
+				}}])
 			//todo: drag-loading
 			if(!UI.Platform.IS_MOBILE){
 				//OS shell
@@ -741,7 +776,7 @@ UI.Application=function(id,attrs){
 				}})
 			}
 			menu_file.AddSeparator();
-			menu_file.AddNormalItem({text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:function(){
+			menu_file.AddNormalItem({icon:"时",text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:function(){
 				var active_document=UI.m_the_document_area.active_tab
 				if(active_document&&active_document.doc&&active_document.doc.m_is_brand_new){
 					return;

@@ -88,6 +88,7 @@ struct TSymbol
 	iptr p_name,n
 	iptr hash
 	int user_slot
+	int decl_slot
 
 class TTraitSymbol
 	TKey=string
@@ -167,12 +168,12 @@ TOK_AA=int('e')
 TOK_OO=int('f')
 TOK_LL=int('g')
 TOK_GG=int('h')
-TOK_ADD_EQ=int('i')
-TOK_SUB_EQ=int('j')
-TOK_MUL_EQ=int('k')
-TOK_DIV_EQ=int('l')
-TOK_ADD_ADD=int('m')
-TOK_SUB_SUB=int('n')
+TOK_ADD_ADD=int('i')
+TOK_SUB_SUB=int('j')
+TOK_ADD_EQ=int('k')
+TOK_SUB_EQ=int('l')
+TOK_MUL_EQ=int('m')
+TOK_DIV_EQ=int('n')
 ////////////////
 TOK_MOD_EQ=int('o')
 TOK_OR_EQ=int('p')
@@ -392,7 +393,8 @@ auto tokenize(string sdata,int g_ignore_indents)
 			break
 		case '-':
 			if(ch=='='){ptr++;ch0=TOK_SUB_EQ;}else
-			if(ch=='-'){ptr++;ch0=TOK_SUB_SUB;}
+			if(ch=='-'){ptr++;ch0=TOK_SUB_SUB;}else
+			if(ch=='>'){ptr++;ch0=int('.');}
 			break
 		case '*':
 			if(ch=='='){ptr++;ch0=TOK_MUL_EQ;}
@@ -412,6 +414,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 					ptr++;ch0=TOK_RSHIFT_EQ;
 			break;
 		case '!':{if(ch=='='){ptr++;ch0=TOK_NE;}break;}
+		case ':':{if(ch==':'){ptr++;ch0=int('.');}break;}
 		case '&':
 			if(ch=='&'){ptr++;ch0=TOK_AA;}
 			if(ch=='='){ptr++;ch0=TOK_AND_EQ;}
@@ -470,6 +473,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 							continue
 						inds.push(ind)
 						ch0=int('{')
+						epos0_ch0=ptr
 					else
 						//don't pop past the {
 						while inds.n&&(inds.back()&0xbfffffff)>ind:
@@ -653,14 +657,28 @@ make the .name func() system an independent pass
 	per-file PPM models
 */
 //global by-last-symbol model (for plain text)
+struct TDeclItem
+	int epos_scope
+	int id
+	int epos0
+KEY_DECL_CLASS=TOK_TYPE*0
+KEY_DECL_FUNCTION=TOK_TYPE*1
+KEY_DECL_MASK=TOK_TYPE_MASK
+struct TKeyDeclItem
+	//we don't need to know the scope
+	int id_type
+	int epos0
 class CFileIndex
 	//basic model, predict from variable. func()
 	int2[] m_ids
 	int2[] m_ppm_pool
+	//code-only
 	int2[int] m_name_dot_index
 	int2[int2] m_function_bracket_index //id, ordinal
+	TDeclItem[] m_all_decls
+	TKeyDeclItem[] m_all_key_decls
 	//text-only: predict by last word or last non-word char
-	int2[int] m_ppm1_index 
+	int2[int] m_ppm1_index
 
 auto appendKeywords(int[] ids,JSObject options)
 	js_kws=options["m_all_keywords"].as(JSObject)
@@ -705,6 +723,7 @@ auto ComputeIDOrderingMaps(int[] just_ids)
 inline IDToOrder(id)
 	return g_symbols[id].user_slot
 
+g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 auto parseAsCLike(string sdata,JSObject options)
 	//enable_semantics=options["enable_semantics"].or(0)
 	sdataz=new char[sdata.n+1]
@@ -714,13 +733,46 @@ auto parseAsCLike(string sdata,JSObject options)
 	just_ids=new int[]
 	name_dot_entries=new int2[] //name, member
 	func_param_entries=new int3[] //func, ordinal, id
+	keywords=new int[]
+	appendKeywords(keywords,options)
+	keyword_map=new int[int]
+	foreach id,I in keywords
+		keyword_map[id]=int(I+1)
 	///////////////////
 	struct TStkEntry
 		int m_function_id
 		int m_param_id
+	struct TScopeEntry
+		int ptok0
+		int pdecls
+		char in_assignment
 	ss=new TStkEntry[]
+	scopes=new TScopeEntry[]
+	sc_decls=new int2[]
+	all_decls=new TDeclItem[]
+	all_key_decls=new TKeyDeclItem[]
 	function_id=0
 	param_id=0
+	scopes.push(TScopeEntry(){ptok0:-1})
+	popScope=inline(){
+		auto sc=scopes.pop()
+		if sc.pdecls<sc_decls.n:
+			auto epos0=(sc.ptok0<0?0:toks[sc.ptok0].epos0)
+			for j=sc.pdecls:sc_decls.n-1
+				auto id=sc_decls[j].x
+				if !g_symbols[id].decl_slot:
+					g_symbols[id].decl_slot=1
+					ptok_decl=sc_decls[j].y
+					//epos1:toks[ptok_decl].epos1
+					all_decls.push(TDeclItem(){
+						epos_scope:epos0,
+						id:id,
+						epos0:toks[ptok_decl].epos0})
+			for j=sc.pdecls:sc_decls.n-1
+				auto id=sc_decls[j].x
+				g_symbols[id].decl_slot=0
+		sc_decls.resize(sc.pdecls)
+	}
 	for i=0:toks.n-1
 		tok_i=toks[i].tok
 		switch(tok_i){
@@ -730,6 +782,43 @@ auto parseAsCLike(string sdata,JSObject options)
 				just_ids.push(id)
 				if function_id:
 					func_param_entries.push(int3(function_id,param_id,id))
+				/////////
+				//decl
+				if scopes.n:
+					sc=scopes[scopes.n-1]
+					if !sc.in_assignment:
+						tok0=(i>0?toks[i-1].tok:int(';'))
+						tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+						if !(tok1=='('&&tok0==';')&&tok1!='{'&&tok0!='.'&&!keyword_map[id]:
+							//declaration
+							sc_decls.push(int2(id,int(i)))
+							//important-ish check
+							//class - class/struct/namespace/module ID[anything other than ; / * / id[,;=]]
+							is_class=0
+							if (tok0&TOK_TYPE_MASK)==TOK_ID:
+								foreach id_class in g_class_ids
+									if tok0!=id_class:continue
+									//check whether it's a C-like declaration (using 'struct foo' as type) or a forward declaration
+									if tok1=='*'||tok1==';':continue
+									if (tok1&TOK_TYPE_MASK)==TOK_ID:
+										tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
+										if tok2==','||tok2==';'||tok2=='=':
+											//guilty
+											continue
+									is_class=1
+									break
+							if is_class:
+								all_key_decls.push(TKeyDeclItem(){
+									id_type:id+KEY_DECL_CLASS,
+									epos0:toks[i].epos0})
+							else
+								//function
+								//ID =/: function/inline/...
+								if tok1=='='||tok1==':'
+								/*
+								ID(...){
+								)ID:( -- objective C
+								*/
 			break
 		case '(','[','{':
 			ss.push(TStkEntry(){m_function_id:function_id,m_param_id:param_id})
@@ -739,16 +828,25 @@ auto parseAsCLike(string sdata,JSObject options)
 				if (tok0&TOK_TYPE_MASK)==TOK_ID:
 					function_id=tok0-TOK_ID
 			param_id=0
+			///////////
+			if tok_i=='{':
+				scopes.push(TScopeEntry(){ptok0:int(i),pdecls:int(sc_decls.n)})
 			break
 		case ')',']','}':
 			if ss.n:
 				se=ss.pop()
 				function_id=se.m_function_id
 				param_id=se.m_param_id
+			if tok_i=='}':
+				if scopes.n>1:
+					//process the decls - sort, unique
+					popScope()
 			break
 		case ',':
 			if function_id:
 				param_id++
+			if scopes.n:
+				scopes[scopes.n-1].in_assignment=i8(0)
 			break
 		case '.':
 			if i>0&&i<toks.n-1:
@@ -757,8 +855,18 @@ auto parseAsCLike(string sdata,JSObject options)
 				if (tok0&TOK_TYPE_MASK)==TOK_ID&&(tok2&TOK_TYPE_MASK)==TOK_ID:
 					name_dot_entries.push(int2(tok0-TOK_ID,tok2-TOK_ID))
 			break
+		case '=',TOK_ADD_EQ,TOK_SUB_EQ,TOK_MUL_EQ,TOK_DIV_EQ,TOK_MOD_EQ,TOK_OR_EQ,TOK_AND_EQ,TOK_XOR_EQ,TOK_LSHIFT_EQ,TOK_RSHIFT_EQ:
+			if scopes.n:
+				scopes[scopes.n-1].in_assignment=i8(1)
+			break
+		case ';':
+			if scopes.n:
+				scopes[scopes.n-1].in_assignment=i8(0)
+			break
 		}
-	appendKeywords(just_ids,options)
+	popScope()
+	///////////
+	just_ids.push(keywords)
 	unique_ids=ComputeIDOrderingMaps(just_ids)
 	name_dot_entries.Sortby(inline(a){return int2(IDToOrder(a.x),IDToOrder(a.y))});
 	func_param_entries.Sortby(inline(a){return int3(IDToOrder(a.x),a.y,IDToOrder(a.z))});
@@ -778,11 +886,15 @@ auto parseAsCLike(string sdata,JSObject options)
 		foreach id,duplicates in members.Groupby(byMember("z"))
 			ppm_pool.push(int2(id,int(duplicates.getForEachRepeatCount())))
 		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
+	all_decls.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
+	all_key_decls.Sortby(inline(di){return (u64(di.id_type)<<32)+u64(di.epos0)})
 	return new CFileIndex(){
 		m_ids:unique_ids,
 		m_ppm_pool:ppm_pool,
 		m_name_dot_index:name_dot_index,
 		m_function_bracket_index:function_bracket_index,
+		m_all_decls:all_decls,
+		m_all_key_decls:all_key_decls,
 	}
 
 auto parseAsText(string sdata,JSObject options)
@@ -1026,6 +1138,35 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if ret_temp.n==1:
 			acret.m_common_prefix=getIdString(ret_temp[0].x)[s_prefix.n:]
 		return JS.Return(acret)
+	}
+	JS_UI["ED_QueryDecl"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		ccnti_scope=JS.Param(1).as(int)
+		s=JS.Param(2).as(string)
+		if !fidx||!fidx.m_all_decls:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		all_decls=fidx.m_all_decls
+		if !s||!s.n:
+			//query-all
+			ret=JS.NewArray()
+			n=0
+			p=all_decls.InlineBisect(inline(di){return di.epos_scope<ccnti_scope})
+			for i=p:all_decls.n-1
+				di=all_decls[i]
+				if di.epos_scope!=ccnti_scope:break
+				ret[n+0]=getIdString(di.id)
+				ret[n+1]=di.epos0
+				n+=2
+			return JS.Return(ret)
+		else
+			//query-one
+			id=getid(s)
+			p=all_decls.InlineBisect(inline(di){return di.epos_scope<ccnti_scope||di.epos_scope==ccnti_scope&&di.id<id})
+			if p<all_decls.n&&all_decls[p].epos_scope==ccnti_scope&&all_decls[p].id==id:
+				return JS.Return(all_decls[p].epos0)
+			return 0
 	}
 	JS_UI["ED_CopyCase"]=function(JSContext JS){
 		s_src=Utf8ToUnicode32(JS.Param(0).as(string))

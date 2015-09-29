@@ -2058,12 +2058,22 @@ W.FileItem=function(id,attrs){
 				W.Text("",{x:obj.x+w_icon,y:obj.y+30,
 					font:obj.misc_font,text:s_misc_text,
 					color:obj.selected?obj.sel_misc_color:obj.misc_color})
-				s_ext=s_ext.toUpperCase()
 				if(!desc.file_icon&&!obj.is_dir){
-					var ext_dims=UI.MeasureText(UI.Font(UI.font_name,24),s_ext)
-					var ext_font=UI.Font(UI.font_name,Math.min(24*28/ext_dims.w,24))
+					var fnt_size_base=24;
+					s_ext=s_ext.toUpperCase()
+					if(s_ext==""){s_ext="?";fnt_size_base=32}
+					var ext_dims=UI.MeasureText(UI.Font(UI.eng_font_name,fnt_size_base),s_ext)
+					var ext_font=UI.Font(UI.eng_font_name,Math.min(24*28/ext_dims.w,fnt_size_base))
 					ext_dims=UI.MeasureText(ext_font,s_ext)
 					W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
+						font:ext_font,text:s_ext,
+						color:ext_color})
+				}else if(desc.file_icon=="プ"){
+					s_ext=s_ext.toUpperCase()
+					var ext_dims=UI.MeasureText(UI.Font(UI.eng_font_name,24),s_ext)
+					var ext_font=UI.Font(UI.eng_font_name,Math.min(24*24/ext_dims.w,24))
+					ext_dims=UI.MeasureText(ext_font,s_ext)
+					W.Text("",{x:obj.x+(w_icon*(s_ext.length==1?0.98:1)-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
 						font:ext_font,text:s_ext,
 						color:ext_color})
 				}
@@ -2574,7 +2584,7 @@ W.CodeEditor=function(id,attrs){
 			doc.h=h_obj_area
 			doc.ed.Render({x:doc.visible_scroll_x,y:doc.visible_scroll_y,
 				w:doc.w/doc.scale,h:doc.h/doc.scale, 
-				scr_x:doc.x*UI.pixels_per_unit,scr_y:doc.y*UI.pixels_per_unit, 
+				scr_x:doc.x*UI.pixels_per_unit,scr_y:doc.y*UI.pixels_per_unit,
 				scale:UI.pixels_per_unit, obj:doc});
 			//////////////////
 			PrepareBookmarks()
@@ -3003,7 +3013,9 @@ W.CodeEditor=function(id,attrs){
 						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
 						if(hh>=0){
 							doc.ed.Render({x:0,y:y0,w:w_obj_area-w_line_numbers-w_scrolling_area,h:hh,
-								scr_x:obj.x+w_line_numbers,scr_y:obj.y+y_top_hint, scale:UI.pixels_per_unit, obj:doc});
+								scr_x:(obj.x+w_line_numbers)*UI.pixels_per_unit,
+								scr_y:(obj.y+y_top_hint)*UI.pixels_per_unit, 
+								scale:UI.pixels_per_unit, obj:doc});
 							//also draw the line numbers
 							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
 						}
@@ -3233,28 +3245,28 @@ W.CodeEditor=function(id,attrs){
 					UI.Refresh()
 				}})
 				menu_search.AddButtonRow({text:"Find "},[
-					{key:"SHIFT+CTRL+G SHIFT+F3",text:"&previous",tooltip:'SHIFT+CTRL+G',action:function(){
+					{key:"SHIFT+CTRL+G SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+G',action:function(){
 						obj.FindNext(-1)
-					}},{key:"CTRL+G F3",text:"&next",tooltip:'CTRL+G',action:function(){
+					}},{key:"CTRL+G F3",text:"find_down",icon:"下",tooltip:'Next - CTRL+G',action:function(){
 						obj.FindNext(1)
 					}}])
 				menu_search.AddButtonRow({text:"Find the current word"},[
-					{key:"SHIFT+CTRL+F3",text:"above",tooltip:'SHIFT+CTRL+F3',action:function(){
+					{key:"SHIFT+CTRL+F3",text:"word_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+F3',action:function(){
 						obj.BeforeQuickFind(-1);
 						obj.FindNext(-1)
-					}},{key:"CTRL+F3",text:"below",tooltip:'CTRL+F3',action:function(){
+					}},{key:"CTRL+F3",text:"word_down",icon:"下",tooltip:'Next - CTRL+F3',action:function(){
 						obj.BeforeQuickFind(1);
 						obj.FindNext(1)
 					}}])
 				if(obj.m_replace_context){
-					menu_search.AddSeparator()
+					//menu_search.AddSeparator()
 					menu_search.AddButtonRow({text:"Replace"},[
-						{key:"CTRL+SHIFT+D",text:"prev",tooltip:'CTRL+SHIFT+D',action:function(){
+						{key:"CTRL+SHIFT+D",text:"replace_up",icon:"上",tooltip:'Prev - CTRL+SHIFT+D',action:function(){
 							obj.DoReplaceFromUI(-1)
-						}},{key:"CTRL+D",text:"next",tooltip:'CTRL+D',action:function(){
-							obj.DoReplaceFromUI(1)
 						}},{key:"ALT+A",text:"all",tooltip:'ALT+A',action:function(){
 							obj.DoReplaceFromUI(0)
+						}},{key:"CTRL+D",text:"replace_down",icon:"下",tooltip:'Next - CTRL+D',action:function(){
+							obj.DoReplaceFromUI(1)
 						}}])
 				}
 				doc.CallHooks('menu')
