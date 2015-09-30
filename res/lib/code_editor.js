@@ -555,13 +555,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//these are locators when set
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
 		this.m_unkeyed_bookmarks=[];
-		this.m_diff_from_save=this.ed.CreateDiffTracker()
+		if(this.m_is_main_editor){this.m_diff_from_save=this.ed.CreateDiffTracker()}
 	},
 	ResetSaveDiff:function(){
 		if(this.m_diff_from_save){
 			this.m_diff_from_save.discard()
+			this.m_diff_from_save=this.ed.CreateDiffTracker()
 		}
-		this.m_diff_from_save=this.ed.CreateDiffTracker()
 	},
 	FindNearestBookmark:function(ccnt,direction){
 		//just do a sequential search
@@ -2551,7 +2551,7 @@ W.CodeEditor=function(id,attrs){
 					var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
 					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
 					var x=w_line_numbers-text_dim.w-obj.padding
-					if(i+1<line_ccnts.length){
+					if(diff&&i+1<line_ccnts.length){
 						if(diff.RangeQuery(line_ccnts[i],line_ccnts[i+1])){
 							//line modified
 							//s_line_number=s_line_number+"*";
