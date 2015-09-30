@@ -2543,8 +2543,8 @@ UI.RegisterEditorPlugin(function(){
 				}
 			}
 			//not found
-			//todo: check important decls in other files / other scopes
-			//todo: important decls - type/function-ish
+			//todo: check key decls by id only
+			//todo: key decls - struct/class/function-ish
 			//print(UI.ED_QueryDecl(doc,ccnt))
 		}})
 	})

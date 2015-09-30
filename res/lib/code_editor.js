@@ -555,6 +555,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//these are locators when set
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
 		this.m_unkeyed_bookmarks=[];
+		this.m_diff_from_save=this.ed.CreateDiffTracker()
+	},
+	ResetSaveDiff:function(){
+		if(this.m_diff_from_save){
+			this.m_diff_from_save.discard()
+		}
+		this.m_diff_from_save=this.ed.CreateDiffTracker()
 	},
 	FindNearestBookmark:function(ccnt,direction){
 		//just do a sequential search
@@ -604,6 +611,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//abandonment should work as is...
 		var floadNext=(function(){
 			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?131072:4194304))
+			this.ResetSaveDiff()
 			if(is_preview){
 				var rendering_ccnt1=this.SeekXY(0,this.h)
 				if(rendering_ccnt1<ed.GetTextSize()){
@@ -619,6 +627,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
 			}else{
+				this.ResetSaveDiff()
 				this.OnLoad()
 			}
 			UI.Refresh()
@@ -626,6 +635,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(ed.hfile_loading){
 			floadNext()
 		}else{
+			this.ResetSaveDiff()
 			this.OnLoad()
 		}
 		UI.Refresh()
@@ -1033,6 +1043,7 @@ W.CodeEditorWidget_prototype={
 				doc.saved_point=doc.ed.GetUndoQueueLength()
 				this.ReleaseEditLock();
 				doc.ed.saving_context=undefined
+				doc.ResetSaveDiff()
 				this.OnSave();
 				this.DismissNotification('saving_progress')
 				UI.Refresh()
@@ -2531,11 +2542,18 @@ W.CodeEditor=function(id,attrs){
 				var line1=doc.GetLC(rendering_ccnt1)[0];
 				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1,"valid_only");
 				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
+				var diff=doc.m_diff_from_save
 				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
 				for(var i=0;i<line_ccnts.length;i++){
 					if(line_ccnts[i]<0){continue;}
 					if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
 					var s_line_number=(line0+i+1).toString();
+					if(i+1<line_ccnts.length){
+						if(diff.RangeQuery(line_ccnts[i],line_ccnts[i+1])){
+							//line modified
+							s_line_number=s_line_number+"*";
+						}
+					}
 					var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
 					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
 					var x=w_line_numbers-text_dim.w-obj.padding
@@ -3087,7 +3105,6 @@ W.CodeEditor=function(id,attrs){
 				W.Button("find_button_close",{style:UI.default_styles.check_button,
 					x:x_button_right+2,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5+2,w:obj.find_bar_button_size-4,h:obj.find_bar_button_size-4,
 					font:UI.icon_font_20,text:"✕",tooltip:"Close - ESC",
-					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 					OnClick:function(){
 						obj.find_bar_edit.CancelFind();
 					}})

@@ -724,6 +724,7 @@ inline IDToOrder(id)
 	return g_symbols[id].user_slot
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
+g_function_ids=[getid("function"),getid("inline")]
 auto parseAsCLike(string sdata,JSObject options)
 	//enable_semantics=options["enable_semantics"].or(0)
 	sdataz=new char[sdata.n+1]
@@ -742,6 +743,7 @@ auto parseAsCLike(string sdata,JSObject options)
 	struct TStkEntry
 		int m_function_id
 		int m_param_id
+		int m_ptok_function_id
 	struct TScopeEntry
 		int ptok0
 		int pdecls
@@ -752,6 +754,7 @@ auto parseAsCLike(string sdata,JSObject options)
 	all_decls=new TDeclItem[]
 	all_key_decls=new TKeyDeclItem[]
 	function_id=0
+	ptok_function_id=0
 	param_id=0
 	scopes.push(TScopeEntry(){ptok0:-1})
 	popScope=inline(){
@@ -797,9 +800,9 @@ auto parseAsCLike(string sdata,JSObject options)
 							is_class=0
 							if (tok0&TOK_TYPE_MASK)==TOK_ID:
 								foreach id_class in g_class_ids
-									if tok0!=id_class:continue
-									//check whether it's a C-like declaration (using 'struct foo' as type) or a forward declaration
-									if tok1=='*'||tok1==';':continue
+									if tok0!=TOK_ID+id_class:continue
+									//check whether it's a C-like declaration (using 'struct foo' as type) or a forward declaration, or a template param
+									if tok1=='*'||tok1==';'||tok1==','||tok1=='>'||tok1==TOK_GG:continue
 									if (tok1&TOK_TYPE_MASK)==TOK_ID:
 										tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
 										if tok2==','||tok2==';'||tok2=='=':
@@ -813,20 +816,34 @@ auto parseAsCLike(string sdata,JSObject options)
 									epos0:toks[i].epos0})
 							else
 								//function
-								//ID =/: function/inline/...
+								is_function=0
 								if tok1=='='||tok1==':'
-								/*
-								ID(...){
-								)ID:( -- objective C
-								*/
+									//ID =/: function/inline/...
+									tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
+									foreach id_func in g_function_ids
+										if tok2!=TOK_ID+id_func:continue
+										is_function=1
+										break
+									if tok0==')'&&tok1==':'&&tok2=='(':
+										//)ID:( -- objective C
+										is_function=1
+								//ID(...){ needs stack-based backtracking, test it later in the function_id line
+								if is_function:
+									all_key_decls.push(TKeyDeclItem(){
+										id_type:id+KEY_DECL_FUNCTION,
+										epos0:toks[i].epos0})
 			break
 		case '(','[','{':
-			ss.push(TStkEntry(){m_function_id:function_id,m_param_id:param_id})
+			ss.push(TStkEntry(){m_function_id:function_id,m_ptok_function_id:ptok_function_id,m_param_id:param_id})
 			function_id=0
+			ptok_function_id=0
 			if tok_i=='('&&i>0:
 				tok0=toks[i-1].tok
 				if (tok0&TOK_TYPE_MASK)==TOK_ID:
-					function_id=tok0-TOK_ID
+					id=tok0-TOK_ID
+					if !keyword_map[id]:
+						function_id=id
+						ptok_function_id=i-1
 			param_id=0
 			///////////
 			if tok_i=='{':
@@ -834,8 +851,16 @@ auto parseAsCLike(string sdata,JSObject options)
 			break
 		case ')',']','}':
 			if ss.n:
+				if function_id&&tok_i==')':
+					//ID(...){ testing
+					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					if tok1=='{':
+						all_key_decls.push(TKeyDeclItem(){
+							id_type:function_id+KEY_DECL_FUNCTION,
+							epos0:toks[ptok_function_id].epos0})
 				se=ss.pop()
 				function_id=se.m_function_id
+				ptok_function_id=se.m_ptok_function_id
 				param_id=se.m_param_id
 			if tok_i=='}':
 				if scopes.n>1:
