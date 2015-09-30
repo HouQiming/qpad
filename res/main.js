@@ -322,6 +322,9 @@ UI.Theme_CustomWidget=function(C){
 			bookmark_border_color:C[0],
 			bookmark_scroll_bar_marker_size:2,
 			///////
+			//color_diff_tag:[{x:0,y:0,color:0xff2ca033&0xffffff},{x:1,y:0,color:0xff2ca033}],
+			color_diff_tag:[{x:0,y:0,color:C&0xffffff},{x:1,y:0,color:C}],
+			///////
 			show_minimap:(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="android"||UI.Platform.ARCH=="ios")?0:1,
 			minimap_font_height:6,
 			minimap_page_shadow:0x1f000000,

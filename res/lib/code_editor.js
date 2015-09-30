@@ -2517,8 +2517,8 @@ W.CodeEditor=function(id,attrs){
 			obj.DismissNotification('loading_progress')
 		}
 		var DrawLineNumbers=function(scroll_x,scroll_y,area_w,area_y,area_h){
+			var hc=UI.GetCharacterHeight(doc.font)
 			if(bm_xys){
-				var hc=UI.GetCharacterHeight(doc.font)
 				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
 				for(var i=0;i<bm_ccnts.length;i++){
 					var y=bm_xys[i*2+1]-scroll_y+area_y
@@ -2548,15 +2548,19 @@ W.CodeEditor=function(id,attrs){
 					if(line_ccnts[i]<0){continue;}
 					if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
 					var s_line_number=(line0+i+1).toString();
-					if(i+1<line_ccnts.length){
-						if(diff.RangeQuery(line_ccnts[i],line_ccnts[i+1])){
-							//line modified
-							s_line_number=s_line_number+"*";
-						}
-					}
 					var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
 					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
 					var x=w_line_numbers-text_dim.w-obj.padding
+					if(i+1<line_ccnts.length){
+						if(diff.RangeQuery(line_ccnts[i],line_ccnts[i+1])){
+							//line modified
+							//s_line_number=s_line_number+"*";
+							UI.RoundRect({
+								x:obj.x+w_line_numbers-6,y:line_xys[i*2+1]-scroll_y+area_y,
+								w:6,h:hc,
+								color:obj.color_diff_tag})
+						}
+					}
 					W.Text("",{x:obj.x+x,y:y, font:obj.line_number_font,text:s_line_number,color:line0+i==line_current?obj.line_number_color_focus:obj.line_number_color})
 				}
 				UI.PopCliprect()
