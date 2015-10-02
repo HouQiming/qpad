@@ -2515,37 +2515,3 @@ UI.RegisterEditorPlugin(function(){
 	})
 	//coulddo: menu items
 }).prototype.name="Auto-edit";
-
-UI.RegisterEditorPlugin(function(){
-	this.AddEventHandler('menu',function(){
-		var menu_search=UI.BigMenu("&Search")
-		var doc=this;
-		menu_search.AddSeparator();
-		menu_search.AddNormalItem({text:"Go to &definition",enable_hotkey:1,key:"F12",action:function(){
-			var sel=doc.GetSelection();
-			var ed=doc.ed
-			sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
-			sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
-			if(sel[0]<sel[1]){
-				var id=ed.GetText(sel[0],sel[1]-sel[0])
-				var ccnt0=doc.sel1.ccnt
-				var ccnt=ccnt0
-				for(;;){
-					ccnt=doc.FindOuterLevel(ccnt);
-					if(!(ccnt>=0)){ccnt=0;}
-					var ccnt_decl=UI.ED_QueryDecl(doc,ccnt,id)
-					if(ccnt_decl>=0&&ccnt_decl!=ccnt0){
-						doc.SetSelection(ccnt_decl,ccnt_decl)
-						UI.Refresh()
-						return;
-					}
-					if(!(ccnt>0)){break;}
-				}
-			}
-			//not found
-			//todo: check key decls by id only
-			//todo: key decls - struct/class/function-ish
-			//print(UI.ED_QueryDecl(doc,ccnt))
-		}})
-	})
-}).prototype.name="Definition searching";

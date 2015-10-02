@@ -8,6 +8,9 @@ var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
 var Language=require("res/lib/langdef");
 var MAX_PARSABLE=33554432
+var TOK_TYPE=0x20000000
+var KEY_DECL_CLASS=TOK_TYPE*0
+var KEY_DECL_FUNCTION=TOK_TYPE*1
 
 if(!UI.m_ui_metadata.find_state){
 	UI.m_ui_metadata.find_state={
@@ -884,6 +887,29 @@ W.NotificationItem=function(id,attrs){
 UI.SEARCH_FLAG_CASE_SENSITIVE=1
 UI.SEARCH_FLAG_WHOLE_WORD=2
 UI.SEARCH_FLAG_REGEXP=4
+UI.SEARCH_FLAG_GOTO_MODE=1024
+var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
+	matches.sort(function(a,b){return a[0]-b[0];});
+	var l=0
+	var r=matches.length-1
+	while(l<=r){
+		var m=(l+r)>>1
+		var ccnt_m=matches[m][0]
+		if(ccnt_m<ccnt_center){
+			l=m+1;
+		}else{
+			r=m-1;
+		}
+	}
+	ctx.m_forward_search_hack=matches.slice(l)
+	ctx.m_backward_search_hack=matches.slice(0,l)
+	if(ctx.m_forward_search_hack.length==0&&ctx.m_backward_search_hack.length>0){
+		ctx.m_init_point_hack=-1
+	}
+	//ctx.m_forward_frontier=-1
+	//ctx.m_backward_frontier=-1
+}
+
 W.CodeEditorWidget_prototype={
 	m_current_wrap_width:1024,
 	m_enable_wrapping:0,
@@ -1019,6 +1045,7 @@ W.CodeEditorWidget_prototype={
 		UI.m_ui_metadata[this.file_name]=new_metadata
 	},
 	OnSave:function(){
+		this.m_file_index=undefined;
 		this.SaveMetaData();
 		UI.SaveMetaData();
 		this.doc.CallHooks("save")
@@ -1074,6 +1101,9 @@ W.CodeEditorWidget_prototype={
 	ResetFindingContext:function(sneedle,flags, force_ccnt){
 		var doc=this.doc
 		var ccnt=(force_ccnt==undefined?doc.sel1.ccnt:force_ccnt)
+		//if(flags&UI.SEARCH_FLAG_GOTO_MODE){
+		//	ccnt=0
+		//}
 		if(this.m_current_find_context){
 			if(force_ccnt!=undefined&&force_ccnt==this.m_current_find_context.m_starting_ccnt0&&!this.m_changed_after_find){
 				return;
@@ -1081,13 +1111,15 @@ W.CodeEditorWidget_prototype={
 			this.m_current_find_context.Cancel()
 			this.m_current_find_context=undefined
 		}
-		if(!sneedle.length){
+		if(!sneedle.length&&!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
 			this.m_current_find_context=undefined
 			//this.m_current_needle=undefined
 			UI.m_ui_metadata.find_state.m_current_needle=""
 			return;
 		}
-		UI.m_ui_metadata.find_state.m_current_needle=sneedle
+		if(!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
+			UI.m_ui_metadata.find_state.m_current_needle=sneedle
+		}
 		var hc=UI.GetCharacterHeight(doc.font)
 		var ccnt_tot=doc.ed.GetTextSize()
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
@@ -1160,6 +1192,45 @@ W.CodeEditorWidget_prototype={
 		if(force_ccnt==undefined){
 			this.AutoScrollFindItems();
 			UI.InvalidateCurrentFrame();
+			UI.Refresh()
+		}
+		if(flags&UI.SEARCH_FLAG_GOTO_MODE){
+			//ignore the flags
+			var matches=[]
+			//try to go to line number first
+			var line_id=parseInt(sneedle)
+			if(line_id>0){
+				var line_ccnts=doc.SeekAllLinesBetween(line_id-1,line_id+1)
+				if(line_ccnts[0]<line_ccnts[1]){
+					var line_ccnt0=doc.ed.MoveToBoundary(line_ccnts[0],1,"space");
+					var line_ccnt1=line_ccnts[1]-1
+					if(!(line_ccnt1>line_ccnt0)){line_ccnt1=line_ccnt0;}
+					matches.push([line_ccnt0,line_ccnt1])
+				}
+			}else{
+				//search for function / class
+				var sneedle_lower=sneedle.toLowerCase()
+				var lg_needle=Duktape.__byte_length(sneedle_lower)
+				var all_key_decls=UI.ED_GetAllKeyDecls(doc)
+				for(var i=0;i<all_key_decls.length;i+=3){
+					var s_id=all_key_decls[i+0]
+					var s_id_lower=s_id.toLowerCase()
+					if(s_id_lower.length>=sneedle_lower.length){
+						if(s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
+							//we don't need the type here
+							//var type=all_key_decls[i+1]
+							var ccnt_match=all_key_decls[i+2]
+							if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
+								matches.push([ccnt_match,ccnt_match+lg_needle])
+							}else{
+								var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
+								matches.push([ccnt_match,ccnt_match1])
+							}
+						}
+					}
+				}
+			}
+			SetFindContextFinalResult(ctx,ccnt,matches)
 			UI.Refresh()
 		}
 	},
@@ -1235,7 +1306,12 @@ W.CodeEditorWidget_prototype={
 		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(this.find_message_font)+this.find_item_separation*2
 		ctx.m_current_visual_h=find_shared_h
 		doc.sel0.ccnt=this.GetMatchCcnt(id,0)
-		doc.sel1.ccnt=this.GetMatchCcnt(id,1)
+		if(ctx.m_flags&UI.SEARCH_FLAG_REGEXP){
+			//goto mode
+			doc.sel1.ccnt=doc.sel0.ccnt
+		}else{
+			doc.sel1.ccnt=this.GetMatchCcnt(id,1)
+		}
 		doc.AutoScroll("show")
 		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,fitem_current.visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),fitem_current.visual_y-h_bof_eof_message_with_sep)
 		ctx.m_find_scroll_visual_y=Math.max(Math.min(ctx.m_find_scroll_visual_y,ctx.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),ctx.m_y_extent_backward-h_bof_eof_message_with_sep)
@@ -1313,7 +1389,16 @@ W.CodeEditorWidget_prototype={
 		var h_safety_internal=h_safety+h_find_items//for page up/down
 		if(find_scroll_y<ctx.m_y_extent_backward+h_safety_internal&&!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)){
 			var p0=ctx.m_backward_matches.length
-			ctx.m_backward_frontier=UI.ED_Search(doc.ed,ctx.m_backward_frontier,-1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchBackward,ctx)
+			if(ctx.m_backward_search_hack){
+				var matches=ctx.m_backward_search_hack
+				ctx.m_backward_search_hack=undefined
+				for(var i=matches.length-1;i>=0;i--){
+					ctx.ReportMatchBackward(matches[i][0],matches[i][1])
+				}
+				ctx.m_backward_frontier=-1
+			}else{
+				ctx.m_backward_frontier=UI.ED_Search(doc.ed,ctx.m_backward_frontier,-1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchBackward,ctx)
+			}
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_backward
 			var current_y1=ctx.m_merged_y_windows_backward.pop()
 			var current_y0=ctx.m_merged_y_windows_backward.pop()
@@ -1352,11 +1437,26 @@ W.CodeEditorWidget_prototype={
 					ctx.m_home_end=undefined
 				}
 			}
+			if(ctx.m_home_end=='init'){
+				if(ctx.m_init_point_hack!=undefined){
+					ctx.m_current_point=ctx.m_init_point_hack
+					ctx.m_home_end=undefined
+				}
+			}
 			UI.Refresh()
 		}
 		if(find_scroll_y+find_shared_h>ctx.m_y_extent_forward-h_safety_internal&&!UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){
 			var p0=ctx.m_forward_matches.length
-			ctx.m_forward_frontier=UI.ED_Search(doc.ed,ctx.m_forward_frontier,1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchForward,ctx);
+			if(ctx.m_forward_search_hack){
+				var matches=ctx.m_forward_search_hack
+				ctx.m_forward_search_hack=undefined
+				for(var i=0;i<matches.length;i++){
+					ctx.ReportMatchForward(matches[i][0],matches[i][1])
+				}
+				ctx.m_forward_frontier=-1
+			}else{
+				ctx.m_forward_frontier=UI.ED_Search(doc.ed,ctx.m_forward_frontier,1,ctx.m_needle,ctx.m_flags,262144,ctx.ReportMatchForward,ctx);
+			}
 			var ccnt_merged_anyway=ctx.m_mergable_ccnt_forward
 			var current_y1=ctx.m_merged_y_windows_forward.pop()
 			var current_y0=ctx.m_merged_y_windows_forward.pop()
@@ -1717,7 +1817,8 @@ var ffindbar_plugin=function(){
 		obj.doc.sel0.ccnt=obj.m_sel0_before_find
 		obj.doc.sel1.ccnt=obj.m_sel1_before_find
 		obj.DestroyReplacingContext();
-		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+		var find_flag_mode=(obj.show_find_bar=="goto"?UI.SEARCH_FLAG_GOTO_MODE:0)
+		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags|find_flag_mode)
 	})
 	this.AddEventHandler('UP',function(){
 		var obj=this.owner
@@ -3068,44 +3169,47 @@ W.CodeEditor=function(id,attrs){
 				UI.PopCliprect()
 				UI.RoundRect({x:obj.x,y:obj.y,w:w_obj_area-w_scrolling_area,h:obj.h_find_bar,
 					color:obj.find_bar_bgcolor})
+				var show_flag_buttons=(obj.show_find_bar!="goto")
 				var rect_bar=UI.RoundRect({
 					x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
-					w:w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*4,h:obj.h_find_bar-obj.find_bar_padding*2,
+					w:w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?4:1),h:obj.h_find_bar-obj.find_bar_padding*2,
 					color:obj.find_bar_color,
 					round:obj.find_bar_round})
 				UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
 					obj.find_bar_hint_color,'s'.charCodeAt(0))
 				var x_button_right=rect_bar.x+rect_bar.w+obj.find_bar_padding
-				W.Button("find_button_case",{style:UI.default_styles.check_button,
-					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"写",tooltip:"Case sensitive",
-					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
-					OnChange:function(value){
-						UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
-						obj.DestroyReplacingContext();
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
-					}})
-				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
-				W.Button("find_button_word",{style:UI.default_styles.check_button,
-					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"字",tooltip:"Whole word",
-					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
-					OnChange:function(value){
-						UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
-						obj.DestroyReplacingContext();
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
-					}})
-				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
-				W.Button("find_button_regexp",{style:UI.default_styles.check_button,
-					x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-					font:UI.icon_font,text:"正",tooltip:"Regular expression",
-					value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
-					OnChange:function(value){
-						UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
-						obj.DestroyReplacingContext();
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
-					}})
-				x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+				if(show_flag_buttons){
+					W.Button("find_button_case",{style:UI.default_styles.check_button,
+						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
+						font:UI.icon_font,text:"写",tooltip:"Case sensitive",
+						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
+						OnChange:function(value){
+							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
+							obj.DestroyReplacingContext();
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+						}})
+					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+					W.Button("find_button_word",{style:UI.default_styles.check_button,
+						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
+						font:UI.icon_font,text:"字",tooltip:"Whole word",
+						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
+						OnChange:function(value){
+							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
+							obj.DestroyReplacingContext();
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+						}})
+					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+					W.Button("find_button_regexp",{style:UI.default_styles.check_button,
+						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
+						font:UI.icon_font,text:"正",tooltip:"Regular expression",
+						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
+						OnChange:function(value){
+							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
+							obj.DestroyReplacingContext();
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+						}})
+					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+				}
 				W.Button("find_button_close",{style:UI.default_styles.check_button,
 					x:x_button_right+2,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5+2,w:obj.find_bar_button_size-4,h:obj.find_bar_button_size-4,
 					font:UI.icon_font_20,text:"✕",tooltip:"Close - ESC",
@@ -3114,7 +3218,7 @@ W.CodeEditor=function(id,attrs){
 					}})
 				var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
 				var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
-				var previous_edit=obj.find_bar_edit
+				var previous_find_bar_edit=obj.find_bar_edit
 				W.Edit("find_bar_edit",{
 					language:doc.language,
 					plugin_language_desc:doc.plugin_language_desc,
@@ -3137,12 +3241,16 @@ W.CodeEditor=function(id,attrs){
 						}
 					},
 				},W.CodeEditor_prototype);
-				if(!previous_edit){
-					if(UI.m_ui_metadata.find_state.m_current_needle){
-						obj.find_bar_edit.HookedEdit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
+				if(!previous_find_bar_edit){
+					//the darn buttons do make sense in ctrl+g mode!
+					var find_flag_mode=(obj.show_find_bar=="goto"?UI.SEARCH_FLAG_GOTO_MODE:0)
+					if(UI.m_ui_metadata.find_state.m_current_needle||obj.show_find_bar=="goto"){
+						if(UI.m_ui_metadata.find_state.m_current_needle&&obj.show_find_bar!="goto"){
+							obj.find_bar_edit.HookedEdit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
+						}
 						obj.find_bar_edit.sel0.ccnt=0
 						obj.find_bar_edit.sel1.ccnt=obj.find_bar_edit.ed.GetTextSize()
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags|find_flag_mode)
 					}
 					UI.SetFocus(obj.find_bar_edit);
 					UI.InvalidateCurrentFrame();
@@ -3155,7 +3263,7 @@ W.CodeEditor=function(id,attrs){
 				if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 					W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 						font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-						text:"Search"})
+						text:obj.show_find_bar=="goto"?"Function / class / line number":"Search"})
 				}
 			}
 			//UI.RoundRect({
@@ -3252,9 +3360,9 @@ W.CodeEditor=function(id,attrs){
 				}
 				///////////////////////
 				var menu_search=UI.BigMenu("&Search")
-				menu_search.AddNormalItem({text:"&Find or replace",icon:"s",enable_hotkey:1,key:"CTRL+F",action:function(){
+				var finvoke_find=function(){
 					var sel=obj.doc.GetSelection()
-					obj.show_find_bar=1
+					obj.show_find_bar="find"
 					obj.m_sel0_before_find=obj.doc.sel0.ccnt
 					obj.m_sel1_before_find=obj.doc.sel1.ccnt
 					if(sel[0]<sel[1]){
@@ -3264,7 +3372,9 @@ W.CodeEditor=function(id,attrs){
 						}
 					}
 					UI.Refresh()
-				}})
+				};
+				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find})
+				W.Hotkey("",{text:"CTRL+R",action:finvoke_find})
 				menu_search.AddButtonRow({text:"Find "},[
 					{key:"SHIFT+CTRL+G SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+G',action:function(){
 						obj.FindNext(-1)
@@ -3289,6 +3399,53 @@ W.CodeEditor=function(id,attrs){
 						}},{key:"CTRL+D",text:"replace_down",icon:"下",tooltip:'Next - CTRL+D',action:function(){
 							obj.DoReplaceFromUI(1)
 						}}])
+				}
+				menu_search.AddSeparator();
+				menu_search.AddNormalItem({text:"&Go to...",enable_hotkey:1,key:"CTRL+G",action:function(){
+					var sel=obj.doc.GetSelection()
+					obj.show_find_bar="goto"
+					obj.m_sel0_before_find=obj.doc.sel0.ccnt
+					obj.m_sel1_before_find=obj.doc.sel1.ccnt
+					//if(sel[0]<sel[1]){
+					//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+					//}
+					//UI.m_ui_metadata.find_state.m_current_needle=""
+					UI.Refresh()
+				}})
+				if(doc.m_file_index&&doc.m_file_index.hasDecls()){
+					menu_search.AddNormalItem({text:"Go to &definition",enable_hotkey:1,key:"F12",action:function(){
+						var doc=obj.doc
+						var sel=doc.GetSelection();
+						var ed=doc.ed
+						sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
+						sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
+						if(sel[0]<sel[1]){
+							var id=ed.GetText(sel[0],sel[1]-sel[0])
+							var ccnt0=doc.sel1.ccnt
+							var ccnt=ccnt0
+							for(;;){
+								ccnt=doc.FindOuterLevel(ccnt);
+								if(!(ccnt>=0)){ccnt=0;}
+								if(doc.m_diff_from_save){
+									ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
+								}
+								var ccnt_decl=UI.ED_QueryDecl(doc,ccnt,id)
+								if(ccnt_decl>=0){
+									if(doc.m_diff_from_save){
+										ccnt_decl=doc.m_diff_from_save.BaseToCurrent(ccnt_decl)
+									}
+									if(ccnt_decl!=ccnt0){
+										doc.SetSelection(ccnt_decl,ccnt_decl)
+										UI.Refresh()
+										return;
+									}
+								}
+								if(!(ccnt>0)){break;}
+							}
+						}
+						//not found
+						//todo: check key decls by id only
+					}})
 				}
 				doc.CallHooks('menu')
 			}
