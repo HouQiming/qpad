@@ -5,6 +5,7 @@ import "text-box.jc"
 import "tex-like.jc"
 import "hunspell.jc"
 import "smart-find.jc"
+import "code-parser.jc"
 import System.Math.*
 import System.Algorithm.*
 import System.Console.*
@@ -14,6 +15,7 @@ import TextBox.*
 import TextBox.detail.*
 import TexLike.*
 import SmartFind.*
+import CodeParser.*
 
 //text -> i64[]
 auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
@@ -90,6 +92,7 @@ REAL_TYPE_ADD=2;
 DEFAULT_WRAP_WIDTH_IN_CHARS=2048LL
 GRACEFUL_WORD_SIZE=256
 MAX_ALLOWED_INDENTATION=20
+MAX_SPECIAL_COLOR_ID_SIZE=iptr(GRACEFUL_WORD_SIZE)
 
 struct TBracketType
 	int type
@@ -141,6 +144,9 @@ class CLanguageDescription
 	string m_trigger_chars
 	/////////
 	int m_color_id_spell_check
+	/////////
+	int[] m_key_decl_color_ids
+	int m_kd_color
 
 auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
 	//just use a glyph - '~' in the icon font!
@@ -207,6 +213,8 @@ class CLayouter_programmer
 	m_hidden_ranges=new CLocator[]
 	i64 m_w_ellipsis
 	m_ellipsis_items=new TEllipsisItem[]
+	/////////////////
+	CFileIndex m_file_index
 	/////////////////
 	charWidth=function(int ch){
 		if u32(ch)<u32(0x80):
@@ -436,6 +444,7 @@ class CLayouter_programmer
 		m_current_frame_strikeouts=new float3[]
 		m_w_ellipsis=float2fixed(obj["w_ellipsis"].as(float))
 		m_ellipsis_items.clear()
+		m_file_index=obj["m_file_index"].as(CFileIndex)
 	}
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
 		m_overlays.clear()
@@ -566,6 +575,8 @@ class CLayouter_programmer
 		word_char_map=m_lang.m_word_char_map
 		n_word_char_types=m_lang.m_n_word_char_types
 		color_id_spell_check=m_lang.m_color_id_spell_check
+		key_decl_color_ids=m_lang.m_key_decl_color_ids
+		kd_color=m_lang.m_kd_color
 		//start from word_ccnt0, do per-char enum until we go out of block
 		word_ccnt0=ccnt_base
 		budget=GRACEFUL_WORD_SIZE
@@ -579,6 +590,13 @@ class CLayouter_programmer
 		trigger_chars=m_lang.m_trigger_chars
 		word_ccnt0_bak=word_ccnt0-1
 		s_word=new string
+		file_index=m_file_index
+		if file_index:
+			BuildColorTable(file_index)
+			color_table=file_index.m_temp_color_table
+		else
+			color_table=int[int].NULL
+		s_temp_getid=new char[MAX_SPECIAL_COLOR_ID_SIZE]
 		for(;;)
 			//Writeln(word_ccnt0)
 			ch_first=0
@@ -617,6 +635,25 @@ class CLayouter_programmer
 					budget--
 					if budget<0:break
 			if st>=0:st=word_dfa[st+1]
+			//Writeln(word_ccnt0,' ',cid,' ',st)
+			if color_table&&st==~kd_color&&key_decl_color_ids:
+				//parser-based highlighting
+				s_temp_getid.n=MAX_SPECIAL_COLOR_ID_SIZE
+				p_s_temp_getid=0L
+				foreach ch,I in ed.enumCharsForward(word_ccnt0)//it's 8-bit here, not UTF8!
+					if p_s_temp_getid>=MAX_SPECIAL_COLOR_ID_SIZE:break
+					chi=int(u8(ch))
+					if !CharSet.has(CharSet.idbody,chi):break
+					s_temp_getid[p_s_temp_getid++]=char(ch)
+				if p_s_temp_getid&&!CharSet.has(CharSet.idhead,int(u8(s_temp_getid[0]))):
+					p_s_temp_getid=0L
+				if p_s_temp_getid:
+					s_temp_getid.n=p_s_temp_getid
+					id_temp=getid(s_temp_getid)
+					key_decl_type=color_table[id_temp]-1
+					//Writeln('>>> ',s_temp_getid,' ',id_temp,' ',key_decl_type)
+					if key_decl_type>=0:
+						st=~key_decl_color_ids[key_decl_type]
 			color_id=~st
 			need_spell_check=0
 			if m_spell_checker&&!m_temporarily_disable_spell_check:
@@ -877,6 +914,8 @@ class CLayouter_programmer
 			h_strikeout=hc*0.1f
 			foreach job in m_current_frame_strikeouts
 				g_renderer.DrawRectangle(job.x,job.y+(hc-h_strikeout)*0.5f,job.z,h_strikeout,C_strikeout)
+		////////////
+		m_file_index=CFileIndex.NULL
 	}
 	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		hid=ed.m_handler_registration["renderer"].as(int)
@@ -1856,6 +1895,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret.m_color_id_spell_check=getWordColorID(s_spell_color)
 		else
 			ret.m_color_id_spell_check=-1
+		s_kd_color=obj["m_color_id_key_decl"].as(string)
+		if s_kd_color:
+			ret.m_kd_color=getWordColorID(s_kd_color)
+		else
+			ret.m_kd_color=-1
+		//a unified color theme for now
+		ret.m_key_decl_color_ids=[
+			getWordColorID("color_key_decl_class"),
+			getWordColorID("color_key_decl_func"),
+			getWordColorID("color_key_decl_macro")]
 		init_state_by_kwset=new int[]
 		for ksi=0:m_keyword_sets.length()-1
 			keyword_set_i=m_keyword_sets[ksi].as(JSObject)
@@ -2045,10 +2094,10 @@ class CSavingContext
 	}
 
 ///////////////////////////////////////////
-inline chrequi(ch0,chw0)
-	ch=int(ch0)
-	chw=int(chw0)
-	return ch0==chw0||(ch^chw)==0x20&&u32((ch|0x20)-int('a'))<26u
+//inline chrequi(ch0,chw0)
+//	ch=int(ch0)
+//	chw=int(chw0)
+//	return ch0==chw0||(ch^chw)==0x20&&u32((ch|0x20)-int('a'))<26u
 
 auto KmpBuildTable(string s,int ocase)
 	if !s.n:return [-1]

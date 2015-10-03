@@ -183,6 +183,9 @@ TOK_AND_EQ=int('q')
 TOK_XOR_EQ=int('r')
 TOK_LSHIFT_EQ=int('s')
 TOK_RSHIFT_EQ=int('t')
+g_id_include=getid("#include")
+g_id_define=getid("#define")
+g_id_typedef=getid("typedef")
 g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 struct TToken
 	int tok
@@ -346,6 +349,8 @@ auto tokenize(string sdata,int g_ignore_indents)
 		else
 			ignore_indents=g_ignore_indents
 		return 1
+	s_include="include"
+	s_define="define"
 	for(;;)
 		skipchars(ignore_indents?CharSet.spaces_newline:CharSet.spaces)
 		ch=int(feed[ptr])
@@ -623,13 +628,109 @@ auto tokenize(string sdata,int g_ignore_indents)
 			break;
 		case '#':
 			//# as comment for Python, shell and C/C++
-			//todo: C macro recognition
+			pword=-1L
 			for(;;)
 				ch=int(feed[ptr])
 				if ch==0||ch=='\n':break
+				if pword<0&&ch!=' '&&ch!='\t':
+					pword=ptr
 				ptr++
 			if last_significant_newline_position==toks.n:
 				last_line_comment_position=toks.n
+			//C macro recognition: #define, #include
+			//make into token lists
+			if feed.n-pword>=8:
+				bk_ptr=ptr
+				if __basic_api.memcmp(__pointer(feed.d+pword),__pointer(s_include.d),s_include.n)==0:
+					//#include
+					push_token(TOK_ID+g_id_include,int(pword),int(pword+s_include.n))
+					//skip spaces
+					ptr=pword+s_include.n
+					skipchars(CharSet.spaces)
+					if ptr<feed.n:
+						c0=int(feed[ptr])
+						ptr++
+						if c0=='<':c0=int('>')
+						if c0=='>'||c0=='"':
+							//just tokens for now
+							efeed0=ptr
+							str=new string
+							while ptr<bk_ptr
+								c=int(feed[ptr]);ptr++
+								if c=='\\':
+									ch=int(feed[ptr])
+									if ch=='\r'||ch=='\n':
+										ptr++;ch=int(feed[ptr])
+										if ch=='\r'||ch=='\n':
+											ptr++;ch=int(feed[ptr])
+										continue
+									c=ch;ptr++;
+									switch c{
+									case 'n':
+										c=int('\n');break;
+									case 'r':
+										c=int('\r');break;
+									case 't':
+										c=int('\t');break;
+									case 'b':
+										c=int('\b');break;
+									case 'e':
+										c=27;
+										break;
+									case 'x','u':
+										chu=0
+										for j=0:(c=='u'?3:1)
+											chj=int(feed[ptr])
+											if chj:ptr++
+											si=((chj-'0')&0x1f)
+											if si>=0x10:si-=7
+											chu=chu*16+(si&0xf)
+										if c=='x':
+											str.push(char(chu))
+										else
+											if chu>=2048:
+												str.push(char(((chu>>12)&0xf)+0xe0))
+												str.push(char(0x80+((chu>>6)&63)))
+												str.push(char(0x80+(chu&63)))
+											else if chu>=128:
+												str.push(char((chu>>6)+0xc0))
+												str.push(char(0x80+(chu&63)))
+											else
+												str.push(char(chu))
+										continue
+									default:
+										if CharSet.has(CharSet.digits,c):
+											ptr--
+											s=ptr
+											skipchars(CharSet.digits)
+											c=0
+											for(;s!=ptr;s++)
+												si=int(feed[s])
+												c=c*8+(si-'0')
+										break
+									}
+								else
+									if c==c0:break
+								str.push(char(c))
+							//need the id for include
+							push_token(TOK_STRING+getid(str),int(efeed0),int(ptr)-1)
+					push_token(int(';'),int(bk_ptr-1),int(bk_ptr))
+				else if __basic_api.memcmp(__pointer(feed.d+pword),__pointer(s_define.d),s_define.n)==0:
+					//#define
+					push_token(TOK_ID+g_id_define,int(pword),int(pword+s_define.n))
+					//grab the id, test for ()
+					ptr=pword+s_define.n
+					skipchars(CharSet.spaces)
+					s=ptr
+					skipchars(CharSet.idbody)
+					//Writeln('#define ',pword,' ',s,' ',ptr,' ',cite_raw(pword,ptr))
+					id=getid(cite_raw(s,ptr))
+					push_token(TOK_ID+id,int(s),int(ptr))
+					if ptr<feed.n&&int(feed[ptr])=='(':
+						push_token(int('('),int(ptr),int(ptr))
+						push_token(int(')'),int(ptr),int(ptr))
+					push_token(int(';'),int(bk_ptr-1),int(bk_ptr))
+				ptr=bk_ptr
 			continue
 		}
 		//toks.push(TToken(){'tok':ch0,'epos0':int(epos0_ch0),'epos1':int(ptr)})
@@ -665,6 +766,7 @@ struct TDeclItem
 	int epos0
 KEY_DECL_CLASS=TOK_TYPE*0
 KEY_DECL_FUNCTION=TOK_TYPE*1
+KEY_DECL_MACRO=TOK_TYPE*2
 KEY_DECL_MASK=TOK_TYPE_MASK
 struct TKeyDeclItem
 	//we don't need to know the scope
@@ -681,6 +783,13 @@ class CFileIndex
 	TKeyDeclItem[] m_all_key_decls
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
+	//dependency
+	int[] m_dep_files
+	//////////////////
+	//transient items
+	int m_all_dep_files_considered
+	int[int] m_temp_color_table
+	iptr m_temp_color_table_time //~g_color_table_time
 	JS_hasDecls=function(JSContext JS){
 		return JS.Return(!!m_all_decls)
 	}
@@ -732,6 +841,8 @@ inline IDToOrder(id)
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 g_function_ids=[getid("function"),getid("inline")]
+g_c_like_parse_queue=new int[]
+g_color_table_time=1L
 auto parseAsCLike(string sdata,JSObject options)
 	//enable_semantics=options["enable_semantics"].or(0)
 	sdataz=new char[sdata.n+1]
@@ -747,6 +858,11 @@ auto parseAsCLike(string sdata,JSObject options)
 	foreach id,I in keywords
 		keyword_map[id]=int(I+1)
 	///////////////////
+	dep_files=new int[]
+	inline addDepFile(int idfn_include)
+		dep_files.push(idfn_include)
+		g_c_like_parse_queue.push(idfn_include)
+	///////////////////
 	struct TStkEntry
 		int m_function_id
 		int m_param_id
@@ -754,7 +870,9 @@ auto parseAsCLike(string sdata,JSObject options)
 	struct TScopeEntry
 		int ptok0
 		int pdecls
+		int blevel
 		char in_assignment
+		char in_typedef
 	ss=new TStkEntry[]
 	scopes=new TScopeEntry[]
 	sc_decls=new int2[]
@@ -793,10 +911,22 @@ auto parseAsCLike(string sdata,JSObject options)
 				if function_id:
 					func_param_entries.push(int3(function_id,param_id,id))
 				/////////
-				//decl
-				if scopes.n:
+				//#include, #define, typedef
+				if tok_i==TOK_ID+g_id_include:
+					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
+						idfn_include=tok1-TOK_STRING
+						addDepFile(idfn_include)
+				else if tok_i==TOK_ID+g_id_define:
+					//do nothing, next id does it
+					//just discount it as decl
+				else if tok_i==TOK_ID+g_id_typedef:
+					scopes[scopes.n-1].in_typedef=i8(1)
+				else if scopes.n:
+					/////////
+					//decl
 					sc=scopes[scopes.n-1]
-					if !sc.in_assignment:
+					if !sc.in_assignment&&!sc.blevel:
 						tok0=(i>0?toks[i-1].tok:int(';'))
 						tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
 						if tok0=='.'&&tok1=='=':
@@ -809,46 +939,53 @@ auto parseAsCLike(string sdata,JSObject options)
 								break
 							if is_function:
 								tok0=int(';')
-						if !(tok1=='('&&tok0==';')&&tok1!='{'&&tok0!='.'&&!keyword_map[id]:
+						//((tok1&TOK_TYPE_MASK)==TOK_ID||tok1=='*'||tok1=='['||tok1=='('||tok1=='&')
+						if !(tok0==';'&&tok1!='=')&&tok1!='{'&&tok0!='.'&&tok1!='.'&&!keyword_map[id]:
 							//declaration
 							sc_decls.push(int2(id,int(i)))
 							//important-ish check
-							//class - class/struct/namespace/module ID[anything other than ; / * / id[,;=]]
-							is_class=0
-							if (tok0&TOK_TYPE_MASK)==TOK_ID:
-								foreach id_class in g_class_ids
-									if tok0!=TOK_ID+id_class:continue
-									//check whether it's a C-like declaration (using 'struct foo' as type) or a forward declaration, or a template param
-									if tok1=='*'||tok1==';'||tok1==','||tok1=='>'||tok1==TOK_GG:continue
-									if (tok1&TOK_TYPE_MASK)==TOK_ID:
-										tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
-										if tok2==','||tok2==';'||tok2=='=':
-											//guilty
-											continue
-									is_class=1
-									break
-							if is_class:
+							//#define
+							if tok0==TOK_ID+g_id_define:
 								all_key_decls.push(TKeyDeclItem(){
-									id_type:id+KEY_DECL_CLASS,
+									id_type:id+KEY_DECL_MACRO,
 									epos0:toks[i].epos0})
 							else
-								//function
-								is_function=0
-								if tok1=='='||tok1==':'
-									//ID =/: function/inline/...
-									tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
-									foreach id_func in g_function_ids
-										if tok2!=TOK_ID+id_func:continue
-										is_function=1
+								//class - class/struct/namespace/module ID[anything other than ; / * / id[,;=]]
+								is_class=int(sc.in_typedef)
+								if !is_class&&(tok0&TOK_TYPE_MASK)==TOK_ID:
+									foreach id_class in g_class_ids
+										if tok0!=TOK_ID+id_class:continue
+										//check whether it's a C-like declaration (using 'struct foo' as type) or a forward declaration, or a template param
+										if tok1=='*'||tok1==';'||tok1==','||tok1=='>'||tok1==TOK_GG:continue
+										if (tok1&TOK_TYPE_MASK)==TOK_ID:
+											tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
+											if tok2==','||tok2==';'||tok2=='=':
+												//guilty
+												continue
+										is_class=1
 										break
-									if tok0==')'&&tok1==':'&&tok2=='(':
-										//)ID:( -- objective C
-										is_function=1
-								//ID(...){ needs stack-based backtracking, test it later in the function_id line
-								if is_function:
+								if is_class:
 									all_key_decls.push(TKeyDeclItem(){
-										id_type:id+KEY_DECL_FUNCTION,
+										id_type:id+KEY_DECL_CLASS,
 										epos0:toks[i].epos0})
+								else
+									//function
+									is_function=0
+									if tok1=='='||tok1==':'
+										//ID =/: function/inline/...
+										tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
+										foreach id_func in g_function_ids
+											if tok2!=TOK_ID+id_func:continue
+											is_function=1
+											break
+										if tok0==')'&&tok1==':'&&tok2=='(':
+											//)ID:( -- objective C
+											is_function=1
+									//ID(...){ needs stack-based backtracking, test it later in the function_id line
+									if is_function:
+										all_key_decls.push(TKeyDeclItem(){
+											id_type:id+KEY_DECL_FUNCTION,
+											epos0:toks[i].epos0})
 			break
 		case '(','[','{':
 			ss.push(TStkEntry(){m_function_id:function_id,m_ptok_function_id:ptok_function_id,m_param_id:param_id})
@@ -866,6 +1003,8 @@ auto parseAsCLike(string sdata,JSObject options)
 			///////////
 			if tok_i=='{':
 				scopes.push(TScopeEntry(){ptok0:int(i),pdecls:int(sc_decls.n)})
+			else
+				scopes[scopes.n-1].blevel++
 			break
 		case ')',']','}':
 			if ss.n:
@@ -885,6 +1024,8 @@ auto parseAsCLike(string sdata,JSObject options)
 				if scopes.n>1:
 					//process the decls - sort, unique
 					popScope()
+			else
+				scopes[scopes.n-1].blevel--
 			break
 		case ',':
 			if function_id:
@@ -906,6 +1047,7 @@ auto parseAsCLike(string sdata,JSObject options)
 		case ';':
 			if scopes.n:
 				scopes[scopes.n-1].in_assignment=i8(0)
+				scopes[scopes.n-1].in_typedef=i8(0)
 			break
 		}
 	popScope()
@@ -939,6 +1081,7 @@ auto parseAsCLike(string sdata,JSObject options)
 		m_function_bracket_index:function_bracket_index,
 		m_all_decls:all_decls,
 		m_all_key_decls:all_key_decls,
+		m_dep_files:dep_files,
 	}
 
 auto parseAsText(string sdata,JSObject options)
@@ -1021,7 +1164,8 @@ auto CommonPrefix(string a,string b)
 	return retx
 
 struct TGlobalKeyDeclItem
-	int idfn_type
+	int idfn
+	int id_type
 	int epos0
 	int w,x
 class CKeyDeclFile
@@ -1063,7 +1207,8 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls)
 	llnodes=kdf.llnodes
 	foreach kd in all_key_decls
 		p=AllocGKD()
-		g_key_decls[p].idfn_type=(idfn|(kd.id_type&KEY_DECL_MASK))
+		g_key_decls[p].idfn=idfn
+		g_key_decls[p].id_type=kd.id_type
 		g_key_decls[p].epos0=kd.epos0
 		id=kd.id_type&~KEY_DECL_MASK
 		px=g_symbols[id].gkd_x
@@ -1077,8 +1222,50 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls)
 			g_key_decls[px].w=p
 		llnodes.push(p)
 
+auto BuildColorTable(CFileIndex file_index)
+	if !file_index.m_all_key_decls:
+		return
+	if !file_index.m_all_dep_files_considered&&file_index.m_temp_color_table_time!=g_color_table_time:
+		temp_color_table=new int[int]
+		all_dep_files_considered=1
+		for kd in file_index.m_all_key_decls
+			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
+			//Writeln(getIdString(kd.id_type&~KEY_DECL_MASK),' ',int(u32(kd.id_type)/u32(TOK_TYPE)))
+		if file_index.m_dep_files:
+			foreach idfn_dep in file_index.m_dep_files
+				kdfile=g_key_decl_files[idfn_dep]
+				if !kdfile:
+					all_dep_files_considered=0
+					continue
+				foreach p in kdfile.llnodes
+					gkd=g_key_decls[p]
+					temp_color_table[gkd.id_type&~KEY_DECL_MASK]=int(u32(gkd.id_type)/u32(TOK_TYPE))+1
+					//Writeln(getIdString(gkd.id_type&~KEY_DECL_MASK),' ',int(u32(gkd.id_type)/u32(TOK_TYPE)))
+		file_index.m_all_dep_files_considered=all_dep_files_considered
+		file_index.m_temp_color_table=temp_color_table
+		file_index.m_temp_color_table_time=g_color_table_time
+
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
-	//todo: multithread it - other-threadly JS ctx? options...
+	//todo: budgeted parse
+	JS_UI["ED_ParseMore"]=function(JSContext JS){
+		while g_c_like_parse_queue.n:
+			idfn=g_c_like_parse_queue.pop()
+			fn=getIdString(idfn)
+			sdata=System.IO.ReadAll(fn)
+			if !sdata:continue
+			//call JS to get the language desc
+			options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
+			sparser=options["parser"].or("text")
+			if sparser!="C":
+				sdata.discard()
+				continue
+			ret=parseAsCLike(sdata,options)
+			if ret.m_all_key_decls:
+				ApplyKeyDecls(idfn,ret.m_all_key_decls)
+			g_color_table_time++
+			return JS.Return(1)
+		return 0
+	}
 	JS_UI["ED_ParseAs"]=function(JSContext JS){
 		fn=JS.Param(0).as(string)
 		options=JS.Param(1).as(JSObject)
@@ -1292,7 +1479,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret[I*3+2]=ccnt
 		return JS.Return(ret)
 	}
-	//todo: query key decl: file relevance
+	JS_UI["ED_QueryKeyDeclByID"]=function(JSContext JS){
+		s=JS.Param(0).as(string)
+		id=getid(s)
+		ret=JS.NewArray()
+		n=0
+		for(p=g_symbols[id].gkd_x;p>=0L;p=g_key_decls[p].x)
+			ret[n*2+0]=getIdString(g_key_decls[p].idfn)
+			ret[n*2+1]=g_key_decls[p].epos0
+			n++
+		return JS.Return(ret)
+	}
 	JS_UI["ED_CopyCase"]=function(JSContext JS){
 		s_src=Utf8ToUnicode32(JS.Param(0).as(string))
 		s_src_lower=Utf8ToUnicode32(JS.Param(1).as(string))

@@ -264,6 +264,7 @@ UI.Theme_CustomWidget=function(C){
 				//tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",32,200),
 				//font_tilde:UI.Font(UI.icon_font_name,32,100),
 				color:0xff000000,
+				color2:0xff000000,
 				color_normal:0xff000000,
 				color_overlay:0xff7f7f7f,
 				color_string:0xff1c1aa3,
@@ -274,6 +275,10 @@ UI.Theme_CustomWidget=function(C){
 				color_symbol:0xff7f7f7f,
 				color_symbol2:0xff7f7f7f,
 				color_meta:0xff9a3d6a,
+				/////////////
+				color_key_decl_func:0xff845717,//0xff5a3b0f,
+				color_key_decl_class:0xffbc470f,
+				color_key_decl_macro:0xff9a3d6a,
 				/////////////
 				//virtual hyphen for tex-like files, should be even less obvious than normal symbols
 				color_hyphen:0xffaaaaaa,

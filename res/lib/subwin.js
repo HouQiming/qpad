@@ -97,6 +97,10 @@ W.TabbedDocument_prototype={
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		UI.Refresh()
 	},
+	SetTab:function(tabid){
+		this.current_tab_id=tabid
+		UI.Refresh()
+	},
 	SaveTab:function(tabid){
 		var active_document=this.items[tabid];
 		active_document.Save()

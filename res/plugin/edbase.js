@@ -33,6 +33,7 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	}
 	kwset.DefineWordColor("color")
 	kwset.DefineWordType("color_number","0-9")
+	lang.SetKeyDeclsBaseColor("color")
 	return (function(lang){
 		if(has_preprocessor){
 			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2,bid_preprocessor]);
@@ -223,7 +224,8 @@ Language.Register({
 			'script',
 			'break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','window','document'])
 		kwset.DefineKeywords("color_type",['typeof','var','void','boolean','byte','int','short','char','double','long','float'])
-		kwset.DefineWordColor("color")
+		kwset.DefineWordColor("color2")
+		lang.SetKeyDeclsBaseColor("color2")
 		return (function(lang){
 			//lang.SetExclusive([bid_comment,bid_tag,bid_script]);
 			lang.SetExclusive([bid_comment,bid_script]);
@@ -431,6 +433,7 @@ Language.Register({
 		kwset.DefineKeywords("color_keyword",['if','else','end','elseif','function','otherwise','switch','case','for','while','break','continue','try','catch','throw','rethrow','true','false'])
 		kwset.DefineWordColor("color")
 		kwset.DefineWordType("color_number","0-9")
+		lang.SetKeyDeclsBaseColor("color")
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_string])
 			if(lang.isInside(bid_comment)||lang.isInside(bid_string)){
@@ -462,6 +465,7 @@ Language.Register({
 		kwset.DefineKeywords("color_keyword",['and','del','from','not','while','as','elif','global','or','with','assert','else','if','pass','yield','break','except','import','print','class','exec','in','raise','continue','finally','is','return','for','try','True','False'])
 		kwset.DefineWordColor("color")
 		kwset.DefineWordType("color_number","0-9")
+		lang.SetKeyDeclsBaseColor("color")
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_string0,bid_string1,bid_string2,bid_string3])
 			if(lang.isInside(bid_comment)||lang.isInside(bid_string0)||lang.isInside(bid_string1)||lang.isInside(bid_string2)||lang.isInside(bid_string3)){
@@ -2274,6 +2278,7 @@ UI.RegisterEditorPlugin(function(){
 			this.m_autoedit_range_highlight.discard()
 			this.m_autoedit_range_highlight=undefined
 		}
+		this.m_autoedit_example_line_id=undefined
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		renderer.m_tentative_editops=undefined
 		renderer.ResetTentativeOps()

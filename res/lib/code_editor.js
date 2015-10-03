@@ -22,6 +22,7 @@ if(!UI.m_ui_metadata.find_state){
 UI.m_code_editor_persistent_members=[
 	//"m_current_needle",
 	//"m_find_flags",
+	"m_language_id",
 	"m_current_wrap_width",
 	"m_enable_wrapping",
 	"m_hyphenator_name",
@@ -910,6 +911,20 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 	//ctx.m_backward_frontier=-1
 }
 
+var g_is_parse_more_running=0
+var CallParseMore=function(){
+	if(g_is_parse_more_running){return;}
+	var fcallmore=UI.HackCallback(function(){
+		if(UI.ED_ParseMore()){
+			UI.NextTick(fcallmore)
+		}else{
+			g_is_parse_more_running=0
+		}
+	});
+	g_is_parse_more_running=1
+	UI.NextTick(fcallmore)
+};
+
 W.CodeEditorWidget_prototype={
 	m_current_wrap_width:1024,
 	m_enable_wrapping:0,
@@ -1012,6 +1027,13 @@ W.CodeEditorWidget_prototype={
 		doc.CallHooks("selectionChange")
 		doc.CallHooks("load")
 		this.ParseFile()
+		var cbs=this.opening_callbacks
+		if(cbs){
+			for(var i=0;i<cbs.length;i++){
+				cbs[i].call(this);
+			}
+			this.opening_callbacks=undefined
+		}
 		UI.Refresh()
 	},
 	SaveMetaData:function(){
@@ -1798,6 +1820,7 @@ W.CodeEditorWidget_prototype={
 		}
 		doc.m_file_index=UI.ED_ParseAs(this.file_name,doc.plugin_language_desc)
 		doc.CallHooks("parse")
+		CallParseMore()
 	},
 }
 
@@ -2409,6 +2432,13 @@ W.SXS_NewPage=function(id,attrs){
 	return obj
 }
 
+UI.ED_ParseMore_callback=function(fn){
+	var s_ext=UI.GetFileNameExtension(fn)
+	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
+	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
+	return Language.GetDefinitionByName(language_id)
+}
+
 W.CodeEditor=function(id,attrs){
 	var tick0
 	if(UI.enable_timing){
@@ -2578,8 +2608,20 @@ W.CodeEditor=function(id,attrs){
 				var scroll_y=doc.visible_scroll_y;
 				var area_w=doc.w
 				var area_h=doc.h
-				var rendering_ccnt0=doc.SeekXY(scroll_x,scroll_y)
-				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,scroll_y+area_h)
+				var y0_rendering=scroll_y
+				var y1_rendering=scroll_y+area_h
+				if(obj.show_minimap){
+					var y_scrolling_area=obj.y
+					var effective_scroll_y=doc.visible_scroll_y
+					var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
+					var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
+					var h_minimap=h_scrolling_area/minimap_scale
+					var scroll_y_minimap=sbar_value*Math.max(ytot-h_minimap,0)
+					if(y0_rendering>scroll_y_minimap){y0_rendering=scroll_y_minimap;}
+					if(y1_rendering<scroll_y_minimap+h_minimap){y1_rendering=scroll_y_minimap+h_minimap;}
+				}
+				var rendering_ccnt0=doc.SeekXY(scroll_x,y0_rendering)
+				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,y1_rendering)
 				obj.ResetFindingContext(UI.m_ui_metadata.find_state.m_current_needle,UI.m_ui_metadata.find_state.m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
 				var ctx=obj.m_current_find_context
 				current_find_context=ctx
@@ -3442,9 +3484,33 @@ W.CodeEditor=function(id,attrs){
 								}
 								if(!(ccnt>0)){break;}
 							}
+							var gkds=UI.ED_QueryKeyDeclByID(id)
+							//not found, check key decls by id only
+							var fn=doc.file_name
+							var p_target=0
+							ccnt=ccnt0
+							if(doc.m_diff_from_save){
+								ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
+							}
+							for(var i=0;i<gkds.length;i+=2){
+								if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
+									p_target=i+2
+									break
+								}
+							}
+							if(p_target<gkds.length){
+								var ccnt_go=gkds[p_target+1]
+								UI.OpenEditorWindow(gkds[p_target+0],function(){
+									var doc=this
+									var ccnt=ccnt_go
+									if(doc.m_diff_from_save){
+										ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
+									}
+									doc.SetSelection(ccnt,ccnt)
+									UI.Refresh()
+								})
+							}
 						}
-						//not found
-						//todo: check key decls by id only
 					}})
 				}
 				doc.CallHooks('menu')
@@ -3581,10 +3647,7 @@ UI.NewCodeEditorTab=function(fname0){
 				this.doc=body;
 				body.m_is_brand_new=(!fname0&&this.auto_focus_file_search)
 				if(this.opening_callbacks.length){
-					var cbs=this.opening_callbacks
-					for(var i=0;i<cbs.length;i++){
-						cbs[i].call(body.doc);
-					}
+					body.doc.opening_callbacks=this.opening_callbacks
 					this.opening_callbacks=[]
 				}
 			}
@@ -3643,6 +3706,7 @@ UI.OpenEditorWindow=function(fname,fcallback){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		if(UI.g_all_document_windows[i].file_name==fname){
 			obj_tab=UI.g_all_document_windows[i]
+			UI.top.app.document_area.SetTab(i)
 			break
 		}
 	}

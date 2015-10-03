@@ -226,6 +226,9 @@ LanguageDefinition.prototype={
 	SetSpellCheckedColor:function(color){
 		this.m_color_id_spell_check=color
 	},
+	SetKeyDeclsBaseColor:function(color){
+		this.m_color_id_key_decl=color
+	},
 };
 
 exports.Define=function(frules,owner){
