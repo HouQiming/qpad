@@ -3221,35 +3221,38 @@ W.CodeEditor=function(id,attrs){
 					obj.find_bar_hint_color,'s'.charCodeAt(0))
 				var x_button_right=rect_bar.x+rect_bar.w+obj.find_bar_padding
 				if(show_flag_buttons){
-					W.Button("find_button_case",{style:UI.default_styles.check_button,
+					var btn_case=W.Button("find_button_case",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"写",tooltip:"Case sensitive",
+						font:UI.icon_font,text:"写",tooltip:"Case sensitive - ALT+C",
 						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
 							obj.DestroyReplacingContext();
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
+					W.Hotkey("",{key:"ALT+C",action:function(){btn_case.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
-					W.Button("find_button_word",{style:UI.default_styles.check_button,
+					var btn_word=W.Button("find_button_word",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"字",tooltip:"Whole word",
+						font:UI.icon_font,text:"字",tooltip:"Whole word - ALT+H",
 						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
 							obj.DestroyReplacingContext();
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
+					W.Hotkey("",{key:"ALT+H",action:function(){btn_word.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
-					W.Button("find_button_regexp",{style:UI.default_styles.check_button,
+					var btn_regexp=W.Button("find_button_regexp",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"正",tooltip:"Regular expression",
+						font:UI.icon_font,text:"正",tooltip:"Regular expression - ALT+E",
 						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
 							obj.DestroyReplacingContext();
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
+					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				}
 				W.Button("find_button_close",{style:UI.default_styles.check_button,
@@ -3417,7 +3420,7 @@ W.CodeEditor=function(id,attrs){
 				};
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find})
 				W.Hotkey("",{text:"CTRL+R",action:finvoke_find})
-				menu_search.AddButtonRow({text:"Find "},[
+				menu_search.AddButtonRow({text:"Find prev / next"},[
 					{key:"SHIFT+CTRL+G SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+G',action:function(){
 						obj.FindNext(-1)
 					}},{key:"CTRL+G F3",text:"find_down",icon:"下",tooltip:'Next - CTRL+G',action:function(){

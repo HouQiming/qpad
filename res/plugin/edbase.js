@@ -1521,12 +1521,18 @@ UI.RegisterEditorPlugin(function(){
 		if(UI.HasFocus(this)&&enabled){
 			var menu_search=UI.BigMenu("&Search")
 			var doc=this;
+			var ccnt=this.sel1.ccnt
+			var sicon="｛";
+			if(ccnt==this.m_lbracket_p0.ccnt||ccnt==this.m_lbracket_p1.ccnt){
+				sicon="｝";
+			}
 			menu_search.AddSeparator();
 			menu_search.AddButtonRow({icon:"プ",text:"Parenthesis"},[
-				{text:"&match",tooltip:'CTRL+P',action:function(){
+				{text:"parenthesis_match",icon:sicon,tooltip:'Go to matching - CTRL+P',action:function(){
 					goto_matching_bracket.call(doc,0)
-				}},{text:"&select to",tooltip:'SHIFT+CTRL+P',action:function(){
-					goto_matching_bracket.call(doc,1)
+				}},{text:"parenthesis_sel",icon:"选",tooltip:'Select between - SHIFT+CTRL+P',action:function(){
+					//text:"&select to"
+					goto_matching_bracket.call(doc,1);
 				}}])
 		}
 	})
