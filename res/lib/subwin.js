@@ -134,6 +134,9 @@ W.TabbedDocument_prototype={
 				tab_i.SaveMetaData()
 			}
 		}
+		if(ret==0){
+			UI.SaveWorkspace();
+		}
 		var window_list=this.items
 		var n2=0;
 		for(var i=0;i<window_list.length;i++){

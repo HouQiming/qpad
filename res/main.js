@@ -630,6 +630,8 @@ UI.ZoomReset=function(){
 	UI.pixels_per_unit=UI.pixels_per_unit_base
 	UI.UpdateZoom()
 }
+
+var g_app_inited=0
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -799,6 +801,26 @@ UI.Application=function(id,attrs){
 			}});
 		UI.End();
 	UI.End();
+	if(!g_app_inited){
+		var workspace=UI.m_ui_metadata["<workspace>"]
+		var fn_current_tab=UI.m_ui_metadata["<current_tab>"]
+		if(workspace){
+			var current_tab_id=undefined
+			for(var i=0;i<workspace.length;i++){
+				UI.NewCodeEditorTab(workspace[i])
+				if(workspace[i]==fn_current_tab){
+					current_tab_id=i;
+				}
+			}
+			if(current_tab_id!=undefined){
+				UI.top.app.document_area.SetTab(current_tab_id)
+				UI.top.app.document_area.n_tabs_last_checked=g_all_document_windows.length
+			}
+			UI.InvalidateCurrentFrame();
+			UI.Refresh()
+		}
+		g_app_inited=1
+	}
 	if(!g_all_document_windows.length){
 		//UI.NewUIEditorTab()
 		//UI.NewCodeEditorTab()

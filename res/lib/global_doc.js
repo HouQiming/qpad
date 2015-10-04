@@ -431,6 +431,19 @@ UI.NewFromTemplate=function(fn_template,fn_real){
 }
 
 ////////////////////////////////////
+UI.SaveWorkspace=function(){
+	//workspace
+	var workspace=[]
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var wnd=UI.g_all_document_windows[i]
+		if(wnd.doc&&wnd.doc.m_is_brand_new){continue;}
+		workspace.push(wnd.file_name)
+	}
+	UI.m_ui_metadata["<workspace>"]=workspace
+	var fn_current_tab=UI.g_all_document_windows[UI.top.app.document_area.current_tab_id].file_name
+	UI.m_ui_metadata["<current_tab>"]=fn_current_tab
+}
+
 UI.BumpHistory=function(file_name){
 	var hist=UI.m_ui_metadata["<history>"]
 	if(!hist){

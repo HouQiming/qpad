@@ -924,7 +924,7 @@ var CallParseMore=function(){
 					break
 				}
 			}
-			if(obj_tab){
+			if(obj_tab&&obj_tab.doc&&obj_tab.doc.doc){
 				obj_tab.doc.doc.m_file_index=ret.file_index
 			}else{
 				//not-opened-yet
@@ -3512,19 +3512,19 @@ W.CodeEditor=function(id,attrs){
 							obj.DoReplaceFromUI(1)
 						}}])
 				}
-				menu_search.AddSeparator();
-				menu_search.AddNormalItem({text:"&Go to...",enable_hotkey:1,key:"CTRL+G",action:function(){
-					var sel=obj.doc.GetSelection()
-					obj.show_find_bar="goto"
-					obj.m_sel0_before_find=obj.doc.sel0.ccnt
-					obj.m_sel1_before_find=obj.doc.sel1.ccnt
-					//if(sel[0]<sel[1]){
-					//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-					//}
-					//UI.m_ui_metadata.find_state.m_current_needle=""
-					UI.Refresh()
-				}})
 				if(doc.m_file_index&&doc.m_file_index.hasDecls()){
+					menu_search.AddSeparator();
+					menu_search.AddNormalItem({text:"&Go to...",enable_hotkey:1,key:"CTRL+G",action:function(){
+						var sel=obj.doc.GetSelection()
+						obj.show_find_bar="goto"
+						obj.m_sel0_before_find=obj.doc.sel0.ccnt
+						obj.m_sel1_before_find=obj.doc.sel1.ccnt
+						//if(sel[0]<sel[1]){
+						//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+						//}
+						//UI.m_ui_metadata.find_state.m_current_needle=""
+						UI.Refresh()
+					}})
 					menu_search.AddNormalItem({text:"Go to &definition",enable_hotkey:1,key:"F12",action:function(){
 						var doc=obj.doc
 						var sel=doc.GetSelection();

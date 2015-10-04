@@ -1377,19 +1377,50 @@ UI.RegisterEditorPlugin(function(){
 		UI.Refresh()
 		return 0;
 	});
-	this.AddEventHandler('F2',function(){
+	var fnextbm=function(is_sel){
 		var ccnt=this.sel1.ccnt;
 		var bm=this.FindNearestBookmark(ccnt+1,1)
 		if(!bm){return 1;}
-		this.SetCaretTo(bm.ccnt)
+		if(is_sel){
+			this.SetSelection(ccnt,bm.ccnt)
+		}else{
+			this.SetCaretTo(bm.ccnt)
+		}
 		return 0;
-	})
-	this.AddEventHandler('SHIFT+F2',function(){
+	}
+	this.AddEventHandler('F2',fnextbm)
+	var fprevbm=function(is_sel){
 		var ccnt=this.sel1.ccnt;
 		var bm=this.FindNearestBookmark(ccnt-1,-1)
 		if(!bm){return 1;}
-		this.SetCaretTo(bm.ccnt)
+		if(is_sel){
+			this.SetSelection(ccnt,bm.ccnt)
+		}else{
+			this.SetCaretTo(bm.ccnt)
+		}
 		return 0;
+	}
+	this.AddEventHandler('SHIFT+F2',fprevbm)
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			menu_search.AddSeparator();
+			menu_search.AddButtonRow({text:"Go to bookmark"},[
+				{text:"bookmark_up",icon:"上",tooltip:'Prev - SHIFT+F2',action:function(){
+					fprevbm.call(doc)
+				}},{text:"bookmark_down",icon:"下",tooltip:'Next - F2',action:function(){
+					//text:"&select to"
+					fnextbm.call(doc)
+				}}])
+			menu_search.AddButtonRow({text:"Select to bookmark"},[
+				{text:"bookmark_sel_up",icon:"上",tooltip:'Prev',action:function(){
+					fprevbm.call(doc,1)
+				}},{text:"bookmark_sel_down",icon:"下",tooltip:'Next',action:function(){
+					//text:"&select to"
+					fnextbm.call(doc,1)
+				}}])
+		}
 	})
 }).prototype.name="Bookmarks";
 
