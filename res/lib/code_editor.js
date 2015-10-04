@@ -1027,10 +1027,11 @@ W.CodeEditorWidget_prototype={
 		doc.CallHooks("selectionChange")
 		doc.CallHooks("load")
 		this.ParseFile()
+		this.m_finished_loading=1
 		var cbs=this.opening_callbacks
 		if(cbs){
 			for(var i=0;i<cbs.length;i++){
-				cbs[i].call(this);
+				cbs[i].call(this.doc);
 			}
 			this.opening_callbacks=undefined
 		}
@@ -1819,6 +1820,7 @@ W.CodeEditorWidget_prototype={
 			return;
 		}
 		doc.m_file_index=UI.ED_ParseAs(this.file_name,doc.plugin_language_desc)
+		//todo: UI.ED_ParserQueueFile(this.file_name)
 		doc.CallHooks("parse")
 		CallParseMore()
 	},
@@ -2436,7 +2438,53 @@ UI.ED_ParseMore_callback=function(fn){
 	var s_ext=UI.GetFileNameExtension(fn)
 	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
 	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
-	return Language.GetDefinitionByName(language_id)
+	var ret=Language.GetDescObjectByName(language_id)
+	if(s_ext=="h"){
+		var fn_main=UI.GetMainFileName(fn);
+		var exts=[".c",".cpp",".cxx",".cc",".C",".m"]
+		for(var i=0;i<exts.length;i++){
+			var fn_c=UI.ED_SearchIncludeFile(fn,fn_main+exts[i],ret)
+			if(fn_c){UI.ED_ParserQueueFile(fn_c)}
+		}
+	}
+	return ret
+}
+
+UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		fn_include=fn_include.toLowerCase().replace("\\","/")
+	}
+	var fn_include_length=fn_include.length
+	//base path
+	var spath=UI.GetPathFromFilename(fn_base)
+	var fn=(spath+"/"+fn_include);
+	if(IO.FileExists(fn)){return fn}
+	//git
+	var repos=g_repo_from_file[fn]
+	if(repos){
+		for(var spath in repos){
+			var files=g_repo_list[spath].files
+			for(var i=0;i<files.length;i++){
+				var fn_i=files[i]
+				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+					fn_i=fn_i.toLowerCase().replace("\\","/")
+				}
+				if(fn_i.length<fn_include_length){continue;}
+				if(fn_i.substr(fn_i.length-fn_include_length)==fn_include&&IO.FileExists(fn_i)){
+					return fn_i
+				}
+			}
+		}
+	}
+	//standard include paths
+	if(options.include_paths){
+		var paths=options.include_paths
+		for(var i=0;i<paths.length;i++){
+			var fn=paths[i]+'/'+fn_include
+			if(IO.FileExists(fn)){return fn}
+		}
+	}
+	return ''
 }
 
 W.CodeEditor=function(id,attrs){
@@ -3633,6 +3681,7 @@ W.CodeEditor=function(id,attrs){
 
 UI.NewCodeEditorTab=function(fname0){
 	var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
+	DetectRepository(file_name)
 	return UI.NewTab({
 		file_name:file_name,
 		title:UI.RemovePath(file_name),
@@ -3650,7 +3699,16 @@ UI.NewCodeEditorTab=function(fname0){
 				this.doc=body;
 				body.m_is_brand_new=(!fname0&&this.auto_focus_file_search)
 				if(this.opening_callbacks.length){
-					body.doc.opening_callbacks=this.opening_callbacks
+					if(body.m_finished_loading){
+						var cbs=this.opening_callbacks
+						if(cbs){
+							for(var i=0;i<cbs.length;i++){
+								cbs[i].call(body.doc);
+							}
+						}
+					}else{
+						body.opening_callbacks=this.opening_callbacks
+					}
 					this.opening_callbacks=[]
 				}
 			}

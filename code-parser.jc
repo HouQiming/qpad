@@ -843,7 +843,7 @@ g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),ge
 g_function_ids=[getid("function"),getid("inline")]
 g_c_like_parse_queue=new int[]
 g_color_table_time=1L
-auto parseAsCLike(string sdata,JSObject options)
+auto parseAsCLike(JSContext JS,string fn_base,string sdata,JSObject options)
 	//enable_semantics=options["enable_semantics"].or(0)
 	sdataz=new char[sdata.n+1]
 	copy(sdataz,sdata)
@@ -862,6 +862,11 @@ auto parseAsCLike(string sdata,JSObject options)
 	inline addDepFile(int idfn_include)
 		dep_files.push(idfn_include)
 		g_c_like_parse_queue.push(idfn_include)
+	auto searchDepFile(int idfn_include)
+		fn_found=JS.GetGlobal()["UI"].CallMethod(string,"ED_SearchIncludeFile",fn_base,getIdString(idfn_include),options)
+		if !fn_found||!fn_found.n:
+			return
+		addDepFile(getid(fn_found))
 	///////////////////
 	struct TStkEntry
 		int m_function_id
@@ -916,7 +921,8 @@ auto parseAsCLike(string sdata,JSObject options)
 					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
 						idfn_include=tok1-TOK_STRING
-						addDepFile(idfn_include)
+						searchDepFile(idfn_include)
+						//addDepFile(idfn_include)
 				else if tok_i==TOK_ID+g_id_define:
 					//do nothing, next id does it
 					//just discount it as decl
@@ -1170,6 +1176,7 @@ struct TGlobalKeyDeclItem
 	int w,x
 class CKeyDeclFile
 	llnodes=new int[]
+	u64 timestamp
 g_key_decl_files=new CKeyDeclFile[int] //this is sparse enough to make a separate map worthwhile?
 g_key_decls=[TGlobalKeyDeclItem()] //leave [0] as a sentential
 g_key_decl_freelist=-1
@@ -1182,7 +1189,7 @@ inline AllocGKD()
 	g_key_decl_freelist=g_key_decls[ret].x
 	return ret
 
-auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls)
+auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 	//apply ret.m_all_key_decls to a global place... int-handled dbl linked list
 	//it should be affected by file closing - only reparse: fn
 	//remove previous on reparse to avoid ordering issues
@@ -1203,7 +1210,7 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls)
 			//free node
 			g_key_decls[p].x=g_key_decl_freelist
 			g_key_decl_freelist=p
-	kdf=new CKeyDeclFile
+	kdf=new CKeyDeclFile(){timestamp:timestamp}
 	llnodes=kdf.llnodes
 	foreach kd in all_key_decls
 		p=AllocGKD()
@@ -1221,6 +1228,7 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls)
 		else
 			g_key_decls[px].w=p
 		llnodes.push(p)
+	g_key_decl_files[idfn]=kdf
 
 auto BuildColorTable(CFileIndex file_index)
 	if !file_index.m_all_key_decls:
@@ -1232,8 +1240,10 @@ auto BuildColorTable(CFileIndex file_index)
 			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
 			//Writeln(getIdString(kd.id_type&~KEY_DECL_MASK),' ',int(u32(kd.id_type)/u32(TOK_TYPE)))
 		if file_index.m_dep_files:
+			//Writeln('BuildColorTable ',g_color_table_time)
 			foreach idfn_dep in file_index.m_dep_files
 				kdfile=g_key_decl_files[idfn_dep]
+				//Writeln('test ',idfn_dep,' ',getIdString(idfn_dep),' ',!!kdfile)
 				if !kdfile:
 					all_dep_files_considered=0
 					continue
@@ -1246,11 +1256,23 @@ auto BuildColorTable(CFileIndex file_index)
 		file_index.m_temp_color_table_time=g_color_table_time
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["ED_ParserQueueFile"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		g_c_like_parse_queue.push(getid(fn))
+		return 0
+	}
 	//todo: budgeted parse
 	JS_UI["ED_ParseMore"]=function(JSContext JS){
 		while g_c_like_parse_queue.n:
 			idfn=g_c_like_parse_queue.pop()
 			fn=getIdString(idfn)
+			timestamp=0uLL
+			foreach fnx,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
+				timestamp=fi.latest_time()
+				break
+			prev_kdf=g_key_decl_files[idfn]
+			if prev_kdf&&timestamp==prev_kdf.timestamp:
+				continue
 			sdata=System.IO.ReadAll(fn)
 			if !sdata:continue
 			//call JS to get the language desc
@@ -1259,9 +1281,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if sparser!="C":
 				sdata.discard()
 				continue
-			ret=parseAsCLike(sdata,options)
+			ret=parseAsCLike(JS,getIdString(idfn),sdata,options)
+			//Writeln('parse ',idfn,' ',getIdString(idfn),' ',!!ret.m_all_key_decls)
 			if ret.m_all_key_decls:
-				ApplyKeyDecls(idfn,ret.m_all_key_decls)
+				ApplyKeyDecls(idfn,ret.m_all_key_decls,timestamp)
 			g_color_table_time++
 			return JS.Return(1)
 		return 0
@@ -1280,11 +1303,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			sdata=System.IO.ReadAll(fn)
 			if !sdata:return 0
 			if sparser=="C":
-				ret=parseAsCLike(sdata,options)
+				ret=parseAsCLike(JS,fn,sdata,options)
 			else
 				ret=parseAsText(sdata,options)
 		if ret.m_all_key_decls:
-			ApplyKeyDecls(getid(fn),ret.m_all_key_decls)
+			timestamp=0uLL
+			foreach fnx,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
+				timestamp=fi.latest_time()
+				break
+			ApplyKeyDecls(getid(fn),ret.m_all_key_decls,timestamp)
 		return JS.Return(ret)
 	}
 	JS_UI["ED_QueryAutoCompletion"]=function(JSContext JS){
