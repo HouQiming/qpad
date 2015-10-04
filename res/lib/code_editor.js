@@ -915,7 +915,23 @@ var g_is_parse_more_running=0
 var CallParseMore=function(){
 	if(g_is_parse_more_running){return;}
 	var fcallmore=UI.HackCallback(function(){
-		if(UI.ED_ParseMore()){
+		var ret=UI.ED_ParseMore()
+		if(ret){
+			var obj_tab=undefined;
+			for(var i=0;i<UI.g_all_document_windows.length;i++){
+				if(UI.g_all_document_windows[i].file_name==ret.file_name){
+					obj_tab=UI.g_all_document_windows[i]
+					break
+				}
+			}
+			if(obj_tab){
+				obj_tab.doc.doc.m_file_index=ret.file_index
+			}else{
+				//not-opened-yet
+				//if(UI.Platform.BUILD=="debug"){
+				//	print("panic: failed to set m_file_index",ret.file_name)
+				//}
+			}
 			UI.NextTick(fcallmore)
 		}else{
 			g_is_parse_more_running=0
@@ -1010,11 +1026,13 @@ W.CodeEditorWidget_prototype={
 		if(loaded_metadata.sel1){doc.sel1.ccnt=Math.max(Math.min(loaded_metadata.sel1,doc.ed.GetTextSize()),0);}
 		for(var i=0;i<UI.m_code_editor_persistent_members.length;i++){
 			var name_i=UI.m_code_editor_persistent_members[i]
-			this[name_i]=(loaded_metadata[name_i]||this[name_i])
+			var value_i=loaded_metadata[name_i];
+			if(value_i!=undefined){this[name_i]=value_i;}
 		}
 		for(var i=0;i<UI.m_code_editor_persistent_members_doc.length;i++){
 			var name_i=UI.m_code_editor_persistent_members_doc[i]
-			this.doc[name_i]=(loaded_metadata[name_i]||this.doc[name_i])
+			var value_i=loaded_metadata[name_i];
+			if(value_i!=undefined){this.doc[name_i]=value_i;}
 		}
 		var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
 		if(loaded_metadata.m_hidden_ranges){
@@ -1819,8 +1837,8 @@ W.CodeEditorWidget_prototype={
 		if(sz>MAX_PARSABLE||!this.show_auto_completion){
 			return;
 		}
-		doc.m_file_index=UI.ED_ParseAs(this.file_name,doc.plugin_language_desc)
-		//todo: UI.ED_ParserQueueFile(this.file_name)
+		//doc.m_file_index=UI.ED_ParseAs(this.file_name,doc.plugin_language_desc)
+		UI.ED_ParserQueueFile(this.file_name)
 		doc.CallHooks("parse")
 		CallParseMore()
 	},
@@ -2844,7 +2862,8 @@ W.CodeEditor=function(id,attrs){
 					var loaded_metadata=(UI.m_ui_metadata[obj.file_name]||{})
 					for(var i=0;i<UI.m_code_editor_persistent_members.length;i++){
 						var name_i=UI.m_code_editor_persistent_members[i]
-						obj[name_i]=(loaded_metadata[name_i]||obj[name_i])
+						var value_i=loaded_metadata[name_i]
+						if(value_i!=undefined){obj[name_i]=value_i;}
 					}
 				}
 				W.Edit("doc",{

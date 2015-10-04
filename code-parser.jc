@@ -1177,6 +1177,7 @@ struct TGlobalKeyDeclItem
 class CKeyDeclFile
 	llnodes=new int[]
 	u64 timestamp
+	CFileIndex fidx
 g_key_decl_files=new CKeyDeclFile[int] //this is sparse enough to make a separate map worthwhile?
 g_key_decls=[TGlobalKeyDeclItem()] //leave [0] as a sentential
 g_key_decl_freelist=-1
@@ -1229,6 +1230,7 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 			g_key_decls[px].w=p
 		llnodes.push(p)
 	g_key_decl_files[idfn]=kdf
+	return kdf
 
 auto BuildColorTable(CFileIndex file_index)
 	if !file_index.m_all_key_decls:
@@ -1272,47 +1274,36 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				break
 			prev_kdf=g_key_decl_files[idfn]
 			if prev_kdf&&timestamp==prev_kdf.timestamp:
-				continue
-			sdata=System.IO.ReadAll(fn)
-			if !sdata:continue
+				jsret=JS.New()
+				jsret["file_name"]=fn
+				jsret["file_index"]=prev_kdf.fidx
+				return JS.Return(jsret)
 			//call JS to get the language desc
 			options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
 			sparser=options["parser"].or("text")
-			if sparser!="C":
-				sdata.discard()
-				continue
-			ret=parseAsCLike(JS,getIdString(idfn),sdata,options)
-			//Writeln('parse ',idfn,' ',getIdString(idfn),' ',!!ret.m_all_key_decls)
-			if ret.m_all_key_decls:
-				ApplyKeyDecls(idfn,ret.m_all_key_decls,timestamp)
-			g_color_table_time++
-			return JS.Return(1)
-		return 0
-	}
-	JS_UI["ED_ParseAs"]=function(JSContext JS){
-		fn=JS.Param(0).as(string)
-		options=JS.Param(1).as(JSObject)
-		sparser=options["parser"].or("text")
-		if sparser=="none":
-			ids=new int[]
-			appendKeywords(ids,options)
-			ret=new CFileIndex(){m_ids:ComputeIDOrderingMaps(ids)}
-			ret.m_ids.Sort()
-			ret.m_ids.Unique()
-		else
-			sdata=System.IO.ReadAll(fn)
-			if !sdata:return 0
-			if sparser=="C":
-				ret=parseAsCLike(JS,fn,sdata,options)
+			if sparser=="none":
+				ids=new int[]
+				appendKeywords(ids,options)
+				ret=new CFileIndex(){m_ids:ComputeIDOrderingMaps(ids)}
+				ret.m_ids.Sort()
+				ret.m_ids.Unique()
 			else
-				ret=parseAsText(sdata,options)
-		if ret.m_all_key_decls:
-			timestamp=0uLL
-			foreach fnx,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
-				timestamp=fi.latest_time()
-				break
-			ApplyKeyDecls(getid(fn),ret.m_all_key_decls,timestamp)
-		return JS.Return(ret)
+				sdata=System.IO.ReadAll(fn)
+				if !sdata:continue
+				if sparser=="C":
+					ret=parseAsCLike(JS,getIdString(idfn),sdata,options)
+				else
+					ret=parseAsText(sdata,options)
+				//Writeln('parse ',idfn,' ',getIdString(idfn),' ',!!ret.m_all_key_decls)
+				if ret.m_all_key_decls:
+					kdf=ApplyKeyDecls(idfn,ret.m_all_key_decls,timestamp)
+					kdf.fidx=ret
+			g_color_table_time++
+			jsret=JS.New()
+			jsret["file_name"]=fn
+			jsret["file_index"]=ret
+			return JS.Return(jsret)
+		return 0
 	}
 	JS_UI["ED_QueryAutoCompletion"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)

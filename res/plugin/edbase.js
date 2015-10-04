@@ -2231,10 +2231,12 @@ UI.RegisterEditorPlugin(function(){
 			}.bind(this)})
 		}
 	})
-	this.AddEventHandler('editorCreate',function(){
-		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-		renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
-	})
+	//this.AddEventHandler('load',function(){
+	//	var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+	//	//print(this.owner.file_name,this.owner.m_enable_wrapping)
+	//	renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
+	//	this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+	//})
 }).prototype.name="Wrapping";
 
 var ApplyAutoEdit=function(obj,cur_autoedit_ops,line_id){
