@@ -359,7 +359,7 @@ W.SaveDialog=function(id,attrs){
 		if(obj.value){
 			var region=W.Region("savedlg_region",{x:obj.x,y:obj.y,w:obj.w,h:obj.h})
 			UI.SetFocus(region)
-			var s_text0=UI._("It's not saved yet, so...")
+			var s_text0=UI._("It's not saved yet...")
 			var s_text_y=UI._("Save")
 			var s_text_n=UI._("Don't save")
 			var s_text_c=UI._("Cancel")

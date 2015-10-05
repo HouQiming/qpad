@@ -1346,13 +1346,12 @@ W.CodeEditorWidget_prototype={
 		var find_shared_h=(this.h-this.h_find_bar)/this.find_item_scale-this.find_item_expand_current*hc
 		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(this.find_message_font)+this.find_item_separation*2
 		ctx.m_current_visual_h=find_shared_h
-		doc.sel0.ccnt=this.GetMatchCcnt(id,0)
-		if(ctx.m_flags&UI.SEARCH_FLAG_REGEXP){
-			//goto mode
-			doc.sel1.ccnt=doc.sel0.ccnt
-		}else{
-			doc.sel1.ccnt=this.GetMatchCcnt(id,1)
-		}
+		var ccnt_match0=this.GetMatchCcnt(id,0)
+		var ccnt_match1=((ctx.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?ccnt_match0:this.GetMatchCcnt(id,1))
+		UI.RecordCursorHistroy(doc,(ctx.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?"goto":"find")
+		doc.sel0.ccnt=ccnt_match0
+		doc.sel1.ccnt=ccnt_match1
+		UI.g_cursor_history_test_same_reason=1
 		doc.AutoScroll("show")
 		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,fitem_current.visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),fitem_current.visual_y-h_bof_eof_message_with_sep)
 		ctx.m_find_scroll_visual_y=Math.max(Math.min(ctx.m_find_scroll_visual_y,ctx.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),ctx.m_y_extent_backward-h_bof_eof_message_with_sep)
@@ -3583,7 +3582,7 @@ W.CodeEditor=function(id,attrs){
 							}
 							var gkds=UI.ED_QueryKeyDeclByID(id)
 							//not found, check key decls by id only
-							var fn=doc.file_name
+							var fn=doc.owner.file_name
 							var p_target=0
 							ccnt=ccnt0
 							if(doc.m_diff_from_save){
@@ -3597,6 +3596,7 @@ W.CodeEditor=function(id,attrs){
 							}
 							if(p_target<gkds.length){
 								var ccnt_go=gkds[p_target+1]
+								UI.RecordCursorHistroy(doc,"go_to_definition")
 								UI.OpenEditorWindow(gkds[p_target+0],function(){
 									var doc=this
 									var ccnt=ccnt_go
@@ -3604,6 +3604,7 @@ W.CodeEditor=function(id,attrs){
 										ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
 									}
 									doc.SetSelection(ccnt,ccnt)
+									UI.g_cursor_history_test_same_reason=1
 									UI.Refresh()
 								})
 							}
@@ -3828,4 +3829,31 @@ UI.OpenEditorWindow=function(fname,fcallback){
 		}
 	}
 }
+
+///////////////////////////
+UI.g_cursor_history_undo=[];
+UI.g_cursor_history_redo=[];
+UI.g_cursor_history_test_same_reason=0;
+UI.SetSelectionEx=function(doc,ccnt0,ccnt1,sreason){
+	var prev_ccnt0=doc.sel0.ccnt
+	var prev_ccnt1=doc.sel1.ccnt
+	if(prev_ccnt0!=ccnt0||prev_ccnt1!=ccnt1){
+		UI.RecordCursorHistroy(doc,sreason)
+	}
+	doc.SetSelection(ccnt0,ccnt1)
+	UI.g_cursor_history_test_same_reason=1
+}
+
+UI.RecordCursorHistroy=function(doc,sreason){
+	UI.g_cursor_history_redo=[]
+	if(UI.g_cursor_history_test_same_reason&&UI.g_cursor_history_undo.length&&UI.g_cursor_history_undo[UI.g_cursor_history_undo.length-1].sreason==sreason){
+		//merge same-reason records
+		return;
+	}
+	var prev_ccnt0=doc.sel0.ccnt
+	var prev_ccnt1=doc.sel1.ccnt
+	UI.g_cursor_history_undo.push({file_name:doc.owner.file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:sreason})
+	UI.g_cursor_history_test_same_reason=1
+}
+
 //UI.enable_timing=1

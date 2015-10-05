@@ -1357,7 +1357,10 @@ UI.RegisterEditorPlugin(function(){
 				var ed=this.ed;
 				var ccnt=this.sel1.ccnt;
 				if(this.m_bookmarks[i]){
-					this.SetCaretTo(this.m_bookmarks[i].ccnt,"auto_center")
+					//this.SetCaretTo(this.m_bookmarks[i].ccnt)
+					var ccnt_bm=this.m_bookmarks[i].ccnt
+					UI.SetSelectionEx(this,ccnt_bm,ccnt_bm,"bookmark")
+					this.AutoScroll("center")
 					return 0
 				}
 				return 1;
@@ -1384,7 +1387,7 @@ UI.RegisterEditorPlugin(function(){
 		if(is_sel){
 			this.SetSelection(ccnt,bm.ccnt)
 		}else{
-			this.SetCaretTo(bm.ccnt)
+			UI.SetSelectionEx(this,bm.ccnt,bm.ccnt,"bookmark")
 		}
 		return 0;
 	}
@@ -1396,7 +1399,7 @@ UI.RegisterEditorPlugin(function(){
 		if(is_sel){
 			this.SetSelection(ccnt,bm.ccnt)
 		}else{
-			this.SetCaretTo(bm.ccnt)
+			UI.SetSelectionEx(this,bm.ccnt,bm.ccnt,"bookmark")
 		}
 		return 0;
 	}
@@ -1544,7 +1547,11 @@ UI.RegisterEditorPlugin(function(){
 			//ccnt=this.m_rbracket_p1.ccnt;
 			//return;
 		}
-		this.SetSelection(is_sel?ccnt:ccnt_new,ccnt_new)
+		if(is_sel){
+			this.SetSelection(ccnt,ccnt_new)
+		}else{
+			UI.SetSelectionEx(this,ccnt_new,ccnt_new,"parenthesis")
+		}
 		this.CallOnSelectionChange();
 	}
 	this.AddEventHandler('menu',function(){
@@ -2559,3 +2566,50 @@ UI.RegisterEditorPlugin(function(){
 	})
 	//coulddo: menu items
 }).prototype.name="Auto-edit";
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('selectionChange',function(){
+		UI.g_cursor_history_test_same_reason=0
+	})
+	this.AddEventHandler('change',function(){
+		UI.g_cursor_history_undo=[];
+		UI.g_cursor_history_redo=[];
+		UI.g_cursor_history_test_same_reason=0;
+	})
+	var fnavigate=function(q0,q1){
+		if(!q0.length){return 1;}
+		var navitem=q0.pop()
+		var prev_ccnt0=this.sel0.ccnt
+		var prev_ccnt1=this.sel1.ccnt
+		q1.push({file_name:this.owner.file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:"navigation"})
+		UI.g_cursor_history_test_same_reason=0
+		UI.OpenEditorWindow(navitem.file_name,function(){
+			this.SetSelection(navitem.ccnt0,navitem.ccnt1)
+			this.CallOnSelectionChange();
+		})
+	}
+	var fprevhist=function(){
+		return fnavigate.call(this,UI.g_cursor_history_undo,UI.g_cursor_history_redo)
+	}
+	var fnexthist=function(){
+		return fnavigate.call(this,UI.g_cursor_history_redo,UI.g_cursor_history_undo)
+	}
+	this.AddEventHandler('CTRL+ALT+-',fprevhist)
+	this.AddEventHandler('CTRL+ALT+=',fnexthist)
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			menu_search.AddSeparator();
+			menu_search.AddButtonRow({text:"Navigate"},[
+				{text:"back",tooltip:"CTRL+ALT+'-'",action:function(){
+					fprevhist.call(doc)
+				}},{text:"forward",tooltip:"CTRL+ALT+'+'",action:function(){
+					//text:"&select to"
+					fnexthist.call(doc)
+				}}])
+		}
+	})
+	
+}).prototype.name="Cursor history";
