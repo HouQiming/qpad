@@ -42,13 +42,13 @@ g_sandbox.eval("var UI=require('gui2d/ui');var W=require('gui2d/widgets');requir
 g_sandbox.m_relative_scaling=1;//0.5;
 var g_params={padding:12};
 var g_initial_code=IO.ReadAll("mo\\test\\uiediting.js");
-var g_language_C=Language.GetDescObjectByName("C/C++")
+var g_language_C=Language.GetDescObjectByName("C/C++");
 
 ////////////////////////////////////////
 //the UI editor
 var ParseCodeError=function(err){
 	print(err.stack)
-}
+};
 
 var RerunUserCode=function(code_box){
 	var working_range=code_box.working_range;
@@ -225,7 +225,7 @@ var DrawFrame=function(code_box){
 		}
 		code_box.document_items=items;
 	}
-}
+};
 
 var nthIndex=function(str,pat,n){
 	var L=str.length,i=-1;
@@ -234,7 +234,7 @@ var nthIndex=function(str,pat,n){
 		n--;
 	}
 	return i>=L?-1:i;
-}
+};
 
 W.subwindow_ui_insertion_bar={
 	'title':'Insert widgets',h:500,
@@ -1954,6 +1954,10 @@ var ParseGit=function(spath){
 		repos[spath]=0
 		my_repo.files.push(fname)
 	},function(){
+		//some dangling dependencies may have been resolved
+		if(UI.ED_ReparseDanglingDeps()){
+			CallParseMore()
+		}
 		IO.RunTool(["git","ls-files","--modified"],spath, ".*",function(match){
 			if(match[0].indexOf(':')>=0){
 				return;
@@ -1979,7 +1983,7 @@ var ParseGit=function(spath){
 
 var g_is_repo_detected={}
 var DetectRepository=function(fname){
-	var spath=UI.GetPathFromFilename(fname)
+	var spath=UI.GetPathFromFilename(IO.NormalizeFileName(fname))
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		spath=spath.toLowerCase()
 	}
@@ -2158,8 +2162,23 @@ var FileItem_prototype={
 			UI.Refresh()
 			return
 		}
-		var fn=this.name
+		var fn=IO.NormalizeFileName(this.name)
 		var obj=this.owner.owner
+		//search for existing windows
+		var my_tabid=undefined
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			if(UI.g_all_document_windows[i].doc===obj){
+				my_tabid=i
+				break
+			}
+		}
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			if(i!=my_tabid&&UI.g_all_document_windows[i].file_name==fn){
+				UI.top.app.document_area.SetTab(i)
+				UI.top.app.document_area.CloseTab(my_tabid)
+				return
+			}
+		}
 		obj.file_name=fn
 		obj.doc=undefined
 		obj.m_language_id=undefined
@@ -2478,7 +2497,8 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 	var fn=(spath+"/"+fn_include);
 	if(IO.FileExists(fn)){return fn}
 	//git
-	var repos=g_repo_from_file[fn]
+	DetectRepository(fn_base)
+	var repos=g_repo_from_file[fn_base]
 	if(repos){
 		for(var spath in repos){
 			var files=g_repo_list[spath].files
@@ -3529,6 +3549,13 @@ W.CodeEditor=function(id,attrs){
 						var doc=obj.doc
 						var sel=doc.GetSelection();
 						var ed=doc.ed
+						var ccnt_sel1=doc.sel1.ccnt
+						if(doc.m_diff_from_save){ccnt_sel1=doc.m_diff_from_save.CurrentToBase(ccnt_sel1)}
+						var s_dep_file=UI.ED_QueryDepTokenByBaseCcnt(doc,ccnt_sel1)
+						if(s_dep_file){
+							UI.OpenEditorWindow(s_dep_file)
+							return
+						}
 						sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
 						sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
 						if(sel[0]<sel[1]){
@@ -3793,10 +3820,12 @@ UI.OpenEditorWindow=function(fname,fcallback){
 	if(!obj_tab){
 		obj_tab=UI.NewCodeEditorTab(fname)
 	}
-	if(obj_tab.doc){
-		fcallback.call(obj_tab.doc.doc)
-	}else{
-		obj_tab.opening_callbacks.push(fcallback)
+	if(fcallback){
+		if(obj_tab.doc){
+			fcallback.call(obj_tab.doc.doc)
+		}else{
+			obj_tab.opening_callbacks.push(fcallback)
+		}
 	}
 }
 //UI.enable_timing=1

@@ -105,6 +105,11 @@ auto genString(string s0)
 				fn0="${HOME}"+fn0[1:]
 		return JS.Return(System.Env.ExpandEnvironmentStrings(fn0))
 	}
+	jsio["NormalizeFileName"]=function(JSContext JS){
+		fn0=JS.Param(0).as(string)
+		if !fn0:return 0
+		return JS.Return(System.Env.NormalizeFileName(fn0))
+	}
 	jsio["CreateEnumFileContext"]=function(JSContext JS){
 		fn0=JS.Param(0).as(string)
 		flags=JS.Param(1).or(0)
