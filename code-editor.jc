@@ -523,7 +523,8 @@ class CLayouter_programmer
 		return m_caret_offset
 	}
 	AddOverlayOffset=function(i64 x0,i64 y){
-		p=m_overlays.InlineBisect(inline(a){return a.flatx<x0})
+		flatx0=x0+y*m_wrap_width_in_fp
+		p=m_overlays.InlineBisect(inline(a){return a.flatx<=flatx0})
 		p--
 		x=x0
 		for(;p>=0;p--)

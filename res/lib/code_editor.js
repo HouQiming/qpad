@@ -3190,9 +3190,14 @@ W.CodeEditor=function(id,attrs){
 									doc.m_user_just_typed_char=0
 								}else{
 									obj.m_ac_context.m_ccnt=-1;
+									doc.m_user_just_typed_char=1
 								}
 								doc.sel0.ccnt=ccnt0+lg2
 								doc.sel1.ccnt=ccnt0+lg2
+								doc.CallOnChange()
+								if(this.m_accands.m_common_prefix){
+									doc.m_user_just_typed_char=1
+								}
 								//obj.m_ac_context=undefined
 								UI.Refresh()
 							},
