@@ -507,6 +507,26 @@ UI.Theme_CustomWidget=function(C){
 			tag_padding:4,
 			tag_round:8,
 			tag_border_width:0,
+			button_style:{
+				transition_dt:0.1,
+				font:UI.Font("res/fonts/opensans.ttf",24,-50),
+				round:0,border_width:2,padding:6,
+				color:0,
+				$:{
+					out:{
+						border_color:0x00ffffff,
+						text_color:0xffcccccc,
+					},
+					over:{
+						border_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					down:{
+						border_color:0xffe8e8e8,
+						text_color:0xffe8e8e8,
+					},
+				}
+			},
 		},
 		top_menu:{
 			//nothing

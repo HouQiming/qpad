@@ -68,6 +68,7 @@ W.TabLabel=function(id,attrs){
 	return obj
 }
 
+UI.MAX_TAB_SWITCH_COUNT=32
 W.TabbedDocument_prototype={
 	//closer -> class: OnClose notification and stuff
 	CloseTab:function(tabid,forced){
@@ -75,6 +76,7 @@ W.TabbedDocument_prototype={
 		var tab=this.items[tabid]
 		if(!tab){return;}
 		if(tab.need_save&&!forced){
+			//this doesn't count as a meaningful switch
 			this.current_tab_id=tabid
 			//dialog box
 			tab.in_save_dialog=1
@@ -94,10 +96,36 @@ W.TabbedDocument_prototype={
 		window_list.pop()
 		if(this.current_tab_id>tabid){this.current_tab_id--}
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
+		//this doesn't count as a meaningful switch
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		UI.Refresh()
 	},
 	SetTab:function(tabid){
+		var tabid0=this.current_tab_id
+		if(tabid0!=undefined){
+			var tab0=this.items[tabid0]
+			var tab1=this.items[tabid]
+			if(tab0.doc&&tab0.doc.m_tabswitch_count&&tab1.file_name){
+				var fn=tab1.file_name
+				if(tab1.doc&&tab1.doc.file_name){fn=tab1.doc.file_name}
+				var counts=tab0.doc.m_tabswitch_count
+				var n_tot=(counts["$"]||0)
+				var delta=Math.max(1,n_tot/UI.MAX_TAB_SWITCH_COUNT|0)
+				n_tot+=delta
+				counts["$"]=n_tot;
+				var n=(counts[fn]||0)
+				counts[fn]=n+delta;
+				if(n_tot>UI.MAX_TAB_SWITCH_COUNT*1024){
+					n_tot=0
+					for(var key in counts){
+						if(key=="$"){continue;}
+						counts[key]=Math.max((counts[key]/1024)|0,1);
+						n_tot+=counts[key];
+					}
+					counts["$"]=n_tot;
+				}
+			}
+		}
 		this.current_tab_id=tabid
 		UI.Refresh()
 	},
@@ -127,6 +155,7 @@ W.TabbedDocument_prototype={
 		for(var i=0;i<this.items.length;i++){
 			var tab_i=this.items[i]
 			if(tab_i.need_save){
+				//this doesn't count as a meaningful switch
 				this.current_tab_id=i
 				tab_i.in_save_dialog=1
 				ret=1
@@ -144,6 +173,7 @@ W.TabbedDocument_prototype={
 			if(tab_i.need_save){window_list[n2++]=tab_i;}else{if(this.current_tab_id>i){this.current_tab_id--}}
 		}
 		while(window_list.length>n2){window_list.pop();}
+		//this doesn't count as a meaningful switch
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		UI.SaveMetaData()
@@ -171,6 +201,7 @@ W.TabbedDocument=function(id,attrs){
 	var items=obj.items
 	if((obj.n_tabs_last_checked||0)<items.length){
 		//new tab activating
+		//this doesn't count as a meaningful switch
 		obj.current_tab_id=(items.length-1);
 		obj.m_is_in_menu=0
 	}
@@ -322,6 +353,7 @@ W.TabbedDocument=function(id,attrs){
 			var num_id=tabid
 			if(num_id<0){return;}
 			num_id++;if(num_id>=items.length){num_id=0;}
+			//this doesn't count as a meaningful switch, it's in-transit
 			obj.current_tab_id=num_id
 			UI.Refresh()
 		}});
@@ -330,12 +362,13 @@ W.TabbedDocument=function(id,attrs){
 			if(num_id<0){return;}
 			if(!num_id){num_id=items.length;}
 			num_id--;
+			//this doesn't count as a meaningful switch, it's in-transit
 			obj.current_tab_id=num_id
 			UI.Refresh()
 		}});
 		for(var i=0;i<items.length&&i<10;i++){(function(i){
 			W.Hotkey("",{key:"ALT+"+String.fromCharCode(48+(i+1)%10),action:function(){
-				obj.current_tab_id=i
+				obj.SetTab(i)
 				UI.Refresh()
 			}})
 		})(i)}
@@ -805,19 +838,22 @@ W.FancyMenu=function(id,attrs){
 	return obj
 }
 
-//todo: search support
+//todo: menu search support
 
 ///////////////////////
 UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
+UI.m_previous_document=undefined
 UI.UpdateNewDocumentSearchPath=function(){
 	if(!UI.m_the_document_area){return;}
 	var active_document=UI.m_the_document_area.active_tab
 	var ret=undefined;
 	if(active_document&&active_document.file_name){
 		ret=UI.GetPathFromFilename(active_document.file_name)
+		UI.m_previous_document=active_document.file_name
 	}
 	if(!ret){
 		ret=IO.GetNewDocumentName(undefined,undefined,"document");
+		UI.m_previous_document=undefined
 	}
 	UI.m_new_document_search_path=ret
 	return ret

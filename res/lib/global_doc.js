@@ -102,7 +102,7 @@ UI.LoadZipDocument=function(fname){
 }
 
 UI.OpenFile=function(fname){
-	//todo: consult history for loader preference
+	//consult history for loader preference
 	var ext=UI.GetFileNameExtension(fname).toLowerCase()
 	var parser=(UI.m_ext_loaders[ext]||UI.m_ext_loaders["*"])
 	return parser(fname)

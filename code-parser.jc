@@ -959,9 +959,10 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					/////////
 					//decl
 					sc=scopes[scopes.n-1]
-					if !sc.in_assignment&&!sc.blevel:
-						tok0=(i>0?toks[i-1].tok:int(';'))
-						tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok0=(i>0?toks[i-1].tok:int(';'))
+					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					if (!sc.in_assignment||tok1=='=')&&!sc.blevel:
+						//'=' force-cancels assignment to deal with ;-less JS
 						if tok0=='.'&&tok1=='=':
 							//exception case: XXX.XXX=function(){}
 							is_function=0

@@ -27,6 +27,7 @@ UI.m_code_editor_persistent_members=[
 	"m_enable_wrapping",
 	"m_hyphenator_name",
 	"m_spell_checker",
+	"m_tabswitch_count",
 ]
 UI.m_code_editor_persistent_members_doc=[]
 UI.RegisterCodeEditorPersistentMember=function(name){
@@ -944,6 +945,7 @@ var CallParseMore=function(){
 W.CodeEditorWidget_prototype={
 	m_current_wrap_width:1024,
 	m_enable_wrapping:0,
+	m_tabswitch_count:{},
 	OnEditorCreate:function(){
 		var doc=this.doc
 		var obj=this
@@ -961,6 +963,13 @@ W.CodeEditorWidget_prototype={
 						var ccnt0_i=ops[i]
 						var ccnt1_i=ops[i]+ops[i+1]
 						if(!(ccnt0_i<=match_ccnt1&&ccnt1_i>=match_ccnt0)){
+							intersected=0;
+							break
+						}
+						//m_user_just_typed_char is updated after this, we can test it here for the previous state
+						if(this.m_user_just_typed_char&&ccnt0_i==match_ccnt1){
+							//the user types a new copy of the needle, then continues typing
+							//it SHOULD NOT count as an auto-replace attempt
 							intersected=0;
 							break
 						}
@@ -1986,17 +1995,21 @@ var DetectRepository=function(fname){
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		spath=spath.toLowerCase()
 	}
-	if(spath){
-		if(g_is_repo_detected[spath]){return g_repo_list[spath]?spath:undefined;}
-		g_is_repo_detected[spath]=1;
+	if(!spath){return undefined;}
+	if(g_is_repo_detected[spath]){
+		if(g_is_repo_detected[spath]=="?"){return undefined;}
+		return g_is_repo_detected[spath];
 	}
 	///////////////////
 	if(spath!='.'&&IO.DirExists(spath+"/.git")){
 		ParseGit(spath)
+		g_is_repo_detected[spath]=spath;
 		return spath
 	}
 	///////////////////
-	return DetectRepository(spath)
+	g_is_repo_detected[spath]="?"
+	g_is_repo_detected[spath]=DetectRepository(spath);
+	return g_is_repo_detected[spath]
 }
 
 var FILE_LISTING_BUDGET=100
@@ -2277,6 +2290,18 @@ W.FileItem=function(id,attrs){
 						}
 					}
 				}
+				/////////////////////////
+				//forget button
+				if(obj.selected&&UI.m_ui_metadata[obj.name]){
+					W.Button("forget_button",{style:obj.button_style,
+						x:16,y:0,
+						text:"Forget",
+						anchor:'parent',anchor_align:'right',anchor_valign:'center',
+						OnClick:function(){
+							UI.ForgetFile(obj)
+						}
+					})
+				}
 			}
 		}
 	UI.End()
@@ -2323,6 +2348,11 @@ var fnewpage_findbar_plugin=function(){
 
 var g_regexp_backslash=new RegExp("\\\\","g");
 var g_regexp_abspath=new RegExp("(([a-zA-Z]:/)|(/)|[~]).*");
+var FILE_RELEVANCE_SWITCH_SCORE=32
+var FILE_RELEVANCE_REPO_SCORE=16
+var FILE_RELEVANCE_BASE_SCORE=4
+var FILE_RELEVANCE_SCORE_DECAY=0.99
+//var FILE_RELEVANCE_SAME_REPO_NON_HIST=16
 W.SXS_NewPage=function(id,attrs){
 	//todo: proper refreshing on metadata change
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
@@ -2372,24 +2402,66 @@ W.SXS_NewPage=function(id,attrs){
 			//history mode
 			//only do space split for hist mode
 			//if(s_search_text.indexOf('/')<0){
-			var hist=UI.m_ui_metadata["<history>"].filter(function(a){return a.toUpperCase()})
+			var hist=UI.m_ui_metadata["<history>"]
 			if(hist){
-				var hist_keywords=s_search_text.split(" ");
+				var hist_keywords=s_search_text.split(" ").filter(function(a){return a.toLowerCase()});
 				for(var i=hist.length-1;i>=0;i--){
-					var fn_i=hist[i],fn_i_search=fn_i.toUpperCase()
+					var fn_i=hist[i],fn_i_search=fn_i.toLowerCase()
 					var is_invalid=0;
 					for(var j=0;j<hist_keywords.length;j++){
-						if(fn_i.indexOf(hist_keywords[j])<0){
+						if(fn_i_search.indexOf(hist_keywords[j])<0){
 							is_invalid=1
 							break;
 						}
 					}
 					if(is_invalid){continue;}
-					files.push({name_to_find:fn_i})
+					files.push({name_to_find:fn_i, relevance:FILE_RELEVANCE_BASE_SCORE,hist_ord:i})
+				}
+				var mul=1.0
+				for(var i=0;i<files.length;i++){
+					files[i].relevance*=mul
+					mul*=FILE_RELEVANCE_SCORE_DECAY
+				}
+				if(UI.m_previous_document){
+					var fn_current=UI.m_previous_document
+					var tabswitch_count=UI.m_ui_metadata[fn_current]
+					if(tabswitch_count){tabswitch_count=tabswitch_count.m_tabswitch_count}
+					if(tabswitch_count&&tabswitch_count["$"]){
+						for(var i=0;i<files.length;i++){
+							var fn_switchto=files[i].name_to_find
+							files[i].relevance+=(tabswitch_count[fn_switchto]||0)/Math.max(tabswitch_count["$"],UI.MAX_TAB_SWITCH_COUNT)*FILE_RELEVANCE_SWITCH_SCORE
+						}
+					}
+					var repos=g_repo_from_file[fn_current]
+					if(repos){
+						for(var i=0;i<files.length;i++){
+							var fn_switchto=files[i].name_to_find
+							var repos2=g_repo_from_file[fn_switchto]
+							if(repos2){
+								for(var spath in repos2){
+									if(repos[spath]!=undefined){
+										files[i].relevance+=FILE_RELEVANCE_REPO_SCORE
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+				//git project part
+				var spath_repo=DetectRepository(UI.m_new_document_search_path+"/*")
+				if(spath_repo){
+					if(!UI.m_current_file_list.m_listed_git_repos[spath_repo]){
+						UI.m_current_file_list.m_listed_git_repos[spath_repo]=1;
+						files.push({git_repo_to_list:spath_repo, search_text:s_search_text,
+							relevance:FILE_RELEVANCE_REPO_SCORE,hist_ord:-1})
+					}
 				}
 			}
 			//}
-			//file system part
+			//sort by relevance
+			files.sort(function(a,b){return b.relevance-a.relevance||b.hist_ord-a.hist_ord;});
+			//file system part, leave them unsorted
 			var s_path=s_search_text
 			if(s_path.length||!files.length){
 				s_path=IO.ProcessUnixFileName(s_path.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
@@ -2463,7 +2535,6 @@ W.SXS_NewPage=function(id,attrs){
 			border_width:-obj.find_bar_shadow_size,
 			color:obj.find_bar_shadow_color})
 		UI.PopCliprect()
-		//todo: on-demand sort, proper wiping of child elements
 		//the windows way: "mounted" history
 		//bread / search
 	UI.End()
@@ -2947,7 +3018,6 @@ W.CodeEditor=function(id,attrs){
 						//lc
 						s_status=UI.Format("Ln @1,@2",(lcinfo0[0]+1).toString(),(lcinfo0[1]+1).toString())
 					}
-					//todo: s_status, status_bar_font
 					var status_dims=UI.MeasureText(obj.status_bar_font,s_status)
 					var status_x=obj.x+w_obj_area-w_scrolling_area-status_dims.w-obj.status_bar_padding*2;
 					var status_y=obj.y+h_obj_area-status_dims.h-obj.status_bar_padding*2;
@@ -3854,6 +3924,31 @@ UI.RecordCursorHistroy=function(doc,sreason){
 	var prev_ccnt1=doc.sel1.ccnt
 	UI.g_cursor_history_undo.push({file_name:doc.owner.file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:sreason})
 	UI.g_cursor_history_test_same_reason=1
+}
+
+UI.ForgetFile=function(obj_fileitem){
+	var fname=obj_fileitem.name
+	//wipe its own history
+	UI.m_ui_metadata["<history>"]=UI.m_ui_metadata["<history>"].filter(function(a){return a!=fname})
+	if(UI.m_ui_metadata[fname]){
+		delete UI.m_ui_metadata[fname]
+	}
+	//wipe the tab-switching history from other files
+	var hist=UI.m_ui_metadata["<history>"]
+	for(var i=0;i<hist.length;i++){
+		var metadata=UI.m_ui_metadata[hist[i]]
+		if(metadata.m_tabswitch_count){
+			if(metadata.m_tabswitch_count[fname]){
+				var n=metadata.m_tabswitch_count[fname]
+				delete metadata.m_tabswitch_count[fname]
+				metadata.m_tabswitch_count["$"]-=n;
+			}
+		}
+	}
+	//refresh
+	var obj_newpage=obj_fileitem.owner
+	obj_newpage.m_file_list=undefined
+	UI.Refresh()
 }
 
 //UI.enable_timing=1
