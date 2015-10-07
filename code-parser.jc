@@ -850,6 +850,8 @@ g_color_table_time=1L
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	//enable_semantics=options["enable_semantics"].or(0)
 	fn_base=getIdString(idfn_base)
+	pdot=fn_base.LastIndexOf('.')
+	is_header=(pdot>=0L&&pdot+1<fn_base.n&&(fn_base[pdot+1]=='h'||fn_base[pdot+1]=='H'))
 	sdataz=new char[sdata.n+1]
 	copy(sdataz,sdata)
 	toks=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
@@ -1045,7 +1047,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				if function_id&&tok_i==')':
 					//ID(...){ testing
 					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
-					if tok1=='{'&&ptok_function_id>=0:
+					if (tok1=='{'||tok1==';'&&is_header)&&ptok_function_id>=0:
 						//this should go through even if there was a . before the name
 						all_key_decls.push(TKeyDeclItem(){
 							id_type:function_id+KEY_DECL_FUNCTION,
@@ -1266,6 +1268,7 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 auto BuildColorTable(CFileIndex file_index)
 	if !file_index.m_all_key_decls:
 		return
+	//todo: fill the ids
 	if !file_index.m_all_dep_files_considered&&file_index.m_temp_color_table_time!=g_color_table_time:
 		temp_color_table=new int[int]
 		all_dep_files_considered=1

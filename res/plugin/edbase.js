@@ -48,6 +48,20 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	});
 };
 
+var ProcessIncludePaths=function(paths){
+	var ret=[]
+	for(var i=0;i<paths.length;i++){
+		var path_i=IO.ProcessUnixFileName(paths[i]);
+		var paths_i=path_i.split(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?";":":");
+		for(var j=0;j<paths_i.length;j++){
+			if(IO.DirExists(paths_i[j])){
+				ret.push(paths_i[j].replace("\\","/"))
+			}
+		}
+	}
+	return ret
+}
+
 Language.Register({
 	name:"C/C++",parser:"C",
 	extensions:["c","cxx","cpp","cc","h","hpp"],
@@ -60,7 +74,28 @@ Language.Register({
 			keyword:['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'],
 			type:['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t']
 		},1)
-	}
+	},
+	include_paths:ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?[
+		"%INCLUDE%",
+		"%VS120COMNTOOLS%../../VC/include",
+		"%VS110COMNTOOLS%../../VC/include",
+		"%VS100COMNTOOLS%../../VC/include",
+		"%VS90COMNTOOLS%../../VC/include",
+		"%VS80COMNTOOLS%../../VC/include",
+		"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/um",
+		"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
+		"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
+		"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/um",
+		"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
+		"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
+		"%VS90COMNTOOLS%../../../Microsoft SDKs/Windows/v5.0/Include",
+		"c:/mingw/include"
+	]:[
+		"${INCLUDE}",
+		"/usr/include",
+		"/usr/local/include",
+		//todo: mac paths
+	])
 })
 
 Language.Register({
@@ -91,7 +126,8 @@ Language.Register({
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false'],
 			'type':['void','char','short','int','long','iptr','uptr','auto','byte','ushort','uint','ulong','i8','i16','i32','i64','u8','u16','u32','u64','f32','f64','float','double','string','Object','Interface','typename','typeof'],
 		},0)
-	}
+	},
+	include_paths:['c:/tp/pure/units']
 });
 
 Language.Register({
