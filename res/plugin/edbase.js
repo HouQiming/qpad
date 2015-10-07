@@ -1391,7 +1391,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 0;
 	}
-	this.AddEventHandler('F2',fnextbm)
+	this.AddEventHandler('F2',function(){fnextbm.call(this)})
 	var fprevbm=function(is_sel){
 		var ccnt=this.sel1.ccnt;
 		var bm=this.FindNearestBookmark(ccnt-1,-1)
@@ -1403,7 +1403,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 0;
 	}
-	this.AddEventHandler('SHIFT+F2',fprevbm)
+	this.AddEventHandler('SHIFT+F2',function(){fprevbm.call(this)})
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var menu_search=UI.BigMenu("&Search")

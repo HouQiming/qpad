@@ -497,6 +497,7 @@ UI.Theme_CustomWidget=function(C){
 			h:56,h_icon:48,
 			file_icon_color:0xff444444,
 			name_font:UI.Font("res/fonts/opensans.ttf",24,-50),
+			name_font_bold:UI.Font("res/fonts/opensans.ttf",24,100),
 			misc_font:UI.Font("res/fonts/opensans.ttf",18,-50),
 			name_color:0xff000000,
 			misc_color:0xff7f7f7f,
@@ -852,7 +853,9 @@ UI.Application=function(id,attrs){
 		//c:\tp\pure\mo\pm_tmp\win32\mo\s7main.c
 		//UI.OpenFile("C:/h/syousetu/stars_tr.md")
 		//UI.OpenFile("c:/h/edtest/crap.c")
-		UI.UpdateNewDocumentSearchPath()
+		//UI.UpdateNewDocumentSearchPath()
+		UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
+		UI.m_previous_document=undefined
 		UI.NewCodeEditorTab().auto_focus_file_search=1
 		UI.Refresh()
 	}

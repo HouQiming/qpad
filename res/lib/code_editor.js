@@ -1065,8 +1065,8 @@ W.CodeEditorWidget_prototype={
 		UI.Refresh()
 	},
 	SaveMetaData:function(){
-		if(this.m_is_preview){return;}
 		var doc=this.doc
+		if(this.m_is_preview||doc.ed.hfile_loading){return;}
 		if(!doc||!IO.FileExists(this.file_name)){return;}
 		var new_metadata={m_bookmarks:[],m_unkeyed_bookmarks:[],
 			sel0:doc.sel0.ccnt,
@@ -1994,6 +1994,9 @@ var DetectRepository=function(fname){
 	var spath=UI.GetPathFromFilename(IO.NormalizeFileName(fname))
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		spath=spath.toLowerCase()
+		if(spath.length==2&&spath[1]==':'){
+			return undefined;
+		}
 	}
 	if(!spath){return undefined;}
 	if(g_is_repo_detected[spath]){
@@ -2066,6 +2069,7 @@ W.FileItemOnDemand=function(){
 			size:fnext.size,
 			is_dir:fnext.is_dir,
 			time:fnext.time,
+			history_hl_ranges:this.history_hl_ranges,
 			h:UI.default_styles.file_item.h})
 	}
 	ret.push(this)
@@ -2176,7 +2180,6 @@ var FileItem_prototype={
 		}
 		var fn=IO.NormalizeFileName(this.name)
 		var obj=this.owner.owner
-		//search for existing windows
 		var my_tabid=undefined
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
 			if(UI.g_all_document_windows[i].doc===obj){
@@ -2184,6 +2187,24 @@ var FileItem_prototype={
 				break
 			}
 		}
+		//alt+q searched switch should count BIG toward the switching history
+		if(UI.m_previous_document){
+			var counts=UI.m_ui_metadata[UI.m_previous_document]
+			if(counts){counts=counts.m_tabswitch_count;}
+			for(var i=0;i<UI.g_all_document_windows.length;i++){
+				if(i==my_tabid){continue;}
+				if(!UI.g_all_document_windows[i].doc){continue;}
+				var counts_i=UI.g_all_document_windows[i].doc.m_tabswitch_count
+				if(counts_i){
+					counts=counts_i
+					break
+				}
+			}
+			if(counts){
+				UI.IncrementTabSwitchCount(counts,fn,8)
+			}
+		}
+		//search for existing windows
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
 			if(i!=my_tabid&&UI.g_all_document_windows[i].file_name==fn){
 				UI.top.app.document_area.SetTab(i)
@@ -2237,9 +2258,24 @@ W.FileItem=function(id,attrs){
 						color:sel_bgcolor})
 				}
 				UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
+				var sname=obj.selected?obj.name:GetSmartFileName(obj)
 				W.Text("",{x:obj.x+w_icon,y:obj.y+4,
-					font:obj.name_font,text:obj.selected?obj.name:GetSmartFileName(obj),
+					font:obj.name_font,text:sname,
 					color:obj.selected?obj.sel_name_color:obj.name_color})
+				if(obj.history_hl_ranges){
+					//highlight keywords in history items only
+					var base_offset=obj.selected?0:(obj.name.length-sname.length);
+					for(var i=0;i<obj.history_hl_ranges.length;i+=2){
+						var p0=Math.max(obj.history_hl_ranges[i+0]-base_offset,0);
+						var p1=Math.max(obj.history_hl_ranges[i+1]-base_offset,0);
+						if(p0<p1){
+							var x=obj.x+w_icon+UI.MeasureText(obj.name_font,sname.substr(0,p0)).w
+							W.Text("",{x:x,y:obj.y+4,
+								font:obj.name_font_bold,text:sname.substr(p0,p1-p0),
+								color:obj.selected?obj.sel_name_color:obj.name_color})
+						}
+					}
+				}
 				var s_misc_text=[obj.is_dir?UI._("Folder"):FormatFileSize(obj.size),FormatRelativeTime(obj.time,UI.m_current_file_list.m_now)].join(", ")
 				W.Text("",{x:obj.x+w_icon,y:obj.y+30,
 					font:obj.misc_font,text:s_misc_text,
@@ -2342,7 +2378,56 @@ var fnewpage_findbar_plugin=function(){
 	this.AddEventHandler('PGUP',fpassthrough)
 	this.AddEventHandler('PGDN',fpassthrough)
 	this.AddEventHandler('TAB',function(key,event){
-		//todo: path completion
+		var s_search_text=this.ed.GetText()
+		var s_path=s_search_text
+		var ccnt=Duktape.__byte_length(s_path)
+		if(s_path.length&&this.sel0.ccnt==ccnt&&this.sel1.ccnt==ccnt){
+			s_path=IO.ProcessUnixFileName(s_path.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
+			if(s_path.match(g_regexp_abspath)){
+				//do nothing: it's absolute
+			}else{
+				s_path=UI.m_new_document_search_path+"/"+s_path
+			}
+			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				s_path=s_path.toLowerCase()
+			}
+			var find_context=IO.CreateEnumFileContext(s_path+"*",3)
+			var s_common=undefined
+			for(;;){
+				var fnext=find_context()
+				if(!fnext){
+					find_context=undefined
+					break
+				}
+				var sname=fnext.name
+				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+					sname=sname.toLowerCase()
+				}
+				if(fnext.is_dir){
+					sname=sname+"/"
+				}
+				if(!s_common){
+					s_common=sname
+				}else{
+					for(var i=0;i<s_common.length;i++){
+						if(i>=sname.length||sname[i]!=s_common[i]){
+							s_common=s_common.substr(0,i)
+							break;
+						}
+					}
+				}
+				if(s_common.length<=s_path.length){break;}
+			}
+			if(s_common.length>s_path.length){
+				//path completion
+				var s_insertion=s_common.slice(s_path.length)
+				this.HookedEdit([ccnt,0,s_insertion])
+				this.sel0.ccnt=ccnt+Duktape.__byte_length(s_insertion)
+				this.sel1.ccnt=ccnt+Duktape.__byte_length(s_insertion)
+				this.CallOnChange()
+				this.m_user_just_typed_char=1
+			}
+		}
 	})
 }
 
@@ -2408,14 +2493,18 @@ W.SXS_NewPage=function(id,attrs){
 				for(var i=hist.length-1;i>=0;i--){
 					var fn_i=hist[i],fn_i_search=fn_i.toLowerCase()
 					var is_invalid=0;
+					var hl_ranges=[]
 					for(var j=0;j<hist_keywords.length;j++){
-						if(fn_i_search.indexOf(hist_keywords[j])<0){
+						var pj=fn_i_search.lastIndexOf(hist_keywords[j]);
+						if(pj<0){
 							is_invalid=1
 							break;
 						}
+						hl_ranges.push(pj,pj+hist_keywords[j].length)
 					}
 					if(is_invalid){continue;}
-					files.push({name_to_find:fn_i, relevance:FILE_RELEVANCE_BASE_SCORE,hist_ord:i})
+					files.push({name_to_find:fn_i, relevance:FILE_RELEVANCE_BASE_SCORE,hist_ord:i,
+						history_hl_ranges:hl_ranges})
 				}
 				var mul=1.0
 				for(var i=0;i<files.length;i++){
@@ -2450,6 +2539,7 @@ W.SXS_NewPage=function(id,attrs){
 				}
 				//git project part
 				var spath_repo=DetectRepository(UI.m_new_document_search_path+"/*")
+				//print(spath_repo,UI.m_new_document_search_path)
 				if(spath_repo){
 					if(!UI.m_current_file_list.m_listed_git_repos[spath_repo]){
 						UI.m_current_file_list.m_listed_git_repos[spath_repo]=1;
@@ -2535,8 +2625,6 @@ W.SXS_NewPage=function(id,attrs){
 			border_width:-obj.find_bar_shadow_size,
 			color:obj.find_bar_shadow_color})
 		UI.PopCliprect()
-		//the windows way: "mounted" history
-		//bread / search
 	UI.End()
 	return obj
 }
@@ -2839,7 +2927,7 @@ W.CodeEditor=function(id,attrs){
 				var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
 				var line0=doc.GetLC(rendering_ccnt0)[0];
 				var line1=doc.GetLC(rendering_ccnt1)[0];
-				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1,"valid_only");
+				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+2,"valid_only");
 				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
 				var diff=doc.m_diff_from_save
 				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
@@ -2856,7 +2944,7 @@ W.CodeEditor=function(id,attrs){
 							//s_line_number=s_line_number+"*";
 							UI.RoundRect({
 								x:obj.x+w_line_numbers-6,y:line_xys[i*2+1]-scroll_y+area_y,
-								w:6,h:hc,
+								w:6,h:Math.min(Math.max(line_xys[i*2+3]-line_xys[i*2+1],hc),area_h),
 								color:obj.color_diff_tag})
 						}
 					}

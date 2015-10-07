@@ -69,6 +69,24 @@ W.TabLabel=function(id,attrs){
 }
 
 UI.MAX_TAB_SWITCH_COUNT=32
+UI.IncrementTabSwitchCount=function(counts,fn,delta0){
+	var n_tot=(counts["$"]||0)
+	var delta=Math.max(delta0,n_tot*delta0/UI.MAX_TAB_SWITCH_COUNT|0)
+	n_tot+=delta
+	counts["$"]=n_tot;
+	var n=(counts[fn]||0)
+	counts[fn]=n+delta;
+	if(n_tot>UI.MAX_TAB_SWITCH_COUNT*1024){
+		n_tot=0
+		for(var key in counts){
+			if(key=="$"){continue;}
+			counts[key]=Math.max((counts[key]/1024)|0,1);
+			n_tot+=counts[key];
+		}
+		counts["$"]=n_tot;
+	}
+}
+
 W.TabbedDocument_prototype={
 	//closer -> class: OnClose notification and stuff
 	CloseTab:function(tabid,forced){
@@ -109,21 +127,7 @@ W.TabbedDocument_prototype={
 				var fn=tab1.file_name
 				if(tab1.doc&&tab1.doc.file_name){fn=tab1.doc.file_name}
 				var counts=tab0.doc.m_tabswitch_count
-				var n_tot=(counts["$"]||0)
-				var delta=Math.max(1,n_tot/UI.MAX_TAB_SWITCH_COUNT|0)
-				n_tot+=delta
-				counts["$"]=n_tot;
-				var n=(counts[fn]||0)
-				counts[fn]=n+delta;
-				if(n_tot>UI.MAX_TAB_SWITCH_COUNT*1024){
-					n_tot=0
-					for(var key in counts){
-						if(key=="$"){continue;}
-						counts[key]=Math.max((counts[key]/1024)|0,1);
-						n_tot+=counts[key];
-					}
-					counts["$"]=n_tot;
-				}
+				UI.IncrementTabSwitchCount(counts,fn,1)
 			}
 		}
 		this.current_tab_id=tabid
@@ -850,8 +854,7 @@ UI.UpdateNewDocumentSearchPath=function(){
 	if(active_document&&active_document.file_name){
 		ret=UI.GetPathFromFilename(active_document.file_name)
 		UI.m_previous_document=active_document.file_name
-	}
-	if(!ret){
+	}else{
 		ret=IO.GetNewDocumentName(undefined,undefined,"document");
 		UI.m_previous_document=undefined
 	}
