@@ -2047,6 +2047,7 @@ UI.RegisterEditorPlugin(function(){
 					ctx.current_bracket_ac_ccnt_range.push(hlobj)
 					//ed.trigger_data.bracket_completed=C//tex \ref or \cite... don't need this
 					ctx.detecting_bad_curly=0
+					this.CallOnSelectionChange()
 					this.m_user_just_typed_char=1
 					return 0
 				}
@@ -2059,6 +2060,7 @@ UI.RegisterEditorPlugin(function(){
 				this.HookedEdit([ccnt1,Duktape.__byte_length(C),C])
 				this.CallOnChange()
 				this.SetCaretTo(ccnt1+Duktape.__byte_length(C))
+				this.CallOnSelectionChange()
 				this.m_user_just_typed_char=1
 				ctx.PopBacStack()
 				return 0

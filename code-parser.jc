@@ -1316,18 +1316,23 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 	g_key_decl_files[idfn]=kdf
 	return kdf
 
-auto BuildColorTable(CFileIndex file_index)
-	if !file_index.m_all_key_decls:
+auto BuildColorTable(CFileIndex fidx)
+	if !fidx.m_all_key_decls:
 		return
-	if !file_index.m_all_dep_files_considered&&file_index.m_temp_color_table_time!=g_color_table_time:
+	if !fidx.m_all_dep_files_considered&&fidx.m_temp_color_table_time!=g_color_table_time:
 		kd_ids=new int[]
 		temp_color_table=new int[int]
 		temp_p_prototypes=new TPrototypeItem[]
 		all_dep_files_considered=1
-		for kd in file_index.m_all_key_decls
+		for kd in fidx.m_all_key_decls
 			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
 			//Writeln(getIdString(kd.id_type&~KEY_DECL_MASK),' ',int(u32(kd.id_type)/u32(TOK_TYPE)))
-		if file_index.m_dep_files:
+		auto p_prototypes=fidx.m_p_prototypes
+		if p_prototypes:
+			auto base_addr=fidx.m_all_prototypes.d
+			foreach pproto in p_prototypes
+				temp_p_prototypes.push(TPrototypeItem(){id:pproto.x,ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int)})
+		if fidx.m_dep_files:
 			arv=new int[int]
 			auto dfs(int idfn_dep)
 				if arv[idfn_dep]:return
@@ -1344,21 +1349,21 @@ auto BuildColorTable(CFileIndex file_index)
 					//Writeln(getIdString(gkd.id_type&~KEY_DECL_MASK),' ',int(u32(gkd.id_type)/u32(TOK_TYPE)))
 				auto p_prototypes=kdfile.fidx.m_p_prototypes
 				if p_prototypes:
-					base_addr=kdfile.fidx.m_all_prototypes.d
+					auto base_addr=kdfile.fidx.m_all_prototypes.d
 					foreach pproto in p_prototypes
 						temp_p_prototypes.push(TPrototypeItem(){id:pproto.x,ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int)})
 				foreach idfn_dep in kdfile.fidx.m_dep_files
 					dfs(idfn_dep)
 			//Writeln('BuildColorTable ',g_color_table_time)
-			foreach idfn_dep in file_index.m_dep_files
+			foreach idfn_dep in fidx.m_dep_files
 				dfs(idfn_dep)
-		file_index.m_all_dep_files_considered=all_dep_files_considered
-		file_index.m_temp_color_table=temp_color_table
-		file_index.m_temp_color_table_time=g_color_table_time
+		fidx.m_all_dep_files_considered=all_dep_files_considered
+		fidx.m_temp_color_table=temp_color_table
+		fidx.m_temp_color_table_time=g_color_table_time
 		////
 		temp_p_prototypes.Sortby(byMember("id"))
-		file_index.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
-		file_index.m_temp_p_prototypes=temp_p_prototypes
+		fidx.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
+		fidx.m_temp_p_prototypes=temp_p_prototypes
 
 MAX_PARSABLE_SIZE=1LL<<24
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){

@@ -3221,7 +3221,7 @@ W.CodeEditor=function(id,attrs){
 									var proto_i=prototypes[i]
 									if(n_commas>=proto_i.length){continue;}
 									var ccnt_lcomma=doc.ed.MoveToBoundary(doc.sel1.ccnt,-1,"space")
-									var ch_prev=String.fromCharCode(doc.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[0]);
+									var ch_prev=String.fromCharCode(doc.ed.GetUtf8CharNeighborhood(ccnt_lcomma)[0]);
 									var was_comma=(ch_prev==','||ch_prev=='(');
 									var array_fhint=[]
 									for(var j=n_commas;j<proto_i.length;j++){
