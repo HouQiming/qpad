@@ -2683,6 +2683,7 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 	return ''
 }
 
+var MAX_PARSABLE_FCALL=4096
 W.CodeEditor=function(id,attrs){
 	var tick0
 	if(UI.enable_timing){
@@ -3182,8 +3183,69 @@ W.CodeEditor=function(id,attrs){
 			}else{
 				//line numbers
 				DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h);
-				//auto-completion
+				//function prototype hint
 				var got_overlay_before=!!doc.ed.m_other_overlay;
+				var fhctx=obj.m_fhint_ctx
+				var s_fhint=undefined
+				if(doc.sel0.ccnt==doc.sel1.ccnt&&obj.show_auto_completion&&doc.m_user_just_typed_char){
+					var ccnt_fcall_bracket=doc.FindOuterBracket(doc.sel1.ccnt,-1)
+					if(!(fhctx&&fhctx.m_ccnt_fcall_bracket==ccnt_fcall_bracket)){
+						//context changed, detect new fcall
+						fhctx=undefined
+						if(ccnt_fcall_bracket>=0&&doc.ed.GetUtf8CharNeighborhood(ccnt_fcall_bracket)[1]=='('.charCodeAt(0)){
+							var ccnt_fcall_word1=doc.ed.MoveToBoundary(ccnt_fcall_bracket+1,-1,"word_boundary_right")
+							if(ccnt_fcall_word1>=0){
+								var ccnt_fcall_word0=doc.ed.MoveToBoundary(ccnt_fcall_word1,-1,"word_boundary_left")
+								if(ccnt_fcall_word0>=0){
+									var function_id=doc.ed.GetText(ccnt_fcall_word0,ccnt_fcall_word1-ccnt_fcall_word0);
+									var prototypes=UI.ED_QueryPrototypeByID(doc,function_id)
+									if(prototypes){
+										fhctx={
+											m_prototypes:prototypes,
+											m_ccnt_fcall_bracket:ccnt_fcall_bracket
+										}
+									}
+								}
+							}
+						}
+						obj.m_fhint_ctx=fhctx
+					}
+					if(fhctx&&doc.sel1.ccnt-ccnt_fcall_bracket<MAX_PARSABLE_FCALL){
+						var ccnt_rbracket=doc.ed.MoveToBoundary(doc.sel1.ccnt,1,"space")
+						if(doc.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]==')'.charCodeAt(0)){
+							//do the parsing in native code, GetStateAt then ComputeCharColorID, then do the deed
+							var n_commas=UI.ED_CountCommas(doc.ed,ccnt_fcall_bracket,doc.sel1.ccnt)
+							if(n_commas!=undefined){
+								var prototypes=fhctx.m_prototypes
+								for(var i=0;i<prototypes.length;i++){
+									var proto_i=prototypes[i]
+									if(n_commas>=proto_i.length){continue;}
+									var ccnt_lcomma=doc.ed.MoveToBoundary(doc.sel1.ccnt,-1,"space")
+									var ch_prev=String.fromCharCode(doc.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[0]);
+									var was_comma=(ch_prev==','||ch_prev=='(');
+									var array_fhint=[]
+									for(var j=n_commas;j<proto_i.length;j++){
+										if(array_fhint.length>0||was_comma){
+											array_fhint.push(proto_i[j])
+										}
+										array_fhint.push(',')
+									}
+									if(array_fhint.length>0){
+										array_fhint.pop();
+									}
+									//array_fhint.push(')');
+									s_fhint=array_fhint.join('');
+									break
+								}
+							}
+						}
+					}
+				}else{
+					if(fhctx){
+						obj.m_fhint_ctx=undefined
+					}
+				}
+				//auto-completion
 				doc.ed.m_other_overlay=undefined
 				if(doc.sel0.ccnt==doc.sel1.ccnt&&obj.show_auto_completion&&(doc.m_user_just_typed_char||doc.plugin_language_desc.default_hyphenator_name)){
 					var acctx=obj.m_ac_context
@@ -3407,6 +3469,13 @@ W.CodeEditor=function(id,attrs){
 						obj.m_ac_context=undefined
 						UI.InvalidateCurrentFrame()
 						UI.Refresh()
+					}
+				}
+				if(s_fhint){
+					if(doc.ed.m_other_overlay){
+						doc.ed.m_other_overlay.text=doc.ed.m_other_overlay.text+s_fhint
+					}else{
+						doc.ed.m_other_overlay={'type':'AC','text':s_fhint}
 					}
 				}
 				if(got_overlay_before&&!doc.ed.m_other_overlay){

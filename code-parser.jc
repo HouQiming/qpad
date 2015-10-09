@@ -766,6 +766,9 @@ struct TDeclItem
 	int epos_scope
 	int id
 	int epos0
+struct TPrototypeItem
+	int id
+	iptr ptr_prototype
 KEY_DECL_CLASS=TOK_TYPE*0
 KEY_DECL_FUNCTION=TOK_TYPE*1
 KEY_DECL_MACRO=TOK_TYPE*2
@@ -783,6 +786,8 @@ class CFileIndex
 	int2[int2] m_function_bracket_index //id, ordinal
 	TDeclItem[] m_all_decls
 	TKeyDeclItem[] m_all_key_decls
+	int[] m_all_prototypes
+	int2[] m_p_prototypes
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
 	//dependency
@@ -792,7 +797,9 @@ class CFileIndex
 	//transient items
 	int m_all_dep_files_considered
 	int[int] m_temp_color_table
+	int2[] m_temp_ids
 	iptr m_temp_color_table_time //~g_color_table_time
+	TPrototypeItem[] m_temp_p_prototypes
 	JS_hasDecls=function(JSContext JS){
 		return JS.Return(!!m_all_decls)
 	}
@@ -921,6 +928,45 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				g_symbols[id].decl_slot=0
 		sc_decls.resize(sc.pdecls)
 	}
+	all_prototypes=new int[]
+	p_prototypes=new int2[]
+	MAX_PROTOTYPE_TOKS=1024
+	parsePrototype=function(int function_id,int ptok){
+		auto blevel=0
+		auto param_id=0
+		auto p0=int(all_prototypes.n)
+		auto is_done=0
+		all_prototypes.push(0)
+		for i=ptok:min(toks.n,ptok+MAX_PROTOTYPE_TOKS)-1
+			auto tok_i=toks[i].tok
+			switch(tok_i){
+			default:
+				if (tok_i&TOK_TYPE_MASK)==TOK_ID:
+					param_id=tok_i-TOK_ID
+				break
+			case ',':
+				if blevel==1:
+					all_prototypes.push(param_id)
+					param_id=0
+				break
+			case '(','[','{':
+				blevel++
+				break
+			case ')',']','}':
+				blevel--
+				break
+			}
+			if !blevel:
+				all_prototypes.push(param_id)
+				param_id=0
+				is_done=1
+				break
+		if !is_done:
+			all_prototypes.resize(iptr(p0))
+		else
+			all_prototypes[p0]=int(all_prototypes.n)-p0-1
+			p_prototypes.push(int2(function_id,p0))
+	}
 	for i=0:toks.n-1
 		tok_i=toks[i].tok
 		switch(tok_i){
@@ -1016,12 +1062,14 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 											break
 										if tok0==')'&&tok1==':'&&tok2=='(':
 											//)ID:( -- objective C
-											is_function=1
+											is_function=2
 									//ID(...){ needs stack-based backtracking, test it later in the function_id line
 									if is_function:
 										all_key_decls.push(TKeyDeclItem(){
 											id_type:id+KEY_DECL_FUNCTION,
 											epos0:toks[i].epos0})
+									if is_function==1:
+										parsePrototype(id,i+2)
 			break
 		case '(','[','{':
 			ss.push(TStkEntry(){m_function_id:function_id,m_ptok_function_id:ptok_function_id,m_param_id:param_id})
@@ -1052,6 +1100,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						all_key_decls.push(TKeyDeclItem(){
 							id_type:function_id+KEY_DECL_FUNCTION,
 							epos0:toks[ptok_function_id].epos0})
+						parsePrototype(function_id,ptok_function_id+1)
 				se=ss.pop()
 				function_id=se.m_function_id
 				ptok_function_id=se.m_ptok_function_id
@@ -1121,6 +1170,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		m_all_key_decls:all_key_decls,
 		m_dep_files:dep_files,
 		m_dep_file_name_tokens:dep_file_name_tokens,
+		m_all_prototypes:all_prototypes,
+		m_p_prototypes:p_prototypes,
 	}
 
 auto parseAsText(string sdata,JSObject options)
@@ -1268,28 +1319,46 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 auto BuildColorTable(CFileIndex file_index)
 	if !file_index.m_all_key_decls:
 		return
-	//todo: fill the ids
 	if !file_index.m_all_dep_files_considered&&file_index.m_temp_color_table_time!=g_color_table_time:
+		kd_ids=new int[]
 		temp_color_table=new int[int]
+		temp_p_prototypes=new TPrototypeItem[]
 		all_dep_files_considered=1
 		for kd in file_index.m_all_key_decls
 			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
 			//Writeln(getIdString(kd.id_type&~KEY_DECL_MASK),' ',int(u32(kd.id_type)/u32(TOK_TYPE)))
 		if file_index.m_dep_files:
-			//Writeln('BuildColorTable ',g_color_table_time)
-			foreach idfn_dep in file_index.m_dep_files
+			arv=new int[int]
+			auto dfs(int idfn_dep)
+				if arv[idfn_dep]:return
+				arv[idfn_dep]=1
 				kdfile=g_key_decl_files[idfn_dep]
 				//Writeln('test ',idfn_dep,' ',getIdString(idfn_dep),' ',!!kdfile)
 				if !kdfile:
 					all_dep_files_considered=0
-					continue
+					return
 				foreach p in kdfile.llnodes
 					gkd=g_key_decls[p]
 					temp_color_table[gkd.id_type&~KEY_DECL_MASK]=int(u32(gkd.id_type)/u32(TOK_TYPE))+1
+					kd_ids.push(gkd.id_type&~KEY_DECL_MASK)
 					//Writeln(getIdString(gkd.id_type&~KEY_DECL_MASK),' ',int(u32(gkd.id_type)/u32(TOK_TYPE)))
+				auto p_prototypes=kdfile.fidx.m_p_prototypes
+				if p_prototypes:
+					base_addr=kdfile.fidx.m_all_prototypes.d
+					foreach pproto in p_prototypes
+						temp_p_prototypes.push(TPrototypeItem(){id:pproto.x,ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int)})
+				foreach idfn_dep in kdfile.fidx.m_dep_files
+					dfs(idfn_dep)
+			//Writeln('BuildColorTable ',g_color_table_time)
+			foreach idfn_dep in file_index.m_dep_files
+				dfs(idfn_dep)
 		file_index.m_all_dep_files_considered=all_dep_files_considered
 		file_index.m_temp_color_table=temp_color_table
 		file_index.m_temp_color_table_time=g_color_table_time
+		////
+		temp_p_prototypes.Sortby(byMember("id"))
+		file_index.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
+		file_index.m_temp_p_prototypes=temp_p_prototypes
 
 MAX_PARSABLE_SIZE=1LL<<24
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
@@ -1386,6 +1455,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if s_prefix.n:
 			//common prefix here - if we have a common prefix, make it the only candidate and *mark* it as *continue after confirmation*
 			SearchPrefix(fidx.m_ids,1.f)
+			BuildColorTable(fidx)
+			if fidx.m_temp_ids&&fidx.m_temp_ids.n:
+				SearchPrefix(fidx.m_temp_ids,1.f)
 			if cands.n:
 				s_common_prefix=CommonPrefix(getIdString(cands[0].x)[s_prefix.n:],getIdString(cands.back().x)[s_prefix.n:])
 				if s_common_prefix.n:
@@ -1557,6 +1629,71 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if tokinfo.x<=ccnt&&ccnt<tokinfo.y:
 				return JS.Return(getIdString(tokinfo.z))
 		return 0
+	}
+	JS_UI["ED_QueryPrototypeByID"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		s_id=JS.Param(1).as(string)
+		if !fidx||!fidx.m_temp_p_prototypes:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		if !s_id||!s_id.n:return 0
+		BuildColorTable(fidx)
+		id=getid(s_id)
+		p=fidx.m_temp_p_prototypes.InlineBisect(inline(pproto){return pproto.id<=id})-1
+		if p>=0L:
+			pproto=fidx.m_temp_p_prototypes[p]
+			if pproto.id==id:
+				id_unknown=getid("?")
+				ret=JS.NewArray()
+				n=0
+				for(;p<fidx.m_temp_p_prototypes.n;p++)
+					if fidx.m_temp_p_prototypes[p].id!=id:break
+					ptr_prototype=fidx.m_temp_p_prototypes[p].ptr_prototype
+					n_args=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
+					ret_n=JS.NewArray()
+					for i=0:n_args-1
+						id_i=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
+						if !id_i:
+							id_i=id_unknown
+						ret_n[i]=getIdString(id_i)
+					ret[n++]=ret_n
+				return JS.Return(ret)
+		return 0
+	}
+	JS_UI["ED_CountCommas"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor object")
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		hid_colorer=ed.m_handler_registration["colorer"].or(-1)
+		state_at_ccnt=ed.GetStateAt(hid_colorer,ccnt0)
+		s=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
+		handler_colorer=ed.m_handlers[hid_colorer]
+		s_context=ed.GetContextBefore(handler_colorer,ccnt0)
+		color_ids=handler_colorer.ComputeCharColorID(state_at_ccnt,s_context,s)
+		//return undefined if it's an "offensive" color id
+		color_std=color_ids[0]
+		color_final=color_ids[color_ids.n-1]
+		if int(color_final)!=int(color_std):
+			return 0
+		blevel=0
+		ncomma=0
+		for i=1:s.n-1
+			if color_ids[i]!=color_std:continue
+			switch s[i]{
+			case ',':
+				if !blevel:
+					ncomma++
+				break
+			case '(','[','{':
+				blevel++
+				break
+			case ')',']','}':
+				blevel--
+				break
+			}
+		return JS.Return(ncomma)
 	}
 	JS_UI["ED_ReparseDanglingDeps"]=function(JSContext JS){
 		if !g_dangling_deps_queue.n:return 0
