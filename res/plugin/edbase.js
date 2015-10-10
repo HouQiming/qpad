@@ -48,6 +48,8 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	});
 };
 
+var g_regexp_backslash=new RegExp("\\\\","g");
+var g_regexp_slash=new RegExp("/","g");
 var ProcessIncludePaths=function(paths){
 	var ret=[]
 	for(var i=0;i<paths.length;i++){
@@ -55,7 +57,7 @@ var ProcessIncludePaths=function(paths){
 		var paths_i=path_i.split(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?";":":");
 		for(var j=0;j<paths_i.length;j++){
 			if(IO.DirExists(paths_i[j])){
-				ret.push(paths_i[j].replace("\\","/"))
+				ret.push(paths_i[j].replace(g_regexp_backslash,"/"))
 			}
 		}
 	}
@@ -376,6 +378,32 @@ Language.Register({
 		return f_shell_like(lang,{
 			'keyword':['newmtl'],
 			'type':['Ka','Kd','Ks','illum','Ns','map_Kd','map_bump','bump','map_opacity','map_d','refl','map_kS','map_kA','map_Ns'],
+		})
+	}
+});
+
+Language.Register({
+	name:'Unix Shell Script',parser:"none",
+	extensions:['sh'],
+	shell_script_type:"unix",
+	file_icon_color:0xff444444,
+	file_icon:'プ',
+	rules:function(lang){
+		return f_shell_like(lang,{
+			'keyword':['if','fi','else','function','for','while','do','done'],
+		})
+	}
+});
+
+Language.Register({
+	name:'Windows Batch File',parser:"none",
+	extensions:['bat','cmd'],
+	shell_script_type:"windows",
+	file_icon_color:0xff444444,
+	file_icon:'プ',
+	rules:function(lang){
+		return f_shell_like(lang,{
+			'keyword':['if','exists','not','goto','for','do'],
 		})
 	}
 });
@@ -2651,5 +2679,111 @@ UI.RegisterEditorPlugin(function(){
 				}}])
 		}
 	})
-	
 }).prototype.name="Cursor history";
+
+var g_regexp_bash_escaping=new RegExp('[#;&"\'\\\\,`:!*?$(){}\\[\\]<|> \t]','g');
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('TAB',function(){
+		//shell script
+		var lang=this.plugin_language_desc
+		if(!lang||!lang.shell_script_type){return 1;}
+		//no selection
+		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
+		//cursor at end of line
+		var ccnt_end=this.ed.MoveToBoundary(this.sel1.ccnt,1,"space");
+		if(this.ed.GetUtf8CharNeighborhood(ccnt_end)[1]!=10){return 1;}
+		//line short enough
+		var ccnt_lh=this.SeekLC(this.GetLC(this.sel1.ccnt)[0],0)
+		if(!(this.sel1.ccnt-ccnt_lh<4096)){return 1;}
+		//parse the line into a list of words, then work on the last word
+		var s=this.ed.GetText(ccnt_lh,this.sel1.ccnt-ccnt_lh)
+		var pword=-1,cur_str=[],instr=undefined;
+		var args=[];
+		var endWord=UI.HackCallback(function(i){
+			if(pword<0){return;}
+			args.push(cur_str.join(""))
+			args.push(pword)
+			args.push(i)
+			pword=-1;
+			cur_str=[];
+		});
+		for(var i=0;i<s.length;i++){
+			var ch=s[i];
+			if(!instr&&(ch==' '||ch=='\t')){
+				endWord(i);
+				continue;
+			}
+			if(pword<0){
+				pword=i;
+			}
+			if(ch=='\\'&&lang.shell_script_type!="windows"){
+				i++;
+				if(i<s.length){cur_str.push(s[i]);}
+				continue;
+			}
+			if(instr&&ch==instr){
+				instr=undefined;
+				//assert(pword>=0)
+				endWord(i+1);
+			}else if(ch=="'"&&lang.shell_script_type!="windows"||ch=='"'){
+				instr=ch;
+				pword=i;
+			}else{
+				cur_str.push(s[i]);
+			}
+		}
+		endWord(s.length);
+		if(args.length<3){return 1;}
+		//work on args
+		var s_path=args[args.length-3];
+		var find_context=IO.CreateEnumFileContext(s_path.replace(g_regexp_backslash,"/")+"*",3)
+		var s_common=undefined
+		for(;;){
+			var fnext=find_context()
+			if(!fnext){
+				find_context=undefined
+				break
+			}
+			var sname=fnext.name
+			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				sname=sname.toLowerCase()
+			}
+			if(fnext.is_dir){
+				sname=sname+"/"
+			}
+			if(!s_common){
+				s_common=sname
+			}else{
+				for(var i=0;i<s_common.length;i++){
+					if(i>=sname.length||sname[i]!=s_common[i]){
+						s_common=s_common.substr(0,i)
+						break;
+					}
+				}
+			}
+			if(s_common.length<=s_path.length){break;}
+		}
+		if(!s_common||s_common.length<=s_path.length){return 1;}
+		//actually replace the stuff
+		if(lang.shell_script_type=="windows"){
+			s_common=s_common.replace(g_regexp_slash,"\\")
+			if(s_common.indexOf(' ')>=0||s_common.indexOf('\t')>=0){
+				//quote it
+				s_common='"'+s_common+'"';
+			}
+		}else{
+			//unix, escape the stuff
+			var fescapestuff=UI.HackCallback(function(smatch){
+				return "\\"+smatch;
+			});
+			s_common=s_common.replace(g_regexp_bash_escaping,fescapestuff);
+		}
+		var ccnt0=ccnt_lh+Duktape.__byte_length(s.slice(0,args[args.length-2]))
+		var ccnt1=ccnt_lh+Duktape.__byte_length(s.slice(0,args[args.length-1]))
+		this.HookedEdit([ccnt0,ccnt1-ccnt0,s_common])
+		this.CallOnChange()
+		this.SetCaretTo(ccnt0+Duktape.__byte_length(s_common))
+		return 0
+	})
+}).prototype.name="File name completion";
