@@ -270,10 +270,10 @@ Language.Register({
 			//bid_string,bid_string2
 			if(lang.isInside(bid_script)){
 				lang.SetExclusive([bid_js_comment,bid_js_comment2,bid_string,bid_string2]);
-				if(lang.isInside(bid_js_comment)||lang.isInside(bid_js_comment2)){
-					lang.Enable(bid_js_bracket);
-				}else{
+				if(lang.isInside(bid_js_comment)||lang.isInside(bid_js_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)){
 					lang.Disable(bid_js_bracket);
+				}else{
+					lang.Enable(bid_js_bracket);
 				}
 			//}else if(lang.isInside(bid_tag)){
 			//	//we're in tags, enable strings but disable the JS stuff
@@ -2681,6 +2681,7 @@ UI.RegisterEditorPlugin(function(){
 	})
 }).prototype.name="Cursor history";
 
+/*
 var g_regexp_bash_escaping=new RegExp('[#;&"\'\\\\,`:!*?$(){}\\[\\]<|> \t]','g');
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
@@ -2787,3 +2788,4 @@ UI.RegisterEditorPlugin(function(){
 		return 0
 	})
 }).prototype.name="File name completion";
+*/

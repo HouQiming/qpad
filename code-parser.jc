@@ -1022,7 +1022,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							if is_function:
 								tok0=int(';')
 						//((tok1&TOK_TYPE_MASK)==TOK_ID||tok1=='*'||tok1=='['||tok1=='('||tok1=='&')
-						if !(tok0==';'&&tok1!='=')&&tok1!='{'&&tok0!='.'&&tok1!='.'&&!keyword_map[id]:
+						if !(tok0==';'&&tok1!='=')&&tok1!='['&&tok0!='.'&&tok1!='.'&&!keyword_map[id]:
 							//declaration
 							sc_decls.push(int2(id,int(i)))
 							//important-ish check

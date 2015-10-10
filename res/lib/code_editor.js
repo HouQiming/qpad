@@ -763,6 +763,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		return renderer.SnapToShown(this.ed,ccnt_ret,side)
 	},
 	DrawEllipsis:function(x,y,scale,color){
+		x/=UI.pixels_per_unit;
+		y/=UI.pixels_per_unit;
+		scale/=UI.pixels_per_unit;
 		if(!this.m_ellipsis_font){
 			this.m_ellipsis_font=UI.Font(UI.icon_font_name,this.h_ellipsis)
 			this.m_ellipsis_delta_x=(this.w_ellipsis-UI.GetCharacterAdvance(this.m_ellipsis_font,0x2026))*0.5
@@ -777,7 +780,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			round:this.h_ellipsis*0.5,
 			border_width:2,border_color:color})
 		UI.DrawChar(this.m_ellipsis_font,
-			x+this.m_ellipsis_delta_x*scale,y+this.m_ellipsis_delta_y*scale,color,
+			x+this.m_ellipsis_delta_x*scale,
+			y+this.m_ellipsis_delta_y*scale,color,
 			0x2026)
 	}
 })

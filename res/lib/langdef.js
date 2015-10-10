@@ -180,7 +180,7 @@ LanguageDefinition.prototype={
 			fenabler(this);
 			this.m_contradiction_fixes[this.m_inside_mask]=(this.m_enabling_mask&this.m_inside_mask)
 			if((this.m_enabling_mask&this.m_inside_mask)!=this.m_inside_mask){
-				//self-contradicting, add a correcting entry it
+				//self-contradicting, add a correcting entry
 				continue
 			}
 			var raw_enabling_mask=0;

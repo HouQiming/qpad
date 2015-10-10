@@ -747,7 +747,7 @@ class CLayouter_programmer
 		//maintain x normally
 		I_query_valid_point=-1LL
 		if enable_hidden:
-			//todo: query at the first non-hidden char
+			//query at the first non-hidden char
 			if !m_hidden_ranges_prepared:
 				PrepareHiddenRanges(ed)
 			p=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt_base})
@@ -1511,8 +1511,8 @@ class CColorer_programmer
 				if min_value>inc_value:
 					min_value=inc_value
 			//if !sti:Writeln(' ',inc_value,' ',ofs)
+			a[pa+0]=((i64(~and_mask)<<32)|i64(u64(u32(xor_mask))))
 			a[pa+2]=min(a[pa+2],a[pa+1]+i64(min_value))
-			a[pa+0]=((i64(~and_mask)<<32)|i64(u32(xor_mask)))
 			a[pa+1]+=i64(inc_value)
 	}
 	Add=function(i64[] a,i64[] b){
@@ -1668,6 +1668,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			foreach ch in s_bigchar_i
 				char_map[int(u8(ch))]=1
 			context_size=max(context_size,s_bigchar_i.n)
+			//Writeln('token ',i,': ',s_bigchar_i)
 		ret.m_context_size=int(context_size)
 		////////////////////////////
 		//we need bigchars to be a prefix code, but no checking yet
@@ -1849,6 +1850,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					key_state_i=m_contradiction_fixes[key_state_i].as(int)
 				assert(m_id_from_key_state[key_state_i]>=0)
 				bdfa[st+i].m_next_state=u16((m_id_from_key_state[key_state_i])*n_tokens)
+		for i=0:m_id_from_key_state.n-1
+			if m_id_from_key_state[i]<0:
+				m_id_from_key_state[i]=m_id_from_key_state[m_contradiction_fixes[i].as(int)]
 		ret.m_id_from_key_state=m_id_from_key_state
 		ret.m_n_key_states=n_key_states
 		ret.m_token_lengths=token_lengths
