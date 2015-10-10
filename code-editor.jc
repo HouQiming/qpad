@@ -1608,7 +1608,12 @@ class CColorer_programmer
 	SEEK_MODE_STATE=1LL
 	hasValidResult=function(i64[] a,i64[] da, i64[] b){
 		if b[0]==SEEK_MODE_BRACKET:
-			return a[1]+da[2]<=b[1]
+			ld=m_lang
+			key_mask=(1<<ld.m_n_key_states)-1
+			and_maska=~int(a[0]>>32)
+			xor_maska=int(a[0])
+			pb=3*ld.m_id_from_key_state[((ld.m_all_key_states[0]&and_maska)^xor_maska)&key_mask]
+			return a[1]+da[pb+2]<=b[1]
 		else
 			assert(0)
 			return 0

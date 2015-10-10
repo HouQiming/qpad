@@ -244,6 +244,7 @@ Language.Register({
 		var bid_script=lang.ColoredDelimiter("key","<script","</script>","color_symbol2");
 		var bid_js_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 		var bid_js_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
+		//var bid_js_regexp=lang.DefineDelimiter("key",'(/','/',"color_string");
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 		var bid_js_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
@@ -252,6 +253,7 @@ Language.Register({
 		lang.DefineToken('&quot;')
 		lang.DefineToken('&lt;')
 		lang.DefineToken('&gt;')
+		lang.DefineToken('\\/')
 		var kwset=lang.DefineKeywordSet("color_symbol",['<','/']);
 		kwset.DefineKeywords("color_keyword",["DOCTYPE","a","abbr","acronym","address","applet","area","article","aside","audio","b","base","basefont","bdi","bdo","big","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","datalist","dd","del","details","dfn","dialog","dir","div","dl","dt","em","embed","fieldset","figcaption","figure","font","footer","form","frame","frameset","h1","head","header","hr","html","i","iframe","img","input","ins","kbd","keygen","label","legend","li","link","main","map","mark","menu","menuitem","meta","meter","nav","noframes","noscript","object","ol","optgroup","option","output","p","param","pre","progress","q","rp","rt","ruby","s","samp","script","section","select","small","source","span","strike","strong","style","sub","summary","sup","table","tbody","td","textarea","tfoot","th","thead","time","title","tr","track","tt","u","ul","var","video","wbr"])
 		kwset.DefineWordColor("color")
@@ -1540,43 +1542,6 @@ UI.RegisterEditorPlugin(function(){
 	var fcheckbrackets=function(){
 		var ccnt=this.sel1.ccnt
 		var lang=this.plugin_language_desc
-		//if(this.IsBracketEnabledAt(ccnt)){
-			//what constitutes a bracket, state
-			//var is_left_bracket=0
-			//for(var i=0;i<lang.m_lbracket_tokens.length;i++){
-			//	var s=lang.m_lbracket_tokens[i]
-			//	var lg=Duktape.__byte_length(s)
-			//	if(this.ed.GetText(ccnt-lg,lg)==s){
-			//		//left bracket
-			//		is_left_bracket=1;
-			//		break
-			//	}
-			//}
-			//if(is_left_bracket){
-			//	var ccnt2=this.FindOuterBracket(ccnt,1)
-			//	if(ccnt2>=0){
-			//		HighlightBrackets(this,ccnt-1,ccnt2-1)
-			//		return
-			//	}
-			//}
-			//var is_right_bracket=0;
-			//for(var i=0;i<lang.m_rbracket_tokens.length;i++){
-			//	var s=lang.m_rbracket_tokens[i]
-			//	var lg=Duktape.__byte_length(s)
-			//	if(this.ed.GetText(ccnt,lg)==s){
-			//		//left bracket
-			//		is_right_bracket=1;
-			//		break
-			//	}
-			//}
-			//if(is_right_bracket){
-			//	var ccnt2=this.FindOuterBracket(ccnt,-1)
-			//	if(ccnt2>=0){
-			//		HighlightBrackets(this,ccnt2,ccnt)
-			//		return
-			//	}
-			//}
-		//}
 		var ccnt_right=this.FindOuterBracket(ccnt,1)
 		if(ccnt_right>=0){
 			var ccnt_left=this.FindOuterBracket(ccnt,-1)
