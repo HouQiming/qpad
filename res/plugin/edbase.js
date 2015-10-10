@@ -239,12 +239,11 @@ Language.Register({
 	file_icon:'マ',
 	rules:function(lang,keywords,has_preprocessor){
 		lang.DefineDefaultColor("color_symbol")
-		//var bid_tag=lang.DefineDelimiter("key","<",">");
+		var bid_tag=lang.DefineDelimiter("key","<",">");
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
 		var bid_script=lang.ColoredDelimiter("key","<script","</script>","color_symbol2");
 		var bid_js_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 		var bid_js_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
-		//var bid_js_regexp=lang.DefineDelimiter("key",'(/','/',"color_string");
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 		var bid_js_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
@@ -267,9 +266,7 @@ Language.Register({
 		kwset.DefineWordColor("color2")
 		lang.SetKeyDeclsBaseColor("color2")
 		return (function(lang){
-			//lang.SetExclusive([bid_comment,bid_tag,bid_script]);
-			lang.SetExclusive([bid_comment,bid_script]);
-			//bid_string,bid_string2
+			lang.SetExclusive([bid_comment,bid_tag,bid_script]);
 			if(lang.isInside(bid_script)){
 				lang.SetExclusive([bid_js_comment,bid_js_comment2,bid_string,bid_string2]);
 				if(lang.isInside(bid_js_comment)||lang.isInside(bid_js_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)){
@@ -277,11 +274,13 @@ Language.Register({
 				}else{
 					lang.Enable(bid_js_bracket);
 				}
-			//}else if(lang.isInside(bid_tag)){
-			//	//we're in tags, enable strings but disable the JS stuff
-			//	lang.Disable(bid_js_bracket);
-			//	lang.Disable(bid_js_comment);
-			//	lang.Disable(bid_js_comment2);
+			}else if(lang.isInside(bid_tag)){
+				//we're in tags, enable strings but disable the JS stuff
+				lang.Disable(bid_js_bracket);
+				lang.Disable(bid_js_comment);
+				lang.Disable(bid_js_comment2);
+				lang.Enable(bid_string);
+				lang.Enable(bid_string2);
 			}else{
 				lang.Disable(bid_js_bracket);
 				lang.Disable(bid_js_comment);
