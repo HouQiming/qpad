@@ -335,10 +335,10 @@ UI.Theme_CustomWidget=function(C){
 			minimap_page_shadow:0x1f000000,
 			minimap_page_border_width:2,
 			minimap_page_border_color:0xffaaaaaa,
-			sbar_page_shadow:0x7f444444,
+			sbar_eye_font:UI.Font(UI.icon_font_name,12,200),
+			sbar_page_shadow:0xaa444444,
 			sbar_page_border_color:0xff444444,
 			sbar_page_border_width:1,
-			sbar_page_arrow_color:0xff444444,
 			w_minimap:128,
 			///////
 			h_find_bar:32,
