@@ -161,9 +161,11 @@ W.TabbedDocument_prototype={
 		for(var i=0;i<this.items.length;i++){
 			var tab_i=this.items[i]
 			if(tab_i.need_save){
-				//this doesn't count as a meaningful switch
-				if(ret==0){this.current_tab_id=i;}
-				tab_i.in_save_dialog=1
+				if(ret==0){
+					//this doesn't count as a meaningful switch
+					this.current_tab_id=i;
+					tab_i.in_save_dialog=1
+				}
 				ret=1
 			}//else{
 			tab_i.SaveMetaData()
@@ -172,6 +174,7 @@ W.TabbedDocument_prototype={
 		if(ret==0){
 			UI.SaveWorkspace();
 		}else{
+			this.m_is_close_pending=1
 			UI.Refresh()
 			return ret;
 		}
@@ -421,15 +424,23 @@ W.SaveDialog=function(id,attrs){
 			})
 			W.Text("",{x:obj.x+(obj.w-sz_text.w)*0.5,y:y_text, font:obj.font_text,text:s_text0,color:obj.text_color})
 			var fyes=function(){
+				var darea=obj.parent
 				obj.parent.SaveTab(obj.tabid)
 				obj.parent.CloseTab(obj.tabid)
 				obj.parent=undefined
 				UI.Refresh()
+				if(darea.m_is_close_pending){
+					if(!UI.top.app.OnClose()){UI.DestroyWindow(UI.top.app)}
+				}
 			}
 			var fno=function(){
+				var darea=obj.parent
 				obj.parent.CloseTab(obj.tabid,"forced")
 				obj.parent=undefined
 				UI.Refresh()
+				if(darea.m_is_close_pending){
+					if(!UI.top.app.OnClose()){UI.DestroyWindow(UI.top.app)}
+				}
 			}
 			var fcancel=function(){
 				obj.parent.items[obj.tabid].in_save_dialog=0

@@ -2212,6 +2212,12 @@ UI.RegisterEditorPlugin(function(){
 			}.bind(this)})
 		}
 	})
+	this.AddEventHandler('selectionChange',function(){
+		var sel=this.GetSelection();
+		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		renderer.ShowRange(this.ed,sel[0],sel[0])
+		renderer.ShowRange(this.ed,sel[1],sel[1])
+	})
 }).prototype.name="Text hiding";
 
 //unicode
@@ -2775,3 +2781,11 @@ UI.RegisterEditorPlugin(function(){
 	})
 }).prototype.name="File name completion";
 */
+
+UI.RegisterEditorPlugin(function(){
+	this.AddEventHandler('change',function(){
+		if(!this.m_diff_from_save||!this.owner||!(this.owner.h_obj_area>0)){return;}
+		this.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(this.ed,this.m_diff_from_save,this.owner.h_obj_area*UI.pixels_per_unit);
+		this.m_diff_minimap_h_obj_area=this.owner.h_obj_area
+	})
+}).prototype.name="Diff minimap";

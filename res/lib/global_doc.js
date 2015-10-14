@@ -440,8 +440,11 @@ UI.SaveWorkspace=function(){
 		workspace.push(wnd.file_name)
 	}
 	UI.m_ui_metadata["<workspace>"]=workspace
-	var fn_current_tab=UI.g_all_document_windows[UI.top.app.document_area.current_tab_id].file_name
-	UI.m_ui_metadata["<current_tab>"]=fn_current_tab
+	var obj_current_tab=UI.g_all_document_windows[UI.top.app.document_area.current_tab_id]
+	if(obj_current_tab){
+		var fn_current_tab=obj_current_tab.file_name
+		UI.m_ui_metadata["<current_tab>"]=fn_current_tab
+	}
 }
 
 UI.BumpHistory=function(file_name){

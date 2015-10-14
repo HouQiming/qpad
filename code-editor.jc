@@ -6,6 +6,7 @@ import "tex-like.jc"
 import "hunspell.jc"
 import "smart-find.jc"
 import "code-parser.jc"
+import "g-l.jc"
 import System.Math.*
 import System.Algorithm.*
 import System.Console.*
@@ -16,6 +17,7 @@ import TextBox.detail.*
 import TexLike.*
 import SmartFind.*
 import CodeParser.*
+import GL.*
 
 //text -> i64[]
 auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
@@ -2590,6 +2592,9 @@ auto AutoEdit_Evaluate(TEditop[] ops,i64 ccnt_base, CReplaceContext ctx, TProgra
 		ops.push(op2)
 	return 1
 
+class CDiffBitmap
+	u8[] data
+
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
 		//initial read, which is a raw edit
@@ -2893,5 +2898,98 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret[I*3+1]=op.sz
 			ret[I*3+2]=op.s
 		return JS.Return(ret)
+	}
+	JS_UI["ED_CreateDiffTrackerBitmap"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return 0
+		diff=JS.Param(1).as(CDiffTracker)
+		if !diff:return 0
+		h_screen=min(int(JS.Param(2).as(float)),2048)
+		bmp=new u8[h_screen]
+		//////
+		ytot=ed.XYFromCcnt(ed.GetTextSize()).y
+		modified_ccnt_ranges=new i64[]
+		DEPTH_THRESHOLD=16
+		auto dfs(CDiffSLNode nd,i64 ccnt_current_base,int depth)
+			if nd.ccnts[0]==nd.ccnts[2]&&nd.ccnts[1]==nd.ccnts[2]:
+				//ignore unchanged parts
+				return
+			if !nd.ccnts[1]||!nd.ccnts[0]:
+				//ignore completely deleted / inserted parts
+				modified_ccnt_ranges.push(ccnt_current_base)
+				modified_ccnt_ranges.push(ccnt_current_base+nd.ccnts[1])
+				return
+			if depth>DEPTH_THRESHOLD:
+				//cost-control: switch to GetXY-h_screen test when depth goes beyond a threshold
+				auto boundary_xys=ed.GetXYEnMasse([ccnt_current_base,ccnt_current_base+nd.ccnts[1]])
+				auto y0=min(max(int(boundary_xys[1]*i64(h_screen)/ytot),0),h_screen-1)
+				auto y1=min(max(int(boundary_xys[3]*i64(h_screen)/ytot),0),h_screen-1)
+				if y1-y0<=2:
+					modified_ccnt_ranges.push(ccnt_current_base)
+					modified_ccnt_ranges.push(ccnt_current_base+nd.ccnts[1])
+					return
+			auto pc=nd.pchild
+			auto ccnt_acc=ccnt_current_base
+			assert(!!pc)
+			for(;pc;pc=pc.pnext)
+				dfs(pc,ccnt_acc,depth+1)
+				ccnt_acc+=pc.ccnts[1]
+		dfs(diff.m_skiplist,0LL,0)
+		xys=ed.GetXYEnMasse(modified_ccnt_ranges)
+		hc=ed.GetCharacterHeightAt(0LL)
+		for i=0:4:xys.n-4
+			y0=min(max(int(xys[i+1]*i64(h_screen)/ytot),0),h_screen-1)
+			y1=min(max(int((xys[i+3]+hc)*i64(h_screen)/ytot),0),h_screen-1)
+			for j=y0:y1
+				bmp[j]=u8(255)
+		return JS.Return(new CDiffBitmap(){data:bmp})
+	}
+	JS_UI["ED_DrawDiffMinimap"]=function(JSContext JS){
+		x=JS.Param(0).as(float)
+		y=JS.Param(1).as(float)
+		w=JS.Param(2).as(float)
+		h=JS.Param(3).as(float)
+		C=JS.Param(4).as(int)
+		dbmp=JS.Param(5).as(CDiffBitmap)
+		if !dbmp:return 0
+		bmp=dbmp.data
+		texid=JS_UI["g_diff_minimap_texture"].as(GLuint)
+		tech=JS_UI["g_diff_minimap_technique"].as(GLTechnique)
+		if !texid:
+			texid=glCreateTexture(GL_ALPHA8,2048,1, GL_LINEAR,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,NULL)
+			tech=new GLTechnique
+			tech.SetVarying("vec4 C;")
+			tech.SetVarying("float u;")
+			tech.SetVertexShader("
+			void main(){
+				vec2 P_scr=P*scale;
+				"+(Gui2D.detail.g_renderer.m_srgb_supported?"C=vec4(pow(C_vert.xyz,vec3("+formatNumber(Gui2D.detail.g_renderer.m_gamma,{frac:7})+")),C_vert.w);":"C=C_vert;")+"
+				gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
+				u=u_vert;
+			}")
+			tech.SetFragmentShader("void main(){gl_FragColor=vec4(1.0,1.0,1.0,texture2D(tex0,vec2(u,0.5)).w)*C;}")
+			JS_UI["g_diff_minimap_texture"]=texid
+			JS_UI["g_diff_minimap_technique"]=tech
+		glBindTexture(GL_TEXTURE_2D,texid)
+		glTexSubImage2D(GL_TEXTURE_2D,0,0,0,int(bmp.n),1,GL_ALPHA,GL_UNSIGNED_BYTE,__pointer(bmp.d))
+		glBindTexture(GL_TEXTURE_2D,0u)
+		u_max=f32(bmp.n)/2048.f
+		mini_vbo=[
+			__float_as_int(x),__float_as_int(y),
+			__float_as_int(x+w),__float_as_int(y),
+			__float_as_int(x+w),__float_as_int(y+h),
+			__float_as_int(x),__float_as_int(y+h),
+			C,C,C,C,
+			0,0,__float_as_int(u_max),__float_as_int(u_max)]
+		tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(int),mini_vbo.d)
+		tech.SetVertexPointer("C_vert", 4,GL_UNSIGNED_BYTE,1, sizeof(int),mini_vbo.d+8*sizeof(float))
+		tech.SetVertexPointer("u_vert", 1,GL_FLOAT,1, sizeof(int),mini_vbo.d+12*sizeof(float))
+		prev_viewport=new int[4]
+		glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
+		tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
+		tech.SetTexture2D("tex0",texid)
+		tech.Draw(0u,GL_QUADS,4)
+		mini_vbo.discard()
+		return 0
 	}
 })

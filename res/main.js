@@ -328,13 +328,14 @@ UI.Theme_CustomWidget=function(C){
 			bookmark_scroll_bar_marker_size:2,
 			///////
 			//color_diff_tag:[{x:0,y:0,color:0xff2ca033&0xffffff},{x:1,y:0,color:0xff2ca033}],
-			color_diff_tag:[{x:0,y:0,color:C&0xffffff},{x:1,y:0,color:C}],
+			color_diff_tag:[{x:0,y:0,color:C[0]&0xffffff},{x:1,y:0,color:C[0]}],
 			///////
 			show_minimap:(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="android"||UI.Platform.ARCH=="ios")?0:1,
 			minimap_font_height:6,
 			minimap_page_shadow:0x1f000000,
 			minimap_page_border_width:2,
 			minimap_page_border_color:0xffaaaaaa,
+			sbar_diff_color:(0x7fffffff&C[0]),
 			sbar_eye_font:UI.Font(UI.icon_font_name,12,200),
 			sbar_page_shadow:0xaa444444,
 			sbar_page_border_color:0xff444444,

@@ -2283,6 +2283,7 @@ W.CodeEditor=function(id,attrs){
 	}
 	UI.Begin(obj)
 		//main code area
+		obj.h_obj_area=h_obj_area
 		var doc=obj.doc
 		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,w_scrolling_area=0,y_top_hint_scroll=0;
 		var h_scrolling_area=h_obj_area
@@ -2478,7 +2479,7 @@ W.CodeEditor=function(id,attrs){
 				var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
 				var line0=doc.GetLC(rendering_ccnt0)[0];
 				var line1=doc.GetLC(rendering_ccnt1)[0];
-				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+2,"valid_only");
+				var line_ccnts=doc.SeekAllLinesBetween(line0,line1+1,"valid_only");
 				var line_xys=doc.ed.GetXYEnMasse(line_ccnts)
 				var diff=doc.m_diff_from_save
 				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
@@ -2490,7 +2491,17 @@ W.CodeEditor=function(id,attrs){
 					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
 					var x=w_line_numbers-text_dim.w-obj.padding
 					if(diff&&i+1<line_ccnts.length){
-						if(diff.RangeQuery(line_ccnts[i],line_ccnts[i+1])){
+						var ccnt_line_next=-1;
+						for(var j=i+1;j<line_ccnts.length;j++){
+							if(line_ccnts[j]>=0){
+								ccnt_line_next=line_ccnts[j]
+								break
+							}
+						}
+						if(ccnt_line_next<0){
+							ccnt_line_next=doc.SeekLC(line1+1,0)
+						}
+						if(diff.RangeQuery(line_ccnts[i],ccnt_line_next)){
 							//line modified
 							//s_line_number=s_line_number+"*";
 							UI.RoundRect({
@@ -3450,11 +3461,24 @@ W.CodeEditor=function(id,attrs){
 			var sbar=UI.RoundRect({x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area,
 				color:obj.line_number_bgcolor
 			})
+			//diff minimap
+			if(doc.m_diff_minimap){
+				if(obj.m_diff_minimap_h_obj_area!=h_obj_area){
+					doc.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(doc.ed,doc.m_diff_from_save,h_obj_area*UI.pixels_per_unit);
+					doc.m_diff_minimap_h_obj_area=h_obj_area
+				}
+				UI.GLWidget(function(){
+					UI.ED_DrawDiffMinimap(
+						(sbar.x+sbar.w*0.5)*UI.pixels_per_unit,sbar.y*UI.pixels_per_unit,
+						(sbar.w-sbar.w*0.5)*UI.pixels_per_unit,sbar.h*UI.pixels_per_unit,
+						obj.sbar_diff_color,doc.m_diff_minimap);
+				})
+			}
 			//at-scrollbar bookmark marker
 			var hc_bookmark=UI.GetCharacterHeight(obj.bookmark_font)
 			if(bm_ccnts.length){
 				for(var i=0;i<bm_ccnts.length;i++){
-					var y=Math.max(Math.min(bm_xys[i*2+1]/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
+					var y=Math.max(Math.min(bm_xys[i*2+1]/ytot,1),0)*sbar.h+sbar.y
 					var id=bm_ccnts[i][0]
 					UI.RoundRect({
 						x:sbar.x, w:sbar.w,
@@ -3481,14 +3505,12 @@ W.CodeEditor=function(id,attrs){
 			var page_state_alpha=255-((obj.sbar.icon_color[0].color>>24)&0xff);
 			if(page_state_alpha>0){
 				var opacity=page_state_alpha/255
-				var sbar_page_y0=Math.max(Math.min(doc.scroll_y/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
-				var sbar_page_y1=Math.max(Math.min((doc.scroll_y+h_scrolling_area)/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
-				//if(sbar_page_y1-sbar_page_y0<obj.sbar_page_border_width*8){
+				var sbar_page_y0=Math.max(Math.min(doc.scroll_y/ytot,1),0)*sbar.h+sbar.y
+				var sbar_page_y1=Math.max(Math.min((doc.scroll_y+h_scrolling_area)/ytot,1),0)*sbar.h+sbar.y
 				UI.DrawChar(obj.sbar_eye_font,
 					sbar.x+sbar.w-UI.MeasureText(obj.sbar_eye_font,"眼").w-1,
 					sbar_page_y0-sbar.y>hc_bookmark?sbar_page_y0-hc_bookmark:sbar_page_y1,
 					UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity),"眼".charCodeAt(0))
-				//}
 				UI.RoundRect({
 					x:sbar.x, y:sbar.y+sbar_page_y0, w:sbar.w, h:sbar_page_y1-sbar_page_y0,
 					color:UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity)})
