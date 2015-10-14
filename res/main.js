@@ -338,6 +338,7 @@ UI.Theme_CustomWidget=function(C){
 			sbar_page_shadow:0x7f444444,
 			sbar_page_border_color:0xff444444,
 			sbar_page_border_width:1,
+			sbar_page_arrow_color:0xff444444,
 			w_minimap:128,
 			///////
 			h_find_bar:32,

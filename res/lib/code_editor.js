@@ -3483,10 +3483,10 @@ W.CodeEditor=function(id,attrs){
 				var opacity=page_state_alpha/255
 				var sbar_page_y0=Math.max(Math.min(doc.scroll_y/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
 				var sbar_page_y1=Math.max(Math.min((doc.scroll_y+h_scrolling_area)/(ytot-h_scrolling_area),1),0)*sbar.h+sbar.y
-				if(sbar_page_y1-sbar_page_y0<obj.sbar_page_border_width*2){
-					UI.DrawChar(obj.bookmark_font,sbar.x-10,(sbar_page_y0+sbar_page_y1)*0.5-hc_bookmark*0.5,
-						obj.bookmark_text_color,0x2192)
-					//todo
+				if(sbar_page_y1-sbar_page_y0<obj.sbar_page_border_width*8){
+					UI.DrawChar(obj.bookmark_font,
+						sbar.x+sbar.w-UI.MeasureText(obj.bookmark_font,"page").w,sbar.y+(sbar_page_y0+sbar_page_y1)*0.5-hc_bookmark*0.5,
+						obj.sbar_page_arrow_color,0x3e)
 				}
 				UI.RoundRect({
 					x:sbar.x, y:sbar.y+sbar_page_y0, w:sbar.w, h:sbar_page_y1-sbar_page_y0,
