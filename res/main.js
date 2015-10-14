@@ -335,6 +335,9 @@ UI.Theme_CustomWidget=function(C){
 			minimap_page_shadow:0x1f000000,
 			minimap_page_border_width:2,
 			minimap_page_border_color:0xffaaaaaa,
+			sbar_page_shadow:0x7f444444,
+			sbar_page_border_color:0xff444444,
+			sbar_page_border_width:1,
 			w_minimap:128,
 			///////
 			h_find_bar:32,
@@ -406,12 +409,20 @@ UI.Theme_CustomWidget=function(C){
 				middle_bar:{
 					w:12,h:12,
 					round:6,
-					color:[{x:0,y:0,color:0xff999999},{x:1,y:1,color:0xff666666}],
+					color:0,
 					border_color:0,
 				},
+				icon_color:0xff999999,
+				text_color:0xff999999,//dummy
 				$:{
-					out:{},
-					over:{},
+					out:{
+						icon_color:[{x:0,y:0,color:0x00999999},{x:1,y:1,color:0x00666666}],
+						text_color:0x00999999,//dummy
+					},
+					over:{
+						icon_color:[{x:0,y:0,color:0xff999999},{x:1,y:1,color:0xff666666}],
+						text_color:0xff999999,//dummy
+					},
 				},
 			},
 			///////
@@ -774,6 +785,16 @@ UI.Application=function(id,attrs){
 			menu_file.AddNormalItem({text:"Save a&ll",icon:'保',action:function(){
 				app.document_area.SaveAll();
 			}});
+			if(app.document_area.active_tab){
+				menu_file.AddNormalItem({text:"&Close",action:function(){
+					app.document_area.CloseTab();
+				}});
+				menu_file.AddSeparator();
+				menu_file.AddNormalItem({text:"Revert",action:function(){
+					var obj_tab=app.document_area.active_tab;
+					if(obj_tab&&obj_tab.Reload){obj_tab.Reload();};
+				}});
+			}
 			menu_file.AddSeparator();
 			W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
 			W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});

@@ -91,6 +91,7 @@ W.TabbedDocument_prototype={
 	//closer -> class: OnClose notification and stuff
 	CloseTab:function(tabid,forced){
 		if(tabid==undefined){tabid=this.current_tab_id}
+		if(tabid==undefined){return;}
 		var tab=this.items[tabid]
 		if(!tab){return;}
 		if(tab.need_save&&!forced){
@@ -161,15 +162,18 @@ W.TabbedDocument_prototype={
 			var tab_i=this.items[i]
 			if(tab_i.need_save){
 				//this doesn't count as a meaningful switch
-				this.current_tab_id=i
+				if(ret==0){this.current_tab_id=i;}
 				tab_i.in_save_dialog=1
 				ret=1
-			}else{
-				tab_i.SaveMetaData()
-			}
+			}//else{
+			tab_i.SaveMetaData()
+			//}
 		}
 		if(ret==0){
 			UI.SaveWorkspace();
+		}else{
+			UI.Refresh()
+			return ret;
 		}
 		var window_list=this.items
 		var n2=0;
@@ -295,7 +299,7 @@ W.TabbedDocument=function(id,attrs){
 			if(i==tabid){x_acc_abs_tabid=x_acc_abs;}
 			x_acc_abs+=label_i.w
 		}
-		if(n>0){
+		if(n>0&&obj[tabid]){
 			obj.scroll_x=Math.max(Math.min(
 				x_acc_abs-w_label_area+8,
 				x_acc_abs_tabid+(obj[tabid].w-w_label_area)*0.5),0)
