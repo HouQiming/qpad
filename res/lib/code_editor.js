@@ -2278,20 +2278,26 @@ W.FileItem=function(id,attrs){
 						color:sel_bgcolor})
 				}
 				UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
-				var sname=obj.selected?obj.name:GetSmartFileName(obj)
-				W.Text("",{x:obj.x+w_icon,y:obj.y+4,
+				var sname=GetSmartFileName(obj)
+				var lg_basepath=obj.name.length-sname.length
+				if(lg_basepath>0){
+					W.Text("",{x:obj.x+w_icon,y:obj.y+4,
+						font:obj.name_font,text:obj.name.substr(0,lg_basepath),
+						color:obj.selected?obj.sel_basepath_color:obj.basepath_color})
+				}
+				W.Text("",{x:obj.x+w_icon+UI.MeasureText(obj.name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+4,
 					font:obj.name_font,text:sname,
 					color:obj.selected?obj.sel_name_color:obj.name_color})
 				if(obj.history_hl_ranges){
 					//highlight keywords in history items only
-					var base_offset=obj.selected?0:(obj.name.length-sname.length);
+					//var base_offset=obj.selected?0:(obj.name.length-sname.length);
 					for(var i=0;i<obj.history_hl_ranges.length;i+=2){
-						var p0=Math.max(obj.history_hl_ranges[i+0]-base_offset,0);
-						var p1=Math.max(obj.history_hl_ranges[i+1]-base_offset,0);
+						var p0=obj.history_hl_ranges[i+0];//Math.max(obj.history_hl_ranges[i+0]-base_offset,0);
+						var p1=obj.history_hl_ranges[i+1];//Math.max(obj.history_hl_ranges[i+1]-base_offset,0);
 						if(p0<p1){
-							var x=obj.x+w_icon+UI.MeasureText(obj.name_font,sname.substr(0,p0)).w
+							var x=obj.x+w_icon+UI.MeasureText(obj.name_font,obj.name.substr(0,p0)).w
 							W.Text("",{x:x,y:obj.y+4,
-								font:obj.name_font_bold,text:sname.substr(p0,p1-p0),
+								font:obj.name_font_bold,text:obj.name.substr(p0,p1-p0),
 								color:obj.selected?obj.sel_name_color:obj.name_color})
 						}
 					}
