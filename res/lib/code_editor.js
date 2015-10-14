@@ -659,6 +659,7 @@ W.CodeEditorWidget_prototype={
 				this.ReleaseEditLock();
 				doc.ed.saving_context=undefined
 				doc.ResetSaveDiff()
+				doc.m_loaded_time=IO.GetFileTimestamp(this.file_name)
 				this.OnSave();
 				this.DismissNotification('saving_progress')
 				UI.Refresh()
@@ -3305,7 +3306,7 @@ W.CodeEditor=function(id,attrs){
 				};
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find})
 				W.Hotkey("",{text:"CTRL+R",action:finvoke_find})
-				menu_search.AddButtonRow({text:"Find prev / next"},[
+				menu_search.AddButtonRow({text:"Find previous / next"},[
 					{key:"SHIFT+CTRL+G SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+G',action:function(){
 						obj.FindNext(-1)
 					}},{key:"CTRL+G F3",text:"find_down",icon:"下",tooltip:'Next - CTRL+G',action:function(){
@@ -3492,7 +3493,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//the actual bar
-			W.ScrollBar("sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area-8, dimension:'y',
+			W.ScrollBar("sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area, dimension:'y',
 				page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
 				OnChange:function(value){
 					doc.scroll_y=value*(this.total_size-this.page_size)
@@ -3678,6 +3679,7 @@ UI.OnApplicationSwitch=function(){
 		if(obj_tab.doc&&obj_tab.doc.doc){
 			var obj=obj_tab.doc
 			if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
+				if(obj.doc.ed.saving_context){continue;}//saving docs are OK
 				//reload
 				if(obj_tab.need_save){
 					//make a notification

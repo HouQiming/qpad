@@ -66,6 +66,7 @@ UI.Theme_CustomWidget=function(C){
 		tab_label:{
 			transition_dt:0.1,
 			shadow_size:8,
+			hotkey_font:UI.Font(UI.font_name,12,0),
 			font:UI.Font(UI.font_name,24,-100), padding:16,
 			$:{
 				active:{
@@ -89,6 +90,8 @@ UI.Theme_CustomWidget=function(C){
 			menu_bar_color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
 			menu_bar_border_width:1,
 			menu_bar_border_color:0xffaaaaaa,
+			menu_bar_shadow_size:8,
+			menu_bar_shadow_color:0xaa000000,
 			menu_button_style:{
 				transition_dt:0.25,
 				round:0,padding:0,
@@ -314,13 +317,13 @@ UI.Theme_CustomWidget=function(C){
 			x_scroll_shadow_size:8,
 			///////
 			show_line_numbers:1,
-			line_number_font:UI.Font("res/fonts/opensans.ttf",14,-50),
+			line_number_font:UI.Font(UI.font_name,14,-50),
 			line_number_bgcolor:0xffd0d0d0,
 			line_number_color:0xff7f7f7f,
 			line_number_color_focus:0xff000000,
 			color_cur_line_highlight:0x55ffffff,
 			///////
-			bookmark_font:UI.Font("res/fonts/opensans.ttf",12,200),
+			bookmark_font:UI.Font(UI.font_name,12,200),
 			bookmark_color:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
 			bookmark_text_color:C[0],
 			//bookmark_shadow:0xff000000,
@@ -350,7 +353,7 @@ UI.Theme_CustomWidget=function(C){
 			find_bar_hint_color:0xff7f7f7f,
 			find_bar_shadow_color:0x7f000000,
 			find_bar_shadow_size:8,
-			find_bar_hint_font:UI.Font("res/fonts/opensans.ttf",20,-50),
+			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
 			find_bar_button_size:28,
 			find_bar_editor_style:{
 				font:UI.Font("res/fonts/inconsolata.ttf",20),
@@ -379,12 +382,12 @@ UI.Theme_CustomWidget=function(C){
 			find_item_shadow_size:4,
 			find_mode_bgcolor:0xffc0c0c0,
 			find_item_highlight_color:0x55007fff,
-			find_message_font:UI.Font("res/fonts/opensans.ttf",32,-50),
+			find_message_font:UI.Font(UI.font_name,32,-50),
 			find_message_color:0xff444444,
 			///////
 			show_auto_completion:1,
-			accands_font:UI.Font("res/fonts/opensans.ttf",22,-50),
-			accands_id_font:UI.Font("res/fonts/opensans.ttf",12,200),
+			accands_font:UI.Font(UI.font_name,22,-50),
+			accands_id_font:UI.Font(UI.font_name,12,200),
 			accands_padding:24,
 			accands_left_padding:14,
 			accands_sel_padding:2,
@@ -435,7 +438,7 @@ UI.Theme_CustomWidget=function(C){
 			sxs_shadow_color:0xaa000000,
 			///////
 			status_bar_bgcolor:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffd0d0d0}],
-			status_bar_font:UI.Font("res/fonts/opensans.ttf",20,-50),
+			status_bar_font:UI.Font(UI.font_name,20,-50),
 			status_bar_padding:4,
 			status_bar_text_color:0xff444444,
 		},
@@ -497,7 +500,7 @@ UI.Theme_CustomWidget=function(C){
 			find_bar_hint_color:0xff7f7f7f,
 			find_bar_shadow_color:0x7f000000,
 			find_bar_shadow_size:8,
-			find_bar_hint_font:UI.Font("res/fonts/opensans.ttf",20,-50),
+			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
 			find_bar_button_size:28,
 			find_bar_editor_style:{
 				font:UI.Font("res/fonts/inconsolata.ttf",20),
@@ -509,9 +512,9 @@ UI.Theme_CustomWidget=function(C){
 		file_item:{
 			h:56,h_icon:48,
 			file_icon_color:0xff444444,
-			name_font:UI.Font("res/fonts/opensans.ttf",24,-50),
-			name_font_bold:UI.Font("res/fonts/opensans.ttf",24,100),
-			misc_font:UI.Font("res/fonts/opensans.ttf",18,-50),
+			name_font:UI.Font(UI.font_name,24,-50),
+			name_font_bold:UI.Font(UI.font_name,24,100),
+			misc_font:UI.Font(UI.font_name,18,-50),
 			name_color:0xff000000,
 			misc_color:0xff7f7f7f,
 			basepath_color:0xffcccccc,
@@ -525,7 +528,7 @@ UI.Theme_CustomWidget=function(C){
 			tag_border_width:0,
 			button_style:{
 				transition_dt:0.1,
-				font:UI.Font("res/fonts/opensans.ttf",24,-50),
+				font:UI.Font(UI.font_name,24,-50),
 				round:0,border_width:2,padding:6,
 				color:0,
 				$:{
@@ -788,7 +791,7 @@ UI.Application=function(id,attrs){
 				app.document_area.SaveAll();
 			}});
 			if(app.document_area.active_tab){
-				menu_file.AddNormalItem({text:"&Close",action:function(){
+				menu_file.AddNormalItem({text:"&Close",key:"CTRL+W",enable_hotkey:0,action:function(){
 					app.document_area.CloseTab();
 				}});
 				menu_file.AddSeparator();

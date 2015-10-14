@@ -2092,10 +2092,13 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_reend=this.GetEnhancedEnd(ccnt_lend)
 		if(ccnt_reend<ccnt_lend&&this.sel1.ccnt!=ccnt_reend){
 			//auto-strip the trailing space
-			this.HookedEdit([ccnt_reend,ccnt_lend-ccnt_reend,null])
-			this.CallOnChange()
-			this.SetCaretTo(ccnt_reend)
-			return 0
+			ccnt_lend=this.SeekLC(this.GetLC(ccnt_reend)[0],1e17)
+			if(ccnt_reend<ccnt_lend){
+				this.HookedEdit([ccnt_reend,ccnt_lend-ccnt_reend,null])
+				this.CallOnChange()
+				this.SetCaretTo(ccnt_reend)
+				return 0
+			}
 		}
 		return 1
 	})
@@ -2215,8 +2218,8 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('selectionChange',function(){
 		var sel=this.GetSelection();
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-		renderer.ShowRange(this.ed,sel[0],sel[0])
-		renderer.ShowRange(this.ed,sel[1],sel[1])
+		renderer.ShowRange(this.ed,sel[0]+1,sel[0]-1)
+		renderer.ShowRange(this.ed,sel[1]+1,sel[1]-1)
 	})
 }).prototype.name="Text hiding";
 

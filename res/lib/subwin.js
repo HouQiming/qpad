@@ -59,6 +59,15 @@ W.TabLabel=function(id,attrs){
 				color:obj.color,
 			})
 		}
+		if(obj.hotkey_str){
+			var dims=UI.MeasureText(obj.hotkey_font,obj.hotkey_str)
+			W.Text("",{
+				'anchor':'parent','anchor_align':"left",'anchor_valign':"up",
+				'x':obj.padding-dims.w-2,'y':6,
+				'font':obj.hotkey_font,'text':obj.hotkey_str,
+				'color':UI.lerp_rgba(obj.text_color&0xffffff,obj.text_color,0.5),
+			})
+		}
 		W.Text("",{
 			'anchor':'parent','anchor_align':"center",'anchor_valign':"center",
 			'x':0,'y':0,
@@ -172,7 +181,9 @@ W.TabbedDocument_prototype={
 			//}
 		}
 		if(ret==0){
-			UI.SaveWorkspace();
+			if(!this.m_is_close_pending){
+				UI.SaveWorkspace();
+			}
 		}else{
 			this.m_is_close_pending=1
 			UI.Refresh()
@@ -240,6 +251,14 @@ W.TabbedDocument=function(id,attrs){
 		}
 		var anim=W.AnimationNode("menu_animation",{transition_dt:0.15,w_menu:w_menu})
 		w_label_area-=anim.w_menu
+		//menu bar shadow goes below tab label
+		UI.RoundRect({
+			x:obj.x+obj.w-w_label_area-obj.menu_bar_shadow_size,y:obj.y-obj.menu_bar_shadow_size*0.5,
+			w:obj.menu_bar_shadow_size*2,h:obj.h_caption+obj.menu_bar_shadow_size*1.5,
+			round:obj.menu_bar_shadow_size,
+			border_width:-obj.menu_bar_shadow_size,
+			color:obj.menu_bar_shadow_color,
+		})
 		UI.RoundRect({
 			x:obj.x,y:obj.y,w:obj.w-w_label_area,h:obj.h_caption,
 			color:obj.menu_bar_color,
@@ -297,7 +316,8 @@ W.TabbedDocument=function(id,attrs){
 		var x_acc_abs=0,x_acc_abs_tabid=0;
 		for(var i=0;i<n;i++){
 			var item_i=items[i]
-			var label_i=W.TabLabel(i,{x:x_label_area,x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid, title:item_i.title})
+			var label_i=W.TabLabel(i,{x:x_label_area,x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid, title:item_i.title, 
+				hotkey_str:i<10?String.fromCharCode(48+(i+1)%10):undefined})
 			x_acc+=label_i.w;
 			if(i==tabid){x_acc_abs_tabid=x_acc_abs;}
 			x_acc_abs+=label_i.w
