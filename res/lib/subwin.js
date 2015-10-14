@@ -116,6 +116,7 @@ W.TabbedDocument_prototype={
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
 		//this doesn't count as a meaningful switch
 		if(this.current_tab_id<0){this.current_tab_id=0;}
+		if(tab.OnDestroy){tab.OnDestroy()}
 		UI.Refresh()
 	},
 	SetTab:function(tabid){

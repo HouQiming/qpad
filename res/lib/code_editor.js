@@ -629,6 +629,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					return
 				}
 			}
+			if(this.m_is_destroyed){
+				if(ed.hfile_loading){
+					ed.hfile_loading.discard()
+					ed.hfile_loading=undefined
+				}
+				return
+			}
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
 			}else{
@@ -745,17 +752,17 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	///////////////////////////////////////
 	//smarter clipboard actions
-	Cut:function(){
-		var ccnt0=this.sel0.ccnt
-		var ccnt1=this.sel1.ccnt
-		if(ccnt0==ccnt1){
-			var line_current=this.GetLC(ccnt1)[0]
-			var line_ccnts=this.SeekAllLinesBetween(line_current,line_current+2)
-			this.sel0.ccnt=line_ccnts[0];
-			this.sel1.ccnt=line_ccnts[1];
-		}
-		W.Edit_prototype.Cut.call(this)
-	},
+	//Cut:function(){
+	//	var ccnt0=this.sel0.ccnt
+	//	var ccnt1=this.sel1.ccnt
+	//	if(ccnt0==ccnt1){
+	//		var line_current=this.GetLC(ccnt1)[0]
+	//		var line_ccnts=this.SeekAllLinesBetween(line_current,line_current+2)
+	//		this.sel0.ccnt=line_ccnts[0];
+	//		this.sel1.ccnt=line_ccnts[1];
+	//	}
+	//	W.Edit_prototype.Cut.call(this)
+	//},
 	///////////////////////////////////////
 	SnapToValidLocation:function(ccnt,side){
 		var ccnt_ret=W.Edit_prototype.SnapToValidLocation.call(this,ccnt,side)
@@ -1017,6 +1024,9 @@ W.CodeEditorWidget_prototype={
 			UI.Refresh()
 			return 1
 		})
+	},
+	OnDestroy:function(){
+		if(this.doc){this.doc.m_is_destroyed=1;}
 	},
 	///////////////////////////
 	OnLoad:function(){
@@ -2026,21 +2036,27 @@ W.FileItemOnDemand=function(){
 		if(repo.is_parsing){
 			return "keep";
 		}
-		var hist_keywords=this.search_text.split(" ");
+		var hist_keywords=this.search_text.split(" ").filter(function(a){return a.toLowerCase()});
 		var ret=[]
 		for(var i=0;i<repo.files.length;i++){
 			var fname_i=repo.files[i]
 			if(UI.m_current_file_list.m_appeared_full_names[fname_i]){continue;}
+			var fn_i_search=fname_i.toLowerCase()
 			var is_invalid=0;
+			var hl_ranges=[]
 			for(var j=0;j<hist_keywords.length;j++){
-				if(fname_i.indexOf(hist_keywords[j])<0){
+				var pj=fn_i_search.lastIndexOf(hist_keywords[j]);
+				if(pj<0){
 					is_invalid=1
 					break;
 				}
+				hl_ranges.push(pj,pj+hist_keywords[j].length)
 			}
 			if(is_invalid){continue;}
 			//ret.push({name_to_find:fname_i})
-			var ret2=W.FileItemOnDemand.call({name_to_find:fname_i})
+			var ret2=W.FileItemOnDemand.call({
+				name_to_find:fname_i,
+				history_hl_ranges:hl_ranges})
 			for(var j=0;j<ret2.length;j++){
 				ret.push(ret2[j])
 			}
@@ -2982,6 +2998,7 @@ W.CodeEditor=function(id,attrs){
 				bm_xys=doc.ed.GetXYEnMasse(bm_ccnts.map(function(a){return a[1]}))
 			}
 		}
+		var f_draw_accands=undefined
 		if(doc&&obj.m_edit_lock){
 			obj.__children.push(doc)
 			UI.Begin(doc)
@@ -3263,16 +3280,18 @@ W.CodeEditor=function(id,attrs){
 						acctx=undefined;
 					}
 					if(!acctx){
-						var accands
+						var accands=undefined;
 						var is_spell_mode=0
 						if(doc.m_user_just_typed_char){
-							accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt)
+							if(!(doc.plugin_language_desc.parser=="C"&&!doc.IsBracketEnabledAt(doc.sel1.ccnt))){
+								accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt);
+							}
 						}else{
 							//tex mode - it's actually a spelling suggestion
 							//var ccnt_word=doc.sel1.ccnt
 							//var ccnt_word0=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_word,-1),-1,"word_boundary_left"),-1)
 							//var ccnt_word1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_word,1),1,"word_boundary_right"),1)
-							var accands={length:0,at:function(id){return this.suggestions[id]},suggestions:[],s_prefix:""}
+							accands={length:0,at:function(id){return this.suggestions[id]},suggestions:[],s_prefix:""}
 							is_spell_mode=1
 							//if(ccnt_word0+1<ccnt_word1){
 							var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
@@ -3382,82 +3401,84 @@ W.CodeEditor=function(id,attrs){
 							if(ac_was_actiavted){
 								acctx.Activate()
 							}
-							var ac_w_needed=0
-							while(acctx.m_display_items.length<acctx.m_scroll_i){
-								acctx.GetDisplayItem(acctx.m_display_items.length)
-							}
-							for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
-								ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
-							}
-							var ed_caret=doc.GetIMECaretXY();
-							var x_caret=(ed_caret.x-doc.visible_scroll_x);
-							var y_caret=(ed_caret.y-doc.visible_scroll_y);
-							x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
-							var hc=UI.GetCharacterHeight(doc.font)
-							var x_accands=Math.max(Math.min(x_caret,obj.x+w_obj_area-ac_w_needed-doc.x),0)
-							var y_accands=y_caret+hc
-							if(doc.y+y_accands+obj.accands_h>obj.y+h_obj_area){
-								y_accands=y_caret-obj.h_accands
-							}
-							x_accands+=doc.x
-							y_accands+=doc.y
-							var ac_anim_node=W.AnimationNode("accands_scrolling",{
-								scroll_x:acctx.GetDisplayItem(acctx.m_scroll_i).x,
-								current_w:ac_w_needed,
-							})
-							var ac_scroll_x=ac_anim_node.scroll_x
-							var w_accands=ac_anim_node.current_w
-							UI.RoundRect({
-								x:x_accands, y:y_accands, 
-								w:w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
-								round:obj.accands_shadow_size,
-								border_width:-obj.accands_shadow_size,
-								color:obj.accands_shadow_color})
-							UI.RoundRect({
-								x:x_accands, y:y_accands,
-								w:w_accands, h:obj.h_accands,
-								border_width:obj.accands_border_width,
-								border_color:obj.accands_border_color,
-								round:obj.accands_round,
-								color:obj.accands_bgcolor})
-							//draw the candidates
-							UI.PushCliprect(x_accands, y_accands, w_accands, obj.h_accands)
-							var hc_accands=UI.GetCharacterHeight(obj.accands_font)
-							var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
-							var ac_id0=acctx.IDFromX(ac_scroll_x)
-							var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
-							for(var i=ac_id0;i<=ac_id1;i++){
-								var dii=acctx.GetDisplayItem(i)
-								var selected=(acctx.m_activated&&i==acctx.m_selection)
-								var num_id=(i-acctx.m_scroll_i+11)%10
-								var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
-								var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
-								//x, w, name
-								if(selected){
-									UI.RoundRect({
-										x:x_item-w_hint_char-obj.accands_sel_padding,
-										y:y_accands_text-obj.accands_sel_padding,
-										w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
-										color:obj.accands_sel_bgcolor,
-									})
+							f_draw_accands=function(){
+								var ac_w_needed=0
+								while(acctx.m_display_items.length<acctx.m_scroll_i){
+									acctx.GetDisplayItem(acctx.m_display_items.length)
 								}
-								W.Text("",{x:x_item,y:y_accands_text,
-									font:obj.accands_font,text:dii.name,
-									color:selected?obj.accands_text_sel_color:obj.accands_text_color})
-								//coulddo: a shaking arrow with a big "TAB"
-								if(acctx.m_activated){
-									UI.DrawChar(obj.accands_id_font,
-										x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
-										selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
-									//W.Hotkey("",{key:String.fromCharCode(48+num_id),action:(function(i){return function(){
-									//	acctx.Confirm(i)
-									//}})(i)})
-									doc.AddTransientHotkey(String.fromCharCode(48+num_id),(function(i){return function(){
-										acctx.Confirm(i)
-									}})(i))
+								for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
+									ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
 								}
+								var ed_caret=doc.GetIMECaretXY();
+								var x_caret=(ed_caret.x-doc.visible_scroll_x);
+								var y_caret=(ed_caret.y-doc.visible_scroll_y);
+								x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
+								var hc=UI.GetCharacterHeight(doc.font)
+								var x_accands=Math.max(Math.min(x_caret,obj.x+w_obj_area-ac_w_needed-doc.x),0)
+								var y_accands=y_caret+hc
+								if(doc.y+y_accands+obj.accands_h>obj.y+h_obj_area){
+									y_accands=y_caret-obj.h_accands
+								}
+								x_accands+=doc.x
+								y_accands+=doc.y
+								var ac_anim_node=W.AnimationNode("accands_scrolling",{
+									scroll_x:acctx.GetDisplayItem(acctx.m_scroll_i).x,
+									current_w:ac_w_needed,
+								})
+								var ac_scroll_x=ac_anim_node.scroll_x
+								var w_accands=ac_anim_node.current_w
+								UI.RoundRect({
+									x:x_accands, y:y_accands, 
+									w:w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
+									round:obj.accands_shadow_size,
+									border_width:-obj.accands_shadow_size,
+									color:obj.accands_shadow_color})
+								UI.RoundRect({
+									x:x_accands, y:y_accands,
+									w:w_accands, h:obj.h_accands,
+									border_width:obj.accands_border_width,
+									border_color:obj.accands_border_color,
+									round:obj.accands_round,
+									color:obj.accands_bgcolor})
+								//draw the candidates
+								UI.PushCliprect(x_accands, y_accands, w_accands, obj.h_accands)
+								var hc_accands=UI.GetCharacterHeight(obj.accands_font)
+								var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
+								var ac_id0=acctx.IDFromX(ac_scroll_x)
+								var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
+								for(var i=ac_id0;i<=ac_id1;i++){
+									var dii=acctx.GetDisplayItem(i)
+									var selected=(acctx.m_activated&&i==acctx.m_selection)
+									var num_id=(i-acctx.m_scroll_i+11)%10
+									var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
+									var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
+									//x, w, name
+									if(selected){
+										UI.RoundRect({
+											x:x_item-w_hint_char-obj.accands_sel_padding,
+											y:y_accands_text-obj.accands_sel_padding,
+											w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
+											color:obj.accands_sel_bgcolor,
+										})
+									}
+									W.Text("",{x:x_item,y:y_accands_text,
+										font:obj.accands_font,text:dii.name,
+										color:selected?obj.accands_text_sel_color:obj.accands_text_color})
+									//coulddo: a shaking arrow with a big "TAB"
+									if(acctx.m_activated){
+										UI.DrawChar(obj.accands_id_font,
+											x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
+											selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
+										//W.Hotkey("",{key:String.fromCharCode(48+num_id),action:(function(i){return function(){
+										//	acctx.Confirm(i)
+										//}})(i)})
+										doc.AddTransientHotkey(String.fromCharCode(48+num_id),(function(i){return function(){
+											acctx.Confirm(i)
+										}})(i))
+									}
+								}
+								UI.PopCliprect()
 							}
-							UI.PopCliprect()
 						}else if(acctx.m_n_cands==1){
 							//doc.ed.m_other_overlay always shows the 1st candidate?
 							//need PPM weight calibration, and float weights
@@ -3738,6 +3759,7 @@ W.CodeEditor=function(id,attrs){
 							UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
 						}
 					}
+					obj.DismissNotification('find_result')
 					UI.Refresh()
 				};
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find})
@@ -3930,6 +3952,9 @@ W.CodeEditor=function(id,attrs){
 				x:obj.x+w_obj_area-w_scrolling_area, y:y_scrolling_area, w:1, h:h_scrolling_area,
 				color:obj.separator_color})
 		}
+		if(f_draw_accands){
+			f_draw_accands()
+		}
 		if(obj.m_notifications&&!obj.show_find_bar){
 			W.ListView('notification_list',{x:obj.x+w_obj_area-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:h_obj_area-8,
 				dimension:'y',layout_spacing:8,layout_align:'left',is_single_click_mode:1,no_region:1,no_clipping:1,
@@ -4025,6 +4050,7 @@ UI.NewCodeEditorTab=function(fname0){
 			return body;
 		},
 		Save:function(){
+			if(!this.doc){return;}
 			this.doc.Save();
 			var doc=this.doc.doc;
 			this.need_save=0
@@ -4034,6 +4060,9 @@ UI.NewCodeEditorTab=function(fname0){
 		},
 		SaveMetaData:function(){
 			if(this.doc){this.doc.SaveMetaData();}
+		},
+		OnDestroy:function(){
+			if(this.doc){this.doc.OnDestroy();}
 		},
 		property_windows:[],
 		color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
@@ -4103,7 +4132,7 @@ UI.ForgetFile=function(obj_fileitem){
 	var hist=UI.m_ui_metadata["<history>"]
 	for(var i=0;i<hist.length;i++){
 		var metadata=UI.m_ui_metadata[hist[i]]
-		if(metadata.m_tabswitch_count){
+		if(metadata&&metadata.m_tabswitch_count){
 			if(metadata.m_tabswitch_count[fname]){
 				var n=metadata.m_tabswitch_count[fname]
 				delete metadata.m_tabswitch_count[fname]

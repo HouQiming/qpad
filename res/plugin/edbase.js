@@ -1378,6 +1378,13 @@ UI.RegisterEditorPlugin(function(){
 		if(!(this.scroll_y>0)){
 			this.scroll_y=0;
 		}
+		var ed_caret=this.GetCaretXY();
+		if(ed_caret.y>this.scroll_y+this.h){
+			var bk=this.x_updown;
+			this.MoveCursorToXY(this.x_updown,ed_caret.y-1.0);
+			this.sel0.ccnt=this.sel1.ccnt
+			this.x_updown=bk;
+		}
 		UI.Refresh();
 		return 0
 	})
@@ -1390,6 +1397,13 @@ UI.RegisterEditorPlugin(function(){
 		this.scroll_y=Math.min(this.scroll_y+hc,ytot-page_height);
 		if(!(this.scroll_y>0)){
 			this.scroll_y=0;
+		}
+		var ed_caret=this.GetCaretXY();
+		if(ed_caret.y<this.scroll_y+(this.h_top_hint||0)){
+			var bk=this.x_updown;
+			this.MoveCursorToXY(this.x_updown,ed_caret.y+hc);
+			this.sel0.ccnt=this.sel1.ccnt
+			this.x_updown=bk;
 		}
 		UI.Refresh();
 		return 0
@@ -2389,15 +2403,18 @@ UI.RegisterEditorPlugin(function(){
 			var locs=this.m_autoedit_locators
 			if(this.m_autoedit_example_line_id>=0){
 				var line_id=this.m_autoedit_example_line_id;
-				if(ccnt_lh>=locs[line_id+0].ccnt&&ccnt_lh<locs[line_id+1].ccnt){
+				//if(ccnt_lh>=locs[line_id+0].ccnt&&ccnt_lh<locs[line_id+1].ccnt)
+				if(ccnt_lh==locs[line_id+0].ccnt){
 					return;
 				}
 			}else if(this.m_autoedit_mode=="explicit"){
-				if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt){
+				//if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt)
+				if(ccnt_lh==locs[0].ccnt){
 					return;
 				}
 			}else{
-				if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[1].ccnt){
+				//if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[1].ccnt)
+				if(ccnt_lh==locs[0].ccnt){
 					return;
 				}
 			}
@@ -2449,6 +2466,11 @@ UI.RegisterEditorPlugin(function(){
 			return 1;
 		}
 		var ops=UI.ED_AutoEdit_Evaluate(ctx,locs)
+		//for(var i=0;i<locs.length;i+=2){
+		//	print("============",i/2)
+		//	print(ed.GetText(locs[i+0].ccnt,locs[i+1].ccnt-locs[i+0].ccnt))
+		//}
+		//print(ops)
 		//highlight ops - fill out the overlay system
 		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		renderer.m_tentative_editops=ops

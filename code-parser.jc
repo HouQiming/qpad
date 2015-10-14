@@ -795,7 +795,7 @@ class CFileIndex
 	int3[] m_dep_file_name_tokens
 	//////////////////
 	//transient items
-	int m_all_dep_files_considered
+	//int m_all_dep_files_considered
 	int[int] m_temp_color_table
 	int2[] m_temp_ids
 	iptr m_temp_color_table_time //~g_color_table_time
@@ -851,6 +851,8 @@ inline IDToOrder(id)
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 g_function_ids=[getid("function"),getid("inline")]
+g_id_if=getid("if")
+g_id_while=getid("while")
 g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
@@ -1003,6 +1005,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					//just discount it as decl
 				else if tok_i==TOK_ID+g_id_typedef:
 					scopes[scopes.n-1].in_typedef=i8(1)
+				else if tok_i==TOK_ID+g_id_if||tok_i==TOK_ID+g_id_while:
+					//if or while is equivalent to assignment: right side is dumb expr
+					scopes[scopes.n-1].in_assignment=i8(1)
 				else if scopes.n:
 					/////////
 					//decl
@@ -1319,11 +1324,12 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 auto BuildColorTable(CFileIndex fidx)
 	if !fidx.m_all_key_decls:
 		return
-	if !fidx.m_all_dep_files_considered&&fidx.m_temp_color_table_time!=g_color_table_time:
+	//!fidx.m_all_dep_files_considered&&
+	if fidx.m_temp_color_table_time!=g_color_table_time:
 		kd_ids=new int[]
 		temp_color_table=new int[int]
 		temp_p_prototypes=new TPrototypeItem[]
-		all_dep_files_considered=1
+		//all_dep_files_considered=1
 		for kd in fidx.m_all_key_decls
 			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
 			//Writeln(getIdString(kd.id_type&~KEY_DECL_MASK),' ',int(u32(kd.id_type)/u32(TOK_TYPE)))
@@ -1340,7 +1346,7 @@ auto BuildColorTable(CFileIndex fidx)
 				kdfile=g_key_decl_files[idfn_dep]
 				//Writeln('test ',idfn_dep,' ',getIdString(idfn_dep),' ',!!kdfile)
 				if !kdfile:
-					all_dep_files_considered=0
+					//all_dep_files_considered=0
 					return
 				foreach p in kdfile.llnodes
 					gkd=g_key_decls[p]
@@ -1357,7 +1363,7 @@ auto BuildColorTable(CFileIndex fidx)
 			//Writeln('BuildColorTable ',g_color_table_time)
 			foreach idfn_dep in fidx.m_dep_files
 				dfs(idfn_dep)
-		fidx.m_all_dep_files_considered=all_dep_files_considered
+		//fidx.m_all_dep_files_considered=all_dep_files_considered
 		fidx.m_temp_color_table=temp_color_table
 		fidx.m_temp_color_table_time=g_color_table_time
 		////

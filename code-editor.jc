@@ -455,7 +455,7 @@ class CLayouter_programmer
 			s=obj["text"].as(string)
 			if s:
 				w_overlayd=GetStringWidth(m_font,s)
-			flatx=XYToX(x,y)
+			flatx=AddHiddenRanges(caller,x,y)
 			overlay_sel0=obj["start"].or(0L)
 			overlay_sel1=overlay_sel0+obj["length"].or(0L)
 			cmap=new iptr[]
@@ -498,7 +498,10 @@ class CLayouter_programmer
 				flatxs=[GetFlatX(a[i*4:]) for i=0:n*2-1]
 				for i=0:n-1
 					s_i=m_tentative_editops[i*3+2].as(string)
-					if !s_i:s_i=""
+					if !s_i:
+						s_i=""
+					else if s_i.IndexOf('\t')>=0:
+						s_i=s_i.Replace(["\t"," "])
 					w_overlayd_i=GetStringWidth(m_font,s_i)
 					prec_overlays.push(TOverlayItem(){
 						flatx:flatxs[i*2+1],
@@ -724,11 +727,12 @@ class CLayouter_programmer
 		p_overlay=m_overlays.InlineBisect(inline(a){return a.flatx<x})
 		inline projectXY(i64 x0)
 			auto y=x0/wrap_width
-			auto x=x0-y*wrap_width+dx_extra
+			auto x=x0-y*wrap_width
+			x+=dx_extra
 			y=(y+dy_extra)*hc
 			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 		inline testOverlay()
-			if TestOverlay(p_overlay, fnt_scaled,scale,x,projectXY):
+			while TestOverlay(p_overlay, fnt_scaled,scale,x,projectXY):
 				dx_extra+=m_overlays[p_overlay].delta_x
 				p_overlay++
 			//if m_overlay_obj&&x==m_caret_overlay.x:
@@ -1069,10 +1073,11 @@ class CLayouter_programmer
 		}
 		inline projectXY(i64 x0)
 			//DO NOT WRAP DURING DRAWOVERLAY!
+			//hidden case... not supported here
 			auto x=x0-y*wrap_width
 			return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y*hc-scroll_y)*scale+screen_y)
 		myDrawChar=function(int ch32){
-			if TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+			while TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
 				x+=m_overlays[p_overlay].delta_x
 				p_overlay++
 			//if m_overlay_obj&&x==x_overlay&&y==y_overlay:
@@ -1139,7 +1144,7 @@ class CLayouter_programmer
 			else if value1&0x80000000:
 				//space
 				if mode==MODE_RENDER:
-					if TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+					while TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
 						x+=m_overlays[p_overlay].delta_x
 						p_overlay++
 				value1&=0x7fffffff
@@ -1173,7 +1178,7 @@ class CLayouter_programmer
 								color=m_cached_colors[int(color_ids[su32[J].y])]
 								myDrawChar(ch32)
 							else
-								if TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+								while TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
 									x+=m_overlays[p_overlay].delta_x
 									p_overlay++
 						dx_temp=charWidth(ch32)
@@ -2311,9 +2316,11 @@ inline isSpaceOrNewline(int ch)
 //this just returns a list of ccnts indicating the ccnt range for each "line" (if they are similar enough)
 //everything works within stext
 AUTO_EDIT_SIMILARITY_THRESHOLD=0.3f
-AUTO_EDIT_SIMILARITY_THRESHOLD_TWOLINER=0.5f
+AUTO_EDIT_SIMILARITY_THRESHOLD_TWOGROUPER=0.5f
+AUTO_EDIT_SIMILARITY_THRESHOLD_MULTILINE_PERIOD=0.7f
 AUTO_EDIT_SIMILARITY_THRESHOLD_SYM=0.5f
-AUTO_EDIT_SIMILARITY_THRESHOLD_SYM_TWOLINER=0.6f
+AUTO_EDIT_SIMILARITY_THRESHOLD_SYM_TWOGROUPER=0.6f
+AUTO_EDIT_SIMILARITY_THRESHOLD_SYM_MULTILINE_PERIOD=0.8f
 AUTO_EDIT_MAX_LINE_LENGTH=400
 AUTO_EDIT_MAX_TOTAL_LENGTH=20480
 AUTO_EDIT_MAX_NLINES=256
@@ -2414,7 +2421,7 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 				//if wgt*nl>best:
 				//if !best||wt_covered_alnum&&percentage_sym>=AUTO_EDIT_SIMILARITY_THRESHOLD_SYM&&percentage_alnum>=AUTO_EDIT_SIMILARITY_THRESHOLD:
 				//	if !(cur_gapprg.n&&cur_gapprg[0]==-1&&cur_gapprg.back()==-1):
-				if !best||_isGapProgramOK(cur_gapprg,wt_covered_sym*nl,sum_total_sym, wt_covered_alnum*nl,sum_total_alnum):
+				if !best||_isGapProgramOK(cur_gapprg,wt_covered_sym*nl,sum_total_sym, wt_covered_alnum*nl,sum_total_alnum,delta_line):
 					if wgt*nl>best:
 						best=wgt*nl
 						//best=percentage
@@ -2433,20 +2440,29 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 		//Writeln(side,' ',best,' ',bnl,' ',cclines.n)
 		cclines.resize(bnl)
 		return nsstd
-	inline _isGapProgramOK(int[] best_gapprg,int best_covered_sym,int best_total_sym,int best_covered_alnum,int best_total_alnum)
+	inline _isGapProgramOK(int[] best_gapprg,int best_covered_sym,int best_total_sym,int best_covered_alnum,int best_total_alnum,int delta_line)
 		if best_gapprg.n&&best_gapprg[0]==-1&&best_gapprg.back()==-1:
 			return 0
 		//don't auto-edit empty lines
 		if !best_covered_alnum:return 0
 		//Writeln(best_covered_sym,' ',best_total_sym)
 		//Writeln(best_covered_alnum,' ',best_total_alnum)
-		if f32(best_covered_sym)<f32(best_total_sym)*(bnl<=2?AUTO_EDIT_SIMILARITY_THRESHOLD_SYM_TWOLINER:AUTO_EDIT_SIMILARITY_THRESHOLD_SYM):
+		auto threshold=AUTO_EDIT_SIMILARITY_THRESHOLD
+		auto threshold_sym=AUTO_EDIT_SIMILARITY_THRESHOLD_SYM
+		if delta_line>1:
+			threshold=AUTO_EDIT_SIMILARITY_THRESHOLD_MULTILINE_PERIOD
+			threshold_sym=AUTO_EDIT_SIMILARITY_THRESHOLD_SYM_MULTILINE_PERIOD
+		else
+			if bnl<=2:
+				threshold=AUTO_EDIT_SIMILARITY_THRESHOLD_TWOGROUPER
+				threshold_sym=AUTO_EDIT_SIMILARITY_THRESHOLD_SYM_TWOGROUPER
+		if f32(best_covered_sym)<f32(best_total_sym)*threshold_sym:
 			return 0
-		if f32(best_covered_alnum)<f32(best_total_alnum)*(bnl<=2?AUTO_EDIT_SIMILARITY_THRESHOLD_TWOLINER:AUTO_EDIT_SIMILARITY_THRESHOLD):
+		if f32(best_covered_alnum)<f32(best_total_alnum)*threshold:
 			return 0
 		return 1
-	inline isGapProgramOK()
-		return _isGapProgramOK(best_gapprg,best_covered_sym,best_total_sym,best_covered_alnum,best_total_alnum)
+	inline isGapProgramOK(int delta_line)
+		return _isGapProgramOK(best_gapprg,best_covered_sym,best_total_sym,best_covered_alnum,best_total_alnum,delta_line)
 	//smartedit test
 	//ccnt_tot=.doc.l00.TotalCcnt()
 	//stext=.doc.GetText(ccnt_lh0,min(ccnt_tot-ccnt_lh0,AUTO_EDIT_MAX_TOTAL_LENGTH))
@@ -2475,7 +2491,7 @@ auto AutoEdit_Detect(string stext,iptr ccnt_middle)
 		foreach ch in best_gapprg
 			if ch==-1:
 				nsegs++
-		if !isGapProgramOK():
+		if !isGapProgramOK(delta_line):
 			continue
 		//Writeln(Unicode32ToUtf8([ch<0?0x2026:ch foreach ch in best_gapprg]))
 		//for i=0:2:cclines.n-2
@@ -2507,10 +2523,10 @@ auto TextToAutoEditText(int is_bof,int is_eof,string stext)
 
 auto AutoEdit_Precompute(string stext0,iptr[] cclines)
 	auto AutoEdit_GetText(iptr _ccnt0,iptr _ccnt1)
-		ccnt0=_ccnt0
-		ccnt1=_ccnt1
-		is_bof=0
-		is_eof=0
+		auto ccnt0=_ccnt0
+		auto ccnt1=_ccnt1
+		auto is_bof=0
+		auto is_eof=0
 		if ccnt0>0:
 			ccnt0--
 		else
@@ -2528,7 +2544,7 @@ auto AutoEdit_Precompute(string stext0,iptr[] cclines)
 		ccnt0=cclines[i]
 		ccnt1=cclines[i+1]
 		(s_unicode,nbras)=AutoEdit_GetText(ccnt0,ccnt1)
-		//Writeln('<<<',Unicode32ToUtf8(s_unicode),'>>>')
+		//Writeln('<<<',s_unicode,'>>>')
 		inputs.push(TReplaceInput(){s_unicode:s_unicode,nbras:nbras})
 	return SF.CreateReplaceInstance(inputs)
 

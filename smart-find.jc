@@ -387,6 +387,8 @@ module detail
 			bcost_rule_for_pos=new float[]
 			counts=new int[m_poses_union.n]
 			//best descriptor for each position
+			//Writeln('src=',s0)
+			//Writeln('tar=',s1)
 			for i=1:s0.n-1
 				//ch0=s0[i-1]
 				//ch1=s0[i]
@@ -526,6 +528,7 @@ module detail
 			while p>0:
 				hi=hows[p]
 				p0=p-hi.y
+				//Writeln('gen ',p0,' ',p,' ',hi)
 				if hi.x==-1:
 					//const
 					ret.push(TProgramItem(){sconst:s1[p0:p-1]})
@@ -535,6 +538,7 @@ module detail
 					pmatch=(hi.x&0x7fffffff)
 					(bp0,dummy)=GetDescriptorAt(pmatch)
 					(bp1,dummy)=GetDescriptorAt(pmatch+hi.y)
+					//Writeln('  ',bp0,' ',bp1)
 					if hi.x&0x80000000:
 						//Writeln('^_^')
 						cases=new i8[hi.y]
@@ -569,7 +573,7 @@ module detail
 						else if a>=TOK_SUBSTRING:
 							Write('"',UnicodeToUtf8([i16(aa) foreach aa in GetSubString(a)]),'"')
 						else if a>=TOK_CHARSET:
-							Write('[',SF.tmp_charsets[a-TOK_CHARSET],']')
+							Write('[',SF.m_tmp_charsets[a-TOK_CHARSET].Replace(["\n","\\n","\r","\\r","\t","\\t"]),']')
 						else
 							Write("'",UnicodeToUtf8([i16(a)]),"'")
 					auto dumpPos(TPositionDescriptor pd,iptr id,char is_left)
@@ -867,6 +871,7 @@ module detail
 						gain=gains[j*w0+(i-1)]
 						//if !isalnum(s0[i-1]):
 						//	gain-=PENALTY_SYMBOL_MISS
+						//newline must match, true even in the middle
 						if best<gain&&s0[i-1]!='\n':
 							best=gain 
 							bhow=-1
