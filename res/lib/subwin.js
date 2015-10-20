@@ -505,7 +505,11 @@ W.CFancyMenuDesc.prototype={
 	AddNormalItem:function(attrs){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:attrs.action?style.text_color:style.hotkey_color,sel_color:style.text_sel_color})
+		children.push({type:'text',icon:attrs.icon,text:attrs.text,
+			color:attrs.action?style.text_color:style.hotkey_color,
+			icon_color:attrs.icon=="对"?style.icon_color:style.text_color,
+			sel_icon_color:style.text_sel_color,
+			sel_color:style.text_sel_color})
 		if(attrs.action){attrs.action=WrapMenuAction(attrs.action);}
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0&&attrs.action){
@@ -848,7 +852,7 @@ W.FancyMenu=function(id,attrs){
 			W.Text("",{x:obj.x+item_i.x,y:obj.y+item_i.y+(obj.h_menu_line-hc)*0.5,font:obj.font,text:item_i.text,color:selected?item_i.sel_color:item_i.color,flags:8})
 			if(item_i.icon){
 				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font_20,text:item_i.icon,
-					color:selected?item_i.sel_color:item_i.color})
+					color:selected?item_i.sel_icon_color:item_i.icon_color})
 			}
 		}else if(s_type=='button'){
 			W.Button(item_i.text,{x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,

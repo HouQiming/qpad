@@ -125,7 +125,7 @@ Language.Register({
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
-			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false'],
+			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false','while'],
 			'type':['void','char','short','int','long','iptr','uptr','auto','byte','ushort','uint','ulong','i8','i16','i32','i64','u8','u16','u32','u64','f32','f64','float','double','string','Object','Interface','typename','typeof'],
 		},0)
 	},
@@ -798,7 +798,7 @@ UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 	}
 }
 
-var g_re_errors=new RegExp("error_.*")
+var g_re_errors=new RegExp("^error_.*$")
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.m_error_overlays=[]
@@ -916,7 +916,7 @@ Language.RegisterCompiler(["tex"],{
 			m_line:doc.GetLC(doc.sel1.ccnt)[0]+1,
 		}
 	},
-	m_regex:new RegExp('(.*?):([0-9]+): (.+)\r?\n'),
+	m_regex:new RegExp('^(.*?):([0-9]+): (.+)\r?\n'),
 	ParseOutput:function(sline){
 		var matches=sline.match(this.m_regex)
 		if(matches){
@@ -956,8 +956,8 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 		}
 		return ret
 	},
-	m_regex_cc:new RegExp('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	m_regex_cc:new RegExp('^(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('^[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
 	ParseOutput:function(sline){
 		var matches=sline.match(this.m_regex_vc)
 		if(matches){
@@ -997,8 +997,8 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 /////////////////////////////////////////////
 Language.RegisterCompiler(["jc"],{
 	name:"jacy",
-	m_regex_cc:new RegExp('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	m_regex_cc:new RegExp('^(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('^[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
 	ParseOutput:function(sline){
 		var matches=sline.match(this.m_regex_vc)
 		if(matches){

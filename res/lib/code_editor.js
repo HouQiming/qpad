@@ -476,7 +476,7 @@ W.CodeEditorWidget_prototype={
 		doc.StartLoading(obj.file_name)
 		doc.HookedEdit=function(ops){
 			if(obj.read_only){return;}
-			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context){
+			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
 				var match_id=obj.BisectMatches(ops[0])
 				if(match_id){
 					var match_ccnt0=obj.GetMatchCcnt(match_id,0)
@@ -500,7 +500,11 @@ W.CodeEditorWidget_prototype={
 					if(intersected){
 						//start replacing - *every* op intersects with the match...
 						obj.SetReplacingContext(match_ccnt0,match_ccnt1)
+					}else{
+						obj.m_current_find_context.m_no_more_replace=1;
 					}
+				}else{
+					obj.m_current_find_context.m_no_more_replace=1;
 				}
 			}
 			if(this.saved_point>this.ed.GetUndoQueueLength()){
@@ -550,6 +554,7 @@ W.CodeEditorWidget_prototype={
 		this.m_ac_context=undefined
 		if(this.doc){this.doc.m_is_destroyed=1;}
 		this.doc=undefined
+		this.m_notifications=[]
 		UI.Refresh()
 	},
 	///////////////////////////
@@ -1372,7 +1377,7 @@ W.CodeEditorWidget_prototype={
 	},
 	DismissNotificationsByRegexp:function(re){
 		if(this.m_notifications){
-			this.m_notifications=this.m_notifications.filter(function(a){return !a.id.match(re)})
+			this.m_notifications=this.m_notifications.filter(function(a){return !(a.id.search(re)>=0)})
 		}
 	},
 	////////////////////////////////
@@ -1934,7 +1939,7 @@ var fnewpage_findbar_plugin=function(){
 		var ccnt=Duktape.__byte_length(s_path)
 		if(s_path.length&&this.sel0.ccnt==ccnt&&this.sel1.ccnt==ccnt){
 			s_path=IO.ProcessUnixFileName(s_path.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
-			if(s_path.match(g_regexp_abspath)){
+			if(s_path.search(g_regexp_abspath)>=0){
 				//do nothing: it's absolute
 			}else{
 				s_path=UI.m_new_document_search_path+"/"+s_path
@@ -1983,7 +1988,7 @@ var fnewpage_findbar_plugin=function(){
 }
 
 var g_regexp_backslash=new RegExp("\\\\","g");
-var g_regexp_abspath=new RegExp("(([a-zA-Z]:/)|(/)|[~]).*");
+var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 var FILE_RELEVANCE_SWITCH_SCORE=32
 var FILE_RELEVANCE_REPO_SCORE=16
 var FILE_RELEVANCE_BASE_SCORE=4
@@ -2106,7 +2111,7 @@ W.SXS_NewPage=function(id,attrs){
 			var s_path=s_search_text
 			if(s_path.length||!files.length){
 				s_path=IO.ProcessUnixFileName(s_path.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
-				if(s_path.match(g_regexp_abspath)){
+				if(s_path.search(g_regexp_abspath)>=0){
 					//do nothing: it's absolute
 				}else{
 					s_path=UI.m_new_document_search_path+"/"+s_path
@@ -2913,6 +2918,9 @@ W.CodeEditor=function(id,attrs){
 								if(this.m_accands.m_common_prefix){
 									doc.m_user_just_typed_char=1
 								}
+								if(this.m_accands.m_auto_activate_after_tab){
+									this.m_activated=1
+								}
 								//obj.m_ac_context=undefined
 								UI.Refresh()
 							},
@@ -3063,7 +3071,7 @@ W.CodeEditor=function(id,attrs){
 						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
 						if(hh>=0){
 							doc.ed.Render({x:0,y:y0,w:w_obj_area-w_line_numbers-w_scrolling_area,h:hh,
-								scr_x:(obj.x+w_line_numbers)*UI.pixels_per_unit,
+								scr_x:(obj.x+w_line_numbers+obj.padding)*UI.pixels_per_unit,
 								scr_y:(obj.y+y_top_hint)*UI.pixels_per_unit, 
 								scale:UI.pixels_per_unit, obj:doc});
 							//also draw the line numbers
