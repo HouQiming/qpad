@@ -1384,7 +1384,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			g_c_like_parse_queue.push(getid(fn))
 		return 1
 	}
-	//todo: budgeted parse
+	//coulddo: budgeted parse
 	JS_UI["ED_ParseMore"]=function(JSContext JS){
 		while g_c_like_parse_queue.n:
 			idfn=g_c_like_parse_queue.pop()
@@ -1474,6 +1474,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto SearchPPMRange(int2 rg,float weight_scale)
 			if rg.x<rg.y:
 				SearchPrefix(fidx.m_ppm_pool[rg.x:rg.y-1],weight_scale)
+		//auto_activate_after_tab=0
+		s_common_prefix=string.NULL
 		if s_prefix.n:
 			//common prefix here - if we have a common prefix, make it the only candidate and *mark* it as *continue after confirmation*
 			SearchPrefix(fidx.m_ids,1.f)
@@ -1499,11 +1501,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 							best=score
 							best_I=I
 						//if best>=s_prefix.n:break
-					cands=[int2(getid(getIdString(cands[best_I].x)[:s_prefix.n+s_common_prefix.n-1]),0x3f800000)]
-					return JS.Return(new CACContext(){
-						m_candidates:cands,
-						m_auto_activate_after_tab:!has_identical,
-						s_prefix:s_prefix,m_common_prefix:s_common_prefix})
+					s_common_prefix=getIdString(cands[best_I].x)[s_prefix.n:s_prefix.n+s_common_prefix.n-1]
+					//auto_activate_after_tab=!has_identical
+					//cands=[int2(getid(getIdString(cands[best_I].x)[:s_prefix.n+s_common_prefix.n-1]),0x3f800000)]
+					//return JS.Return(new CACContext(){
+					//	m_candidates:cands,
+					//	m_auto_activate_after_tab:!has_identical,
+					//	s_prefix:s_prefix,m_common_prefix:s_common_prefix})
 		if fidx.m_ppm1_index:
 			ccnt_last_word=ed.MoveToBoundary(ccnt_before_word,-1,ed.GetStockFCheck("space",-1),4096)
 			ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
@@ -1576,9 +1580,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					ret=sym0.n-sym1.n
 			return ret<0
 		})
-		acret=new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix}
+		acret=new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix,m_common_prefix:s_common_prefix}
 		if ret_temp.n==1:
 			acret.m_common_prefix=getIdString(ret_temp[0].x)[s_prefix.n:]
+		//acret.m_auto_activate_after_tab=auto_activate_after_tab
 		return JS.Return(acret)
 	}
 	JS_UI["ED_QueryDecl"]=function(JSContext JS){

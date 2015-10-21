@@ -477,7 +477,7 @@ W.CodeEditorWidget_prototype={
 		doc.StartLoading(obj.file_name)
 		doc.HookedEdit=function(ops){
 			if(obj.read_only){return;}
-			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
+			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_no_more_replace){
 				var match_id=obj.BisectMatches(ops[0])
 				if(match_id){
 					var match_ccnt0=obj.GetMatchCcnt(match_id,0)
@@ -502,10 +502,10 @@ W.CodeEditorWidget_prototype={
 						//start replacing - *every* op intersects with the match...
 						obj.SetReplacingContext(match_ccnt0,match_ccnt1)
 					}else{
-						obj.m_current_find_context.m_no_more_replace=1;
+						obj.m_no_more_replace=1;
 					}
 				}else{
-					obj.m_current_find_context.m_no_more_replace=1;
+					obj.m_no_more_replace=1;
 				}
 			}
 			if(this.saved_point>this.ed.GetUndoQueueLength()){
@@ -700,7 +700,10 @@ W.CodeEditorWidget_prototype={
 		//	ccnt=0
 		//}
 		if(this.m_current_find_context){
-			if(force_ccnt!=undefined&&force_ccnt==this.m_current_find_context.m_starting_ccnt0&&!this.m_changed_after_find){
+			if(force_ccnt!=undefined&&
+			force_ccnt==this.m_current_find_context.m_starting_ccnt0&&
+			!this.m_changed_after_find&&
+			sneedle==this.m_current_find_context.m_needle){
 				return;
 			}
 			this.m_current_find_context.Cancel()
@@ -878,6 +881,7 @@ W.CodeEditorWidget_prototype={
 		return undefined
 	},
 	AutoScrollFindItems:function(){
+		this.m_no_more_replace=0
 		var doc=this.doc
 		var ctx=this.m_current_find_context
 		var l0=-((ctx.m_merged_y_windows_backward.length>>2)-1)
@@ -909,7 +913,7 @@ W.CodeEditorWidget_prototype={
 		doc.sel1.ccnt=ccnt_match1
 		UI.g_cursor_history_test_same_reason=1
 		doc.AutoScroll("show")
-		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,fitem_current.visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),fitem_current.visual_y-h_bof_eof_message_with_sep)
+		ctx.m_find_scroll_visual_y=Math.min(Math.max(ctx.m_find_scroll_visual_y,ctx.m_current_visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),ctx.m_current_visual_y-h_bof_eof_message_with_sep)
 		ctx.m_find_scroll_visual_y=Math.max(Math.min(ctx.m_find_scroll_visual_y,ctx.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),ctx.m_y_extent_backward-h_bof_eof_message_with_sep)
 	},
 	BisectMatches:function(ccnt){
@@ -1154,6 +1158,7 @@ W.CodeEditorWidget_prototype={
 			//no needle, no find
 			return;
 		}
+		this.m_no_more_replace=0
 		this.DestroyReplacingContext()
 		var doc=this.doc
 		var ccnt=doc.sel1.ccnt
@@ -1908,6 +1913,12 @@ var fnewpage_findbar_plugin=function(){
 		var obj=this.owner
 		if(this.m_close_on_esc){
 			UI.top.app.document_area.CloseTab()
+			for(var i=0;i<UI.g_all_document_windows.length;i++){
+				if(UI.g_all_document_windows[i].file_name==UI.m_previous_document){
+					UI.top.app.document_area.SetTab(i)
+					break
+				}
+			}
 		}else{
 			var editor_widget=obj.owner
 			editor_widget.m_is_brand_new=0
@@ -1993,7 +2004,7 @@ var fnewpage_findbar_plugin=function(){
 var g_regexp_backslash=new RegExp("\\\\","g");
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 var FILE_RELEVANCE_SWITCH_SCORE=32
-var FILE_RELEVANCE_REPO_SCORE=16
+var FILE_RELEVANCE_REPO_SCORE=8
 var FILE_RELEVANCE_BASE_SCORE=4
 var FILE_RELEVANCE_SCORE_DECAY=0.99
 //var FILE_RELEVANCE_SAME_REPO_NON_HIST=16
@@ -2905,11 +2916,12 @@ W.CodeEditor=function(id,attrs){
 									return;
 								}
 								var lg=Duktape.__byte_length(s_prefix);
+								if(id==undefined){lg=0;}
 								var ccnt0=doc.sel1.ccnt-lg
 								if(is_spell_mode){
 									ccnt0=this.m_accands.ccnt0
 								}
-								var sname=this.m_accands.at(id).name
+								var sname=(id==undefined?this.m_accands.m_common_prefix:this.m_accands.at(id).name)
 								if(doc.plugin_language_desc.default_hyphenator_name){
 									sname=UI.ED_CopyCase(sname,sname.toLowerCase(),sname.toUpperCase(),s_prefix)
 								}
@@ -3039,14 +3051,18 @@ W.CodeEditor=function(id,attrs){
 								}
 								UI.PopCliprect()
 							}
-						}else if(acctx.m_n_cands==1){
-							//doc.ed.m_other_overlay always shows the 1st candidate?
-							//need PPM weight calibration, and float weights
-							//can't auto-calibrate - PPM always wins
-							//tab should be strictly for common prefix? if we could guess the 1st candidate right...
-							var s_name=acctx.m_accands.at(0).name
+						}
+						if(acctx.m_accands&&acctx.m_accands.m_common_prefix){
 							doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
 						}
+						//else if(acctx.m_n_cands==1){
+						//	//doc.ed.m_other_overlay always shows the 1st candidate?
+						//	//need PPM weight calibration, and float weights
+						//	//can't auto-calibrate - PPM always wins
+						//	//tab should be strictly for common prefix? if we could guess the 1st candidate right...
+						//	var s_name=acctx.m_accands.at(0).name
+						//	doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
+						//}
 					}
 				}else{
 					var acctx=obj.m_ac_context
@@ -3251,9 +3267,9 @@ W.CodeEditor=function(id,attrs){
 				var acctx=obj.m_ac_context
 				if(acctx&&acctx.m_n_cands){
 					menu_edit.AddSeparator()
-					if(acctx.m_n_cands==1){
+					if(acctx.m_n_cands==1||acctx.m_accands&&acctx.m_accands.m_common_prefix){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
-							acctx.Confirm(0)
+							acctx.Confirm(acctx.m_n_cands==1?0:undefined)
 						}})
 					}else if(!acctx.m_activated){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){

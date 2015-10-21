@@ -2380,6 +2380,7 @@ UI.RegisterEditorPlugin(function(){
 			this.m_autoedit_range_highlight=undefined
 		}
 		this.m_autoedit_example_line_id=undefined
+		this.m_autoedit_context=undefined
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		renderer.m_tentative_editops=undefined
 		renderer.ResetTentativeOps()
@@ -2428,17 +2429,20 @@ UI.RegisterEditorPlugin(function(){
 				}
 			}
 		}
+		this.m_detect_autoedit_at=ccnt_lh
 		//could allow multi-exampling this
 		InvalidateAutoEdit.call(this)
-		var ctx=UI.ED_AutoEdit_Detect(ed,ccnt_lh)
-		this.m_autoedit_context=ctx
-		if(ctx){
-			StartAutoEdit.call(this,ctx.m_cclines,"auto")
-		}
 	})
 	this.AddEventHandler('beforeEdit',function(){
 		this.m_autoedit_example_line_id=-1
 		var ctx=this.m_autoedit_context
+		if(!ctx&&this.m_detect_autoedit_at!=undefined){
+			ctx=UI.ED_AutoEdit_Detect(this.ed,this.m_detect_autoedit_at)
+			if(ctx){
+				this.m_autoedit_context=ctx
+				StartAutoEdit.call(this,ctx.m_cclines,"auto")
+			}
+		}
 		if(!ctx){return}
 		var locs=this.m_autoedit_locators
 		if(!locs){return}
