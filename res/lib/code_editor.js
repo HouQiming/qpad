@@ -257,6 +257,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	IsRightBracketAt:function(ccnt){
 		var lang=this.plugin_language_desc
 		var bs=lang.m_rbracket_tokens
+		if(!bs){return 0;}
 		for(var i=0;i<bs.length;i++){
 			if(bs[i]==this.ed.GetText(ccnt,Duktape.__byte_length(bs[i]))){return 1;}
 		}
@@ -806,19 +807,21 @@ W.CodeEditorWidget_prototype={
 				var sneedle_lower=sneedle.toLowerCase()
 				var lg_needle=Duktape.__byte_length(sneedle_lower)
 				var all_key_decls=UI.ED_GetAllKeyDecls(doc)
-				for(var i=0;i<all_key_decls.length;i+=3){
-					var s_id=all_key_decls[i+0]
-					var s_id_lower=s_id.toLowerCase()
-					if(s_id_lower.length>=sneedle_lower.length){
-						if(s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
-							//we don't need the type here
-							//var type=all_key_decls[i+1]
-							var ccnt_match=all_key_decls[i+2]
-							if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
-								matches.push([ccnt_match,ccnt_match+lg_needle])
-							}else{
-								var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
-								matches.push([ccnt_match,ccnt_match1])
+				if(all_key_decls){
+					for(var i=0;i<all_key_decls.length;i+=3){
+						var s_id=all_key_decls[i+0]
+						var s_id_lower=s_id.toLowerCase()
+						if(s_id_lower.length>=sneedle_lower.length){
+							if(s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
+								//we don't need the type here
+								//var type=all_key_decls[i+1]
+								var ccnt_match=all_key_decls[i+2]
+								if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
+									matches.push([ccnt_match,ccnt_match+lg_needle])
+								}else{
+									var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
+									matches.push([ccnt_match,ccnt_match1])
+								}
 							}
 						}
 					}
@@ -1974,7 +1977,7 @@ var fnewpage_findbar_plugin=function(){
 				}
 				if(s_common.length<=s_path.length){break;}
 			}
-			if(s_common.length>s_path.length){
+			if(s_common&&s_common.length>s_path.length){
 				//path completion
 				var s_insertion=s_common.slice(s_path.length)
 				this.HookedEdit([ccnt,0,s_insertion])
@@ -2671,6 +2674,13 @@ W.CodeEditor=function(id,attrs){
 							}
 							s_status=UI.Format("@1 lines, @2 words, @3 chars, @4 bytes",n_lines.toString(),n_words.toString(),n_chars.toString(),(sel[1]-sel[0]).toString())
 						}
+						var s_status2=''
+						if(!n_lines){
+							s_status2=UI.Format("Ln @1,@2-@3",(lcinfo0[0]+1).toString(),(lcinfo0[1]+1).toString(),(lcinfo1[1]+1).toString())
+						}else{
+							s_status2=UI.Format("Ln @1,@2-@3,@4",(lcinfo0[0]+1).toString(),(lcinfo0[1]+1).toString(),(lcinfo1[0]+1).toString(),(lcinfo1[1]+1).toString())
+						}
+						s_status=s_status+", "+s_status2;
 					}else{
 						//lc
 						s_status=UI.Format("Ln @1,@2",(lcinfo0[0]+1).toString(),(lcinfo0[1]+1).toString())
@@ -3315,9 +3325,9 @@ W.CodeEditor=function(id,attrs){
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find})
 				W.Hotkey("",{text:"CTRL+R",action:finvoke_find})
 				menu_search.AddButtonRow({text:"Find previous / next"},[
-					{key:"SHIFT+CTRL+G SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+G',action:function(){
+					{key:"SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+F3',action:function(){
 						obj.FindNext(-1)
-					}},{key:"CTRL+G F3",text:"find_down",icon:"下",tooltip:'Next - CTRL+G',action:function(){
+					}},{key:"F3",text:"find_down",icon:"下",tooltip:'Next - F3',action:function(){
 						obj.FindNext(1)
 					}}])
 				menu_search.AddButtonRow({text:"Find the current word"},[
@@ -3339,19 +3349,19 @@ W.CodeEditor=function(id,attrs){
 							obj.DoReplaceFromUI(1)
 						}}])
 				}
+				menu_search.AddSeparator();
+				menu_search.AddNormalItem({text:"&Go to...",enable_hotkey:1,key:"CTRL+G",action:function(){
+					var sel=obj.doc.GetSelection()
+					obj.show_find_bar="goto"
+					obj.m_sel0_before_find=obj.doc.sel0.ccnt
+					obj.m_sel1_before_find=obj.doc.sel1.ccnt
+					//if(sel[0]<sel[1]){
+					//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+					//}
+					//UI.m_ui_metadata.find_state.m_current_needle=""
+					UI.Refresh()
+				}})
 				if(doc.m_file_index&&doc.m_file_index.hasDecls()){
-					menu_search.AddSeparator();
-					menu_search.AddNormalItem({text:"&Go to...",enable_hotkey:1,key:"CTRL+G",action:function(){
-						var sel=obj.doc.GetSelection()
-						obj.show_find_bar="goto"
-						obj.m_sel0_before_find=obj.doc.sel0.ccnt
-						obj.m_sel1_before_find=obj.doc.sel1.ccnt
-						//if(sel[0]<sel[1]){
-						//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-						//}
-						//UI.m_ui_metadata.find_state.m_current_needle=""
-						UI.Refresh()
-					}})
 					menu_search.AddNormalItem({text:"Go to &definition",enable_hotkey:1,key:"F12",action:function(){
 						var doc=obj.doc
 						var sel=doc.GetSelection();
@@ -3576,6 +3586,7 @@ UI.NewCodeEditorTab=function(fname0){
 	return UI.NewTab({
 		file_name:file_name,
 		title:UI.RemovePath(file_name),
+		tooltip:file_name,
 		opening_callbacks:[],
 		body:function(){
 			//use styling for editor themes
@@ -3606,8 +3617,10 @@ UI.NewCodeEditorTab=function(fname0){
 			var doc=body.doc;
 			if(body.m_is_brand_new){
 				body.title="New Tab"
+				body.tooltip=undefined
 			}else{
 				body.title=UI.RemovePath(body.file_name)
+				body.tooltip=body.file_name
 			}
 			this.need_save=0
 			if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
@@ -3719,7 +3732,7 @@ UI.RecordCursorHistroy=function(doc,sreason){
 	UI.g_cursor_history_redo=[]
 	if(UI.g_cursor_history_test_same_reason&&UI.g_cursor_history_undo.length&&UI.g_cursor_history_undo[UI.g_cursor_history_undo.length-1].sreason==sreason){
 		//merge same-reason records
-		return;
+		UI.g_cursor_history_undo.pop()
 	}
 	var prev_ccnt0=doc.sel0.ccnt
 	var prev_ccnt1=doc.sel1.ccnt

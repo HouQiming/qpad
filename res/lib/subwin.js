@@ -37,7 +37,24 @@ W.SubWindow=function(id,attrs){
 ///////////////////////
 W.TabLabel_prototype={
 	title:"",//initial empty title
-	//todo: inactive tab mouseover, dragging, click-sel 
+	mouse_state:'out',
+	OnMouseOver:function(){this.mouse_state="over";UI.Refresh();},
+	OnMouseOut:function(){this.mouse_state="out";UI.Refresh();},
+	GetSubStyle:function(){
+		return this.mouse_state
+	},
+	OnMouseDown:function(event){
+		UI.CaptureMouse(this);
+		this.owner.OnTabDown(this.tabid,event)
+	},
+	OnMouseMove:function(event){
+		this.owner.OnTabMove(this.tabid,event)
+	},
+	OnMouseUp:function(event){
+		this.owner.OnTabMove(this.tabid,event)
+		this.owner.OnTabUp(this.tabid)
+		UI.ReleaseMouse(this);
+	},
 }
 W.TabLabel=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
@@ -48,6 +65,7 @@ W.TabLabel=function(id,attrs){
 	}
 	obj.x+=obj.x_animated
 	UI.StdAnchoring(id,obj);
+	W.PureRegion(id,obj)
 	UI.Begin(obj)
 		if(obj.selected){
 			UI.RoundRect({
@@ -73,6 +91,9 @@ W.TabLabel=function(id,attrs){
 			'x':0,'y':0,
 			'font':obj.font,'text':obj.text,'color':obj.text_color,
 		})
+		if(obj.mouse_state=="over"&&obj.tooltip){
+			W.DrawTooltip(obj)
+		}
 	UI.End()
 	return obj
 }
@@ -127,6 +148,7 @@ W.TabbedDocument_prototype={
 		//this doesn't count as a meaningful switch
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		if(tab.OnDestroy){tab.OnDestroy()}
+		this.CancelTabDragging();
 		UI.Refresh()
 	},
 	SetTab:function(tabid){
@@ -216,6 +238,81 @@ W.TabbedDocument_prototype={
 		this.m_is_in_menu=0;
 		UI.Refresh()
 	},
+	////////////
+	OnTabDown:function(tabid,event){
+		if(event.button==UI.SDL_BUTTON_MIDDLE){
+			this.CloseTab(tabid)
+			return;
+		}else{
+			this.SetTab(tabid)
+		}
+		//create a current tab label x snapshot
+		this.m_dragging_tab_label_x_abs=this.m_tab_label_x_abs
+		this.m_dragging_tab_moved=0
+		this.m_dragging_tab_x_base=this.scroll_x+event.x;
+		this.m_dragging_tab_x_offset=this.m_dragging_tab_x_base-this.m_dragging_tab_label_x_abs[tabid];
+		this.m_dragging_tab_src_tabid=tabid
+		this.m_dragging_tab_dst_tabid=tabid
+		this.m_dragging_tab_delta=0;
+	},
+	OnTabMove:function(tabid,event){
+		var xs=this.m_dragging_tab_label_x_abs;
+		if(!xs){return;}
+		this.m_dragging_tab_delta=this.scroll_x+event.x-this.m_dragging_tab_x_base
+		var l=0;
+		var r=xs.length-2;
+		var x=this.m_dragging_tab_delta+xs[tabid]+this.m_dragging_tab_x_offset
+		while(l<=r){
+			var m=(l+r)>>1;
+			if(xs[m]<=x){
+				l=m+1;
+			}else{
+				r=m-1;
+			}
+		}
+		if(r<0){r=0;}
+		this.m_dragging_tab_dst_tabid=r
+		if(this.m_dragging_tab_dst_tabid!=tabid){
+			this.m_dragging_tab_moved=1;
+		}
+		UI.Refresh()
+	},
+	OnTabUp:function(tabid){
+		if(!this.m_dragging_tab_label_x_abs){return;}
+		this.m_dragging_tab_label_x_abs=undefined
+		if(!this.m_dragging_tab_moved){
+			//this.SetTab(tabid)
+		}else{
+			var dstid=this.m_dragging_tab_dst_tabid
+			var srcid=this.m_dragging_tab_src_tabid
+			var item_src=this.items[srcid]
+			var label_src=this[srcid]
+			var tabid_new=this.current_tab_id;
+			if(srcid<dstid){
+				for(j=srcid+1;j<=dstid;j++){
+					this.items[j-1]=this.items[j]
+					this[j-1]=this[j]
+					if(this.current_tab_id==j){tabid_new=j-1;}
+				}
+			}else{
+				for(j=srcid-1;j>=dstid;j--){
+					this.items[j+1]=this.items[j]
+					this[j+1]=this[j]
+					if(this.current_tab_id==j){tabid_new=j+1;}
+				}
+			}
+			if(this.current_tab_id==srcid){tabid_new=dstid;}
+			this.current_tab_id=tabid_new
+			this.items[dstid]=item_src
+			this[dstid]=label_src
+		}
+	},
+	CancelTabDragging:function(){
+		if(this.m_dragging_tab_label_x_abs){
+			this.m_dragging_tab_label_x_abs=undefined
+			if(UI.nd_captured){UI.ReleaseMouse(UI.nd_captured)}
+		}
+	},
 }
 W.TabbedDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabbedDocument_prototype);
@@ -227,6 +324,7 @@ W.TabbedDocument=function(id,attrs){
 		//this doesn't count as a meaningful switch
 		obj.current_tab_id=(items.length-1);
 		obj.m_is_in_menu=0
+		obj.CancelTabDragging();
 	}
 	obj.n_tabs_last_checked=items.length;
 	if(!items.length&&obj.m_is_close_pending){
@@ -312,16 +410,50 @@ W.TabbedDocument=function(id,attrs){
 		//tabs should not need ids
 		//when closing, should change the "existing" ids for the effect...
 		UI.PushCliprect(x_label_area,y_label_area,w_label_area,obj.h_caption)
-		var x_acc=-(obj.scroll_x||0);
+		var x_acc=-(obj.scroll_x||0),x_acc_dragging_tab=0;
 		var x_acc_abs=0,x_acc_abs_tabid=0;
+		var tab_label_x_abs=[]
 		for(var i=0;i<n;i++){
 			var item_i=items[i]
-			var label_i=W.TabLabel(i,{x:x_label_area,x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid, title:item_i.title, 
-				hotkey_str:i<10?String.fromCharCode(48+(i+1)%10):undefined})
+			var x_delta=0
+			if(obj.m_dragging_tab_label_x_abs){
+				if(i==obj.m_dragging_tab_src_tabid){
+					x_delta=obj.m_dragging_tab_delta
+				}else if(i>=obj.m_dragging_tab_src_tabid&&i<=obj.m_dragging_tab_dst_tabid){
+					x_delta=-(obj.m_dragging_tab_label_x_abs[obj.m_dragging_tab_src_tabid+1]-obj.m_dragging_tab_label_x_abs[obj.m_dragging_tab_src_tabid]);
+				}else if(i>=obj.m_dragging_tab_dst_tabid&&i<=obj.m_dragging_tab_src_tabid){
+					x_delta=(obj.m_dragging_tab_label_x_abs[obj.m_dragging_tab_src_tabid+1]-obj.m_dragging_tab_label_x_abs[obj.m_dragging_tab_src_tabid]);
+				}
+			}
+			var label_i;
+			if(obj.m_dragging_tab_label_x_abs&&i==tabid){
+				label_i={w:obj.m_dragging_tab_label_x_abs[i+1]-obj.m_dragging_tab_label_x_abs[i]}
+				x_acc_dragging_tab=x_acc+x_delta;
+			}else{
+				label_i=W.TabLabel(i,{
+					x:x_label_area,x_animated:x_acc+x_delta,y:y_label_area,h:obj.h_caption,selected:i==tabid,
+					title:item_i.title, tooltip:item_i.tooltip,
+					hotkey_str:i<10?String.fromCharCode(48+(i+1)%10):undefined,
+					tabid:i,owner:obj})
+			}
 			x_acc+=label_i.w;
-			if(i==tabid){x_acc_abs_tabid=x_acc_abs;}
+			if(i==tabid){x_acc_abs_tabid=x_acc_abs+x_delta*0.5;}
+			tab_label_x_abs[i]=x_acc_abs
 			x_acc_abs+=label_i.w
 		}
+		if(obj.m_dragging_tab_label_x_abs&&tabid!=undefined){
+			{
+				var i=tabid;
+				var item_i=items[i]
+				var x_acc=x_acc_dragging_tab;
+				W.TabLabel(i,{
+					x:x_label_area,x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid,
+					title:item_i.title, tooltip:item_i.tooltip,
+					hotkey_str:i<10?String.fromCharCode(48+(i+1)%10):undefined,
+					tabid:i,owner:obj})
+			}
+		}
+		tab_label_x_abs[n]=x_acc_abs
 		if(n>0&&obj[tabid]){
 			obj.scroll_x=Math.max(Math.min(
 				x_acc_abs-w_label_area+8,
@@ -331,6 +463,7 @@ W.TabbedDocument=function(id,attrs){
 			obj.w_current_tab_label_width=0;
 		}
 		UI.PopCliprect()
+		obj.m_tab_label_x_abs=tab_label_x_abs
 		obj.h_content=obj.h-(obj.h_caption+obj.h_bar);
 		obj.active_tab=obj.items[tabid]
 		//share the tab wrapper and get rid of it when the tab switches
@@ -359,6 +492,7 @@ W.TabbedDocument=function(id,attrs){
 			UI.End()
 			UI.FlushTopMostContext(n0_topmost)
 			UI.PopSubWindow()
+			tab.tooltip=obj_tab.body.tooltip
 			if(obj_tab.body.title){
 				if(tab.title!=obj_tab.body.title){
 					tab.title=obj_tab.body.title
@@ -530,7 +664,9 @@ W.CFancyMenuDesc.prototype={
 	AddButtonRow:function(attrs,buttons){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',icon:attrs.icon,text:attrs.text,color:style.text_color,sel_color:style.text_sel_color},{type:'rubber'})
+		children.push({type:'text',icon:attrs.icon,text:attrs.text,
+			icon_color:style.text_color,
+			color:style.text_color,sel_color:style.text_sel_color},{type:'rubber'})
 		for(var i=0;i<buttons.length;i++){
 			var button_i=buttons[i]
 			button_i.type='button';
@@ -633,7 +769,6 @@ W.TopMenuBar=function(id,attrs){
 	UI.StdStyling(id,obj,attrs, "top_menu");
 	UI.StdAnchoring(id,obj);
 	var desc=UI.m_frozen_global_menu
-	//todo: search
 	//var lv_items=[]
 	//for(var i=0;i<desc.$.length;i++){
 	//	var submenu_i=desc.$[i];
