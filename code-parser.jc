@@ -1230,7 +1230,7 @@ class CACContext
 	int2[] m_candidates
 	string s_prefix
 	string m_common_prefix
-	int m_auto_activate_after_tab
+	//int m_auto_activate_after_tab
 	JS_At=function(JSContext JS){
 		id=JS.Param(0).as(int)
 		ret=JS.New()
@@ -1247,7 +1247,7 @@ class CACContext
 		proto.ExportMethod(this,"at",JS_At)
 		proto.ExportProperty(this,"s_prefix")
 		proto.ExportProperty(this,"m_common_prefix")
-		proto.ExportProperty(this,"m_auto_activate_after_tab")
+		//proto.ExportProperty(this,"m_auto_activate_after_tab")
 		proto.ExportGetterSetter(this,'length',JS_GetLength,(function(JSContext):int).NULL)
 
 inline chrequi(auto ch0,auto chw0)

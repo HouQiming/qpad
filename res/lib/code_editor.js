@@ -2875,11 +2875,13 @@ W.CodeEditor=function(id,attrs){
 				if(doc.sel0.ccnt==doc.sel1.ccnt&&obj.show_auto_completion&&(doc.m_user_just_typed_char||doc.plugin_language_desc.default_hyphenator_name)){
 					var acctx=obj.m_ac_context
 					var ac_was_actiavted=0
+					var had_some_ac_to_display=0
 					if(acctx&&acctx.m_ccnt!=doc.sel1.ccnt){
 						//if(acctx.m_n_cands>0){
 						//	UI.InvalidateCurrentFrame()
 						//	UI.Refresh()
 						//}
+						had_some_ac_to_display=(acctx.m_n_cands>0)
 						ac_was_actiavted=acctx.m_activated
 						acctx=undefined;
 					}
@@ -2974,11 +2976,12 @@ W.CodeEditor=function(id,attrs){
 								doc.sel1.ccnt=ccnt0+lg2
 								doc.CallOnChange()
 								if(this.m_accands.m_common_prefix){
-									doc.m_user_just_typed_char=1
-								}
-								if(this.m_accands.m_auto_activate_after_tab){
 									this.m_activated=1
 								}
+								//if(this.m_accands.m_auto_activate_after_tab){
+								//	this.m_activated=1
+								//}
+								doc.m_user_just_typed_char=1
 								//obj.m_ac_context=undefined
 								UI.Refresh()
 							},
@@ -3000,8 +3003,11 @@ W.CodeEditor=function(id,attrs){
 								return Math.max(r,0)
 							},
 						}
+						var got_some_ac_to_display=(acctx.m_n_cands>0)
 						obj.m_ac_context=acctx
-						UI.InvalidateCurrentFrame()
+						if(got_some_ac_to_display||had_some_ac_to_display){
+							UI.InvalidateCurrentFrame()
+						}
 						UI.Refresh()
 					}
 					if(!obj.show_find_bar){
@@ -3599,6 +3605,9 @@ W.CodeEditor=function(id,attrs){
 		}
 		if(f_draw_accands){
 			f_draw_accands()
+		}
+		if(UI.enable_timing){
+			print('before notifications=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
 		}
 		if(obj.m_notifications&&!obj.show_find_bar){
 			W.ListView('notification_list',{x:obj.x+w_obj_area-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:h_obj_area-8,

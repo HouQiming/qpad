@@ -1966,6 +1966,9 @@ UI.RegisterEditorPlugin(function(){
 					if(indent_cur_line<indent_next_line){
 						chbraac=0;
 					}
+				}else if(C==chbraac&&chprev==C.charCodeAt(0)){
+					//type two quotes in the middle of a string, do not AC
+					chbraac=0;
 				}
 			}
 			if(chbraac==C){
