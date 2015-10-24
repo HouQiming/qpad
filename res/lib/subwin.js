@@ -150,6 +150,7 @@ W.TabbedDocument_prototype={
 		if(tab.OnDestroy){tab.OnDestroy()}
 		this.CancelTabDragging();
 		UI.Refresh()
+		UI.CallGCLater()
 	},
 	SetTab:function(tabid){
 		var tabid0=this.current_tab_id

@@ -893,14 +893,16 @@ UI.Application=function(id,attrs){
 			UI.detectLeaks();
 		}});
 		W.Hotkey("",{key:"CTRL+SHIFT+M",action:function(){
+			print("=== manual gc call")
+			Duktape.gc()
 			UI.debugDumpHeap()
 		}});
 	}
 };
 
-UI.Run()
+UI.Run();
 
-if(UI.Platform.BUILD=="debug"){
+/*if(UI.Platform.BUILD=="debug"){
 	//detect memory leaks
 	print("=== run gc")
 	Duktape.gc()
@@ -926,4 +928,4 @@ if(UI.Platform.BUILD=="debug"){
 	//print("=== wipe stash and gc")
 	//UI.debugWipeStash()
 	//Duktape.gc()
-}
+}*/

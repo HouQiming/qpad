@@ -486,10 +486,6 @@ var CallParseMore=function(){
 	UI.NextTick(fcallmore)
 };
 
-var fcallGC=function(){
-	Duktape.gc();
-};
-
 W.CodeEditorWidget_prototype={
 	m_current_wrap_width:1024,
 	m_enable_wrapping:0,
@@ -565,8 +561,9 @@ W.CodeEditorWidget_prototype={
 		if(this.doc){
 			//var sz=(this.doc.ed?this.doc.ed.GetTextSize():0)
 			this.doc.m_is_destroyed=1;
-			this.doc.ed=undefined;//todo
-			this.doc=undefined; //break the connection for rc
+			//break the connections for rc
+			this.doc.ed=undefined;
+			this.doc=undefined;
 			//if(sz>CALL_GC_DOC_SIZE_THRESHOLD){
 			//	//print("UI.NextTick(fcallGC);")
 			//	UI.NextTick(fcallGC);
