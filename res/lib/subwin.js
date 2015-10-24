@@ -156,10 +156,10 @@ W.TabbedDocument_prototype={
 		if(tabid0!=undefined){
 			var tab0=this.items[tabid0]
 			var tab1=this.items[tabid]
-			if(tab0.doc&&tab0.doc.m_tabswitch_count&&tab1.file_name){
+			if(tab0.main_widget&&tab0.main_widget.m_tabswitch_count&&tab1.file_name){
 				var fn=tab1.file_name
-				if(tab1.doc&&tab1.doc.file_name){fn=tab1.doc.file_name}
-				var counts=tab0.doc.m_tabswitch_count
+				if(tab1.main_widget&&tab1.main_widget.file_name){fn=tab1.main_widget.file_name}
+				var counts=tab0.main_widget.m_tabswitch_count
 				UI.IncrementTabSwitchCount(counts,fn,1)
 			}
 		}

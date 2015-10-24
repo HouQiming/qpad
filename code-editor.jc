@@ -7,6 +7,7 @@ import "hunspell.jc"
 import "smart-find.jc"
 import "code-parser.jc"
 import "g-l.jc"
+import "leak-detection.jc"
 import System.Math.*
 import System.Algorithm.*
 import System.Console.*
@@ -202,7 +203,7 @@ class CLayouter_programmer
 	float3[] m_current_frame_strikeouts
 	int m_temporarily_disable_spell_check
 	//////////////
-	JSObject m_style
+	//JSObject m_style
 	CLanguageDescription m_lang
 	int[] m_cached_colors
 	int m_cached_colors_p_word_part
@@ -1444,6 +1445,8 @@ class CLayouter_programmer
 		proto.ExportProperty(this,"m_tentative_editops")
 		proto.ExportMethod(this,"ResetTentativeOps",JS_ResetTentativeOps)
 	}
+	//auto __done__()
+	//	Writeln('!!! LAYOUTER DESTRUCTED !!!')
 
 class CColorer_programmer
 	CLanguageDescription m_lang
@@ -2106,8 +2109,16 @@ class CSavingContext
 	System.IO.CFile hf
 	//////////
 	float progress
+	JS_discard=function(JSContext JS){
+		if hf:
+			hf.Close()
+			hf=System.IO.CFile.NULL
+			ed=CEditableText.NULL
+		return 0
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"progress")
+		proto.ExportMethod(this,"discard",JS_discard)
 	}
 
 ///////////////////////////////////////////
@@ -2935,13 +2946,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				dfs(pc,ccnt_acc,depth+1)
 				ccnt_acc+=pc.ccnts[1]
 		dfs(diff.m_skiplist,0LL,0)
-		xys=ed.GetXYEnMasse(modified_ccnt_ranges)
-		hc=ed.GetCharacterHeightAt(0LL)
-		for i=0:4:xys.n-4
-			y0=min(max(int(xys[i+1]*i64(h_screen)/ytot),0),h_screen-1)
-			y1=min(max(int((xys[i+3]+hc)*i64(h_screen)/ytot),0),h_screen-1)
-			for j=y0:y1
-				bmp[j]=u8(255)
+		if modified_ccnt_ranges.n:
+			xys=ed.GetXYEnMasse(modified_ccnt_ranges)
+			hc=ed.GetCharacterHeightAt(0LL)
+			ytot+=hc
+			if !(ytot>0LL):
+				ytot=1LL
+			for i=0:4:xys.n-4
+				y0=min(max(int(xys[i+1]*i64(h_screen)/ytot),0),h_screen-1)
+				y1=min(max(int((xys[i+3]+hc)*i64(h_screen)/ytot),0),h_screen-1)
+				for j=y0:y1
+					bmp[j]=u8(255)
 		return JS.Return(new CDiffBitmap(){data:bmp})
 	}
 	JS_UI["ED_DrawDiffMinimap"]=function(JSContext JS){

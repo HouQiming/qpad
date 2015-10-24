@@ -412,13 +412,13 @@ UI.RegisterZipLoader("json",function(gdoc,sdata){
 ////////////////////////////////////
 UI.m_ui_metadata={};
 (function(){
-	var s_json=IO.ReadAll(IO.GetStoragePath()+"/metadata.json")
+	var s_json=IO.ReadAll(IO.GetStoragePath()+(UI.Platform.BUILD=="debug"?"/metadata_debug.json":"/metadata.json"))
 	if(s_json){
 		UI.m_ui_metadata=JSON.parse(s_json)
 	}
 })();
 UI.SaveMetaData=function(){
-	IO.CreateFile(IO.GetStoragePath()+"/metadata.json",JSON.stringify(UI.m_ui_metadata))
+	IO.CreateFile(IO.GetStoragePath()+(UI.Platform.BUILD=="debug"?"/metadata_debug.json":"/metadata.json"),JSON.stringify(UI.m_ui_metadata))
 }
 
 UI.NewFromTemplate=function(fn_template,fn_real){
@@ -436,7 +436,7 @@ UI.SaveWorkspace=function(){
 	var workspace=[]
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var wnd=UI.g_all_document_windows[i]
-		if(wnd.doc&&wnd.doc.m_is_brand_new){continue;}
+		if(wnd.main_widget&&wnd.main_widget.m_is_brand_new){continue;}
 		workspace.push(wnd.file_name)
 	}
 	UI.m_ui_metadata["<workspace>"]=workspace

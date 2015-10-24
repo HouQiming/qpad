@@ -6,11 +6,13 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
+require("res/lib/global_doc");
 var Language=require("res/lib/langdef");
 var MAX_PARSABLE=33554432
 var TOK_TYPE=0x20000000
 var KEY_DECL_CLASS=TOK_TYPE*0
-var KEY_DECL_FUNCTION=TOK_TYPE*1
+var KEY_DECL_FUNCTION=TOK_TYPE*1;
+var CALL_GC_DOC_SIZE_THRESHOLD=4194304;
 
 if(!UI.m_ui_metadata.find_state){
 	UI.m_ui_metadata.find_state={
@@ -127,6 +129,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216))
 		//abandonment should work as is...
 		var floadNext=(function(){
+			if(this.m_is_destroyed){
+				if(ed.hfile_loading){
+					ed.hfile_loading.discard()
+					ed.hfile_loading=undefined
+				}
+				return
+			}
 			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?131072:4194304))
 			this.ResetSaveDiff()
 			if(is_preview){
@@ -141,18 +150,11 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					return
 				}
 			}
-			if(this.m_is_destroyed){
-				if(ed.hfile_loading){
-					ed.hfile_loading.discard()
-					ed.hfile_loading=undefined
-				}
-				return
-			}
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
 			}else{
 				this.ResetSaveDiff()
-				this.OnLoad()
+				this.owner.OnLoad()
 			}
 			UI.Refresh()
 		}).bind(this)
@@ -160,7 +162,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			floadNext()
 		}else{
 			this.ResetSaveDiff()
-			this.OnLoad()
+			this.owner.OnLoad()
 		}
 		UI.Refresh()
 	},
@@ -303,7 +305,25 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			x+this.m_ellipsis_delta_x*scale,
 			y+this.m_ellipsis_delta_y*scale,color,
 			0x2026)
-	}
+	},
+	//////////////////////////
+	HookedEdit:function(ops){
+		var obj=this.owner
+		if(obj){
+			if(obj.read_only){return;}
+			if(this.saved_point>this.ed.GetUndoQueueLength()){
+				//undo beyond the saved point, then edit sth else, the save point is lost permanently
+				this.saved_point=-1;
+			}
+			var hk=this.m_event_hooks["beforeEdit"];
+			if(hk){
+				for(var i=hk.length-1;i>=0;i--){
+					hk[i].call(this,ops)
+				}
+			}
+		}
+		this.ed.Edit(ops);
+	},
 })
 
 W.MinimapThingy_prototype={
@@ -449,8 +469,8 @@ var CallParseMore=function(){
 					break
 				}
 			}
-			if(obj_tab&&obj_tab.doc&&obj_tab.doc.doc){
-				obj_tab.doc.doc.m_file_index=ret.file_index
+			if(obj_tab&&obj_tab.main_widget&&obj_tab.main_widget.doc){
+				obj_tab.main_widget.doc.m_file_index=ret.file_index
 			}else{
 				//not-opened-yet
 				//if(UI.Platform.BUILD=="debug"){
@@ -466,17 +486,20 @@ var CallParseMore=function(){
 	UI.NextTick(fcallmore)
 };
 
+var fcallGC=function(){
+	Duktape.gc();
+};
+
 W.CodeEditorWidget_prototype={
 	m_current_wrap_width:1024,
 	m_enable_wrapping:0,
 	m_tabswitch_count:{},
 	OnEditorCreate:function(){
 		var doc=this.doc
-		var obj=this
-		doc.OnLoad=obj.OnLoad.bind(obj)
-		doc.StartLoading(obj.file_name)
-		doc.HookedEdit=function(ops){
-			if(obj.read_only){return;}
+		//doc.OnLoad=obj.OnLoad.bind(obj)
+		doc.StartLoading(this.file_name)
+		doc.AddEventHandler('beforeEdit',function(ops){
+			var obj=this.owner
 			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_no_more_replace){
 				var match_id=obj.BisectMatches(ops[0])
 				if(match_id){
@@ -508,14 +531,9 @@ W.CodeEditorWidget_prototype={
 					obj.m_no_more_replace=1;
 				}
 			}
-			if(this.saved_point>this.ed.GetUndoQueueLength()){
-				//undo beyond the saved point, then edit sth else, the save point is lost permanently
-				this.saved_point=-1;
-			}
-			this.CallHooks("beforeEdit")
-			this.ed.Edit(ops);
-		}
+		})
 		doc.AddEventHandler('change',function(){
+			var obj=this.owner
 			if(obj.m_current_find_context){
 				obj.m_current_find_context.Cancel()
 				obj.m_current_find_context=undefined
@@ -526,13 +544,14 @@ W.CodeEditorWidget_prototype={
 				obj.m_ac_context.m_ccnt=-1;
 			}
 			obj.m_is_brand_new=0
-			var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+			var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 			renderer.m_hidden_ranges_prepared=0
 		})
 		doc.AddEventHandler('ESC',function(){
+			var obj=this.owner
 			obj.m_notifications=[]
 			obj.m_ac_context=undefined
-			doc.m_user_just_typed_char=0
+			this.m_user_just_typed_char=0
 			obj.DestroyReplacingContext();
 			obj.hide_sxs_visualizer=!obj.hide_sxs_visualizer;
 			if(!obj.m_sxs_visualizer){
@@ -543,7 +562,16 @@ W.CodeEditorWidget_prototype={
 		})
 	},
 	OnDestroy:function(){
-		if(this.doc){this.doc.m_is_destroyed=1;}
+		if(this.doc){
+			//var sz=(this.doc.ed?this.doc.ed.GetTextSize():0)
+			this.doc.m_is_destroyed=1;
+			this.doc.ed=undefined;//todo
+			this.doc=undefined; //break the connection for rc
+			//if(sz>CALL_GC_DOC_SIZE_THRESHOLD){
+			//	//print("UI.NextTick(fcallGC);")
+			//	UI.NextTick(fcallGC);
+			//}
+		}
 	},
 	///////////////////////////
 	Reload:function(){
@@ -553,7 +581,9 @@ W.CodeEditorWidget_prototype={
 			this.m_current_find_context=undefined
 		}
 		this.m_ac_context=undefined
-		if(this.doc){this.doc.m_is_destroyed=1;}
+		if(this.doc){
+			this.doc.m_is_destroyed=1;
+		}
 		this.doc=undefined
 		this.m_notifications=[]
 		UI.Refresh()
@@ -659,6 +689,11 @@ W.CodeEditorWidget_prototype={
 		doc.ed.saving_context=ctx
 		this.AcquireEditLock();
 		var fsave=UI.HackCallback(function(){
+			if(doc.m_is_destroyed){
+				ctx.discard();
+				doc.ed.saving_context=undefined
+				return;
+			}
 			var ret=UI.EDSaver_Write(ctx)
 			if(ret=="done"){
 				doc.saved_point=doc.ed.GetUndoQueueLength()
@@ -1740,7 +1775,7 @@ var FileItem_prototype={
 		var obj=this.owner.owner
 		var my_tabid=undefined
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
-			if(UI.g_all_document_windows[i].doc===obj){
+			if(UI.g_all_document_windows[i].main_widget===obj){
 				my_tabid=i
 				break
 			}
@@ -1751,8 +1786,8 @@ var FileItem_prototype={
 			if(counts){counts=counts.m_tabswitch_count;}
 			for(var i=0;i<UI.g_all_document_windows.length;i++){
 				if(i==my_tabid){continue;}
-				if(!UI.g_all_document_windows[i].doc){continue;}
-				var counts_i=UI.g_all_document_windows[i].doc.m_tabswitch_count
+				if(!UI.g_all_document_windows[i].main_widget){continue;}
+				var counts_i=UI.g_all_document_windows[i].main_widget.m_tabswitch_count
 				if(counts_i){
 					counts=counts_i
 					break
@@ -1775,6 +1810,7 @@ var FileItem_prototype={
 		obj.m_language_id=undefined
 		obj.m_is_brand_new=undefined;
 		obj.m_is_preview=undefined;
+		UI.m_current_file_list=undefined
 		UI.Refresh()
 	},
 }
@@ -1931,6 +1967,7 @@ var fnewpage_findbar_plugin=function(){
 				editor_widget.m_file_name_before_preview=undefined
 			}
 		}
+		UI.m_current_file_list=undefined
 		UI.Refresh()
 	})
 	var fpassthrough=function(key,event){
@@ -2301,6 +2338,8 @@ W.CodeEditor=function(id,attrs){
 			sxs_area_dim='y'
 		}
 	}
+	//prevent m_current_file_list leaks
+	UI.m_current_file_list=undefined
 	UI.Begin(obj)
 		//main code area
 		obj.h_obj_area=h_obj_area
@@ -2510,7 +2549,7 @@ W.CodeEditor=function(id,attrs){
 					var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
 					var text_dim=UI.MeasureText(obj.line_number_font,s_line_number)
 					var x=w_line_numbers-text_dim.w-obj.padding
-					if(diff&&i+1<line_ccnts.length){
+					if(diff){
 						var ccnt_line_next=-1;
 						for(var j=i+1;j<line_ccnts.length;j++){
 							if(line_ccnts[j]>=0){
@@ -2526,7 +2565,7 @@ W.CodeEditor=function(id,attrs){
 							//s_line_number=s_line_number+"*";
 							UI.RoundRect({
 								x:obj.x+w_line_numbers-6,y:line_xys[i*2+1]-scroll_y+area_y,
-								w:6,h:Math.min(Math.max(line_xys[i*2+3]-line_xys[i*2+1],hc),area_h),
+								w:6,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
 								color:obj.color_diff_tag})
 						}
 					}
@@ -3606,15 +3645,15 @@ UI.NewCodeEditorTab=function(fname0){
 		opening_callbacks:[],
 		body:function(){
 			//use styling for editor themes
-			UI.context_parent.body=this.doc;
-			if(this.doc){this.file_name=this.doc.file_name}
+			UI.context_parent.body=this.main_widget;
+			if(this.main_widget){this.file_name=this.main_widget.file_name}
 			var body=W.CodeEditor("body",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
 				'file_name':this.file_name,
 			})
-			if(!this.doc){
-				this.doc=body;
+			if(!this.main_widget){
+				this.main_widget=body;
 				body.m_is_brand_new=(!fname0&&this.auto_focus_file_search)
 				if(this.opening_callbacks.length){
 					if(body.m_finished_loading){
@@ -3662,22 +3701,22 @@ UI.NewCodeEditorTab=function(fname0){
 			return body;
 		},
 		Save:function(){
-			if(!this.doc){return;}
-			this.doc.Save();
-			var doc=this.doc.doc;
+			if(!this.main_widget){return;}
+			this.main_widget.Save();
+			var doc=this.main_widget.doc;
 			this.need_save=0
 			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
 				this.need_save=1
 			}
 		},
 		SaveMetaData:function(){
-			if(this.doc){this.doc.SaveMetaData();}
+			if(this.main_widget){this.main_widget.SaveMetaData();}
 		},
 		OnDestroy:function(){
-			if(this.doc){this.doc.OnDestroy();}
+			if(this.main_widget){this.main_widget.OnDestroy();}
 		},
 		Reload:function(){
-			if(this.doc){this.doc.Reload();}
+			if(this.main_widget){this.main_widget.Reload();}
 		},
 		property_windows:[],
 		color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
@@ -3702,8 +3741,8 @@ UI.OpenEditorWindow=function(fname,fcallback){
 		obj_tab=UI.NewCodeEditorTab(fname)
 	}
 	if(fcallback){
-		if(obj_tab.doc){
-			fcallback.call(obj_tab.doc.doc)
+		if(obj_tab.main_widget){
+			fcallback.call(obj_tab.main_widget.doc)
 		}else{
 			obj_tab.opening_callbacks.push(fcallback)
 		}
@@ -3713,8 +3752,8 @@ UI.OpenEditorWindow=function(fname,fcallback){
 UI.OnApplicationSwitch=function(){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab=UI.g_all_document_windows[i]
-		if(obj_tab.doc&&obj_tab.doc.doc){
-			var obj=obj_tab.doc
+		if(obj_tab.main_widget&&obj_tab.main_widget.doc){
+			var obj=obj_tab.main_widget
 			if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
 				if(obj.doc.ed.saving_context){continue;}//saving docs are OK
 				//reload

@@ -1,10 +1,8 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("gui2d/dockbar");
-require("res/lib/txtx_editor");
 require("res/lib/code_editor");
 require("res/lib/subwin");
-require("res/lib/demo_doc");
 
 UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.SetFontSharpening(1);
@@ -332,7 +330,7 @@ UI.Theme_CustomWidget=function(C){
 			///////
 			//color_diff_tag:[{x:0,y:0,color:0xff2ca033&0xffffff},{x:1,y:0,color:0xff2ca033}],
 			color_diff_tag:[{x:0,y:0,color:0x002ca033},{x:1,y:0,color:0xff2ca033}],
-			sbar_diff_color:(0x7f2ca033),
+			sbar_diff_color:(0xff2ca033),
 			///////
 			show_minimap:(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="android"||UI.Platform.ARCH=="ios")?0:1,
 			minimap_font_height:6,
@@ -805,10 +803,10 @@ UI.Application=function(id,attrs){
 			W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
 			W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
 			W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
-			menu_file.AddButtonRow({icon:"扩",text:"Zoom"},[
+			menu_file.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
 				{text:"-",tooltip:'CTRL -',action:function(){
 					UI.ZoomRelative(1/ZOOM_RATE)
-				}},{text:"reset",tooltip:'CTRL+0',action:function(){
+				}},{text:"100%",tooltip:'CTRL+0',action:function(){
 					UI.ZoomReset()
 				}},{text:"+",tooltip:'CTRL +',action:function(){
 					UI.ZoomRelative(ZOOM_RATE)
@@ -838,7 +836,7 @@ UI.Application=function(id,attrs){
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({icon:"时",text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:function(){
 				var active_document=UI.m_the_document_area.active_tab
-				if(active_document&&active_document.doc&&active_document.doc.m_is_brand_new){
+				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 					return;
 				}
 				UI.UpdateNewDocumentSearchPath()
@@ -888,6 +886,44 @@ UI.Application=function(id,attrs){
 		UI.NewCodeEditorTab().auto_focus_file_search=1
 		UI.Refresh()
 	}
+	if(UI.Platform.BUILD=="debug"){
+		//detect memory leaks
+		W.Hotkey("",{key:"CTRL+SHIFT+L",action:function(){
+			Duktape.gc()
+			UI.detectLeaks();
+		}});
+		W.Hotkey("",{key:"CTRL+SHIFT+M",action:function(){
+			UI.debugDumpHeap()
+		}});
+	}
 };
 
 UI.Run()
+
+if(UI.Platform.BUILD=="debug"){
+	//detect memory leaks
+	print("=== run gc")
+	Duktape.gc()
+	UI.debugDumpHeap()
+	print("=== get rid of UI shit and run gc again")
+	UI.top=undefined
+	UI.m_global_menu=undefined
+	UI.frame_callbacks=undefined
+	UI.context_paint_queue=undefined
+	UI.context_regions=undefined
+	UI.context_tentative_focus=undefined
+	UI.context_hotkeys=undefined
+	UI.m_the_document_area=undefined
+	UI.nd_focus=undefined
+	UI.nd_mouse_over=undefined
+	UI.m_editor_plugins=undefined
+	UI.m_current_file_list=undefined
+	Duktape.gc()
+	print("=== detect leaks")
+	UI.detectLeaks();
+	print("=== heap dump")
+	UI.debugDumpHeap()
+	//print("=== wipe stash and gc")
+	//UI.debugWipeStash()
+	//Duktape.gc()
+}
