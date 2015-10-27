@@ -486,6 +486,38 @@ var CallParseMore=function(){
 	UI.NextTick(fcallmore)
 };
 
+var fsave_code_editor=UI.HackCallback(function(){
+	var doc=this.doc;
+	var ctx=doc.ed.saving_context;
+	if(doc.m_is_destroyed){
+		ctx.discard();
+		doc.ed.saving_context=undefined
+		return;
+	}
+	var ret=UI.EDSaver_Write(ctx,doc.ed)
+	if(ret=="done"){
+		doc.saved_point=doc.ed.GetUndoQueueLength()
+		this.ReleaseEditLock();
+		ctx.discard();
+		doc.ed.saving_context=undefined
+		doc.ResetSaveDiff()
+		doc.m_loaded_time=IO.GetFileTimestamp(this.file_name)
+		this.OnSave();
+		this.DismissNotification('saving_progress')
+		UI.Refresh()
+	}else if(ret=="continue"){
+		this.CreateNotification({id:'saving_progress',icon:undefined,text:"Saving @1%...".replace('@1',(ctx.progress*100).toFixed(0)),
+			progress:ctx.progress
+		},"quiet")
+		UI.NextTick(fsave_code_editor.bind(this))
+	}else{
+		this.ReleaseEditLock();
+		ctx.discard();
+		doc.ed.saving_context=undefined
+		this.CreateNotification({id:'saving_progress',icon:'错',text:"Failed to save it"})
+	}
+});
+
 W.CodeEditorWidget_prototype={
 	m_current_wrap_width:1024,
 	m_enable_wrapping:0,
@@ -553,6 +585,11 @@ W.CodeEditorWidget_prototype={
 			if(!obj.m_sxs_visualizer){
 				obj.hide_sxs_visualizer=0;
 			}
+			if(obj.m_current_find_context){
+				obj.m_current_find_context.Cancel()
+				obj.m_current_find_context=undefined
+			}
+			obj.m_hide_find_highlight=1
 			UI.Refresh()
 			return 1
 		})
@@ -685,34 +722,7 @@ W.CodeEditorWidget_prototype={
 		}
 		doc.ed.saving_context=ctx
 		this.AcquireEditLock();
-		var fsave=UI.HackCallback(function(){
-			if(doc.m_is_destroyed){
-				ctx.discard();
-				doc.ed.saving_context=undefined
-				return;
-			}
-			var ret=UI.EDSaver_Write(ctx)
-			if(ret=="done"){
-				doc.saved_point=doc.ed.GetUndoQueueLength()
-				this.ReleaseEditLock();
-				doc.ed.saving_context=undefined
-				doc.ResetSaveDiff()
-				doc.m_loaded_time=IO.GetFileTimestamp(this.file_name)
-				this.OnSave();
-				this.DismissNotification('saving_progress')
-				UI.Refresh()
-			}else if(ret=="continue"){
-				this.CreateNotification({id:'saving_progress',icon:undefined,text:"Saving @1%...".replace('@1',(ctx.progress*100).toFixed(0)),
-					progress:ctx.progress
-				},"quiet")
-				UI.NextTick(fsave)
-			}else{
-				this.ReleaseEditLock();
-				doc.ed.saving_context=undefined
-				this.CreateNotification({id:'saving_progress',icon:'错',text:"Failed to save it"})
-			}
-		}).bind(this)
-		fsave();
+		fsave_code_editor.call(this)
 	},
 	///////////////////////////////////////////
 	m_edit_lock:0,
@@ -731,6 +741,7 @@ W.CodeEditorWidget_prototype={
 		//if(flags&UI.SEARCH_FLAG_GOTO_MODE){
 		//	ccnt=0
 		//}
+		this.m_hide_find_highlight=0
 		if(this.m_current_find_context){
 			if(force_ccnt!=undefined&&
 			force_ccnt==this.m_current_find_context.m_starting_ccnt0&&
@@ -2212,6 +2223,7 @@ W.SXS_NewPage=function(id,attrs){
 				editor_widget.m_language_id=undefined
 				editor_widget.m_is_brand_new=1
 				editor_widget.m_is_preview=1
+				UI.InvalidateCurrentFrame()
 				UI.Refresh()
 			},
 			item_template:{
@@ -2447,7 +2459,7 @@ W.CodeEditor=function(id,attrs){
 			doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
 			doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
 			//find highlight
-			if(!obj.show_find_bar&&UI.m_ui_metadata.find_state.m_current_needle){
+			if(!obj.show_find_bar&&UI.m_ui_metadata.find_state.m_current_needle&&!obj.m_hide_find_highlight){
 				//repeat the animation to get correct the correct scrolling information
 				UI.Begin(doc)
 					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
@@ -2620,6 +2632,7 @@ W.CodeEditor=function(id,attrs){
 		}else{
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar
+				obj.m_hide_find_highlight=0;
 			}
 			//individual lines, each with a box and a little shadow for separation
 			var h_max_find_items_per_side=(h_obj_area-obj.h_find_bar)*obj.find_item_space_percentage*0.5
@@ -2663,12 +2676,16 @@ W.CodeEditor=function(id,attrs){
 						if(value_i!=undefined){obj[name_i]=value_i;}
 					}
 				}
+				var wrap_width=(obj.m_enable_wrapping?obj.m_current_wrap_width:0)
+				if(obj.m_is_preview){
+					wrap_width=Math.min(wrap_width,w_obj_area-w_line_numbers-obj.padding-w_scrolling_area)
+				}
 				W.Edit("doc",{
 					///////////////
 					language:Language.GetDefinitionByName(obj.m_language_id),
 					plugin_language_desc:Language.GetDescObjectByName(obj.m_language_id),
 					style:editor_style,
-					wrap_width:obj.m_is_preview?w_obj_area-w_line_numbers-obj.padding-w_scrolling_area:(obj.m_enable_wrapping?obj.m_current_wrap_width:0),
+					wrap_width:wrap_width,
 					///////////////
 					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_find,w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,h:h_obj_area-h_top_find-h_bottom_find,
 					///////////////

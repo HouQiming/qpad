@@ -1417,11 +1417,13 @@ class CLayouter_programmer
 		return JS.Return(ret)
 	}
 	JS_ResetWrapping=function(JSContext JS){
-		m_wrap_width=JS.Param(0).or(0.f)
+		auto m_wrap_width=JS.Param(0).or(0.f)
+		auto obj=JS.Param(1).as(JSObject)
 		if !(m_wrap_width>0.f):
 			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
 		else
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
+		obj["displayed_wrap_width"]=fixed2double(m_wrap_width_in_fp)
 		return 0
 	}
 	JS_ResetTentativeOps=function(JSContext JS){
@@ -2102,18 +2104,20 @@ class CLoadingContext
 	}
 
 class CSavingContext
-	CEditableText ed
 	i64 ofs
 	//////////
 	string fn
 	System.IO.CFile hf
 	//////////
 	float progress
+	auto __done__()
+		if hf:
+			hf.Close()
+			hf=System.IO.CFile.NULL
 	JS_discard=function(JSContext JS){
 		if hf:
 			hf.Close()
 			hf=System.IO.CFile.NULL
-			ed=CEditableText.NULL
 		return 0
 	}
 	__JS_prototype=function(JSObject proto){
@@ -2678,14 +2682,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ret=new CSavingContext
 		ret.fn=fn
 		ret.hf=System.IO.CreateFile(fn+".$$$")
-		ret.ed=ed
 		if !ret.hf:return 0
 		return JS.Return(ret)
 	}
 	JS_UI["EDSaver_Write"]=function(JSContext JS){
 		ret=JS.Param(0).as(CSavingContext)
+		ed=JS.Param(1).as(CEditableText)
 		ofs=ret.ofs
-		ed=ret.ed
 		szmax=ed.GetTextSize()
 		szwrite=int(min(szmax-ofs,i64(WRITE_BATCH)))
 		if szwrite>0:

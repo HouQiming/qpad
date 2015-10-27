@@ -117,6 +117,12 @@ UI.IncrementTabSwitchCount=function(counts,fn,delta0){
 	}
 }
 
+UI.m_closed_windows=[];
+var GetTabFileName=function(tab1){
+	var fn=tab1.file_name
+	if(tab1.main_widget&&tab1.main_widget.file_name){fn=tab1.main_widget.file_name}
+	return fn;
+}
 W.TabbedDocument_prototype={
 	//closer -> class: OnClose notification and stuff
 	CloseTab:function(tabid,forced){
@@ -132,6 +138,10 @@ W.TabbedDocument_prototype={
 			UI.Refresh()
 			return;
 		}
+		///////
+		var fntab=GetTabFileName(tab);
+		UI.m_closed_windows=UI.m_closed_windows.filter(UI.HackCallback(function(fn){return fn!=fntab}))
+		UI.m_closed_windows.push(fntab);
 		//close it
 		if(!tab.need_save){
 			tab.SaveMetaData();
@@ -149,6 +159,7 @@ W.TabbedDocument_prototype={
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		if(tab.OnDestroy){tab.OnDestroy()}
 		this.CancelTabDragging();
+		UI.SaveWorkspace();
 		UI.Refresh()
 		UI.CallGCLater()
 	},
@@ -158,8 +169,7 @@ W.TabbedDocument_prototype={
 			var tab0=this.items[tabid0]
 			var tab1=this.items[tabid]
 			if(tab0.main_widget&&tab0.main_widget.m_tabswitch_count&&tab1.file_name){
-				var fn=tab1.file_name
-				if(tab1.main_widget&&tab1.main_widget.file_name){fn=tab1.main_widget.file_name}
+				var fn=GetTabFileName(tab1);
 				var counts=tab0.main_widget.m_tabswitch_count
 				UI.IncrementTabSwitchCount(counts,fn,1)
 			}
@@ -326,6 +336,7 @@ W.TabbedDocument=function(id,attrs){
 		obj.current_tab_id=(items.length-1);
 		obj.m_is_in_menu=0
 		obj.CancelTabDragging();
+		UI.SaveWorkspace();
 	}
 	obj.n_tabs_last_checked=items.length;
 	if(!items.length&&obj.m_is_close_pending){
@@ -608,7 +619,7 @@ W.SaveDialog=function(id,attrs){
 			W.Button("btn_n",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_n,style:obj.bad_button_style,OnClick:fno});
 			x_buttons+=UI.MeasureText(obj.font_buttons,s_text_n).w+obj.space_button
 			W.Button("btn_c",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_c,style:obj.bad_button_style,OnClick:fcancel});
-			W.Hotkey("",{key:"Y",action:fyes});W.Hotkey("",{key:"S",action:fyes});W.Hotkey("",{key:"RETURN",action:fyes})
+			W.Hotkey("",{key:"Y",action:fyes});W.Hotkey("",{key:"S",action:fyes});W.Hotkey("",{key:"RETURN",action:fyes});W.Hotkey("",{key:"SPACE",action:fyes})
 			W.Hotkey("",{key:"N",action:fno});W.Hotkey("",{key:"D",action:fno})
 			W.Hotkey("",{key:"ESC",action:fcancel});W.Hotkey("",{key:"C",action:fcancel})
 			/////////////////

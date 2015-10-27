@@ -16,7 +16,7 @@ UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
 UI.icon_font_name='res/fonts/iconfnt.ttf,!'
 UI.Theme_CustomWidget=function(C){
 	var C_dark=UI.lerp_rgba(C[0],0xff000000,0.15)
-	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.75)
+	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.66)
 	var custom_styles={
 		tooltip:{
 			font:UI.Font(UI.font_name,24,-100),
@@ -296,7 +296,7 @@ UI.Theme_CustomWidget=function(C){
 				padding_ellipsis:2,
 				h_ellipsis:20,
 				/////////////
-				bgcolor_selection:C[0]&0x3fffffff,
+				bgcolor_selection:C[0]&0x55ffffff,
 				tab_width:4,
 				scroll_transition_dt:0.075,
 			},
@@ -368,7 +368,7 @@ UI.Theme_CustomWidget=function(C){
 				color_keyword:0xffb4771f,
 				color_type:0xffbc470f,
 				color_symbol:0xff7f7f7f,
-				bgcolor_selection:C[0]&0x3fffffff,
+				bgcolor_selection:C[0]&0x55ffffff,
 				tab_width:4,
 			},
 			find_item_scale:0.8,
@@ -628,12 +628,25 @@ UI.Theme_CustomWidget=function(C){
 				}
 			},
 		},
+		scroll_bar:{
+			transition_dt:0.1,
+			//bgcolor:0xffd0d0d0,
+			round:0,
+			padding:0,
+			szbar_min:32,
+			middle_bar:{
+				w:8,h:8,
+				round:6,
+				color:[{x:0,y:0,color:0xff999999},{x:1,y:1,color:0xff666666}],
+				border_color:0,
+			},
+			text_color:0xff999999,//dummy
+		},
 	};
 	var s0=UI.default_styles;
 	for(var key in custom_styles){
 		s0[key]=custom_styles[key]
 	}
-	s0.scroll_bar.middle_bar.color=0xff444444
 }
 if(UI.Platform.BUILD=="debug"){
 	UI.Theme_Minimalistic([0xff3377cc])
@@ -843,6 +856,19 @@ UI.Application=function(id,attrs){
 				UI.NewCodeEditorTab().auto_focus_file_search=1
 				UI.Refresh()
 			}})
+			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
+				menu_file.AddNormalItem({text:"Restore closed",key:"CTRL+SHIFT+T",enable_hotkey:1,action:function(){
+					if(UI.m_closed_windows.length>0){
+						var active_document=UI.m_the_document_area.active_tab
+						var fn=UI.m_closed_windows.pop();
+						if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
+							app.document_area.CloseTab();
+						}
+						UI.OpenEditorWindow(fn);
+						UI.Refresh();
+					}
+				}})
+			}
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({text:"E&xit",action:function(){
 				if(!app.OnClose()){UI.DestroyWindow(app)}
@@ -884,6 +910,7 @@ UI.Application=function(id,attrs){
 		UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
 		UI.m_previous_document=undefined
 		UI.NewCodeEditorTab().auto_focus_file_search=1
+		UI.InvalidateCurrentFrame()
 		UI.Refresh()
 	}
 	if(UI.Platform.BUILD=="debug"){

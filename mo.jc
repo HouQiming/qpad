@@ -301,8 +301,12 @@ if Platform.BUILD=="debug":
 		auto shell_args=JS.Param(0).as(JSObject)
 		auto spath=JS.Param(1).or(".")
 		auto show=JS.Param(2).or(1)
-		n=shell_args.length()
-		pproc=System.Processes.RunPiped([shell_args[i].as(string) for i=0:n-1],spath,show,"new_job,output,error")
+		auto n=shell_args.length()
+		auto args=[shell_args[i].as(string) for i=0:n-1]
+		foreach s,I in args
+			if !s:
+				return JS.ReturnError("bad args")
+		pproc=System.Processes.RunPiped(args,spath,show,"new_job,output,error")
 		if !pproc:
 			return 0
 		return JS.Return(new CProcessWrapper(){proc:pproc})

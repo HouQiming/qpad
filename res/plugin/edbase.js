@@ -12,14 +12,14 @@ Language.Register({
 
 var f_C_like=function(lang,keywords,has_preprocessor){
 	lang.DefineDefaultColor("color_symbol")
-	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
-	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
 	var bid_preprocessor
 	if(has_preprocessor){
 		bid_preprocessor=lang.ColoredDelimiter("key","#","\n","color_meta");
 	}else{
 		bid_preprocessor=bid_comment
 	}
+	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
+	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
 	var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 	var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 	var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
@@ -37,10 +37,14 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	return (function(lang){
 		if(has_preprocessor){
 			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2,bid_preprocessor]);
+			if(lang.isInside(bid_preprocessor)){
+				lang.Enable(bid_comment);
+				//lang.Enable(bid_comment2);
+			}
 		}else{
 			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2]);
 		}
-		if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)||lang.isInside(bid_preprocessor)){
+		if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)||has_preprocessor&&lang.isInside(bid_preprocessor)){
 			lang.Disable(bid_bracket);
 		}else{
 			lang.Enable(bid_bracket);
@@ -668,8 +672,10 @@ UI.WriteBuildOutput=function(fparse,s){
 			})
 			this.AddEventHandler('ESC',function(){
 				var sztext=this.ed.GetTextSize()
-				this.ed.Edit([0,sztext,undefined])
-				this.SetSelection(0,0)
+				if(sztext){
+					this.ed.Edit([0,sztext,undefined])
+					this.SetSelection(0,0)
+				}
 				for(var i=0;i<this.m_clickable_ranges.length;i++){
 					var crange=this.m_clickable_ranges[i];
 					crange.loc0.discard()
@@ -1039,7 +1045,7 @@ Language.RegisterCompiler(["jc"],{
 			args.push("--build="+doc.m_cflags.build)
 			args.push("--arch="+doc.m_cflags.arch)
 		}
-		args.push(doc.file_name)
+		args.push(doc.m_file_name)
 		if(run_it){
 			args.push("--run")
 		}
@@ -1084,7 +1090,10 @@ UI.RegisterEditorPlugin(function(){
 					ignore paste location as long as it's inside the indent
 				*/
 				var ccnt_corrected=ed.MoveToBoundary(sel[1],1,"space");
-				if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]==10){
+				if(sel[1]>sel[0]&&ed.MoveToBoundary(sel[0],-1,"space")<sel[0]){
+					//line overwrite mode, use sel[0]
+					ccnt_corrected=sel[0];
+				}else if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]==10){
 					var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
 					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_corrected){
 						//empty line: simply paste before this line, do nothing
@@ -1459,52 +1468,115 @@ UI.RegisterEditorPlugin(function(){
 		UI.Refresh()
 		return 0;
 	});
-	var fnextbm=function(is_sel){
+	//todo: menu
+}).prototype.name="Bookmarks";
+
+//point of interest
+UI.RegisterEditorPlugin(function(){
+	var fnextbm=function(dir,is_sel){
 		var ccnt=this.sel1.ccnt;
-		var bm=this.FindNearestBookmark(ccnt+1,1)
-		if(!bm){return 1;}
+		var sz=this.ed.GetTextSize()
+		var ccnt_next=undefined;
+		var propose=UI.HackCallback(function(ccnt_cand){
+			if(dir>0){
+				if(ccnt<ccnt_cand&&(ccnt_next>ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
+			}else{
+				if(ccnt>ccnt_cand&&(ccnt_next<ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
+			}
+		});
+		//bookmark
+		var bm=(dir>0?this.FindNearestBookmark(ccnt+1,1):this.FindNearestBookmark(ccnt-1,-1))
+		if(bm){
+			propose(bm.ccnt);
+		}
+		//modification
+		if(this.m_diff_from_save){
+			//coulddo: round-to-line
+			var ccnt_starting=this.sel1.ccnt;
+			var ccnt_base_starting=this.m_diff_from_save.CurrentToBase(ccnt_starting)
+			var ccnt_both_starting=this.m_diff_from_save.CurrentToBoth(ccnt_starting)
+			//go to both
+			var l=0;
+			var r=(dir>0?sz-ccnt_starting:ccnt_starting);
+			while(l<=r){
+				var m=(l+r)>>1;
+				var ccnt_base_m=this.m_diff_from_save.CurrentToBase(ccnt_starting+dir*m)
+				var ccnt_both_m=this.m_diff_from_save.CurrentToBoth(ccnt_starting+dir*m)
+				if((ccnt_both_m-ccnt_both_starting)*dir>0){
+					r=m-1;
+				}else{
+					l=m+1;
+				}
+			}
+			if(r>0){
+				ccnt_starting+=r*dir;
+				var ccnt_base_starting=this.m_diff_from_save.CurrentToBase(ccnt_starting)
+				var ccnt_both_starting=this.m_diff_from_save.CurrentToBoth(ccnt_starting)
+			}
+			//go to edit
+			l=0;r=(dir>0?sz-ccnt_starting:ccnt_starting);
+			while(l<=r){
+				var m=(l+r)>>1;
+				var ccnt_base_m=this.m_diff_from_save.CurrentToBase(ccnt_starting+dir*m)
+				var ccnt_both_m=this.m_diff_from_save.CurrentToBoth(ccnt_starting+dir*m)
+				if(ccnt_both_m-ccnt_both_starting==dir*m&&ccnt_base_m-ccnt_base_starting==dir*m){
+					l=m+1;
+				}else{
+					r=m-1;
+				}
+			}
+			if(r>0){
+				ccnt_starting+=r*dir;
+				if(ccnt_starting!=0&&ccnt_starting!=sz){
+					propose(ccnt_starting);
+				}
+			}
+		}
+		//build error
+		if(this.m_error_overlays){
+			for(var i=0;i<this.m_error_overlays.length;i++){
+				var err=this.m_error_overlays[i];
+				var ccnt_err0=err.ccnt0.ccnt;
+				var ccnt_err1=err.ccnt1.ccnt;
+				if(ccnt_err0<=ccnt&&ccnt<=ccnt_err1){continue;}
+				propose(ccnt_err0);
+			}
+		}
+		//spell error
+		//todo: native searcher - call colorer, find word, test color, spell check
+		//actually go there
+		if(ccnt_next==undefined){return 1;}
 		if(is_sel){
-			this.SetSelection(ccnt,bm.ccnt)
+			this.SetSelection(ccnt,ccnt_next)
 		}else{
-			UI.SetSelectionEx(this,bm.ccnt,bm.ccnt,"bookmark")
+			UI.SetSelectionEx(this,ccnt_next,ccnt_next,"poi")
 		}
 		return 0;
 	}
-	this.AddEventHandler('F2',function(){fnextbm.call(this)})
-	var fprevbm=function(is_sel){
-		var ccnt=this.sel1.ccnt;
-		var bm=this.FindNearestBookmark(ccnt-1,-1)
-		if(!bm){return 1;}
-		if(is_sel){
-			this.SetSelection(ccnt,bm.ccnt)
-		}else{
-			UI.SetSelectionEx(this,bm.ccnt,bm.ccnt,"bookmark")
-		}
-		return 0;
-	}
-	this.AddEventHandler('SHIFT+F2',function(){fprevbm.call(this)})
+	this.AddEventHandler('SHIFT+F2',function(){fnextbm.call(this,-1)})
+	this.AddEventHandler('F2',function(){fnextbm.call(this,1)})
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var menu_search=UI.BigMenu("&Search")
 			var doc=this;
 			menu_search.AddSeparator();
-			menu_search.AddButtonRow({text:"Go to bookmark"},[
+			menu_search.AddButtonRow({text:"Go to point of interest"},[
 				{text:"bookmark_up",icon:"上",tooltip:'Prev - SHIFT+F2',action:function(){
-					fprevbm.call(doc)
+					fnextbm.call(doc,-1)
 				}},{text:"bookmark_down",icon:"下",tooltip:'Next - F2',action:function(){
-					//text:"&select to"
-					fnextbm.call(doc)
-				}}])
-			menu_search.AddButtonRow({text:"Select to bookmark"},[
-				{text:"bookmark_sel_up",icon:"上",tooltip:'Prev',action:function(){
-					fprevbm.call(doc,1)
-				}},{text:"bookmark_sel_down",icon:"下",tooltip:'Next',action:function(){
 					//text:"&select to"
 					fnextbm.call(doc,1)
 				}}])
+			menu_search.AddButtonRow({text:"Select to point of interest"},[
+				{text:"bookmark_sel_up",icon:"上",tooltip:'Prev',action:function(){
+					fnextbm.call(doc,-1,1)
+				}},{text:"bookmark_sel_down",icon:"下",tooltip:'Next',action:function(){
+					//text:"&select to"
+					fnextbm.call(doc,1,1)
+				}}])
 		}
 	})
-}).prototype.name="Bookmarks";
+}).prototype.name="Point of interest";
 
 ////////////////////////////////////
 //C-like
@@ -2317,7 +2389,8 @@ UI.RegisterEditorPlugin(function(){
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				var ed_caret_original=this.GetCaretXY();
 				var scroll_y_original=this.scroll_y;
-				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
+				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0,this)
+				this.caret_is_wrapped=0
 				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
 				var ed_caret_new=this.GetCaretXY();
 				this.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
@@ -2344,7 +2417,7 @@ var ApplyAutoEdit=function(obj,cur_autoedit_ops,line_id){
 	var delta=0;
 	for(var i=0;i<cur_autoedit_ops.length;i+=3){
 		var ccnt=cur_autoedit_ops[i];
-		if(ccnt>=ccnt0&&ccnt<ccnt1){
+		if(ccnt>=ccnt0&&ccnt<=ccnt1){
 			var s=cur_autoedit_ops[i+2];
 			var sz=cur_autoedit_ops[i+1];
 			ops_now.push(cur_autoedit_ops[i],sz,s)
@@ -2393,7 +2466,7 @@ UI.RegisterEditorPlugin(function(){
 		this.m_autoedit_locators=locs;
 		for(var i=0;i<cclines.length;i++){
 			//create locators
-			locs[i]=this.ed.CreateLocator(cclines[i],-1)
+			locs[i]=this.ed.CreateLocator(cclines[i],i&1?1:-1)
 		}
 		//render the stuff - gives some structural understanding
 		if(mode=="explicit"){
@@ -2414,15 +2487,16 @@ UI.RegisterEditorPlugin(function(){
 		//still-in-range test
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
-			if(this.m_autoedit_example_line_id>=0){
+			if(this.m_autoedit_mode=="explicit"){
+				//if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt)
+				//if(ccnt_lh==locs[0].ccnt){
+				//	return;
+				//}
+				return;
+			}else if(this.m_autoedit_example_line_id>=0){
 				var line_id=this.m_autoedit_example_line_id;
 				//if(ccnt_lh>=locs[line_id+0].ccnt&&ccnt_lh<locs[line_id+1].ccnt)
 				if(ccnt_lh==locs[line_id+0].ccnt){
-					return;
-				}
-			}else if(this.m_autoedit_mode=="explicit"){
-				//if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt)
-				if(ccnt_lh==locs[0].ccnt){
 					return;
 				}
 			}else{
@@ -2436,10 +2510,17 @@ UI.RegisterEditorPlugin(function(){
 		//could allow multi-exampling this
 		InvalidateAutoEdit.call(this)
 	})
-	this.AddEventHandler('beforeEdit',function(){
+	this.AddEventHandler('beforeEdit',function(ops){
 		this.m_autoedit_example_line_id=-1
 		var ctx=this.m_autoedit_context
 		if(!ctx&&this.m_detect_autoedit_at!=undefined){
+			for(var i=0;i<ops.length;i+=3){
+				var s=ops[i+2];
+				if(s&&s.indexOf('\n')>=0){
+					//op with enter doesn't trigger AC
+					return;
+				}
+			}
 			ctx=UI.ED_AutoEdit_Detect(this.ed,this.m_detect_autoedit_at)
 			if(ctx){
 				this.m_autoedit_context=ctx
@@ -2504,7 +2585,7 @@ UI.RegisterEditorPlugin(function(){
 			var line_id=-1;
 			//the line(s) intersected by ops... multi-line edit should cancel it
 			for(var i=0;i<locs.length;i+=2){
-				if(locs[i+1].ccnt>sel[1]){
+				if(locs[i+1].ccnt>=sel[1]){
 					if(locs[i+0].ccnt<=sel[0]){
 						line_id=i
 						break
@@ -2549,6 +2630,10 @@ UI.RegisterEditorPlugin(function(){
 				}}])
 			
 		}
+	})
+	this.AddEventHandler('ESC',function(){
+		InvalidateAutoEdit.call(this)
+		return 1
 	})
 	///////////////
 	var EnterVSel=(function(){
