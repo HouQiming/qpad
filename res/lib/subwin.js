@@ -187,6 +187,11 @@ W.TabbedDocument_prototype={
 		active_document.Save()
 		return !active_document.need_save
 	},
+	SaveAs:function(){
+		var active_document=this.active_tab;
+		active_document.SaveAs()
+		return !active_document.need_save
+	},
 	SaveAll:function(){
 		var ret=1
 		for(var i=0;i<this.items.length;i++){

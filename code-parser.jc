@@ -609,15 +609,18 @@ auto tokenize(string sdata,int g_ignore_indents)
 			if(ch=='='){ptr++;ch0=TOK_DIV_EQ;break;}
 			if ch=='/':
 				ptr++
+				efeed0=ptr
 				for(;;)
 					ch=int(feed[ptr])
 					if ch==0||ch=='\n':break
 					ptr++
 				if last_significant_newline_position==toks.n:
 					last_line_comment_position=toks.n
+				//parseComment(feed,efeed0,ptr+1)
 				continue
 			if ch=='*':{
 				ptr++
+				efeed0=ptr
 				auto c=0;
 				for(;;)
 					ch=int(feed[ptr])
@@ -625,18 +628,21 @@ auto tokenize(string sdata,int g_ignore_indents)
 					ptr++
 					if ch=='/'&&c=='*':break;
 					c=ch;
+				//parseComment(feed,efeed0,ptr)
 				continue
 			}
 			break;
 		case '#':
 			//# as comment for Python, shell and C/C++
 			pword=-1L
+			efeed0=ptr
 			for(;;)
 				ch=int(feed[ptr])
 				if ch==0||ch=='\n':break
 				if pword<0&&ch!=' '&&ch!='\t':
 					pword=ptr
 				ptr++
+			//parseComment(feed,efeed0,ptr)
 			if last_significant_newline_position==toks.n:
 				last_line_comment_position=toks.n
 			//C macro recognition: #define, #include
@@ -744,6 +750,63 @@ auto tokenize(string sdata,int g_ignore_indents)
 	//toks.push(TToken(){'tok':TOK_EOF,'epos0':int(ptr),'epos1':int(ptr)})
 	push_token(TOK_EOF,int(ptr),int(ptr))
 	return toks
+
+/*
+auto parseComment(u8[] feed,int ptr0,int ptr_end)
+	//find the convention strings
+	inline skipchars(u32[] cs)
+		while ptr<feed.n
+			ch=int(u8(feed[ptr]))
+			if !CharSet.has(cs,ch):return
+			ptr++
+	is_first=0
+	ptr=ptr0
+	toks=new int[]
+	for(;ptr<ptr_end;)
+		skipchars(is_first?CharSet.spaces_newline:CharSet.spaces)
+		ch=int(feed[ptr])
+		//id
+		if CharSet.has(CharSet.idbody,ch):
+			s=ptr
+			ptr++
+			skipchars(CharSet.idbody)
+			if is_first:
+				if ptr==s+2&&feed[s]=='w'&&feed[s+1]=='e':
+					//trigger word: we
+				else
+					break
+			id=getid(feed[s:ptr-1].ConvertToAsBinary(char))
+			toks.push(TOK_ID+id)
+			continue
+		ch0=ch
+		if !ch0:break
+		epos0_ch0=ptr
+		ptr++;ch=int(feed[ptr])
+		switch ch0{
+		default:
+			break;//nothing
+		case ':':
+			ptr++
+			skipchars(CharSet.spaces)
+			toks.push(TOK_STRING+ptr)
+			continue;
+		case '\n':
+			ch0=';'
+			break;
+		}
+		toks.push(int(ch0))
+	if toks.n:
+		!? //where do we keep the result... return from tokenize
+		//generate tokens for function correspondence
+		parseConvention(toks)
+
+class CConventionList
+	!?
+auto parseConvention(int[] toks)
+	//for each line, search key word
+	//ignore we say
+	!?
+*/
 
 //////////////////////////////////////////////////////////////////
 /*

@@ -1201,6 +1201,7 @@ W.CodeEditorWidget_prototype={
 			//no needle, no find
 			return;
 		}
+		this.m_hide_find_highlight=0
 		this.m_no_more_replace=0
 		this.DestroyReplacingContext()
 		var doc=this.doc
@@ -3658,8 +3659,10 @@ W.CodeEditor=function(id,attrs){
 	return obj
 }
 
+var g_new_id=0
 UI.NewCodeEditorTab=function(fname0){
-	var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
+	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
+	var file_name=fname0||("<New #"+(g_new_id++).toString()+">")
 	DetectRepository(file_name)
 	return UI.NewTab({
 		file_name:file_name,
@@ -3725,12 +3728,28 @@ UI.NewCodeEditorTab=function(fname0){
 		},
 		Save:function(){
 			if(!this.main_widget){return;}
+			if(this.main_widget.file_name&&this.main_widget.file_name.indexOf('<')>=0){
+				this.SaveAs()
+				return
+			}
 			this.main_widget.Save();
 			var doc=this.main_widget.doc;
 			this.need_save=0
 			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
 				this.need_save=1
 			}
+		},
+		SaveAs:function(){
+			if(!this.main_widget){return;}
+			var fn=IO.DoFileDialog(["All File","*.*"],
+				this.main_widget.file_name.indexOf('<')>=0?
+					UI.m_new_document_search_path+"/*":
+					this.main_widget.file_name,
+				"",1);
+			if(!fn){return;}
+			this.file_name=fn
+			this.main_widget.file_name=fn
+			this.Save()
 		},
 		SaveMetaData:function(){
 			if(this.main_widget){this.main_widget.SaveMetaData();}
@@ -3780,9 +3799,14 @@ UI.OnApplicationSwitch=function(){
 			if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
 				if(obj.doc.ed.saving_context){continue;}//saving docs are OK
 				//reload
-				if(obj_tab.need_save){
+				if(!IO.FileExists(obj.file_name)){
+					//make a notification
+					obj.CreateNotification({id:'saving_progress',icon:'警',text:"IT'S DELETED!\nSave your changes to dismiss this"})
+					obj.doc.saved_point=-1;
+				}else if(obj_tab.need_save){
 					//make a notification
 					obj.CreateNotification({id:'saving_progress',icon:'警',text:"FILE CHANGED OUTSIDE!\n - Use File-Revert to reload\n - Save your changes to dismiss this"})
+					obj.doc.saved_point=-1;
 				}else{
 					//what is reload? nuke it
 					obj.Reload()

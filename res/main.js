@@ -791,13 +791,19 @@ UI.Application=function(id,attrs){
 				UI.Refresh()
 			}})
 			menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
-				var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
+				//var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
+				//if(!fn){return;}
+				UI.UpdateNewDocumentSearchPath()
+				var fn=IO.DoFileDialog(["All File","*.*"],UI.m_new_document_search_path+"/*");
 				if(!fn){return;}
 				UI.OpenFile(fn.replace(new RegExp("\\\\","g"),"/"));
 				UI.Refresh()
 			}});
 			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
 				app.document_area.SaveCurrent();
+			}});
+			menu_file.AddNormalItem({text:"Save &as...",key:"CTRL+SHIFT+S",enable_hotkey:1,action:function(){
+				app.document_area.SaveAs();
 			}});
 			menu_file.AddNormalItem({text:"Save a&ll",icon:'保',action:function(){
 				app.document_area.SaveAll();
