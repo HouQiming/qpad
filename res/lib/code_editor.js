@@ -308,7 +308,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	//////////////////////////
 	HookedEdit:function(ops){
-		var obj=this.owner
+		var obj=this.owner
 		if(obj){
 			if(obj.read_only){return;}
 			if(this.saved_point>this.ed.GetUndoQueueLength()){
@@ -323,7 +323,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			}
 		}
 		this.ed.Edit(ops);
-	},
+	},
 })
 
 W.MinimapThingy_prototype={
@@ -527,7 +527,7 @@ W.CodeEditorWidget_prototype={
 		//doc.OnLoad=obj.OnLoad.bind(obj)
 		doc.StartLoading(this.file_name)
 		doc.AddEventHandler('beforeEdit',function(ops){
-			var obj=this.owner
+			var obj=this.owner
 			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_no_more_replace){
 				var match_id=obj.BisectMatches(ops[0])
 				if(match_id){
@@ -561,7 +561,7 @@ W.CodeEditorWidget_prototype={
 			}
 		})
 		doc.AddEventHandler('change',function(){
-			var obj=this.owner
+			var obj=this.owner
 			if(obj.m_current_find_context){
 				obj.m_current_find_context.Cancel()
 				obj.m_current_find_context=undefined
@@ -576,7 +576,7 @@ W.CodeEditorWidget_prototype={
 			renderer.m_hidden_ranges_prepared=0
 		})
 		doc.AddEventHandler('ESC',function(){
-			var obj=this.owner
+			var obj=this.owner
 			obj.m_notifications=[]
 			obj.m_ac_context=undefined
 			this.m_user_just_typed_char=0
@@ -1258,6 +1258,13 @@ W.CodeEditorWidget_prototype={
 			var ed=this.doc.ed
 			sel[0]=this.doc.SkipInvisibles(ccnt,-1);
 			sel[0]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[0],-1),-1,"word_boundary_left"),-1)
+			////print('SkipInvisibles',sel[0],ccnt)
+			//sel[0]=ed.SnapToCharBoundary(sel[0],-1);
+			////print('SnapToCharBoundary',sel[0],ccnt)
+			//sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left");
+			////print('word_boundary_left',sel[0],ccnt)
+			//sel[0]=this.doc.SnapToValidLocation(sel[0],-1);
+			////print('SnapToValidLocation',sel[0],ccnt)
 			sel[1]=this.doc.SkipInvisibles(ccnt,1);
 			sel[1]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[1],1),1,"word_boundary_right"),1)
 		}

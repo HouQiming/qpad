@@ -431,7 +431,7 @@ class CLayouter_programmer
 		if Platform.BUILD=="debug":
 			if !m_lang:
 				obj.GetContext().evalVoid("UI.DumpCallStack()","<stack>")
-		m_cached_colors_p_word_part=m_lang.m_coloring_rules.n+1
+		m_cached_colors_p_word_part=int(m_lang.m_coloring_rules.n+1)
 		m_cached_colors=new int[m_cached_colors_p_word_part+m_lang.m_word_color_names.n]
 		m_cached_colors[0]=obj[m_lang.m_default_color_name].or(0xff000000)
 		foreach crule,I in m_lang.m_coloring_rules
@@ -2904,7 +2904,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ccnt0=(locs[i].as(CLocator)).ccnt
 			ccnt1=(locs[i+1].as(CLocator)).ccnt
 			(s_unicode,nbras_old)=TextToAutoEditText(1,1,ed.GetText(i64(ccnt0),i64(ccnt1-ccnt0)))
-			if !AutoEdit_Evaluate(ops,i64(ccnt0), ctx, prg, i>>1,s_unicode,nbras_old):
+			if !AutoEdit_Evaluate(ops,i64(ccnt0), ctx, prg, int(i)>>1,s_unicode,nbras_old):
 				break
 		ret=JS.NewArray()
 		foreach op,I in ops

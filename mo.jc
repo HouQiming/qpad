@@ -171,7 +171,7 @@ if Platform.BUILD=="debug":
 			else
 				s_userdir=s_userdir.Replace(["\\","/"])
 		else
-			s_userdir=System.Env.GetStoragePath()
+			s_userdir=System.Env.ExpandEnvironmentStrings("${HOME}")
 		if !fn_base||!s_ext:
 			return JS.Return(s_userdir)
 		fn_base=s_userdir+"/"+fn_base
@@ -241,7 +241,7 @@ if Platform.BUILD=="debug":
 			s_def_ext=new(JS.Param(2).or(""))
 			is_save=JS.Param(3).or(0)
 			///////////
-			s_ret=new char[512]
+			s_ret=new char[512]
 			if !osal_DoFileDialogMac(s_ret,s_ret.n,is_save):
 				return 0
 			p=s_ret.IndexOf(char(0))

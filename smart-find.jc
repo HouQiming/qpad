@@ -87,19 +87,19 @@ module detail
 		auto Search(CReplaceContext owner,i32[] s,int[] nbras,iptr id)
 			if id<0:
 				seq=~id
-				nbra0=0L
+				nbra0=0
 				foreach ch,I in s.ReverseOrder()
 					if I<s.n-1:
 						if Matches(owner,s,I+1,nbra0):
 							if !seq--:return I+1
-					nbra0=nbras[I]
+					nbra0=int(nbras[I])
 			else
 				seq=id
 				foreach ch,I in s
 					if I:
 						if Matches(owner,s,I,nbras[I]):
 							if !seq--:return I
-			return -1
+			return -1L
 	
 	(TPositionDescriptor<TPositionDescriptor)=inline(a,b){
 		return a.tok0<b.tok0||a.tok0==b.tok0&&(a.tok1<b.tok1||a.tok1==b.tok1&&a.nbra0<b.nbra0)
@@ -375,7 +375,7 @@ module detail
 				if bcost>cost||best<0:
 					bcost=cost
 					best=I
-			return ((best<0L?TRuleMatch(){id:-1,cnt:-1}:rmatches[best]),bcost)
+			return ((best<0L?TRuleMatch(){id:-1L,cnt:-1L}:rmatches[best]),bcost)
 		/////////////////////////////////////////
 		auto SetReplaceExample(iptr input_id,int[] target_unicode,function(int):int isalnum)
 			//todo: multi-exampling, better numbering
@@ -398,7 +398,7 @@ module detail
 					if ppd.a.Matches(this,s0,i,nbra):
 						if J==m_poses_union.n-1:
 							if !(i==1||i==s0.n-1):continue
-						matched_rules.push(TRuleMatch(){id:J,cnt:counts[J]})
+						matched_rules.push(TRuleMatch(){id:J,cnt:iptr(counts[J])})
 						//Write(J,' ')
 						counts[J]++
 				//Writeln()
@@ -450,7 +450,7 @@ module detail
 					ret0=best_rule_for_pos[p0-1]
 					ret1=bcost_rule_for_pos[p0-1]
 				else
-					ret0=TRuleMatch(){id:-1,cnt:-1}
+					ret0=TRuleMatch(){id:-1L,cnt:-1L}
 					ret1=0.f
 				return (ret0,ret1)
 			costs=new float[s1.n+1]
@@ -657,7 +657,7 @@ module detail
 				//-2: carry
 				//-1+: take and goto
 				st=new TMatchDPState[(raw_matches.n+1)*s.n]
-				st[0].how=0
+				st[0].how=0L
 				for i=0:raw_matches.n
 					pst=i*s.n+1+!i
 					for j=1+!i:s.n-1
@@ -941,7 +941,7 @@ module detail
 						n_covered=0
 						for j=I_word0:I-1
 							n_covered+=s1_covered[j]
-						wt_word=(I-I_word0)*WEIGHT_WORD_CHAR*2
+						wt_word=int(I-I_word0)*WEIGHT_WORD_CHAR*2
 						if !n_covered:
 							//do nothing
 						else if n_covered==I-I_word0:
@@ -979,7 +979,7 @@ module detail
 						I_word0=I
 				else
 					if I_word0>=0L:
-						wt_word=(I-I_word0)*WEIGHT_WORD_CHAR*2
+						wt_word=int(I-I_word0)*WEIGHT_WORD_CHAR*2
 						wt_total_alnum+=wt_word
 					I_word0=-1L
 					if I<s1.n:
