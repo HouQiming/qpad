@@ -1826,6 +1826,7 @@ var FileItem_prototype={
 		obj.m_language_id=undefined
 		obj.m_is_brand_new=undefined;
 		obj.m_is_preview=undefined;
+		UI.top.app.quit_on_zero_tab=0;
 		UI.m_current_file_list=undefined
 		UI.Refresh()
 	},
@@ -2142,6 +2143,7 @@ W.SXS_NewPage=function(id,attrs){
 						for(var i=0;i<files.length;i++){
 							var fn_switchto=files[i].name_to_find
 							files[i].relevance+=(tabswitch_count[fn_switchto]||0)/Math.max(tabswitch_count["$"],UI.MAX_TAB_SWITCH_COUNT)*FILE_RELEVANCE_SWITCH_SCORE
+							print((tabswitch_count[fn_switchto]||0)/Math.max(tabswitch_count["$"],UI.MAX_TAB_SWITCH_COUNT)*FILE_RELEVANCE_SWITCH_SCORE)//todo
 						}
 					}
 					var repos=g_repo_from_file[fn_current]
@@ -3305,7 +3307,7 @@ W.CodeEditor=function(id,attrs){
 				menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:0,key:"CTRL+Z",action:function(){
 					doc.Undo()
 				}})
-				menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:0,key:"CTRL+SHIFT+Z",action:function(){
+				menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:0,key:"SHIFT+CTRL+Z",action:function(){
 					doc.Redo()
 				}})
 				///////////////////////
@@ -3424,7 +3426,7 @@ W.CodeEditor=function(id,attrs){
 				if(obj.m_replace_context){
 					//menu_search.AddSeparator()
 					menu_search.AddButtonRow({text:"Replace"},[
-						{key:"CTRL+SHIFT+D",text:"replace_up",icon:"上",tooltip:'Prev - CTRL+SHIFT+D',action:function(){
+						{key:"SHIFT+CTRL+D",text:"replace_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+D',action:function(){
 							obj.DoReplaceFromUI(-1)
 						}},{key:"ALT+A",text:"all",tooltip:'ALT+A',action:function(){
 							obj.DoReplaceFromUI(0)
@@ -3671,6 +3673,7 @@ UI.NewCodeEditorTab=function(fname0){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
 	var file_name=fname0||("<New #"+(g_new_id++).toString()+">")
 	DetectRepository(file_name)
+	UI.top.app.quit_on_zero_tab=0;
 	return UI.NewTab({
 		file_name:file_name,
 		title:UI.RemovePath(file_name),

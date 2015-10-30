@@ -1079,7 +1079,7 @@ UI.RegisterEditorPlugin(function(){
 			var menu_edit_children=menu_edit.$
 			var bk_children=menu_edit_children.slice(menu_edit.p_paste,menu_edit_children.length)
 			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste)
-			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"CTRL+SHIFT+V",action:function(){
+			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"SHIFT+CTRL+V",action:function(){
 				var sel=this.GetSelection();
 				var ed=this.ed;
 				/*
@@ -1425,7 +1425,7 @@ UI.RegisterEditorPlugin(function(){
 	//the numbered guys
 	for(var i=0;i<10;i++){
 		(function(i){
-			this.AddEventHandler('CTRL+SHIFT+'+i.toString(),function(){
+			this.AddEventHandler('SHIFT+CTRL+'+i.toString(),function(){
 				var ed=this.ed;
 				var ccnt=this.sel1.ccnt;
 				if(!this.m_bookmarks[i]){
@@ -1456,7 +1456,7 @@ UI.RegisterEditorPlugin(function(){
 		}).call(this,i)
 	}
 	//the unmarked guys
-	this.AddEventHandler('CTRL+SHIFT+Q',function(){
+	this.AddEventHandler('SHIFT+CTRL+Q',function(){
 		var ed=this.ed;
 		var ccnt=this.sel1.ccnt;
 		var bm0=this.FindNearestBookmark(ccnt,1)
@@ -1689,7 +1689,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,0)})
-	this.AddEventHandler('CTRL+SHIFT+P',function(){goto_matching_bracket.call(this,1)})
+	this.AddEventHandler('SHIFT+CTRL+P',function(){goto_matching_bracket.call(this,1)})
 }).prototype.name="Parenthesis matching";
 
 var CountSpacesAfter=function(ed,ccnt){
@@ -2189,6 +2189,7 @@ UI.RegisterEditorPlugin(function(){
 			}else{
 				ccnt=this.sel1.ccnt+1;
 			}
+			if(ccnt>this.ed.GetTextSize()){return 0;}
 			//auto-delete spaces after enter
 			var ed=this.ed;
 			if(this.plugin_class=="code_editor"&&this.m_is_main_editor){
@@ -2320,7 +2321,7 @@ UI.RegisterEditorPlugin(function(){
 			var menu_edit=UI.BigMenu("&Edit")
 			if(sel[0]<sel[1]){
 				menu_edit.AddSeparator()
-				menu_edit.AddNormalItem({text:"Wide char ↔ \\u",icon:"Ｕ",enable_hotkey:1,key:"CTRL+SHIFT+U",action:function(){
+				menu_edit.AddNormalItem({text:"Wide char ↔ \\u",icon:"Ｕ",enable_hotkey:1,key:"SHIFT+CTRL+U",action:function(){
 					var ed=this.ed;
 					var sel=this.GetSelection();
 					if(sel[0]<sel[1]){
@@ -2364,6 +2365,7 @@ UI.RegisterEditorPlugin(function(){
 						var ssret=sret.join("")
 						this.HookedEdit([sel[0],sel[1]-sel[0],ssret])
 						this.SetSelection(sel[0],sel[0]+Duktape.__byte_length(ssret))
+						this.CallOnChange()
 						this.AutoScroll("show")
 						UI.Refresh()
 					}
@@ -2383,7 +2385,7 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit.AddNormalItem({
 					text:"Auto &wrap",
 					icon:this.owner.m_enable_wrapping?"对":undefined,
-					enable_hotkey:1,key:"CTRL+SHIFT+W",
+					enable_hotkey:1,key:"SHIFT+CTRL+W",
 					action:function(){
 				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
@@ -2597,7 +2599,7 @@ UI.RegisterEditorPlugin(function(){
 			var this_outer=this;
 			menu_edit.AddSeparator()
 			menu_edit.AddButtonRow({text:"Replace"},[
-				{key:"CTRL+SHIFT+D",text:"prev",tooltip:'CTRL+SHIFT+D',action:function(){
+				{key:"SHIFT+CTRL+D",text:"prev",tooltip:'SHIFT+CTRL+D',action:function(){
 					if(line_id>0){
 						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id-2)
 						renderer.ResetTentativeOps()

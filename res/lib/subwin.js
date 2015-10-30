@@ -397,7 +397,7 @@ W.TabbedDocument=function(id,attrs){
 					if(s_text){
 						var p_and=s_text.indexOf('&')
 						if(p_and>=0){
-							W.Hotkey("",{key:"ALT+"+s_text.substr(p_and+1,1).toUpperCase(),action:function(){
+							W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:function(){
 								obj.m_is_in_menu=1;
 								obj.m_menu_preselect=i
 								//g_menu_action_invoked=0;
@@ -550,7 +550,7 @@ W.TabbedDocument=function(id,attrs){
 			UI.Refresh()
 		}});
 		for(var i=0;i<items.length&&i<10;i++){(function(i){
-			W.Hotkey("",{key:"ALT+"+String.fromCharCode(48+(i+1)%10),action:function(){
+			W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"WIN+":"ALT+")+String.fromCharCode(48+(i+1)%10),action:function(){
 				obj.SetTab(i)
 				UI.Refresh()
 			}})
@@ -665,14 +665,17 @@ W.CFancyMenuDesc.prototype={
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0&&attrs.action){
 			//underlined hotkey
-			children.push(
-				{type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action},
-				{type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
+			children.push({type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
+			if(UI.Platform.ARCH!="mac"){
+				children.push({type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
+			}
 		}
 		if(attrs.key){
 			children.push(
 				{type:'rubber'},
-				{type:'text',text:UI.LocalizeKeyName(attrs.key),color:style.hotkey_color,sel_color:style.hotkey_sel_color})
+				{type:'text',
+					text:UI.LocalizeKeyName(UI.TranslateHotkey(attrs.key)),
+					color:style.hotkey_color,sel_color:style.hotkey_sel_color})
 			if(attrs.enable_hotkey&&attrs.action){W.Hotkey("",{key:attrs.key,action:attrs.action})}
 		}
 		children.push({type:'newline',action:attrs.action})
@@ -694,9 +697,10 @@ W.CFancyMenuDesc.prototype={
 				var p_and=button_i.text.indexOf('&')
 				if(p_and>=0){
 					//underlined hotkey
-					children.push(
-						{type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action},
-						{type:'hotkey',key:'ALT+'+button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
+					children.push({type:'hotkey',key:button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
+					if(UI.Platform.ARCH!="mac"){
+						children.push({type:'hotkey',key:'ALT+'+button_i.text.substr(p_and+1,1).toUpperCase(),action:button_i.action})
+					}
 				}
 			}
 			if(button_i.key){
@@ -716,6 +720,9 @@ UI.BigMenu=function(){
 	var style=UI.default_styles['fancy_menu']
 	for(var i=0;i<arguments.length;i++){
 		var name=arguments[i]
+		//if(UI.Platform.ARCH=="mac"){
+		//	name=name.replace('&','')
+		//}
 		if(!menu[name]){
 			//if(menu==UI.m_global_menu){
 			//}else{

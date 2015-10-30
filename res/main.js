@@ -19,7 +19,7 @@ UI.Theme_CustomWidget=function(C){
 	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.66)
 	var custom_styles={
 		tooltip:{
-			font:UI.Font(UI.font_name,24,-100),
+			font:UI.Font(UI.font_name,24,-50),
 			padding:8,
 			spacing:8,
 			color:0xffffffff,
@@ -65,7 +65,7 @@ UI.Theme_CustomWidget=function(C){
 			transition_dt:0.1,
 			shadow_size:8,
 			hotkey_font:UI.Font(UI.font_name,12,0),
-			font:UI.Font(UI.font_name,24,-100), padding:16,
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,22,-100):UI.Font(UI.font_name,24,-50), padding:16,
 			$:{
 				active:{
 					text_color:0xffffffff,
@@ -131,9 +131,9 @@ UI.Theme_CustomWidget=function(C){
 			space_dlg_rect:56,
 			round_dlg_rect:32,
 			color_dlg_rect:0xf0ffffff,
-			font_text:UI.Font(UI.font_name,40,-100),
+			font_text:UI.Font(UI.font_name,40,-50),
 			text_color:0xff000000,
-			font_buttons:UI.Font(UI.font_name,24,-100),
+			font_buttons:UI.Font(UI.font_name,24,-50),
 			space_middle:40,
 			space_button:96,
 			h_button:32,
@@ -453,7 +453,7 @@ UI.Theme_CustomWidget=function(C){
 			round:4,
 			text_color:0xff444444,
 			progress_color:C_sel,
-			font:UI.Font(UI.font_name,20,-100),
+			font:UI.Font(UI.font_name,20,0),
 			icon_color:0xff000000,
 			icon_font:UI.Font('res/fonts/iconfnt.ttf,!',20),
 			icon:'告',
@@ -467,7 +467,7 @@ UI.Theme_CustomWidget=function(C){
 			border_width:0,
 			color:0xffffffff,
 			editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",16,-100),
+				font:UI.Font("res/fonts/inconsolata.ttf",16,-50),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,100),
 				scroll_transition_dt:0.1,
 				bgcolor_selection:C_sel,
@@ -510,9 +510,9 @@ UI.Theme_CustomWidget=function(C){
 		file_item:{
 			h:56,h_icon:48,
 			file_icon_color:0xff444444,
-			name_font:UI.Font(UI.font_name,24,-50),
-			name_font_bold:UI.Font(UI.font_name,24,100),
-			misc_font:UI.Font(UI.font_name,18,-50),
+			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
+			name_font_bold:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,100):UI.Font(UI.font_name,24,100),
+			misc_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,16,-50):UI.Font(UI.font_name,18,-50),
 			name_color:0xff000000,
 			misc_color:0xff7f7f7f,
 			basepath_color:0xffcccccc,
@@ -526,7 +526,7 @@ UI.Theme_CustomWidget=function(C){
 			tag_border_width:0,
 			button_style:{
 				transition_dt:0.1,
-				font:UI.Font(UI.font_name,24,-50),
+				font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
 				round:0,border_width:2,padding:6,
 				color:0,
 				$:{
@@ -549,7 +549,7 @@ UI.Theme_CustomWidget=function(C){
 			//nothing
 		},
 		top_menu_item:{
-			font:UI.Font(UI.font_name,22,-100),
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
 			padding:8,
 			$:{
 				active:{
@@ -569,7 +569,7 @@ UI.Theme_CustomWidget=function(C){
 			shadow_color:0xaa000000,
 			shadow_size:12,
 			///////////
-			font:UI.Font(UI.font_name,22,-100),
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
 			text_color:0xff000000,
 			text_sel_color:0xffffffff,
 			icon_color:C[0],
@@ -591,7 +591,7 @@ UI.Theme_CustomWidget=function(C){
 			button_style:{
 				transition_dt:0.1,
 				round:0.1,border_width:1,padding:0,
-				font:UI.Font(UI.font_name,20,-100),
+				font:UI.Font(UI.font_name,20,-50),
 				icon_font:UI.Font(UI.icon_font_name,18),
 				$:{
 					out:{
@@ -655,9 +655,63 @@ if(UI.Platform.BUILD=="debug"){
 }
 UI.icon_font=UI.Font(UI.icon_font_name,24);
 UI.icon_font_20=UI.Font(UI.icon_font_name,20);
-UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf'])
-UI.font_name="res/fonts/opensans.ttf"
-UI.eng_font_name="res/fonts/opensans.ttf,!"
+UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
+if(UI.Platform.ARCH=="mac"){
+	UI.font_name="LucidaGrande,res/fonts/opensans.ttf"
+	UI.eng_font_name="LucidaGrande,res/fonts/opensans.ttf,!"
+}else{
+	UI.font_name="res/fonts/opensans.ttf"
+	UI.eng_font_name="res/fonts/opensans.ttf,!"
+}
+
+if(UI.Platform.ARCH=="mac"){
+	UI.g_hotkey_map={
+		"CTRL+N":"WIN+N",
+		"CTRL+O":"WIN+O",
+		"CTRL+W":"WIN+W",
+		"CTRL+S":"WIN+S",
+		"SHIFT+CTRL+S":"SHIFT+WIN+S",
+		////////////////
+		"CTRL+C":"WIN+C",
+		"CTRL+V":"WIN+V",
+		"SHIFT+CTRL+V":"SHIFT+WIN+V",
+		"CTRL+X":"WIN+X",
+		"CTRL+Z":"WIN+Z",
+		"SHIFT+CTRL+Z":"SHIFT+WIN+Z",
+		"CTRL+A":"WIN+A",
+		"CTRL+L":"WIN+L",
+		"CTRL+T":"WIN+T",
+		"CTRL+K":"WIN+K",
+		"SHIFT+CTRL+U":"SHIFT+WIN+U",
+		"CTRL+D":"WIN+D",
+		"SHIFT+CTRL+D":"SHIFT+WIN+D",
+		////////////////
+		"SHIFT+CTRL+O":"SHIFT+WIN+O",
+		//"ALT+Q":"SHIFT+WIN+O",
+		"ALT+C":"CTRL+C",
+		"ALT+H":"CTRL+H",
+		"ALT+E":"CTRL+E",
+		////////////////
+		"CTRL+F":"WIN+F",
+		"CTRL+G":"WIN+G",
+		////////////////
+		"F7":"SHIFT+WIN+B",
+		"CTRL+F5":"SHIFT+WIN+R",
+		////////////////
+		"CTRL+LEFT":"ALT+LEFT",
+		"CTRL+RIGHT":"ALT+RIGHT",
+		"ALT+LEFT":"WIN+LEFT",
+		"ALT+RIGHT":"WIN+RIGHT",
+		////////////////
+		"CTRL+SHIFT+TAB":"SHIFT+WIN+LEFT",
+		"CTRL+TAB":"SHIFT+WIN+RIGHT",
+	}
+}else{
+	UI.g_hotkey_map={}
+}
+UI.TranslateHotkey=function(s){
+	return UI.g_hotkey_map[s]||s;
+}
 
 var g_all_document_windows=[];
 UI.g_all_document_windows=g_all_document_windows
@@ -682,13 +736,13 @@ UI.ZoomReset=function(){
 	UI.UpdateZoom()
 }
 
-var g_app_inited=0
+var g_app_inited=0;
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
 		///////////////////
 		var app=UI.Begin(W.Window('app',{
-				title:'UI Editor',w:1280,h:720,bgcolor:0xfff0f0f0,icon:"res/icon256.png",
+				title:'QPad',w:1280,h:720,bgcolor:0xfff0f0f0,icon:"res/icon256.png",
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1,
 				OnWindowBlur:function(){
@@ -802,7 +856,7 @@ UI.Application=function(id,attrs){
 			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
 				app.document_area.SaveCurrent();
 			}});
-			menu_file.AddNormalItem({text:"Save &as...",key:"CTRL+SHIFT+S",enable_hotkey:1,action:function(){
+			menu_file.AddNormalItem({text:"Save &as...",key:"SHIFT+CTRL+S",enable_hotkey:1,action:function(){
 				app.document_area.SaveAs();
 			}});
 			menu_file.AddNormalItem({text:"Save a&ll",icon:'保',action:function(){
@@ -845,15 +899,18 @@ UI.Application=function(id,attrs){
 						//mac
 						//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
 						IO.Shell(["osascript",
-							"-e",'tell application "Terminal" to activate',
-							"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down',
-							"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'
-						])
+							"-e",'tell application "Terminal" to activate'])
+						IO.Shell(["osascript",
+							"-e",'tell application "System Events" to delay 0.1'])
+						IO.Shell(["osascript",
+							"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
+						IO.Shell(["osascript",	
+							"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
 					}
 				}})
 			}
 			menu_file.AddSeparator();
-			menu_file.AddNormalItem({icon:"时",text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:function(){
+			var fopen_brand_new=function(){
 				var active_document=UI.m_the_document_area.active_tab
 				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 					return;
@@ -861,16 +918,17 @@ UI.Application=function(id,attrs){
 				UI.UpdateNewDocumentSearchPath()
 				UI.NewCodeEditorTab().auto_focus_file_search=1
 				UI.Refresh()
-			}})
+			};
+			menu_file.AddNormalItem({icon:"时",text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:fopen_brand_new})
 			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
-				menu_file.AddNormalItem({text:"Restore closed",key:"CTRL+SHIFT+T",enable_hotkey:1,action:function(){
+				menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
 					if(UI.m_closed_windows.length>0){
 						var active_document=UI.m_the_document_area.active_tab
 						var fn=UI.m_closed_windows.pop();
 						if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 							app.document_area.CloseTab();
 						}
-						UI.OpenEditorWindow(fn);
+						UI.OpenEditorWindow(fn);
 						UI.Refresh();
 					}
 				}})
@@ -902,6 +960,10 @@ UI.Application=function(id,attrs){
 		g_app_inited=1
 	}
 	if(!g_all_document_windows.length){
+		if(app.quit_on_zero_tab){
+			if(!app.OnClose()){UI.DestroyWindow(app)}
+			return;
+		}
 		//UI.NewUIEditorTab()
 		//UI.NewCodeEditorTab()
 		//UI.OpenFile("c:/tp/kara/ide/edcore.spap")
@@ -918,14 +980,15 @@ UI.Application=function(id,attrs){
 		UI.NewCodeEditorTab().auto_focus_file_search=1
 		UI.InvalidateCurrentFrame()
 		UI.Refresh()
+		app.quit_on_zero_tab=1;
 	}
 	if(UI.Platform.BUILD=="debug"){
 		//detect memory leaks
-		W.Hotkey("",{key:"CTRL+SHIFT+L",action:function(){
+		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
 			Duktape.gc()
 			UI.detectLeaks();
 		}});
-		W.Hotkey("",{key:"CTRL+SHIFT+M",action:function(){
+		W.Hotkey("",{key:"SHIFT+CTRL+M",action:function(){
 			print("=== manual gc call")
 			Duktape.gc()
 			UI.debugDumpHeap()
