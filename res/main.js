@@ -64,8 +64,8 @@ UI.Theme_CustomWidget=function(C){
 		tab_label:{
 			transition_dt:0.1,
 			shadow_size:8,
-			hotkey_font:UI.Font(UI.font_name,12,0),
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,22,-100):UI.Font(UI.font_name,24,-50), padding:16,
+			hotkey_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,10,0):UI.Font(UI.font_name,12,0),
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,22,-100):UI.Font(UI.font_name,24,-100), padding:16,
 			$:{
 				active:{
 					text_color:0xffffffff,
@@ -256,7 +256,7 @@ UI.Theme_CustomWidget=function(C){
 				//font_tilde:UI.Font(UI.icon_font_name,36,100),
 				font:UI.Font("res/fonts/inconsolata.ttf",28),
 				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
-				tex_font:UI.Font("res/fonts/cmunrm.ttf",28),
+				tex_font:UI.Font("res/fonts/cmunrm.ttf",28,0),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
 				font_tilde:UI.Font(UI.icon_font_name,28,100),
 				//font:UI.Font("res/fonts/inconsolata.ttf",32),
@@ -315,13 +315,13 @@ UI.Theme_CustomWidget=function(C){
 			x_scroll_shadow_size:8,
 			///////
 			show_line_numbers:1,
-			line_number_font:UI.Font(UI.font_name,14,-50),
+			line_number_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,12,-50):UI.Font(UI.font_name,14,-50),
 			line_number_bgcolor:0xffd0d0d0,
 			line_number_color:0xff7f7f7f,
 			line_number_color_focus:0xff000000,
 			color_cur_line_highlight:0x55ffffff,
 			///////
-			bookmark_font:UI.Font(UI.font_name,12,200),
+			bookmark_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,10,200):UI.Font(UI.font_name,12,200),
 			bookmark_color:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
 			bookmark_text_color:C[0],
 			//bookmark_shadow:0xff000000,
@@ -549,7 +549,7 @@ UI.Theme_CustomWidget=function(C){
 			//nothing
 		},
 		top_menu_item:{
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-100):UI.Font(UI.font_name,22,-100),
 			padding:8,
 			$:{
 				active:{
@@ -569,7 +569,7 @@ UI.Theme_CustomWidget=function(C){
 			shadow_color:0xaa000000,
 			shadow_size:12,
 			///////////
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-100):UI.Font(UI.font_name,22,-100),
 			text_color:0xff000000,
 			text_sel_color:0xffffffff,
 			icon_color:C[0],
@@ -658,7 +658,7 @@ UI.icon_font_20=UI.Font(UI.icon_font_name,20);
 UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
 if(UI.Platform.ARCH=="mac"){
 	UI.font_name="LucidaGrande,res/fonts/opensans.ttf"
-	UI.eng_font_name="LucidaGrande,res/fonts/opensans.ttf,!"
+	UI.eng_font_name="res/fonts/opensans.ttf,!"
 }else{
 	UI.font_name="res/fonts/opensans.ttf"
 	UI.eng_font_name="res/fonts/opensans.ttf,!"
@@ -681,10 +681,12 @@ if(UI.Platform.ARCH=="mac"){
 		"CTRL+A":"WIN+A",
 		"CTRL+L":"WIN+L",
 		"CTRL+T":"WIN+T",
+		"SHIFT+CTRL+T":"SHIFT+WIN+T",
 		"CTRL+K":"WIN+K",
 		"SHIFT+CTRL+U":"SHIFT+WIN+U",
 		"CTRL+D":"WIN+D",
 		"SHIFT+CTRL+D":"SHIFT+WIN+D",
+		"SHIFT+CTRL+W":"SHIFT+WIN+W",
 		////////////////
 		"SHIFT+CTRL+O":"SHIFT+WIN+O",
 		//"ALT+Q":"SHIFT+WIN+O",
@@ -698,10 +700,12 @@ if(UI.Platform.ARCH=="mac"){
 		"F7":"SHIFT+WIN+B",
 		"CTRL+F5":"SHIFT+WIN+R",
 		////////////////
-		"CTRL+LEFT":"ALT+LEFT",
-		"CTRL+RIGHT":"ALT+RIGHT",
+		"CTRL+LEFT SHIFT+CTRL+LEFT":"ALT+LEFT SHIFT+ALT+LEFT",
+		"CTRL+RIGHT SHIFT+CTRL+RIGHT":"ALT+RIGHT SHIFT+ALT+RIGHT",
 		"ALT+LEFT":"WIN+LEFT",
 		"ALT+RIGHT":"WIN+RIGHT",
+		"CTRL+UP":"WIN+UP",
+		"CTRL+DOWN":"WIN+DOWN",
 		////////////////
 		"CTRL+SHIFT+TAB":"SHIFT+WIN+LEFT",
 		"CTRL+TAB":"SHIFT+WIN+RIGHT",
@@ -840,6 +844,10 @@ UI.Application=function(id,attrs){
 			//////////////////////////
 			var menu_file=UI.BigMenu("&File")
 			menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:1,action:function(){
+				var active_document=UI.m_the_document_area.active_tab
+				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
+					app.document_area.CloseTab();
+				}
 				UI.UpdateNewDocumentSearchPath()
 				UI.NewCodeEditorTab()
 				UI.Refresh()

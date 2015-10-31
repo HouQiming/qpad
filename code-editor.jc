@@ -1463,7 +1463,7 @@ class CColorer_programmer
 		//do the dfa and get all tokens
 		return {'forEach':inline(fbody_outer){
 			auto ld=m_lang
-			auto sz_context=ld.m_context_size
+			auto sz_context=int(s_context.n)
 			auto n_char_types=ld.m_n_char_types
 			auto char_map=ld.m_char_map
 			auto dfa=ld.m_bigchar_dfa

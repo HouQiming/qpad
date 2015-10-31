@@ -102,6 +102,10 @@ UI.LoadZipDocument=function(fname){
 }
 
 UI.OpenFile=function(fname){
+	var active_document=UI.m_the_document_area.active_tab
+	if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
+		UI.m_the_document_area.CloseTab();
+	}
 	//consult history for loader preference
 	var ext=UI.GetFileNameExtension(fname).toLowerCase()
 	var parser=(UI.m_ext_loaders[ext]||UI.m_ext_loaders["*"])
@@ -437,6 +441,7 @@ UI.SaveWorkspace=function(){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var wnd=UI.g_all_document_windows[i]
 		if(wnd.main_widget&&wnd.main_widget.m_is_brand_new){continue;}
+		if((wnd.main_widget&&wnd.main_widget.file_name||wnd.file_name).indexOf('<')>=0){continue;}
 		workspace.push(wnd.file_name)
 	}
 	UI.m_ui_metadata["<workspace>"]=workspace

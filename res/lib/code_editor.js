@@ -674,7 +674,7 @@ W.CodeEditorWidget_prototype={
 	},
 	SaveMetaData:function(){
 		var doc=this.doc
-		if(this.m_is_preview||doc.ed.hfile_loading){return;}
+		if(this.m_is_preview||doc&&doc.ed.hfile_loading){return;}
 		if(!doc||!IO.FileExists(this.file_name)){return;}
 		var new_metadata={m_bookmarks:[],m_unkeyed_bookmarks:[],
 			sel0:doc.sel0.ccnt,
@@ -2143,7 +2143,6 @@ W.SXS_NewPage=function(id,attrs){
 						for(var i=0;i<files.length;i++){
 							var fn_switchto=files[i].name_to_find
 							files[i].relevance+=(tabswitch_count[fn_switchto]||0)/Math.max(tabswitch_count["$"],UI.MAX_TAB_SWITCH_COUNT)*FILE_RELEVANCE_SWITCH_SCORE
-							print((tabswitch_count[fn_switchto]||0)/Math.max(tabswitch_count["$"],UI.MAX_TAB_SWITCH_COUNT)*FILE_RELEVANCE_SWITCH_SCORE)//todo
 						}
 					}
 					var repos=g_repo_from_file[fn_current]
