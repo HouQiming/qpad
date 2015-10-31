@@ -384,7 +384,9 @@ class CLayouter_programmer
 						x+=dx
 				return s.n
 		foreach ch,I in Utf8Chars(s)
-			if x>=x_goal:return I
+			if x>=x_goal:
+				//Writeln('SeekInBlock ',x,' ',x_goal,' ',I,' ',int(ch))
+				return I
 			if ch=='\t':
 				x=(x/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
 			else if ch=='\n':
@@ -753,7 +755,7 @@ class CLayouter_programmer
 		//it's OK to have a negative dx_extra
 		//maintain x normally
 		I_query_valid_point=-1LL
-		if enable_hidden:
+		if enable_hidden>=0:
 			//query at the first non-hidden char
 			if !m_hidden_ranges_prepared:
 				PrepareHiddenRanges(ed)
@@ -822,7 +824,7 @@ class CLayouter_programmer
 						prj_x=float2(fixed2float(ix+dx_extra-scroll_x)*scale+screen_x,fixed2float((iy+dy_extra)*hc-scroll_y)*scale+screen_y)
 						//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 						color=m_cached_colors[int(cidi)&127]
-						if !enable_hidden&&(int(cidi)&128):
+						if enable_hidden<=0&&(int(cidi)&128):
 							color&=0x55ffffff
 						g_renderer.FastDrawChar(prj_x.x,prj_x.y,color, ch)
 				else
@@ -838,12 +840,12 @@ class CLayouter_programmer
 					ix-=wrap_width
 					iy++
 					if (iy+dy_extra)*hc-scroll_y>=clip_h:break
-			if (int(cidi)&128)&&enable_hidden:
+			if (int(cidi)&128)&&enable_hidden>=0:
 				if cidi!=u8(255):
 					cidi&=u8(127)
 					//dx_i=charWidth(U_ELLIPSIS)
 					dx_i=m_w_ellipsis
-					if ix<x_right_clip:
+					if ix<x_right_clip&&enable_hidden>0:
 						//grey it out to mark it as "hidden"
 						prj_x=float2(fixed2float(ix+dx_extra-scroll_x)*scale+screen_x,fixed2float((iy+dy_extra)*hc-scroll_y)*scale+screen_y)
 						//g_renderer.FastDrawChar(prj_x.x,prj_x.y,m_cached_colors[cidi]&0x55ffffff, U_ELLIPSIS)
@@ -899,7 +901,7 @@ class CLayouter_programmer
 		else
 			//fnt_scaled=m_font
 			//fnt_scaled.h*=scale
-			if m_enable_hidden:
+			if m_enable_hidden>0:
 				if !m_hidden_ranges_prepared:
 					PrepareHiddenRanges(ed)
 				if m_hidden_ccnts.n&&m_hidden_ccnts[0]==0LL:
@@ -1236,7 +1238,12 @@ class CLayouter_programmer
 	long4[] m_hidden_dx_add
 	long4[] m_hidden_dx_sub
 	i64[] m_hidden_ccnts
-	m_enable_hidden=1
+	/*
+	-1: disable all
+	 0: enable seeking, disable rendering
+	 1: enable all
+	*/
+	m_enable_hidden=1 
 	PrepareHiddenRanges=function(CEditableText ed){
 		//they must be x-addressible
 		m_hidden_ranges_prepared=1
@@ -1259,7 +1266,7 @@ class CLayouter_programmer
 				cvg++
 		assert(!(ccnts.n&1))
 		hid=ed.m_handler_registration["renderer"].as(int)
-		m_enable_hidden=0
+		m_enable_hidden=-1
 		a=ed.GetStateEnMasse(hid,ccnts)
 		m_enable_hidden=1
 		all_x=[GetFlatX(a[i:]) for i=0:4:a.n-4]
@@ -1296,7 +1303,7 @@ class CLayouter_programmer
 		//it's not necessarily an 'add'
 		//test: are we on the last line? same line as last hidden should be enough
 		//then again, we can't easily get flat X for the bsearch - precompute needs to be in xy pairs
-		if !m_enable_hidden:return XYToX(x,y)
+		if m_enable_hidden<0:return XYToX(x,y)
 		if !m_hidden_ranges_prepared:
 			PrepareHiddenRanges(ed)
 		hc=charHeight()
@@ -1314,7 +1321,7 @@ class CLayouter_programmer
 	SubHiddenRanges=function(CEditableText ed,i64 fx){
 		y=fx/m_wrap_width_in_fp
 		x=fx-y*m_wrap_width_in_fp
-		if m_enable_hidden:
+		if m_enable_hidden>=0:
 			if !m_hidden_ranges_prepared:
 				PrepareHiddenRanges(ed)
 			p=m_hidden_dx_sub.Bisect(function(long4 a){return a.x<fx})-1L
@@ -1331,11 +1338,11 @@ class CLayouter_programmer
 		return (x,y)
 	}
 	IsRangeHidden=function(CEditableText ed,i64 ccnt0,i64 ccnt1){
-		if !m_enable_hidden:return 0
+		if m_enable_hidden<=0:return 0
 		if !m_hidden_ranges_prepared:
 			PrepareHiddenRanges(ed)
-		p0=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt0})
-		p1=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt1})
+		p0=m_hidden_ccnts.InlineBisect(inline(i64 a){return a<=ccnt0})
+		p1=m_hidden_ccnts.InlineBisect(inline(i64 a){return a<=ccnt1})
 		return p0==p1&&(p0&1)
 	}
 	HideChars=function(CEditableText ed,i64 ccnt0,u8[] color_ids){
@@ -1346,7 +1353,7 @@ class CLayouter_programmer
 		if p>=m_hidden_ccnts.n:
 			return
 		ccnt_next=m_hidden_ccnts[p]-ccnt0
-		enable_hidden=m_enable_hidden
+		enable_hidden=(m_enable_hidden>=0)
 		for i=0L:color_ids.n-1
 			if i==ccnt_next:
 				if i&&enable_hidden:color_ids[i-1]|=u8(128)
@@ -1423,6 +1430,7 @@ class CLayouter_programmer
 			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
 		else
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
+		m_hidden_ranges_prepared=0
 		obj["displayed_wrap_width"]=fixed2double(m_wrap_width_in_fp)
 		return 0
 	}

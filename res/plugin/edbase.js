@@ -3,7 +3,7 @@ var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
 
 Language.Register({
-	name:"Plain text",parser:"text",
+	name_sort_hack:" Plain Text",name:"Plain text",parser:"text",
 	rules:function(lang){
 		lang.DefineDefaultColor("color")
 		return function(){}
@@ -16,7 +16,7 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	if(has_preprocessor){
 		bid_preprocessor=lang.ColoredDelimiter("key","#","\n","color_meta");
 	}else{
-		bid_preprocessor=bid_comment
+		bid_preprocessor=bid_comment;
 	}
 	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
@@ -104,26 +104,26 @@ Language.Register({
 	])
 })
 
-Language.Register({
-	name:'SPAP#',parser:"C",
-	extensions:['spap'],
-	has_dlist_type:1,
-	has_pointer_ops:1,
-	indent_as_parenthesis:1,
-	file_icon_color:0xff9a3d6a,
-	file_icon:'プ',
-	rules:function(lang){
-		return f_C_like(lang,{
-			'keyword':['enum','if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','function','F','sizeof','new','delete','import','export','typedef','stdcall','inline','operator','forall','foreach','in','this','module','project','true','false','abstract','interface','virtual','__host__','__device__','__operation__'],
-			'meta':['If','Else','Elif','For','Switch','Case','Default','#include','#flavor','#make'],
-			'type':['void','char','short','int','long','iptr','uptr','auto','byte','ushort','uint','ulong','i8','i16','i32','i64','u8','u16','u32','u64','f32','f64','float','double','string','Object','Interface','typename','typeof'],
-		},0)
-	}
-});
+//Language.Register({
+//	name:'SPAP#',parser:"C",
+//	extensions:['spap'],
+//	has_dlist_type:1,
+//	has_pointer_ops:1,
+//	indent_as_parenthesis:1,
+//	file_icon_color:0xff9a3d6a,
+//	file_icon:'プ',
+//	rules:function(lang){
+//		return f_C_like(lang,{
+//			'keyword':['enum','if','else','elif','switch','case','default','break','continue','goto','return','for','while','do','loop','const','static','struct','union','class','function','F','sizeof','new','delete','import','export','typedef','stdcall','inline','operator','forall','foreach','in','this','module','project','true','false','abstract','interface','virtual','__host__','__device__','__operation__'],
+//			'meta':['If','Else','Elif','For','Switch','Case','Default','#include','#flavor','#make'],
+//			'type':['void','char','short','int','long','iptr','uptr','auto','byte','ushort','uint','ulong','i8','i16','i32','i64','u8','u16','u32','u64','f32','f64','float','double','string','Object','Interface','typename','typeof'],
+//		},0)
+//	}
+//});
 
 Language.Register({
 	name:'Jacy',parser:"C",
-	extensions:['jc'],
+	extensions:['jc','spap'],
 	indent_as_parenthesis:1,
 	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
@@ -457,7 +457,7 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Bibliography',extensions:['bib'],
+	name:'TeX bibliography',extensions:['bib'],
 	curly_bracket_is_not_special:1,is_tex_like:1,
 	default_hyphenator_name:"en_us",
 	spell_checker:"en_us",
@@ -467,7 +467,7 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Markdown',extensions:['md','markdown'],
+	name_sort_hack:" Markdown",name:'Markdown',extensions:['md','markdown'],
 	curly_bracket_is_not_special:1,
 	default_hyphenator_name:"en_us",
 	spell_checker:"en_us",
@@ -1311,7 +1311,7 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
 		if(ccnt_new>=0){
 			this.m_outer_scope_queue.push(this.sel1.ccnt)
-			this.m_outer_scope_queue_just_pushed=1
+			this.m_outer_scope_queue_just_pushed=ccnt_new
 			this.SetCaretTo(ccnt_new)
 			return 0;
 		}
@@ -1320,6 +1320,7 @@ UI.RegisterEditorPlugin(function(){
 	var finner_scope=function(){
 		if(this.m_outer_scope_queue.length){
 			var ccnt_new=this.m_outer_scope_queue.pop()
+			this.m_outer_scope_queue_just_pushed=ccnt_new
 			this.SetCaretTo(ccnt_new)
 			return 0;
 		}
@@ -1327,8 +1328,12 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('ALT+PGUP',fouter_scope)
 	this.AddEventHandler('ALT+PGDN',finner_scope)
 	this.AddEventHandler('selectionChange',function(){
-		if(this.m_outer_scope_queue_just_pushed){this.m_outer_scope_queue_just_pushed=0;return;}
+		if(this.sel0.ccnt==this.m_outer_scope_queue_just_pushed&&
+		this.sel1.ccnt==this.m_outer_scope_queue_just_pushed){
+			return;
+		}
 		this.m_outer_scope_queue=[];
+		this.m_outer_scope_queue_just_pushed=undefined
 	})
 	this.AddEventHandler('change',function(){this.m_outer_scope_queue=[];})
 	//alt+up/down
@@ -2509,6 +2514,9 @@ UI.RegisterEditorPlugin(function(){
 			}
 		}
 		this.m_detect_autoedit_at=ccnt_lh
+		if(this.m_do_not_detect_autoedit_at!=undefined&&this.GetLC(this.sel1.ccnt)[0]!=this.m_do_not_detect_autoedit_at){
+			this.m_do_not_detect_autoedit_at=undefined
+		}
 		//could allow multi-exampling this
 		InvalidateAutoEdit.call(this)
 	})
@@ -2523,10 +2531,16 @@ UI.RegisterEditorPlugin(function(){
 					return;
 				}
 			}
+			if(this.m_do_not_detect_autoedit_at!=undefined&&this.GetLC(this.m_detect_autoedit_at)[0]==this.m_do_not_detect_autoedit_at){
+				return;
+			}
 			ctx=UI.ED_AutoEdit_Detect(this.ed,this.m_detect_autoedit_at)
 			if(ctx){
 				this.m_autoedit_context=ctx
 				StartAutoEdit.call(this,ctx.m_cclines,"auto")
+				this.m_do_not_detect_autoedit_at=undefined
+			}else{
+				this.m_do_not_detect_autoedit_at=this.GetLC(this.m_detect_autoedit_at)[0];
 			}
 		}
 		if(!ctx){return}
@@ -2880,9 +2894,46 @@ UI.RegisterEditorPlugin(function(){
 */
 
 UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('change',function(){
 		if(!this.m_diff_from_save||!this.owner||!(this.owner.h_obj_area>0)){return;}
 		this.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(this.ed,this.m_diff_from_save,this.owner.h_obj_area*UI.pixels_per_unit);
 		this.m_diff_minimap_h_obj_area=this.owner.h_obj_area
 	})
 }).prototype.name="Diff minimap";
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('menu',function(){
+		var menu_lang=UI.BigMenu("&Language")
+		var langs=Language.m_all_languages
+		var got_separator=0
+		langs.sort(function(a,b){
+			a=(a.name_sort_hack||a.name);
+			b=(b.name_sort_hack||b.name);
+			return a>b?1:(a<b?-1:0);
+		})
+		for(var i=0;i<langs.length;i++){
+			if(!got_separator&&!langs[i].name_sort_hack){
+				menu_lang.AddSeparator()
+				got_separator=1
+			}
+			menu_lang.AddNormalItem({
+				text:langs[i].name,
+				icon:(this.owner.m_language_id==langs[i].name)?"对":undefined,
+				action:function(name){
+					this.owner.m_language_id=name;
+					//try to reload
+					if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
+						//make a notification
+						this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file and reload for the language change to take effect"})
+						this.saved_point=-1;
+					}else{
+						//what is reload? nuke it
+						this.owner.Reload()
+					}
+					UI.Refresh();
+				}.bind(this,langs[i].name)})
+		}
+	})
+}).prototype.name="Language selection";

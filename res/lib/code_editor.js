@@ -526,6 +526,29 @@ W.CodeEditorWidget_prototype={
 		var doc=this.doc
 		//doc.OnLoad=obj.OnLoad.bind(obj)
 		doc.StartLoading(this.file_name)
+		doc.AddEventHandler('selectionChange',function(){
+			var obj=this.owner
+			if(!obj){return;}
+			var show_replace_hint=0
+			if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_no_more_replace){
+				var ccnt=this.sel1.ccnt
+				var match_id=obj.BisectMatches(ccnt)
+				if(match_id){
+					var match_ccnt0=obj.GetMatchCcnt(match_id,0)
+					var match_ccnt1=obj.GetMatchCcnt(match_id,1)
+					if(match_ccnt0<=ccnt&&ccnt<=match_ccnt1&&match_ccnt0<=this.sel0.ccnt&&this.sel0.ccnt<=match_ccnt1){
+						show_replace_hint=1
+					}
+				}
+			}
+			if(show_replace_hint){
+				obj.CreateNotification({
+					id:'replace_hint',text:['Edit the match to start replacing'].join("\n")
+				},"quiet")
+			}else{
+				obj.DismissNotification('replace_hint')
+			}
+		})
 		doc.AddEventHandler('beforeEdit',function(ops){
 			var obj=this.owner
 			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_no_more_replace){
@@ -2411,6 +2434,7 @@ W.CodeEditor=function(id,attrs){
 					var eps=hc/16;
 					var cur_bb_y0=line_xys[1];
 					var cur_bb_y1=cur_bb_y0+hc;
+					//print(doc.sel1.ccnt,'->',JSON.stringify(top_hints),JSON.stringify(line_xys))
 					h_top_hint=hc
 					for(var i=2;i<line_xys.length;i+=2){
 						var y=line_xys[i+1];
@@ -2790,11 +2814,12 @@ W.CodeEditor=function(id,attrs){
 				}else{
 					s_replace='';
 				}
+				obj.DismissNotification('replace_hint')
 				if(rctx.m_needle==s_replace){
 					obj.DismissNotification('find_result')
 				}else{
 					obj.CreateNotification({
-						id:'find_result',icon:'警',text:[rctx.m_needle,'  \u2192',s_replace].join("\n")
+						id:'find_result',text:[rctx.m_needle,'  \u2192',s_replace].join("\n")
 					},"quiet")
 				}
 			}
@@ -3164,6 +3189,7 @@ W.CodeEditor=function(id,attrs){
 						var y1=top_hint_bbs[bbi+1]
 						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
 						if(hh>=0){
+							//print('draw',y0,(obj.y+y_top_hint)*UI.pixels_per_unit,doc.ed.SeekXY(0,y0))
 							doc.ed.Render({x:0,y:y0,w:w_obj_area-w_line_numbers-w_scrolling_area,h:hh,
 								scr_x:(obj.x+w_line_numbers+obj.padding)*UI.pixels_per_unit,
 								scr_y:(obj.y+y_top_hint)*UI.pixels_per_unit, 
