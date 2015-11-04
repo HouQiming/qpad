@@ -192,6 +192,7 @@ class CLayouter_programmer
 	m_font_emboldened=TFont()
 	m_bgcolor_selection=0xff800000
 	m_color_overlay=0xff000000
+	m_color_virtual_diff_bold=0xff000000
 	//////////////
 	m_enable_advanced_wrapping=0
 	CHyphenator m_hyp
@@ -402,7 +403,9 @@ class CLayouter_programmer
 	//JSObject m_overlay_obj
 	i64 m_caret_offset
 	JSObject m_tentative_editops
+	JSObject m_virtual_diffs
 	TOverlayItem[] m_precomputed_overlays_for_tentative_editops//need to reset in JS
+	i64[] m_overlay_embolden_ranges
 	SetTextStyle=function(JSObject obj){
 		m_lang=obj["language"].as(CLanguageDescription)
 		m_font=obj["font"].as(TFont)
@@ -450,6 +453,7 @@ class CLayouter_programmer
 		m_w_ellipsis=float2fixed(obj["w_ellipsis"].as(float))
 		m_ellipsis_items.clear()
 		m_file_index=obj["m_file_index"].as(CFileIndex)
+		m_color_virtual_diff_bold=obj["color_virtual_diff_bold"].as(int)
 	}
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
 		m_overlays.clear()
@@ -487,9 +491,9 @@ class CLayouter_programmer
 				w_strikeout:0LL,
 			})
 		if !m_precomputed_overlays_for_tentative_editops:
+			prec_overlays=new TOverlayItem[]
+			m_precomputed_overlays_for_tentative_editops=prec_overlays
 			if m_tentative_editops:
-				prec_overlays=new TOverlayItem[]
-				m_precomputed_overlays_for_tentative_editops=prec_overlays
 				n3=m_tentative_editops.length()
 				n=n3/3
 				ccnts=new i64[]
@@ -520,6 +524,41 @@ class CLayouter_programmer
 					})
 		if m_precomputed_overlays_for_tentative_editops:
 			m_overlays.push(m_precomputed_overlays_for_tentative_editops)
+		m_overlay_embolden_ranges=new i64[]
+		if m_virtual_diffs:
+			ccnts=new i64[]
+			n3=m_virtual_diffs.length()
+			for i=0:3:n3-3
+				ccnt_j=m_virtual_diffs[i+0].as(i64)
+				sz_j=m_virtual_diffs[i+1].as(i64)
+				ccnts.push(ccnt_j)
+				ccnts.push(ccnt_j+sz_j)
+			n=n3/3
+			hid=caller.m_handler_registration["renderer"].as(int)
+			a=caller.GetStateEnMasse(hid,ccnts)
+			flatxs=[GetFlatX(a[i*4:]) for i=0:n*2-1]
+			for i=0:n-1
+				ccnt_j=m_virtual_diffs[i*3+0].as(i64)
+				sz_j=m_virtual_diffs[i*3+1].as(i64)
+				if sz_j:
+					m_overlay_embolden_ranges.push(ccnt_j)
+					m_overlay_embolden_ranges.push(ccnt_j+sz_j)
+				s_i=m_virtual_diffs[i*3+2].as(string)
+				if !s_i:
+					s_i=""
+				else if s_i.IndexOf('\t')>=0:
+					s_i=s_i.Replace(["\t"," "])
+				w_overlayd_i=GetStringWidth(m_font,s_i)
+				m_overlays.push(TOverlayItem(){
+					flatx:flatxs[i*2+1],
+					y:(flatxs[i*2+1]+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp-1LL,
+					delta_x:double2fixed(w_overlayd_i),
+					s_text:s_i,
+					s_type:"AE",
+					sel0:0LL,
+					sel1:0LL,
+					w_strikeout:-double2fixed(w_overlayd_i),
+				})
 		m_overlays.Sortby(inline(item){return item.flatx})
 		w_overlay=double2fixed(w_overlayd)
 		//m_caret_overlay=long3(,0LL,w_overlay)
@@ -554,11 +593,18 @@ class CLayouter_programmer
 			(x_sel0,x_sel1)=(x_sel1,x_sel0)
 		if oi.w_strikeout:
 			auto dy_strikeout=fnt_scaled.h*fnt_scaled.pfnt.y_baseline_per_height*0.46875f
-			y_s0=(x-oi.w_strikeout)/m_wrap_width_in_fp
-			y_s1=(x)/m_wrap_width_in_fp
+			flatx_s0=x-oi.w_strikeout
+			flatx_s1=x
+			if flatx_s0>flatx_s1:
+				tmp=flatx_s0
+				flatx_s0=flatx_s1
+				flatx_s1=tmp
+			y_s0=(flatx_s0)/m_wrap_width_in_fp
+			y_s1=(flatx_s1)/m_wrap_width_in_fp
 			for yi=y_s0:y_s1
-				fx0=max(yi*m_wrap_width_in_fp,x-oi.w_strikeout)
-				fx1=min((yi+1)*m_wrap_width_in_fp-1,x)
+				fx0=max(yi*m_wrap_width_in_fp,flatx_s0)
+				fx1=min((yi+1)*m_wrap_width_in_fp-1,flatx_s1)
+				//Writeln('--- ',yi,' ',fx0,' ',fx1)
 				auto prj_fx0=projectXY(fx0)
 				auto prj_fx1=projectXY(fx1)
 				m_current_frame_strikeouts.push(float3(prj_fx0.x,prj_fx0.y,prj_fx1.x-prj_fx0.x))
@@ -748,6 +794,16 @@ class CLayouter_programmer
 		if m_enable_advanced_wrapping:
 			//we won't need x_right_clip here anyway
 			_RenderText(MODE_RENDER,ccnt_base,a,pp,s,s.n, color_ids, scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
+			//additional emboldens
+			if m_overlay_embolden_ranges&&m_overlay_embolden_ranges.n:
+				C_virtual_diff_bold=m_color_virtual_diff_bold
+				for i=0:2:m_overlay_embolden_ranges.n-2
+					EmboldenTextRange(
+						ed,
+						m_overlay_embolden_ranges[i+0],
+						m_overlay_embolden_ranges[i+1],
+						C_virtual_diff_bold,
+						scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 			return 
 		//the \t\n ignorant hiding
 		HideChars(ed,ccnt_base,color_ids)
@@ -854,6 +910,20 @@ class CLayouter_programmer
 		//if ccnt_base+s.n>=980&&ccnt_base+s.n<=990:
 		//	Writeln('      ',ccnt_base+s.n,' ',dx_extra,' ',dy_extra)
 		testOverlay()
+		//additional emboldens
+		if m_overlay_embolden_ranges&&m_overlay_embolden_ranges.n:
+			C_virtual_diff_bold=m_color_virtual_diff_bold
+			for i=0:2:m_overlay_embolden_ranges.n-2
+				//Writeln(
+				//	'embolden ',
+				//	m_overlay_embolden_ranges[i+0],' ',
+				//	m_overlay_embolden_ranges[i+1])
+				EmboldenTextRange(
+					ed,
+					m_overlay_embolden_ranges[i+0],
+					m_overlay_embolden_ranges[i+1],
+					C_virtual_diff_bold,
+					scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 	}
 	EndRender=function(JSObject obj,CEditableText ed, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		if m_current_frame_spell_errors:
@@ -927,35 +997,38 @@ class CLayouter_programmer
 		////////////
 		m_file_index=CFileIndex.NULL
 	}
-	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
+	EmboldenTextRange=function(CEditableText ed,i64 ccnt0,i64 ccnt1,int C, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		hid=ed.m_handler_registration["renderer"].as(int)
+		hc=charHeight()
 		fnt_bold_scaled=m_font_emboldened
 		fnt_bold_scaled.h*=scale
-		hc=charHeight()
+		ch_prev=ed.GetUtf8CharNeighborhood(ccnt0)[0]
+		s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
+		wrap_width=m_wrap_width_in_fp
+		x=GetFlatX(ed.GetStateAt(hid,ccnt0))
+		foreach ch in Utf8Chars(s_embolden)
+			iy=x/wrap_width
+			ix=x-iy*wrap_width
+			ix_with_overlay=AddOverlayOffset(ix,iy)
+			dx_overlay=ix_with_overlay-ix
+			(ix,iy)=SubHiddenRanges(ed,x)
+			ix+=dx_overlay
+			prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
+			g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,C, ch)
+			dx_i=charWidth(ch)
+			x+=dx_i
+			if m_enable_advanced_wrapping:
+				x+=charKerning(ch_prev,ch)
+				ch_prev=ch
+	}
+	DrawEnhancedHighlight=function(JSObject obj,CEditableText ed,CHLRange hl, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		////////
 		ccnt0=hl.p0.ccnt
 		ccnt1=hl.p1.ccnt
 		mode=int(hl.display_mode)
 		if mode==HL_DISPLAY_MODE_EMBOLDEN:
 			//only embolden a single char
-			ch_prev=ed.GetUtf8CharNeighborhood(ccnt0)[0]
-			s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
-			wrap_width=m_wrap_width_in_fp
-			x=GetFlatX(ed.GetStateAt(hid,ccnt0))
-			foreach ch in Utf8Chars(s_embolden)
-				iy=x/wrap_width
-				ix=x-iy*wrap_width
-				ix_with_overlay=AddOverlayOffset(ix,iy)
-				dx_overlay=ix_with_overlay-ix
-				(ix,iy)=SubHiddenRanges(ed,x)
-				ix+=dx_overlay
-				prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
-				g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,hl.color, ch)
-				dx_i=charWidth(ch)
-				x+=dx_i
-				if m_enable_advanced_wrapping:
-					x+=charKerning(ch_prev,ch)
-					ch_prev=ch
+			EmboldenTextRange(ed,ccnt0,ccnt1,hl.color, scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 		else if mode==HL_DISPLAY_MODE_TILDE:
 			m_current_frame_tildes.push(TTildeItem(){ccnt0:ccnt0,ccnt1:ccnt1,color:hl.color})
 	}
@@ -1453,6 +1526,7 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"ResetWrapping",JS_ResetWrapping)
 		////////////////////
 		proto.ExportProperty(this,"m_tentative_editops")
+		proto.ExportProperty(this,"m_virtual_diffs")
 		proto.ExportMethod(this,"ResetTentativeOps",JS_ResetTentativeOps)
 	}
 	//auto __done__()
@@ -2197,6 +2271,7 @@ auto SearchPlainText(CEditableText ed,i64 ccnt_starting,const direction, string 
 SEARCH_FLAG_CASE_SENSITIVE=1
 SEARCH_FLAG_WHOLE_WORD=2
 SEARCH_FLAG_REGEXP=4
+SEARCH_FLAG_FUZZY=8
 class CRegexpSearchContext
 	int has6,has4
 	i64 ccnt,ccnt_base
@@ -2310,7 +2385,267 @@ auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int fla
 	if (is_sliding||!matcher.is_matching()||ch==-1)&&match:
 		testMatch(ch,dir>0?ed.GetTextSize():-1LL,match)
 	return JS.Return(-1LL)
+
+class CFuzzySearchContext
+	int[] chtab
+	int[] dfa
+	i64 ccnt,ccnt_base
+	last_acode=9999
+	last_match_ccnt0=0LL
+	last_match_ccnt1=0LL
+	st=0
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"ccnt")
+	};
+
+inline absEncode(int a)
+	return (a*2)^(a>>31)
+
+inline absDecode(int a)
+	return (a>>1)^-(a&1)
 	
+auto CreateFuzzyDFA(string s,int oword,int maxdist, int budget)
+	struct TFrontier
+		int pos
+		int dist
+		int dlength
+	(TFrontier<TFrontier)=inline(a,b){
+		return a.pos<b.pos||a.pos==b.pos&&(a.dist<b.dist||a.dist==b.dist&&absEncode(a.dlength)<absEncode(b.dlength))
+	}
+	//(TFrontier==TFrontier)=inline(a,b){
+	//	return a.pos==b.pos
+	//}
+	if s.n<=1||maxdist>s.n-1||maxdist<1:
+		ret=CFuzzySearchContext.NULL
+	else
+		//we may be limited to a distance of 2 - one bad char
+		//but we could incorporate swap? swap is 2. it doesn't get along with others
+		//(s.n+1)*(maxdist+1)
+		chset=(new(s)).ConvertToAsBinary(u8)
+		chset.Sort()
+		chset.Unique()
+		chtab=[0 for i=0:256]
+		if oword:
+			foreach c,I in chset
+				chtab[int(c)+1]=int(I+2)
+			nc=int(chset.n+2)
+		else
+			foreach c,I in chset
+				chtab[int(c)+1]=int(I+1)
+			nc=int(chset.n+1)
+		//do the NFA -> DFA deed
+		state_id=new int[int[]]
+		tran=new int[]
+		Q=new TFrontier[]
+		if !oword:
+			//manual restart for whole-word states
+			for i=0:maxdist
+				Q.push(TFrontier(){pos:i,dist:i,dlength:-i})
+			Q.Sort()
+		ikey=Q[0:].ConvertToAsBinary(int)
+		tran.resize(tran.n+nc);state_id[ikey]=int(tran.n)
+		Q.push(TFrontier(){pos:0,dist:-1,dlength:0})
+		fcur=new TFrontier[]
+		fnext=new TFrontier[]
+		advanced_by=[new int[] for i=0:nc-1]
+		head=0L
+		my_sid=nc
+		ret=new CFuzzySearchContext(){chtab:chtab,dfa:tran}
+		while head<Q.n&&ret:
+			fcur.clear()
+			fnext.clear()
+			//n0=maxdist+1
+			while Q[head].dist>=0:
+				fcur.push(Q[head])
+				head++
+			head++
+			//Writeln(head,' ',Q.n,' ',fcur)
+			//there is SPL: increase one distance and one char
+			//it's better to do SPL-out: avoiding duplicate ins
+			//then it's just a matter of who's remaining -- everyone remaining advances by one and repopulates the deleters
+			foreach ids in advanced_by
+				ids.clear()
+			//Writeln('>>>')
+			foreach st,I in fcur
+				advanced_by[chtab[int(u8(s[st.pos]))+1]].push(int(I))
+			//	Write(st.pos,' ')
+			//Writeln()
+			foreach ids,ch in advanced_by
+				//we can always restart
+				fnext.clear()
+				if oword&&ch==1:
+					//hack char for restartable point
+					fnext.push(fcur)
+				else
+					//states advanced by ch
+					foreach id in ids
+						st=fcur[id]
+						st.pos++
+						fnext.push(st)
+				if !(oword&&ch==1):
+					//mistaken edit: advance pos regardless of the char
+					//we go from fcur, NOT fnext!
+					//foreach sti in fcur
+					//	st=sti
+					//	st.pos++
+					//	st.dist++
+					//	if st.dist<maxdist:
+					//		fnext.push(st)
+					//mistaken insertion: ignore the current character and just bump the dist
+					//for(i=0;i<fnext.n;i++)
+					//	st=fnext[i]
+					foreach sti in fcur
+						st=sti
+						st.dlength++
+						st.dist++
+						if st.dist<=maxdist:
+							fnext.push(st)
+				//restart
+				if !oword||oword&&ch==1:
+					fnext.push(TFrontier(){pos:0})
+				//avoid explosions
+				fnext.Sort()
+				fnext.UniqueBy(byMember("pos"))
+				//mistaken deletion: ignore the current template character and bump pos/dist
+				for(i=0;i<fnext.n;i++)
+					st=fnext[i]
+					st.pos++
+					st.dlength--
+					st.dist++
+					if st.dist<=maxdist:
+						fnext.push(st)
+				fnext.Sort()
+				fnext.UniqueBy(byMember("pos"))
+				//remove acceptance, record the best one
+				acc_code=0
+				if fnext.n&&fnext.back().pos>=s.n:
+					sacc=fnext.back()
+					while fnext.n&&fnext.back().pos>=s.n:
+						sacc=fnext.pop()
+					acc_code=sacc.dist*(maxdist*2+1)+absEncode(sacc.dlength)+1
+					if oword&&ch==1:
+						//assert(0)
+						//this could happen: when restarting from an originally-accepting state
+						acc_code=0
+				ikey=fnext[0:].ConvertToAsBinary(int)
+				sid=state_id[ikey]
+				if !sid:
+					if tran.n+nc>budget:
+						ret=CFuzzySearchContext.NULL
+						break
+					tran.resize(tran.n+nc);state_id[ikey]=int(tran.n)
+					sid=int(tran.n)
+					//Writeln(sid,' ',ikey)
+					Q.push(fnext)
+					Q.push(TFrontier(){pos:0,dist:-1,dlength:0})
+				ikey.discard()
+				//ch -> sid, my sid
+				tran[my_sid-nc+ch]=int(sid-nc+((acc_code)<<24))
+			my_sid+=nc
+	return ret
+
+FUZZY_DFA_BUDGET=131072//65536
+auto SearchFuzzy(JSContext JS,CEditableText ed,const dir,string s,int flags,function(i64,i64):int ReportMatch, int budget)
+	ctx=JS.Param(1).as(CFuzzySearchContext)
+	maxdist=int(max(min((s.n-2)/3+1,3),1))
+	if !ctx:
+		if !(flags&SEARCH_FLAG_CASE_SENSITIVE):
+			scased=s.ToLower()
+		else
+			scased=s
+		if dir<0:
+			scased=[ch foreach ch in scased.ReverseOrder()]
+		//Writeln(s,' ',scased)
+		ctx=CreateFuzzyDFA(scased,!!(flags&SEARCH_FLAG_WHOLE_WORD),maxdist, FUZZY_DFA_BUDGET)
+		if !ctx:
+			return JS.Return(-1LL)
+		ctx.ccnt=JS.Param(1).as(i64)
+	chtab=ctx.chtab
+	tran=ctx.dfa
+	ccnt_starting=ctx.ccnt
+	last_acode=ctx.last_acode
+	last_match_ccnt0=ctx.last_match_ccnt0
+	last_match_ccnt1=ctx.last_match_ccnt1
+	st=ctx.st
+	(ch0,ch1)=ed.GetCharNeighborhood(ccnt_starting)
+	isa0=isWordChar(dir>0?ch0:ch1)
+	is_done=1
+	pbudget=budget
+	foreach ch0,ccnt in dir>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
+		//Writeln('>>> ',ccnt,' ',dir)
+		ch=int(i8(ch0))
+		//if ch==-1:continue
+		if !(flags&SEARCH_FLAG_CASE_SENSITIVE):
+			if u32(ch-int('A'))<26u:
+				ch+=0x20
+		pbudget--
+		if !pbudget:
+			ccnt_starting=ccnt+(dir<0)
+			is_done=0
+			break
+		if flags&SEARCH_FLAG_WHOLE_WORD:
+			isa1=isWordChar(ch)
+			if !isa0||!isa1:
+				//manual restart at word boundary
+				st=tran[st+1]
+			isa0=isa1
+		chid=chtab[ch+1]
+		st=tran[st+chid]
+		if st&0xff000000:
+			//accepted
+			acode=(st>>24)-1
+			dlg=absDecode(acode%(2*maxdist+1))
+			st&=0xffffff
+			//word boundary test
+			if flags&SEARCH_FLAG_WHOLE_WORD:
+				(nch0,nch1)=ed.GetUtf8CharNeighborhood(ccnt)
+				if isWordChar(nch0)==isWordChar(nch1):continue
+			lgmatch=s.n+dlg
+			//Writeln(ccnt-lgmatch,' ',ccnt_stop_at)
+			//if ccnt+1-lgmatch>=ccnt_stop_at:
+			//	break
+			if (dir>0?(ccnt+1-lgmatch<last_match_ccnt1):(ccnt-1+lgmatch>last_match_ccnt1)):
+				//there's overlap
+				if last_acode>acode:
+					last_acode=acode
+					if dir>0:
+						last_match_ccnt0=ccnt+1-lgmatch
+						last_match_ccnt1=ccnt+1
+					else
+						last_match_ccnt0=ccnt+lgmatch
+						last_match_ccnt1=ccnt
+			else
+				if last_acode<9999:
+					if dir<0:
+						pbudget-=ReportMatch(last_match_ccnt1,last_match_ccnt0)*16
+					else
+						pbudget-=ReportMatch(last_match_ccnt0,last_match_ccnt1)*16
+				last_acode=acode
+				if dir>0:
+					last_match_ccnt0=ccnt+1-lgmatch
+					last_match_ccnt1=ccnt+1
+				else
+					last_match_ccnt0=ccnt+lgmatch
+					last_match_ccnt1=ccnt
+	ret=0
+	if is_done:
+		if last_acode<9999:
+			if dir<0:
+				ReportMatch(last_match_ccnt1,last_match_ccnt0)
+			else
+				ReportMatch(last_match_ccnt0,last_match_ccnt1)
+		ret=JS.Return(-1)
+	else
+		ctx.ccnt=ccnt_starting
+		ctx.last_acode=last_acode
+		ctx.last_match_ccnt0=last_match_ccnt0
+		ctx.last_match_ccnt1=last_match_ccnt1
+		ctx.st=st
+		ret=JS.Return(ctx)
+	//}}
+	//Writeln(last_acode,' ',last_match_ccnt0,' ',last_match_ccnt1)
+	return ret
+
 ///////////////////////////////////////////
 class CReplaceJob
 	m_ops=new TEditop[]
@@ -2603,6 +2938,101 @@ auto ProcessEditDistance(TProgramMatch[] matches,int[] ssrc,int[] sret)
 		ret.push(TEditop(){ccnt:ccntmap[psrc],s:Unicode32ToUtf8(sret[ptar:])})
 	return ret
 
+auto RawEditDistance(int[] su0,int[] su1, int ocase)//(string ss0,string ss1)
+	MAX_DIST=4
+	n0=su0.n
+	n1=su1.n
+	//last op: copy 01 / delete 0 / insert 1
+	struct TState
+		int best
+		int op_from
+	st=new TState[(n0+1)*(n1+1)]
+	st[0].op_from=1
+	inline stateid(iptr a,iptr b)
+		return (b*(n0+1)+a)
+	//del_cost=[COST_BASE+COST_CHAR,COST_CHAR,COST_BASE+COST_CHAR]
+	//ins_cost=[COST_BASE+COST_CHAR,COST_BASE+COST_CHAR,COST_CHAR]
+	//cpy_cost=[0,0,0]
+	for j=0:n1
+		for i=max(!j,j-MAX_DIST):min(n0,j+MAX_DIST)
+			best=0
+			bestop=-1
+			//delete
+			if i>0:
+				sid0=stateid(i-1,j)
+				if st[sid0].op_from>0:
+					cost=st[sid0].best+1
+					if bestop<0||best>cost:
+						best=cost
+						bestop=1
+			//insert
+			if j>0:
+				sid0=stateid(i,j-1)
+				if st[sid0].op_from>0:
+					cost=st[sid0].best+1
+					if bestop<0||best>cost:
+						best=cost
+						bestop=2
+			//cpy
+			if i>0&&j>0&&(su0[i-1]==su1[j-1]||!ocase&&chrequi(su0[i-1],su1[j-1])):
+				sid0=stateid(i-1,j-1)
+				if st[sid0].op_from>0:
+					cost=st[sid0].best
+					if bestop<0||best>cost:
+						best=cost
+						bestop=0
+			sid=stateid(i,j)
+			st[sid].best=best
+			st[sid].op_from=bestop+1
+	sid=stateid(n0,n1)
+	pi=n0
+	pj=n1
+	cc=0
+	op=-1
+	raw_ret=new int4[]
+	while pi||pj:
+		sid=stateid(pi,pj)
+		op0=st[sid].op_from-1
+		if op0!=op:
+			//we're at a boundary, record one item
+			if cc:raw_ret.push(int4(int(pi),int(pj),int(cc),op))
+			cc=0
+		if op0<0:
+			break
+		op=op0
+		pi0=pi
+		pj0=pj
+		if op==0:
+			//copy
+			pi0--
+			pj0--
+		else if op==1:
+			pi0--
+		else
+			assert(op==2)
+			pj0--
+		cc++
+		pi=pi0
+		pj=pj0
+	if cc:raw_ret.push(int4(int(pi),int(pj),int(cc),op))
+	cc=0
+	///
+	ccnt_tran=new int[]
+	c=0
+	ccnt_tran.push(c)
+	for i=0:n0-1
+		c+=Utf8Length(su0[i])
+		ccnt_tran.push(c)
+	ret=new TEditop[]
+	foreach rawitem in raw_ret.ReverseOrder()
+		if rawitem.w==1:
+			//delete
+			ret.push(TEditop(){ccnt:ccnt_tran[rawitem[0]],sz:ccnt_tran[rawitem[0]+rawitem[2]]-ccnt_tran[rawitem[0]]})
+		else if rawitem.w==2:
+			//delete
+			ret.push(TEditop(){ccnt:ccnt_tran[rawitem[0]],s:Unicode32ToUtf8(su1[rawitem[1]:rawitem[1]+rawitem[2]-1])})
+	return ret
+
 auto AutoEdit_Evaluate(TEditop[] ops,i64 ccnt_base, CReplaceContext ctx, TProgramItem[] prg, int line_id,int[] s_unicode,int[] nbras_old)
 	//just return the edit ops?
 	(s_replaced,errs,edhint0)=ctx.ApplyReplaceProgram(prg,s_unicode,nbras_old,line_id, 1)
@@ -2734,6 +3164,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				js_this["m_current_replace_job"]=rjob
 			ops=rjob.m_ops
 			//replace mode
+			assert(!(flags&SEARCH_FLAG_FUZZY))
 			if flags&SEARCH_FLAG_REGEXP:
 				ReportMatch=function(i64 ccnt0,i64 ccnt1){
 					ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:rjob.m_s_replace})
@@ -2751,6 +3182,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				}
 		else
 			if flags&SEARCH_FLAG_REGEXP:
+				assert(!(flags&SEARCH_FLAG_FUZZY))
 				ReportMatch=function(i64 ccnt0,i64 ccnt1){
 					return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
 				}
@@ -2764,11 +3196,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
 				}
 		if flags&SEARCH_FLAG_REGEXP:
+			assert(!(flags&SEARCH_FLAG_FUZZY))
 			//the regexp version returns an object to JS
 			if direction>0:
 				return SearchRegexp(JS,ed,1, s,flags,ReportMatch, budget)
 			else
 				return SearchRegexp(JS,ed,-1, s,flags,ReportMatch, budget)
+		else if flags&SEARCH_FLAG_FUZZY:
+			if direction>0:
+				return SearchFuzzy(JS,ed,1, s,flags,ReportMatch, budget)
+			else
+				return SearchFuzzy(JS,ed,-1, s,flags,ReportMatch, budget)
 		else
 			ocase=(flags&SEARCH_FLAG_CASE_SENSITIVE)
 			ccnt0=JS.Param(1).as(i64)
@@ -2787,6 +3225,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		n=rjob.m_ops.n
 		ed.Edit(rjob.m_ops)
 		return JS.Return(n)
+	}
+	//
+	JS_UI["ED_RawEditDistance"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		s_tar=JS.Param(3).as(string)
+		ocase=JS.Param(4).as(int)
+		s_src=ed.GetText(ccnt0,ccnt1-ccnt0)
+		ops=RawEditDistance(Utf8ToUnicode32(s_src),Utf8ToUnicode32(s_tar),ocase)
+		ret=JS.NewArray()
+		foreach op,I in ops
+			ret[I*3+0]=op.ccnt+ccnt0
+			ret[I*3+1]=op.sz
+			ret[I*3+2]=op.s
+		return JS.Return(ret)
 	}
 	//smart paste - it's slow, do it natively
 	JS_UI["ED_GetClipboardTextSmart"]=function(JSContext JS){

@@ -401,7 +401,7 @@ Language.Register({
 });
 
 Language.Register({
-	name:'Windows Batch File',parser:"none",
+	name:'Windows BAT',parser:"none",
 	extensions:['bat','cmd'],
 	shell_script_type:"windows",
 	file_icon_color:0xff444444,

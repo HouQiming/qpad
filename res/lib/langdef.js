@@ -254,6 +254,7 @@ exports.GetNameByExt=function(s_ext){
 
 exports.GetDefinitionByName=function(s_name){
 	var desc=g_desc_by_name[s_name];
+	if(!desc){desc=g_desc_by_name["Plain text"];}
 	if(!desc.definition){
 		desc.definition=exports.Define(desc.rules.bind(desc),desc)
 	}
@@ -261,7 +262,7 @@ exports.GetDefinitionByName=function(s_name){
 }
 
 exports.GetDescObjectByName=function(s_name){
-	return g_desc_by_name[s_name];
+	return g_desc_by_name[s_name]||g_desc_by_name["Plain text"];
 }
 
 exports.Register=function(desc){

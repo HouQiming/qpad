@@ -290,6 +290,7 @@ UI.Theme_CustomWidget=function(C){
 				color_completing_bracket:0x80999999,
 				color_auto_edit_range_highlight:0x4099ffff,
 				color_strikeout:0x80444444,
+				color_virtual_diff_bold:0xff1c1aa3,
 				/////////////
 				bgcolor_ellipsis:[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}],
 				w_ellipsis:32,
@@ -343,6 +344,8 @@ UI.Theme_CustomWidget=function(C){
 			sbar_page_border_width:1,
 			w_minimap:128,
 			///////
+			disclaimer_transition_dt:0.1,
+			disclaimer_color:0xff1c1aa3,
 			h_find_bar:32,
 			find_bar_bgcolor:0xffffffff,
 			find_bar_color:0xffe8e8e8,

@@ -430,10 +430,11 @@ W.NotificationItem=function(id,attrs){
 	return obj
 }
 
-UI.SEARCH_FLAG_CASE_SENSITIVE=1
-UI.SEARCH_FLAG_WHOLE_WORD=2
-UI.SEARCH_FLAG_REGEXP=4
-UI.SEARCH_FLAG_GOTO_MODE=1024
+UI.SEARCH_FLAG_CASE_SENSITIVE=1;
+UI.SEARCH_FLAG_WHOLE_WORD=2;
+UI.SEARCH_FLAG_REGEXP=4;
+UI.SEARCH_FLAG_FUZZY=8;
+UI.SEARCH_FLAG_GOTO_MODE=1024;
 var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 	matches.sort(function(a,b){return a[0]-b[0];});
 	var l=0
@@ -769,7 +770,8 @@ W.CodeEditorWidget_prototype={
 			if(force_ccnt!=undefined&&
 			force_ccnt==this.m_current_find_context.m_starting_ccnt0&&
 			!this.m_changed_after_find&&
-			sneedle==this.m_current_find_context.m_needle){
+			sneedle==this.m_current_find_context.m_needle&&
+			(this.m_current_find_context.m_flags&UI.SEARCH_FLAG_FUZZY)){
 				return;
 			}
 			this.m_current_find_context.Cancel()
@@ -788,6 +790,7 @@ W.CodeEditorWidget_prototype={
 		var ccnt_tot=doc.ed.GetTextSize()
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 		var ctx={
+			m_original_frontier:ccnt,
 			m_is_just_reset:1,
 			m_forward_matches:[],
 			m_forward_frontier:ccnt,
@@ -954,6 +957,16 @@ W.CodeEditorWidget_prototype={
 		var l=l0
 		var r=(ctx.m_merged_y_windows_forward.length>>2)-1
 		var id=ctx.m_current_point
+		if(ctx.m_flags&UI.SEARCH_FLAG_FUZZY){
+			if(!ctx.m_fuzzy_virtual_diffs||ctx.m_fuzzy_diff_match_id!=id){
+				//fuzzy match rendering - GetMatchCcnt, something else like m_tentative_editops but rendered the other direction
+				var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+				ctx.m_fuzzy_virtual_diffs=UI.ED_RawEditDistance(doc.ed,
+					this.GetMatchCcnt(id,0),this.GetMatchCcnt(id,1),
+					ctx.m_needle, ctx.m_flags&UI.SEARCH_FLAG_CASE_SENSITIVE);
+				ctx.m_fuzzy_diff_match_id=id;
+			}
+		}
 		while(l<=r){
 			var m=(l+r)>>1
 			var fitem=this.GetFindItem(m)
@@ -1027,9 +1040,13 @@ W.CodeEditorWidget_prototype={
 	},
 	RenderVisibleFindItems:function(w_line_numbers,w_find_items,h_find_items, DrawItem){
 		this.AutoScrollFindItems()
-		//do it here and now
 		var ctx=this.m_current_find_context
 		var doc=this.doc
+		if(ctx.m_fuzzy_virtual_diffs){
+			var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+			renderer.m_virtual_diffs=ctx.m_fuzzy_virtual_diffs;
+		}
+		//do it here and now
 		var hc=UI.GetCharacterHeight(doc.font)
 		var h_bof_eof_message=UI.GetCharacterHeight(this.find_message_font)+this.find_item_separation
 		var eps=hc/16;
@@ -1053,6 +1070,7 @@ W.CodeEditorWidget_prototype={
 		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 		var h_safety=hc*this.find_item_expand_current;
 		var h_safety_internal=h_safety+h_find_items//for page up/down
+		//auto-fuzzy search
 		if(find_scroll_y<ctx.m_y_extent_backward+h_safety_internal&&!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)){
 			var p0=ctx.m_backward_matches.length
 			if(ctx.m_backward_search_hack){
@@ -2641,6 +2659,10 @@ W.CodeEditor=function(id,attrs){
 			}
 		}
 		var f_draw_accands=undefined
+		if(doc){
+			var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+			renderer.m_virtual_diffs=undefined;
+		}
 		if(doc&&obj.m_edit_lock){
 			obj.__children.push(doc)
 			UI.Begin(doc)
@@ -2854,6 +2876,13 @@ W.CodeEditor=function(id,attrs){
 					DrawFindItemHighlight(find_item_i.visual_y-find_scroll_y-h_expand*0.5,doc_h,h_expand/h_expand_max)
 				})
 				renderer.m_enable_hidden=1
+				if(!current_find_context.m_forward_matches.length&&!current_find_context.m_backward_matches.length&&
+				!(current_find_context.m_flags&(UI.SEARCH_FLAG_REGEXP|UI.SEARCH_FLAG_FUZZY|UI.SEARCH_FLAG_GOTO_MODE))){
+					if(UI.IsSearchFrontierCompleted(current_find_context.m_forward_frontier)&&UI.IsSearchFrontierCompleted(current_find_context.m_backward_frontier)){
+						obj.ResetFindingContext(current_find_context.m_needle,current_find_context.m_find_flags|UI.SEARCH_FLAG_FUZZY)
+						UI.Refresh()
+					}
+				}
 				//print(render_secs*1000,ln_secs*1000)
 				UI.PopSubWindow()
 			}else{
@@ -3214,6 +3243,13 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			if(obj.show_find_bar){
+				//print(obj.disclaimer_animation&&obj.disclaimer_animation.alpha)
+				var disclaimer_animation=W.AnimationNode("disclaimer_animation",{
+					transition_dt:obj.disclaimer_transition_dt,
+					alpha:(current_find_context&&(current_find_context.m_flags&UI.SEARCH_FLAG_FUZZY?1.0:0.0)),})
+				var disclaimer_alpha=disclaimer_animation.alpha
+				//print(current_find_context&&(current_find_context.m_flags&UI.SEARCH_FLAG_FUZZY?1.0:0.0),
+				//	disclaimer_alpha,obj.disclaimer_transition_dt)
 				//the find bar
 				UI.PushCliprect(obj.x,obj.y,w_obj_area-w_scrolling_area,h_obj_area)
 				UI.RoundRect({
@@ -3225,14 +3261,23 @@ W.CodeEditor=function(id,attrs){
 				UI.RoundRect({x:obj.x,y:obj.y,w:w_obj_area-w_scrolling_area,h:obj.h_find_bar,
 					color:obj.find_bar_bgcolor})
 				var show_flag_buttons=(obj.show_find_bar!="goto")
+				//fuzzy match disclaimer... fade, red search bar with "fuzzy match" written on
 				var rect_bar=UI.RoundRect({
 					x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
 					w:w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?4:1),h:obj.h_find_bar-obj.find_bar_padding*2,
-					color:obj.find_bar_color,
+					color:UI.lerp_rgba(obj.find_bar_color,obj.disclaimer_color,disclaimer_alpha*0.125),
 					round:obj.find_bar_round})
 				UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
 					obj.find_bar_hint_color,'s'.charCodeAt(0))
 				var x_button_right=rect_bar.x+rect_bar.w+obj.find_bar_padding
+				if(disclaimer_alpha>0){
+					//"fuzzy search" text
+					W.Text("",{x:8,
+						anchor:rect_bar,anchor_align:'right',anchor_yalign:'up',
+						font:obj.find_bar_hint_font,
+						color:UI.lerp_rgba(obj.disclaimer_color&0x00ffffff,obj.disclaimer_color,disclaimer_alpha),
+						text:"fuzzy search"})
+				}
 				if(show_flag_buttons){
 					var btn_case=W.Button("find_button_case",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
