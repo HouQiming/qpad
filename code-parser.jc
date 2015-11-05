@@ -1543,7 +1543,24 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if fidx.m_temp_ids&&fidx.m_temp_ids.n:
 				SearchPrefix(fidx.m_temp_ids,1.f)
 			if cands.n:
+				cands.Sort(inline(cand0,cand1){
+					auto id0=cand0.x
+					auto id1=cand1.x
+					auto p0=g_symbols[id0].p_name
+					auto n0=g_symbols[id0].n
+					auto p1=g_symbols[id1].p_name
+					auto n1=g_symbols[id1].n
+					for(j=0;;j++){
+						if j>=n0||j>=n1:
+							return n0<n1
+						if !chrequi(g_strings[p0+j],g_strings[p1+j]):
+							ch0=int(u8(g_strings[p0+j])); if u32(ch0-'A')<26u:ch0|=0x20
+							ch1=int(u8(g_strings[p1+j])); if u32(ch1-'A')<26u:ch1|=0x20
+							return ch0<ch1
+					}
+				})
 				s_common_prefix=CommonPrefix(getIdString(cands[0].x)[s_prefix.n:],getIdString(cands.back().x)[s_prefix.n:])
+				//Writeln('s_common_prefix=',s_common_prefix)
 				if s_common_prefix.n:
 					//find the most similar
 					best=0
