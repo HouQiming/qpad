@@ -997,6 +997,7 @@ UI.Application=function(id,attrs){
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
 			Duktape.gc()
+			UI.dumpMemoryUsage();
 			UI.detectLeaks();
 		}});
 		W.Hotkey("",{key:"SHIFT+CTRL+M",action:function(){

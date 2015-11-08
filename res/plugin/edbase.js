@@ -2612,18 +2612,13 @@ UI.RegisterEditorPlugin(function(){
 			var menu_edit=UI.BigMenu("&Edit")
 			var this_outer=this;
 			menu_edit.AddSeparator()
-			menu_edit.AddButtonRow({text:"Replace"},[
-				{key:"SHIFT+CTRL+D",text:"prev",tooltip:'SHIFT+CTRL+D',action:function(){
+			menu_edit.AddButtonRow({text:"Apply changes"},[
+				{key:"SHIFT+CTRL+D",text:"ae_prev",icon:'上',tooltip:'SHIFT+CTRL+D',action:function(){
 					if(line_id>0){
 						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id-2)
 						renderer.ResetTentativeOps()
 					}
-				}},{key:"CTRL+D",text:"next",tooltip:'CTRL+D',action:function(){
-					if(line_id+2<locs.length){
-						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id+2)
-						renderer.ResetTentativeOps()
-					}
-				}},{key:"ALT+A",text:"all",tooltip:'ALT+A',action:function(){
+				}},{key:"ALT+A",text:"ae_all",icon:'换',tooltip:'ALT+A',action:function(){
 					if(cur_autoedit_ops.length>0){
 						var ccnt=cur_autoedit_ops[cur_autoedit_ops.length-3]
 						this_outer.SetSelection(ccnt,ccnt)
@@ -2643,6 +2638,11 @@ UI.RegisterEditorPlugin(function(){
 					this_outer.CallOnChange()
 					this_outer.m_autoedit_example_line_id=tmp;
 					InvalidateAutoEdit.call(this_outer)
+				}},{key:"CTRL+D",text:"ae_next",icon:'下',tooltip:'CTRL+D',action:function(){
+					if(line_id+2<locs.length){
+						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id+2)
+						renderer.ResetTentativeOps()
+					}
 				}}])
 			
 		}
@@ -2756,6 +2756,7 @@ UI.RegisterEditorPlugin(function(){
 		q1.push({file_name:this.owner.file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:"navigation"})
 		UI.g_cursor_history_test_same_reason=0
 		UI.OpenEditorWindow(navitem.file_name,function(){
+			//print('nav',navitem.ccnt0,navitem.ccnt1,prev_ccnt0,prev_ccnt1)
 			this.SetSelection(navitem.ccnt0,navitem.ccnt1)
 			this.CallOnSelectionChange();
 		})

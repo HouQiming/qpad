@@ -2573,13 +2573,13 @@ auto SearchFuzzy(JSContext JS,CEditableText ed,const dir,string s,int flags,func
 	pbudget=budget
 	foreach ch0,ccnt in dir>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
 		//Writeln('>>> ',ccnt,' ',dir)
-		ch=int(i8(ch0))
+		ch=int(u8(ch0))
 		//if ch==-1:continue
 		if !(flags&SEARCH_FLAG_CASE_SENSITIVE):
 			if u32(ch-int('A'))<26u:
 				ch+=0x20
 		pbudget--
-		if !pbudget:
+		if pbudget<=0:
 			ccnt_starting=ccnt+(dir<0)
 			is_done=0
 			break
@@ -2627,6 +2627,7 @@ auto SearchFuzzy(JSContext JS,CEditableText ed,const dir,string s,int flags,func
 				else
 					last_match_ccnt0=ccnt+lgmatch
 					last_match_ccnt1=ccnt
+	//Writeln('fuzzy search! ',is_done,' ',ccnt_starting,' ',dir)
 	ret=0
 	if is_done:
 		if last_acode<9999:
@@ -2634,6 +2635,7 @@ auto SearchFuzzy(JSContext JS,CEditableText ed,const dir,string s,int flags,func
 				ReportMatch(last_match_ccnt1,last_match_ccnt0)
 			else
 				ReportMatch(last_match_ccnt0,last_match_ccnt1)
+		ctx.ccnt=-1LL
 		ret=JS.Return(-1)
 	else
 		ctx.ccnt=ccnt_starting

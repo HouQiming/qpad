@@ -41,6 +41,10 @@ auto genString(string s0)
 
 if Platform.BUILD=="debug":
 	registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+		JS_UI["dumpMemoryUsage"]=function(JSContext JS){
+			Writeln('=== internal memory usage: ',LeakDetection.GetMemoryUsage(),' bytes')
+			return 0
+		}
 		JS_UI["detectLeaks"]=function(JSContext JS){
 			LeakDetection.DetectLeaks()
 			return 0
