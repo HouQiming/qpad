@@ -162,6 +162,11 @@ W.TabbedDocument_prototype={
 		UI.SaveWorkspace();
 		UI.Refresh()
 		UI.CallGCLater()
+		if(UI.Platform.BUILD=="debug"){
+			print(">>> window closed");
+			Duktape.gc();
+			UI.dumpMemoryUsage();
+		}
 	},
 	SetTab:function(tabid){
 		var tabid0=this.current_tab_id
@@ -342,6 +347,11 @@ W.TabbedDocument=function(id,attrs){
 		obj.m_is_in_menu=0
 		obj.CancelTabDragging();
 		UI.SaveWorkspace();
+		if(UI.Platform.BUILD=="debug"){
+			print(">>> window opened");
+			Duktape.gc();
+			UI.dumpMemoryUsage();
+		}
 	}
 	obj.n_tabs_last_checked=items.length;
 	if(!items.length&&obj.m_is_close_pending){
@@ -392,24 +402,26 @@ W.TabbedDocument=function(id,attrs){
 			UI.m_frozen_global_menu=undefined
 			obj.m_menu_preselect=undefined
 			if(bk_menu){
-				for(var i=0;i<bk_menu.$.length;i++){(function(i){
+				for(var i=0;i<bk_menu.$.length;i++){
 					var s_text=bk_menu.$[i].text
 					if(s_text){
 						var p_and=s_text.indexOf('&')
 						if(p_and>=0){
-							W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:function(){
-								obj.m_is_in_menu=1;
-								obj.m_menu_preselect=i
-								//g_menu_action_invoked=0;
-								UI.m_frozen_global_menu=UI.m_global_menu
-								UI.InvalidateCurrentFrame()
-								UI.Refresh()
-							}})
+							W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:
+								(function(obj,i){
+									obj.m_is_in_menu=1;
+									obj.m_menu_preselect=i
+									//g_menu_action_invoked=0;
+									UI.m_frozen_global_menu=UI.m_global_menu
+									UI.InvalidateCurrentFrame()
+									UI.Refresh()
+								}).bind(null,obj,i)})
 						}
 					}
-				})(i)}
+				}
 			}
 		}
+		bk_menu=undefined;
 		W.Button("main_menu_button",{
 			x:obj.x+obj.padding,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
 			style:obj.menu_button_style,
@@ -549,12 +561,12 @@ W.TabbedDocument=function(id,attrs){
 			obj.current_tab_id=num_id
 			UI.Refresh()
 		}});
-		for(var i=0;i<items.length&&i<10;i++){(function(i){
-			W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"WIN+":"ALT+")+String.fromCharCode(48+(i+1)%10),action:function(){
+		for(var i=0;i<items.length&&i<10;i++){
+			W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"WIN+":"ALT+")+String.fromCharCode(48+(i+1)%10),action:(function(obj,i){
 				obj.SetTab(i)
 				UI.Refresh()
-			}})
-		})(i)}
+			}).bind(null,obj,i)})
+		}
 	}
 	UI.m_the_document_area=obj
 	return obj
@@ -814,7 +826,7 @@ W.TopMenuBar=function(id,attrs){
 		if(!obj.m_show_sub_menus){
 			W.Hotkey("",{key:"DOWN",action:fshow_sub_menus})
 			W.Hotkey("",{key:"RETURN RETURN2",action:fshow_sub_menus})
-			W.Hotkey("",{key:"ESC",action:function(){obj.owner.m_is_in_menu=0;UI.Refresh();}})
+			W.Hotkey("",{key:"ESC",action:(function(obj){obj.owner.m_is_in_menu=0;UI.Refresh();}).bind(null,obj)})
 			if(is_first&&!obj.m_show_sub_menus){
 				UI.SetFocus(obj.list_view);
 			}
@@ -830,6 +842,7 @@ W.TopMenuBar=function(id,attrs){
 			//}
 		}
 	UI.End()
+	desc=undefined;
 	return obj;
 }
 

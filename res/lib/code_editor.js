@@ -782,6 +782,9 @@ W.CodeEditorWidget_prototype={
 			this.m_current_find_context=undefined
 		}
 		if(!sneedle.length&&!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
+			if(this.m_current_find_context){
+				this.m_current_find_context.Cancel()
+			}
 			this.m_current_find_context=undefined
 			//this.m_current_needle=undefined
 			UI.m_ui_metadata.find_state.m_current_needle=""
@@ -1658,9 +1661,10 @@ var DetectRepository=function(fname){
 		return spath
 	}
 	///////////////////
-	g_is_repo_detected[spath]="?"
-	g_is_repo_detected[spath]=DetectRepository(spath);
-	return g_is_repo_detected[spath]
+	g_is_repo_detected[spath]="?";
+	var ret=DetectRepository(spath);
+	g_is_repo_detected[spath]=ret;
+	return ret;
 }
 
 var FILE_LISTING_BUDGET=100
@@ -1824,6 +1828,50 @@ var FormatRelativeTime=function(then,now){
 	}
 }
 
+var OpenInPlace=function(obj,name){
+	var fn=IO.NormalizeFileName(name)
+	var my_tabid=undefined
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		if(UI.g_all_document_windows[i].main_widget===obj){
+			my_tabid=i
+			break
+		}
+	}
+	//alt+q searched switch should count BIG toward the switching history
+	if(UI.m_previous_document){
+		var counts=UI.m_ui_metadata[UI.m_previous_document]
+		if(counts){counts=counts.m_tabswitch_count;}
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			if(i==my_tabid){continue;}
+			if(!UI.g_all_document_windows[i].main_widget){continue;}
+			var counts_i=UI.g_all_document_windows[i].main_widget.m_tabswitch_count
+			if(counts_i){
+				counts=counts_i
+				break
+			}
+		}
+		if(counts){
+			UI.IncrementTabSwitchCount(counts,fn,8)
+		}
+	}
+	//search for existing windows
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		if(i!=my_tabid&&UI.g_all_document_windows[i].file_name==fn){
+			UI.top.app.document_area.SetTab(i)
+			UI.top.app.document_area.CloseTab(my_tabid)
+			return
+		}
+	}
+	obj.file_name=fn
+	obj.doc=undefined
+	obj.m_language_id=undefined
+	obj.m_is_brand_new=undefined;
+	obj.m_is_preview=undefined;
+	UI.top.app.quit_on_zero_tab=0;
+	UI.m_current_file_list=undefined
+	UI.Refresh()
+}
+
 var FileItem_prototype={
 	OnDblClick:function(event){
 		if(this.name_to_find){return;}
@@ -1838,48 +1886,8 @@ var FileItem_prototype={
 			UI.Refresh()
 			return
 		}
-		var fn=IO.NormalizeFileName(this.name)
 		var obj=this.owner.owner
-		var my_tabid=undefined
-		for(var i=0;i<UI.g_all_document_windows.length;i++){
-			if(UI.g_all_document_windows[i].main_widget===obj){
-				my_tabid=i
-				break
-			}
-		}
-		//alt+q searched switch should count BIG toward the switching history
-		if(UI.m_previous_document){
-			var counts=UI.m_ui_metadata[UI.m_previous_document]
-			if(counts){counts=counts.m_tabswitch_count;}
-			for(var i=0;i<UI.g_all_document_windows.length;i++){
-				if(i==my_tabid){continue;}
-				if(!UI.g_all_document_windows[i].main_widget){continue;}
-				var counts_i=UI.g_all_document_windows[i].main_widget.m_tabswitch_count
-				if(counts_i){
-					counts=counts_i
-					break
-				}
-			}
-			if(counts){
-				UI.IncrementTabSwitchCount(counts,fn,8)
-			}
-		}
-		//search for existing windows
-		for(var i=0;i<UI.g_all_document_windows.length;i++){
-			if(i!=my_tabid&&UI.g_all_document_windows[i].file_name==fn){
-				UI.top.app.document_area.SetTab(i)
-				UI.top.app.document_area.CloseTab(my_tabid)
-				return
-			}
-		}
-		obj.file_name=fn
-		obj.doc=undefined
-		obj.m_language_id=undefined
-		obj.m_is_brand_new=undefined;
-		obj.m_is_preview=undefined;
-		UI.top.app.quit_on_zero_tab=0;
-		UI.m_current_file_list=undefined
-		UI.Refresh()
+		OpenInPlace(obj,this.name)
 	},
 }
 W.FileItem=function(id,attrs){
@@ -2017,6 +2025,222 @@ W.FileItem=function(id,attrs){
 			}
 		}
 	UI.End()
+	return obj
+}
+
+var FSTreeItem_prototype={
+	OnDblClick:function(event){
+		//expand or open
+		this.owner.OnEnter()
+	},
+	OnClick:function(event){
+		this.owner.selection_y=this.y_abs
+		//icon test for dirs
+		if(this.is_dir){
+			if(event.x-this.x<UI.GetCharacterAdvance(obj.icon_font,0x2b)){
+				this.owner.OnEnter();
+			}
+		}
+		UI.Refresh()
+	},
+}
+var DrawFSTreeItem=function(parent, item,x_abs,y_abs){
+	var id=parent.counter++;
+	var obj=UI.Keep(id,item,FSTreeItem_prototype)
+	obj.x=parent.x-parent.visible_scroll_x+x_abs;
+	obj.y=parent.y-parent.visible_scroll_y+y_abs;
+	obj.w=Math.max(parent.w-(x_abs-parent.visible_scroll_x),0);
+	obj.h=parent.h_item;
+	obj.y_abs=y_abs
+	obj.owner=parent;
+	W.PureRegion(id,obj)
+	//just icon and name
+	var selected=(parent.selection_y==y_abs);
+	var ext_color=(desc.file_icon_color||parent.file_icon_color)
+	var icon_code=0;
+	if(obj.is_dir){
+		ext_color=0xffb4771f
+		icon_code=(obj.is_dir==1?0x2b:0x2d);//'+-'
+	}else{
+		var s_ext=UI.GetFileNameExtension(obj.name)
+		var language_id=Language.GetNameByExt(s_ext)
+		var desc=Language.GetDescObjectByName(language_id)
+		icon_code=(desc.file_icon||'档').charCodeAt(0)
+	}
+	var w_icon=UI.GetCharacterAdvance(parent.icon_font,icon_code)
+	if(selected){
+		ext_color=parent.sel_file_icon_color
+		UI.RoundRect({
+			x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
+			color:sel_bgcolor})
+	}
+	UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-UI.GetFontHeight(parent.icon_font))*0.5,ext_color,icon_code)
+	W.Text("",{x:obj.x+w_icon,y:obj.y+(obj.h-UI.GetFontHeight(parent.name_font))*0.5,
+		font:parent.name_font,text:obj.name,
+		color:selected?parent.sel_name_color:parent.name_color})
+	return obj;
+}
+
+var DrawFSTreeView=function(parent, items, x_abs,y0,h){
+	var pfile=items.length;
+	var y=y0,y_vis=y;
+	parent.min_indent=Math.min(parent.min_indent,x_abs);
+	for(var i=0;i<items.length;i++){
+		var item_i=items[i];
+		if(!item_i.is_dir){
+			pfile=i;
+			break;
+		}
+		y_vis=y-parent.visible_scroll_y;
+		if(y_vis<h&&y_vis+item_i.h>0){
+			//visible, draw 
+			DrawFSTreeItem(parent, item_i,x_abs,y);
+			if(item_i.is_dir==2){
+				//expanded, recurse
+				DrawFSTreeView(parent,item_i.items,x_abs+parent.w_indent,y+parent.h_item,h);
+			}
+		}
+		y+=item_i.total_size;
+	}
+	var p0=pfile+(Math.floor(Math.max(-y,0)/parent.h_item)|0);
+	var p1=Math.min(pfile+(Math.ceil((h-y)/parent.h_item)|0),items.length);
+	for(var i=p0;i<p1;i++){
+		var item_i=items[i];
+		DrawFSTreeItem(parent, item_i,x_abs,parent.y+y);
+		y+=parent.h_item;
+	}
+}
+
+
+var FSTreeView_prototype={
+	GetItemByYDfs:function(obj,y0,y_pinpoint){
+		var items=obj.items;
+		var pfile=items.length;
+		var y=y0;
+		if(this!=obj&&y_pinpoint>=y&&y_pinpoint<y+this.h_item){
+			return {'item':obj,'y':y};
+		}
+		y+=this.h_item;
+		for(var i=0;i<items.length;i++){
+			var item_i=items[i];
+			if(!item_i.is_dir){
+				pfile=i;
+				break;
+			}
+			if(y_pinpoint>=y&&(y_pinpoint<y+item_i.total_size||i==items.length-1)){
+				//recurse 
+				var ret=GetItemByYDfs(item_i,y,y_pinpoint)
+				ret.path=item_i.name+'/'+ret.path;
+				return ret;
+			}
+			y+=item_i.total_size;
+		}
+		var p=Math.min(Math.max(Math.floor((y_pinpoint-y)/this.h_item),0)+pfile,items.length-1);
+		y+=(p-pfile)*this.h_item;
+		return {'item':items[p],'y':y,'path':items[p].name}
+	},
+	GetItemByY:function(y_pinpoint){
+		return this.GetItemByYDfs(this,0,y_pinpoint);
+	},
+	HeightDfs:function(obj,y0,y_pinpoint){
+		var items=obj.items;
+		var pfile=items.length;
+		var y=y0+(obj==this?0:this.h_item);
+		for(var i=0;i<items.length;i++){
+			var item_i=items[i];
+			if(!item_i.is_dir){
+				pfile=i;
+				break;
+			}
+			if(y_pinpoint==undefined||y_pinpoint>=y&&y_pinpoint<y+item_i.total_size){
+				//recurse 
+				this.HeightDfs(item_i,y,y_pinpoint==y?undefined:y_pinpoint)
+			}
+			y+=item_i.total_size;
+		}
+		y+=(items.length-pfile)*this.h_item;
+		obj.total_size=y;
+	},
+	OnEnter:function(key){
+		var item_yabs=this.GetItemByY(this.selection_y);
+		var item=item_yabs.item;
+		if(!item.is_dir){
+			OpenInPlace(this.owner,item.name)
+			return;
+		}
+		item.is_dir=3-item.is_dir;
+		if(item.is_dir==1){
+			item.items=undefined
+		}else{
+			var find_context=IO.CreateEnumFileContext(item_yabs.path,3)
+			var items=[];
+			for(;;){
+				var fnext=find_context()
+				if(!fnext){
+					find_context=undefined;
+					break;
+				}
+				items.push({'name':UI.RemovePath(fnext.name),'is_dir':fnext.is_dir})
+			}
+			item.items=items
+		}
+		this.HeightDfs(this,0,item_yabs.y)
+	},
+	AutoScroll:function(){
+		this.scroll_y=Math.min(Math.max(this.scroll_y,this.selection_y),this.selection_y-this.h+this.h_item)
+		this.scroll_y=Math.min(Math.max(this.scroll_y,0),this.total_size-this.h+this.h_item)
+	},
+	SelectAtY:function(y){
+		var item_yabs=this.GetItemByY(y);
+		this.selection_y=item_yabs.y;
+		this.AutoScroll();
+		UI.Refresh();
+	},
+	OnKeyDown:function(){
+		if(0){
+		}else if(UI.IsHotkey(event,"UP")){
+			this.SelectAtY(this.selection_y-this.h_item);
+		}else if(UI.IsHotkey(event,"DOWN")){
+			this.SelectAtY(this.selection_y+this.h_item);
+		}else if(UI.IsHotkey(event,"RETURN")){
+			this.OnEnter()
+		}else if(UI.IsHotkey(event,"LEFT")){
+			this.OnEnter("LEFT")
+		}else if(UI.IsHotkey(event,"RIGHT")){
+			this.OnEnter("RIGHT")
+		}
+	},
+}
+W.FSTreeView=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"fs_tree_view",FSTreeView_prototype);
+	//todo: actually call it
+	//todo: top overlay for the over-indented case
+	W.PureRegion(id,obj)
+	UI.Begin(obj);
+		UI.PushCliprect(obj.x,obj.y,obj.w,obj.h)
+		if(obj.total_size==undefined){
+			obj.HeightDfs(obj,0)
+		}
+		var scroll_x=(obj.scroll_x||0);
+		var scroll_y=(obj.scroll_y||0);
+		if(obj.scroll_transition_dt>0){
+			var anim=W.AnimationNode("scrolling_animation",{transition_dt:obj.scroll_transition_dt,
+				scroll_x:scroll_x,
+				scroll_y:scroll_y})
+			scroll_x=anim.scroll_x
+			scroll_y=anim.scroll_y
+		}
+		obj.visible_scroll_x=scroll_x
+		obj.visible_scroll_y=scroll_y
+		obj.counter=0;
+		obj.min_indent=1e15;
+		if(!obj.selection_y){obj.selection_y=0;}
+		DrawFSTreeView(obj, obj.items,0,obj.h);
+		if(obj.counter>0){
+			obj.scroll_x=Math.max(obj.min_indent-obj.w_indent,0);
+		}
+		UI.PopCliprect()
+	UI.End();
 	return obj
 }
 
@@ -2314,6 +2538,51 @@ W.SXS_NewPage=function(id,attrs){
 	return obj
 }
 
+UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
+	menu.AddButtonRow({text:stext},[
+		{key:"SHIFT+CTRL+D",text:"edit_up",icon:"上",tooltip:'Prev - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),action:fprev},
+		{key:"ALT+A",text:"edit_all",icon:"换",tooltip:'All - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),action:fall},
+		{key:"CTRL+D",text:"edit_down",icon:"下",tooltip:'Next - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),action:fnext}])
+	var sz_button=obj.autoedit_button_size;
+	var padding=obj.autoedit_button_padding;
+	var x_button_box=x-sz_button-padding*2;
+	var y_button_box=y-sz_button*1.5-padding;
+	var w_button_box=sz_button+padding*2;
+	var h_button_box=sz_button*3+padding*2;
+	UI.RoundRect({
+		x:x_button_box-obj.accands_shadow_size, y:y_button_box, 
+		w:w_button_box+obj.accands_shadow_size*2, h:h_button_box+obj.accands_shadow_size,
+		round:obj.accands_shadow_size,
+		border_width:-obj.accands_shadow_size,
+		color:obj.accands_shadow_color})
+	UI.RoundRect({
+		x:x_button_box, y:y_button_box,
+		w:w_button_box, h:h_button_box,
+		border_width:obj.accands_border_width,
+		border_color:obj.accands_border_color,
+		round:obj.accands_round,
+		color:obj.accands_bgcolor})
+	//do the three buttons
+	W.Button("button_edit_up",{style:UI.default_styles.check_button,
+		x:x_button_box+padding,y:y_button_box+sz_button*0+padding,
+		w:sz_button,h:sz_button,
+		font:UI.icon_font_20,text:"上",tooltip:stext2.replace("@1","prev")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),
+		tooltip_placement:'right',
+		OnClick:fprev})
+	W.Button("button_edit_all",{style:UI.default_styles.check_button,
+		x:x_button_box+padding,y:y_button_box+sz_button*1+padding,
+		w:sz_button,h:sz_button,
+		font:UI.icon_font_20,text:"换",tooltip:stext2.replace("@1","all")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),
+		tooltip_placement:'right',
+		OnClick:fall})
+	W.Button("button_edit_down",{style:UI.default_styles.check_button,
+		x:x_button_box+padding,y:y_button_box+sz_button*2+padding,
+		w:sz_button,h:sz_button,
+		font:UI.icon_font_20,text:"下",tooltip:stext2.replace("@1","next")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),
+		tooltip_placement:'right',
+		OnClick:fnext})
+}
+
 UI.ED_ParseMore_callback=function(fn){
 	var s_ext=UI.GetFileNameExtension(fn)
 	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
@@ -2321,7 +2590,7 @@ UI.ED_ParseMore_callback=function(fn){
 	var ret=Language.GetDescObjectByName(language_id)
 	if(s_ext=="h"){
 		var fn_main=UI.GetMainFileName(fn);
-		var exts=[".c",".cpp",".cxx",".cc",".C",".m"]
+		var exts=[".c",".cpp",".cxx",".cc",".C",".m",".cu"]
 		for(var i=0;i<exts.length;i++){
 			var fn_c=UI.ED_SearchIncludeFile(fn,fn_main+exts[i],ret)
 			if(fn_c){UI.ED_ParserQueueFile(fn_c)}
@@ -2678,6 +2947,7 @@ W.CodeEditor=function(id,attrs){
 				bm_xys=doc.ed.GetXYEnMasse(bm_ccnts.map(function(a){return a[1]}))
 			}
 		}
+		obj.w_line_numbers=w_line_numbers
 		var f_draw_accands=undefined
 		if(doc){
 			var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
@@ -2861,7 +3131,7 @@ W.CodeEditor=function(id,attrs){
 					obj.DismissNotification('find_result')
 				}else{
 					obj.CreateNotification({
-						id:'find_result',text:[rctx.m_needle,'  \u2192',s_replace].join("\n")
+						id:'find_result',text:[rctx.m_needle,'  \u2193',s_replace].join("\n")
 					},"quiet")
 				}
 			}
@@ -3144,8 +3414,8 @@ W.CodeEditor=function(id,attrs){
 								var ac_scroll_x=ac_anim_node.scroll_x
 								var w_accands=ac_anim_node.current_w
 								UI.RoundRect({
-									x:x_accands, y:y_accands, 
-									w:w_accands+obj.accands_shadow_size, h:obj.h_accands+obj.accands_shadow_size,
+									x:x_accands-obj.accands_shadow_size, y:y_accands, 
+									w:w_accands+obj.accands_shadow_size*2, h:obj.h_accands+obj.accands_shadow_size,
 									round:obj.accands_shadow_size,
 									border_width:-obj.accands_shadow_size,
 									color:obj.accands_shadow_color})
@@ -3517,14 +3787,21 @@ W.CodeEditor=function(id,attrs){
 					}}])
 				if(obj.m_replace_context){
 					//menu_search.AddSeparator()
-					menu_search.AddButtonRow({text:"Replace"},[
-						{key:"SHIFT+CTRL+D",text:"replace_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+D',action:function(){
-							obj.DoReplaceFromUI(-1)
-						}},{key:"ALT+A",text:"replace_all",icon:"换",tooltip:'All - ALT+A',action:function(){
-							obj.DoReplaceFromUI(0)
-						}},{key:"CTRL+D",text:"replace_down",icon:"下",tooltip:'Next - CTRL+D',action:function(){
-							obj.DoReplaceFromUI(1)
-						}}])
+					//menu_search.AddButtonRow({text:"Replace"},[
+					//	{key:"SHIFT+CTRL+D",text:"replace_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+D',action:function(){
+					//		obj.DoReplaceFromUI(-1)
+					//	}},{key:"ALT+A",text:"replace_all",icon:"换",tooltip:'All - ALT+A',action:function(){
+					//		obj.DoReplaceFromUI(0)
+					//	}},{key:"CTRL+D",text:"replace_down",icon:"下",tooltip:'Next - CTRL+D',action:function(){
+					//		obj.DoReplaceFromUI(1)
+					//	}}])
+					var ed_caret=doc.GetIMECaretXY();
+					var y_caret=(ed_caret.y-doc.visible_scroll_y);
+					var hc=UI.GetCharacterHeight(doc.font)
+					UI.DrawPrevNextAllButtons(obj,obj.x+w_line_numbers,obj.y+y_caret+hc*0.5, menu_search,"Replace","Replace @1",
+						function(){obj.DoReplaceFromUI(-1);},
+						function(){obj.DoReplaceFromUI( 0);},
+						function(){obj.DoReplaceFromUI( 1);})
 				}
 				menu_search.AddSeparator();
 				menu_search.AddNormalItem({text:"&Go to...",enable_hotkey:1,key:"CTRL+G",action:function(){
@@ -3704,8 +3981,8 @@ W.CodeEditor=function(id,attrs){
 			var page_state_alpha=255-((obj.sbar.icon_color[0].color>>24)&0xff);
 			if(page_state_alpha>0){
 				var opacity=page_state_alpha/255
-				var sbar_page_y0=Math.max(Math.min(doc.scroll_y/ytot,1),0)*sbar.h+sbar.y
-				var sbar_page_y1=Math.max(Math.min((doc.scroll_y+h_scrolling_area)/ytot,1),0)*sbar.h+sbar.y
+				var sbar_page_y0=Math.max(Math.min(doc.visible_scroll_y/ytot,1),0)*sbar.h+sbar.y
+				var sbar_page_y1=Math.max(Math.min((doc.visible_scroll_y+h_scrolling_area)/ytot,1),0)*sbar.h+sbar.y
 				UI.DrawChar(obj.sbar_eye_font,
 					sbar.x+sbar.w-UI.MeasureText(obj.sbar_eye_font,"眼").w-1,
 					sbar_page_y0-sbar.y>hc_bookmark?sbar_page_y0-hc_bookmark:sbar_page_y1,

@@ -78,7 +78,7 @@ Language.Register({
 	rules:function(lang){
 		return f_C_like(lang,{
 			keyword:['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'],
-			type:['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t']
+			type:['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t','size_t']
 		},1)
 	},
 	include_paths:ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?[
@@ -2449,7 +2449,7 @@ var ApplyAutoEdit=function(obj,cur_autoedit_ops,line_id){
 }
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	var InvalidateAutoEdit=function(){
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
@@ -2595,7 +2595,7 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('menu',function(){
 		var ed=this.ed
 		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-		if(renderer.m_tentative_editops){
+		if(renderer.m_tentative_editops&&renderer.m_tentative_editops.length>0){
 			var locs=this.m_autoedit_locators
 			var sel=this.GetSelection()
 			var line_id=-1;
@@ -2612,16 +2612,20 @@ UI.RegisterEditorPlugin(function(){
 			var menu_edit=UI.BigMenu("&Edit")
 			var this_outer=this;
 			menu_edit.AddSeparator()
-			menu_edit.AddButtonRow({text:"Apply changes"},[
-				{key:"SHIFT+CTRL+D",text:"ae_prev",icon:'上',tooltip:'SHIFT+CTRL+D',action:function(){
+			var ed_caret=this.GetIMECaretXY();
+			var y_caret=(ed_caret.y-this.visible_scroll_y);
+			var hc=UI.GetCharacterHeight(this.font)
+			UI.DrawPrevNextAllButtons(this.owner,
+				this.owner.x+this.owner.w_line_numbers,this.owner.y+y_caret+hc*0.5, menu_edit,"Apply changes","Apply @1",
+				function(){
 					if(line_id>0){
-						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id-2)
+						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id-2);
 						renderer.ResetTentativeOps()
 					}
-				}},{key:"ALT+A",text:"ae_all",icon:'换',tooltip:'ALT+A',action:function(){
+				},function(){
 					if(cur_autoedit_ops.length>0){
-						var ccnt=cur_autoedit_ops[cur_autoedit_ops.length-3]
-						this_outer.SetSelection(ccnt,ccnt)
+						var ccnt=cur_autoedit_ops[cur_autoedit_ops.length-3];
+						this_outer.SetSelection(ccnt,ccnt);
 					}
 					this_outer.HookedEdit(cur_autoedit_ops);
 					if(cur_autoedit_ops.length>0){
@@ -2638,13 +2642,12 @@ UI.RegisterEditorPlugin(function(){
 					this_outer.CallOnChange()
 					this_outer.m_autoedit_example_line_id=tmp;
 					InvalidateAutoEdit.call(this_outer)
-				}},{key:"CTRL+D",text:"ae_next",icon:'下',tooltip:'CTRL+D',action:function(){
+				},function(){
 					if(line_id+2<locs.length){
 						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id+2)
 						renderer.ResetTentativeOps()
 					}
-				}}])
-			
+				})
 		}
 	})
 	this.AddEventHandler('ESC',function(){

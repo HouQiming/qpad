@@ -29,8 +29,8 @@ UI.Theme_CustomWidget=function(C){
 			text_color:0xff000000,
 			shadow_size:6,
 			shadow_color:0xaa000000,
-			triangle_font:UI.Font(UI.font_name,32,0),
-			triangle_font2:UI.Font(UI.font_name,32,250),
+			triangle_font:UI.Font("res/fonts/dsanscn.ttc,!",32,0),
+			triangle_font2:UI.Font("res/fonts/dsanscn.ttc,!",32,250),
 		},
 		sub_window:{
 			transition_dt:0.1,
@@ -65,7 +65,7 @@ UI.Theme_CustomWidget=function(C){
 			transition_dt:0.1,
 			shadow_size:8,
 			hotkey_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,10,0):UI.Font(UI.font_name,12,0),
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,22,-100):UI.Font(UI.font_name,24,-100), padding:16,
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,22,-50):UI.Font(UI.font_name,24,-50), padding:16,
 			$:{
 				active:{
 					text_color:0xffffffff,
@@ -402,6 +402,8 @@ UI.Theme_CustomWidget=function(C){
 			accands_text_sel_color:0xffffffff,
 			accands_sel_bgcolor:C[0],
 			accands_n_shown:5,
+			autoedit_button_size:24,
+			autoedit_button_padding:2,
 			//w_accands:512,
 			h_accands:32,
 			///////
@@ -552,7 +554,7 @@ UI.Theme_CustomWidget=function(C){
 			//nothing
 		},
 		top_menu_item:{
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-100):UI.Font(UI.font_name,22,-100),
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
 			padding:8,
 			$:{
 				active:{
@@ -572,7 +574,7 @@ UI.Theme_CustomWidget=function(C){
 			shadow_color:0xaa000000,
 			shadow_size:12,
 			///////////
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-100):UI.Font(UI.font_name,22,-100),
+			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
 			text_color:0xff000000,
 			text_sel_color:0xffffffff,
 			icon_color:C[0],
@@ -651,14 +653,8 @@ UI.Theme_CustomWidget=function(C){
 		s0[key]=custom_styles[key]
 	}
 }
-if(UI.Platform.BUILD=="debug"){
-	UI.Theme_Minimalistic([0xff3377cc])
-}else{
-	UI.Theme_Minimalistic([0xffcc7733])
-}
 UI.icon_font=UI.Font(UI.icon_font_name,24);
 UI.icon_font_20=UI.Font(UI.icon_font_name,20);
-UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
 if(UI.Platform.ARCH=="mac"){
 	UI.font_name="LucidaGrande,res/fonts/opensans.ttf"
 	UI.eng_font_name="res/fonts/opensans.ttf,!"
@@ -666,6 +662,12 @@ if(UI.Platform.ARCH=="mac"){
 	UI.font_name="res/fonts/opensans.ttf"
 	UI.eng_font_name="res/fonts/opensans.ttf,!"
 }
+if(UI.Platform.BUILD=="debug"){
+	UI.Theme_Minimalistic([0xff3377cc])
+}else{
+	UI.Theme_Minimalistic([0xffcc7733])
+}
+UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
 
 if(UI.Platform.ARCH=="mac"){
 	UI.g_hotkey_map={
@@ -692,7 +694,7 @@ if(UI.Platform.ARCH=="mac"){
 		"SHIFT+CTRL+W":"SHIFT+WIN+W",
 		////////////////
 		"SHIFT+CTRL+O":"SHIFT+WIN+O",
-		//"ALT+Q":"SHIFT+WIN+O",
+		"ALT+Q":"SHIFT+WIN+O",
 		"ALT+C":"CTRL+C",
 		"ALT+H":"CTRL+H",
 		"ALT+E":"CTRL+E",

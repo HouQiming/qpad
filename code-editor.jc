@@ -1461,16 +1461,19 @@ class CLayouter_programmer
 		ccnt1=JS.Param(2).as(i64)
 		ranges0=m_hidden_ranges
 		ranges1=new CLocator[]
+		did=0
 		for i=0:2:ranges0.n-2
 			if ranges0[i].ccnt<=ccnt1&&ccnt0<=ranges0[i+1].ccnt:
 				//drop it
 				ranges0[i].discarded=i8(1)
 				ranges0[i+1].discarded=i8(1)
+				did=1
 			else
 				ranges1.push(ranges0[i])
 				ranges1.push(ranges0[i+1])
-		m_hidden_ranges=ranges1
-		m_hidden_ranges_prepared=0
+		if did:
+			m_hidden_ranges=ranges1
+			m_hidden_ranges_prepared=0
 		return 0
 	}
 	JS_SnapToShown=function(JSContext JS){

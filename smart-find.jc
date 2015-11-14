@@ -13,7 +13,7 @@ inline EscapedChars(string s)
 		in_unicode=0
 		chu=0
 		II=0L
-		foreach ch,I in Utf8Chars(s)
+		foreach ch,I in Gui2D.Utf8Chars(s)
 			chi=ch
 			if in_unicode:
 				in_unicode--

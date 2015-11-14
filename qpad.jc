@@ -344,5 +344,6 @@ if Platform.BUILD=="debug":
 		return JS.Return(System.Algorithm.Unicode32ToUtf8([JS.Param(0).or(0)]))
 	}
 	/////////////
+	Gui2D.g_log_file=System.Env.GetStoragePath()+"/log.txt"
 	sbox.UIRunJS(JS,"res/main.js")
 })()
