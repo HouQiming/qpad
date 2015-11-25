@@ -216,8 +216,15 @@ Language.Register({
 	file_icon:'プ',
 	rules:function(lang){
 		return f_C_like(lang,{
-			'keyword':['if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','__global__','__device__','__host__'],
-			'type':['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t'],
+			'keyword':['if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','__global__','__device__','__host__','__shared__','__constant__'],
+			'type':['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t','texture','surface',
+				'float2','float3','float4',
+				'char2','char3','char4',
+				'short2','short3','short4',
+				'int2','int3','int4',
+				'uchar2','uchar3','uchar4',
+				'ushort2','ushort3','ushort4',
+				'uint2','uint3','uint4'],
 		},1)
 	}
 });
@@ -1077,8 +1084,9 @@ UI.RegisterEditorPlugin(function(){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			var menu_edit_children=menu_edit.$
-			var bk_children=menu_edit_children.slice(menu_edit.p_paste,menu_edit_children.length)
-			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste)
+			var bk_children=menu_edit_children.slice(menu_edit.p_paste,menu_edit_children.length);
+			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste);
+			menu_edit_children=undefined;
 			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"SHIFT+CTRL+V",action:function(){
 				var sel=this.GetSelection();
 				var ed=this.ed;
@@ -1121,6 +1129,7 @@ UI.RegisterEditorPlugin(function(){
 				UI.Refresh()
 			}.bind(this)})
 			menu_edit.$=menu_edit.$.concat(bk_children)
+			menu_edit=undefined;
 		}
 	})
 }).prototype.name="Smart paste";
@@ -1161,6 +1170,7 @@ UI.RegisterEditorPlugin(function(){
 					return 1
 				}
 			}.bind(this)})
+			menu_edit=undefined;
 		}
 	})
 }).prototype.name="Line / word deletion";
@@ -1234,11 +1244,9 @@ UI.RegisterEditorPlugin(function(){
 		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
-			var obj=this
 			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({icon:"释",text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:function(){
-				fcomment.call(obj)
-			}})
+			menu_edit.AddNormalItem({icon:"释",text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:fcomment.bind(this)})
+			menu_edit=undefined;
 		}
 	})
 }).prototype.name="Comment / uncomment";
@@ -1291,12 +1299,13 @@ UI.RegisterEditorPlugin(function(){
 				menu_edit.AddNormalItem({text:"&Dedent selection",enable_hotkey:0,key:"SHIFT+TAB",action:function(){
 					return indentText.call(obj,-1)
 				}})
-				this.AddEventHandler('TAB',function(){
+				this.AddTransientHotkey('TAB',function(){
 					return indentText.call(this,1)
 				})
-				this.AddEventHandler('SHIFT+TAB',function(){
+				this.AddTransientHotkey('SHIFT+TAB',function(){
 					return indentText.call(this,-1)
 				})
+				menu_edit=undefined;
 			}
 		}
 	})
@@ -1872,9 +1881,7 @@ UI.RegisterEditorPlugin(function(){
 	var listening_keys=[")","]","}"]
 	for(var i=0;i<listening_keys.length;i++){
 		var C=listening_keys[i];
-		(function(C){
-			this.AddEventHandler(C,function(){return f_key_test.call(this,C)})
-		}).call(this,C);
+		this.AddEventHandler(C,f_key_test.bind(this,C))
 	}
 }).prototype.name="Auto-indent";
 
@@ -2158,9 +2165,7 @@ UI.RegisterEditorPlugin(function(){
 	var listening_keys=["{","[","(","'","\"","$",")","]","}"]
 	for(var i=0;i<listening_keys.length;i++){
 		var C=listening_keys[i];
-		(function(C){
-			this.AddEventHandler(C,function(){return f_key_test.call(this,C)})
-		}).call(this,C);
+		this.AddEventHandler(C,f_key_test.bind(this,C))
 	}
 }).prototype.name="Bracket completion";
 
@@ -2294,6 +2299,7 @@ UI.RegisterEditorPlugin(function(){
 				this.CallOnSelectionChange();
 				UI.Refresh()
 			}.bind(this)})
+			menu_edit=undefined;
 		}
 	})
 	this.AddEventHandler('selectionChange',function(){
@@ -2376,6 +2382,7 @@ UI.RegisterEditorPlugin(function(){
 					}
 				}.bind(this)})
 			}
+			menu_edit=undefined;
 		}
 	})
 }).prototype.name="Unicode conversion";
@@ -2405,6 +2412,7 @@ UI.RegisterEditorPlugin(function(){
 				this.scrolling_animation=undefined
 				UI.Refresh()
 			}.bind(this)})
+			menu_edit=undefined;
 		}
 	})
 	//this.AddEventHandler('load',function(){
@@ -2523,7 +2531,7 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('beforeEdit',function(ops){
 		this.m_autoedit_example_line_id=-1
 		var ctx=this.m_autoedit_context
-		if(!ctx&&this.m_detect_autoedit_at!=undefined){
+		if(!ctx&&this.m_detect_autoedit_at!=undefined&&this.m_detect_autoedit_at>=0&&this.m_detect_autoedit_at<=this.ed.GetTextSize()){
 			for(var i=0;i<ops.length;i+=3){
 				var s=ops[i+2];
 				if(s&&s.indexOf('\n')>=0){
@@ -2648,6 +2656,7 @@ UI.RegisterEditorPlugin(function(){
 						renderer.ResetTentativeOps()
 					}
 				})
+			menu_edit=undefined;
 		}
 	})
 	this.AddEventHandler('ESC',function(){

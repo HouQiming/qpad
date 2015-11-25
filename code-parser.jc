@@ -1329,9 +1329,27 @@ struct TGlobalKeyDeclItem
 	int epos0
 	int w,x
 class CKeyDeclFile
+	int gc_flag
 	llnodes=new int[]
 	u64 timestamp
 	CFileIndex fidx
+	int[] idfn_parsemore_deps
+	auto discard()
+		foreach p in llnodes
+			//break link
+			pw=g_key_decls[p].w
+			px=g_key_decls[p].x
+			if pw<0:
+				g_symbols[~pw].gkd_x=px
+			else
+				g_key_decls[pw].x=px
+			if px<0:
+				g_symbols[~px].gkd_w=pw
+			else
+				g_key_decls[px].w=pw
+			//free node
+			g_key_decls[p].x=g_key_decl_freelist
+			g_key_decl_freelist=p
 g_key_decl_files=new CKeyDeclFile[int] //this is sparse enough to make a separate map worthwhile?
 g_key_decls=[TGlobalKeyDeclItem()] //leave [0] as a sentential
 g_key_decl_freelist=-1
@@ -1350,21 +1368,7 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 	//remove previous on reparse to avoid ordering issues
 	prev_kdf=g_key_decl_files[idfn]
 	if prev_kdf:
-		foreach p in prev_kdf.llnodes
-			//break link
-			pw=g_key_decls[p].w
-			px=g_key_decls[p].x
-			if pw<0:
-				g_symbols[~pw].gkd_x=px
-			else
-				g_key_decls[pw].x=px
-			if px<0:
-				g_symbols[~px].gkd_w=pw
-			else
-				g_key_decls[px].w=pw
-			//free node
-			g_key_decls[p].x=g_key_decl_freelist
-			g_key_decl_freelist=p
+		prev_kdf.discard()
 	kdf=new CKeyDeclFile(){timestamp:timestamp}
 	llnodes=kdf.llnodes
 	foreach kd in all_key_decls
@@ -1460,7 +1464,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				jsret["file_index"]=prev_kdf.fidx
 				return JS.Return(jsret)
 			//call JS to get the language desc
+			n0_parsemore=g_c_like_parse_queue.n
 			options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
+			n1_parsemore=g_c_like_parse_queue.n
 			sparser=options["parser"].or("text")
 			if sparser=="none":
 				ids=new int[]
@@ -1471,6 +1477,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			else
 				sdata=System.IO.ReadAll(fn)
 				if !sdata:continue
+				//Writeln('ED_ParserMore ',fn)
 				if sparser=="C":
 					ret=parseAsCLike(JS,idfn,sdata,options)
 				else
@@ -1479,11 +1486,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				if ret.m_all_key_decls:
 					kdf=ApplyKeyDecls(idfn,ret.m_all_key_decls,timestamp)
 					kdf.fidx=ret
+					if n0_parsemore<n1_parsemore:
+						kdf.idfn_parsemore_deps=new(g_c_like_parse_queue[n0_parsemore:n1_parsemore-1])
 			g_color_table_time++
 			jsret=JS.New()
 			jsret["file_name"]=fn
 			jsret["file_index"]=ret
 			return JS.Return(jsret)
+		g_c_like_parse_queue.discard()
 		return 0
 	}
 	JS_UI["ED_QueryAutoCompletion"]=function(JSContext JS){
@@ -1810,7 +1820,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if prev_kdf:
 				prev_kdf.timestamp=0uLL//force reparse
 		g_c_like_parse_queue.push(g_dangling_deps_queue)
-		g_dangling_deps_queue.clear()
+		g_dangling_deps_queue.discard()
 		return JS.Return(1)
 	}
 	JS_UI["ED_CopyCase"]=function(JSContext JS){
@@ -1822,5 +1832,38 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if s_tar[i]==s_src_lower[i]||s_tar[i]==s_src_upper[i]:
 				s_src[i]=s_tar[i]
 		return JS.Return(Unicode32ToUtf8(s_src))
+	}
+	JS_UI["ED_IndexGCBegin"]=function(JSContext JS){
+		foreach kdf in g_key_decl_files
+			if kdf:
+				kdf.gc_flag=0
+		return 0
+	}
+	igc_mark=function(int idfn){
+		kdf=g_key_decl_files[idfn]
+		if kdf&&!kdf.gc_flag:
+			//Writeln('igc_mark: ',getIdString(idfn))
+			kdf.gc_flag=1
+			fidx=kdf.fidx
+			if fidx&&fidx.m_dep_files:
+				foreach idfn2 in fidx.m_dep_files
+					igc_mark(idfn2)
+			if kdf.idfn_parsemore_deps:
+				foreach idfn2 in kdf.idfn_parsemore_deps
+					igc_mark(idfn2)
+	}
+	JS_UI["ED_IndexGCMark"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		idfn=getid(fn)
+		igc_mark(idfn)
+		return 0
+	}
+	JS_UI["ED_IndexGCEnd"]=function(JSContext JS){
+		foreach kdf,id in g_key_decl_files
+			if kdf&&!kdf.gc_flag:
+				kdf.discard()
+				g_key_decl_files[id]=CKeyDeclFile.NULL
+				//Writeln('index gc collected: ',getIdString(id))
+		return 0
 	}
 })

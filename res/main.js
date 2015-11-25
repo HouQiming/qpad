@@ -745,6 +745,10 @@ UI.ZoomReset=function(){
 	UI.UpdateZoom()
 }
 
+UI.BeforeGC=function(){
+	UI.ED_IndexGC();
+};
+
 var g_app_inited=0;
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
@@ -950,6 +954,10 @@ UI.Application=function(id,attrs){
 			menu_file.AddNormalItem({text:"E&xit",action:function(){
 				if(!app.OnClose()){UI.DestroyWindow(app)}
 			}});
+			menu_file=undefined;
+			//if(!UI.m_current_file_list){
+			//	UI.ClearFileListingCache();
+			//}
 		UI.End();
 	UI.End();
 	if(!g_app_inited){
@@ -998,44 +1006,20 @@ UI.Application=function(id,attrs){
 	if(UI.Platform.BUILD=="debug"){
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
+			UI.BeforeGC()
 			Duktape.gc()
 			UI.dumpMemoryUsage();
 			UI.detectLeaks();
 		}});
 		W.Hotkey("",{key:"SHIFT+CTRL+M",action:function(){
 			print("=== manual gc call")
+			UI.BeforeGC()
 			Duktape.gc()
 			UI.debugDumpHeap()
+			UI.debugDumpFragmentation()
 		}});
 	}
 };
 
 UI.Run();
 
-/*if(UI.Platform.BUILD=="debug"){
-	//detect memory leaks
-	print("=== run gc")
-	Duktape.gc()
-	UI.debugDumpHeap()
-	print("=== get rid of UI shit and run gc again")
-	UI.top=undefined
-	UI.m_global_menu=undefined
-	UI.frame_callbacks=undefined
-	UI.context_paint_queue=undefined
-	UI.context_regions=undefined
-	UI.context_tentative_focus=undefined
-	UI.context_hotkeys=undefined
-	UI.m_the_document_area=undefined
-	UI.nd_focus=undefined
-	UI.nd_mouse_over=undefined
-	UI.m_editor_plugins=undefined
-	UI.m_current_file_list=undefined
-	Duktape.gc()
-	print("=== detect leaks")
-	UI.detectLeaks();
-	print("=== heap dump")
-	UI.debugDumpHeap()
-	//print("=== wipe stash and gc")
-	//UI.debugWipeStash()
-	//Duktape.gc()
-}*/

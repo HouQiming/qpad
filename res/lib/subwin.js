@@ -410,9 +410,9 @@ W.TabbedDocument=function(id,attrs){
 							W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:
 								(function(obj,i){
 									obj.m_is_in_menu=1;
-									obj.m_menu_preselect=i
+									obj.m_menu_preselect=i;
 									//g_menu_action_invoked=0;
-									UI.m_frozen_global_menu=UI.m_global_menu
+									UI.m_frozen_global_menu=UI.m_global_menu;
 									UI.InvalidateCurrentFrame()
 									UI.Refresh()
 								}).bind(null,obj,i)})
@@ -421,7 +421,6 @@ W.TabbedDocument=function(id,attrs){
 				}
 			}
 		}
-		bk_menu=undefined;
 		W.Button("main_menu_button",{
 			x:obj.x+obj.padding,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
 			style:obj.menu_button_style,
@@ -568,6 +567,7 @@ W.TabbedDocument=function(id,attrs){
 			}).bind(null,obj,i)})
 		}
 	}
+	bk_menu=undefined;
 	UI.m_the_document_area=obj
 	return obj
 }

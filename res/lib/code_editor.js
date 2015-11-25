@@ -202,7 +202,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	///////////////////////////////
 	GetIndentLevel:function(ccnt){
-		return this.GetLC(Math.min(this.GetEnhancedHome(ccnt),ccnt))[1];
+		var ccnt_home=Math.min(this.GetEnhancedHome(ccnt),ccnt)
+		return ccnt_home-this.ed.MoveToBoundary(ccnt_home,-1,"space");
 	},
 	FindOuterIndentation:function(ccnt){
 		var ed=this.ed;
@@ -231,7 +232,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		return delta<0?ccnt_raw:(ccnt_raw+1-this.BracketSizeAt(ccnt_raw,0))
 	},
 	FindOuterLevel:function(ccnt){
-		var ret=Math.max(this.FindOuterBracket_SizeFriendly(ccnt,-1),this.FindOuterIndentation(ccnt))
+		var ccnt_bracket=this.FindOuterBracket_SizeFriendly(ccnt,-1);
+		var ccnt_indent=this.FindOuterIndentation(ccnt);
+		if(ccnt_bracket>=0&&ccnt_indent>=0){
+			if(this.GetIndentLevel(ccnt_indent)<=this.GetIndentLevel(ccnt_bracket)){
+				//#endif and stuff in C, ignore it
+				ccnt_indent=ccnt_bracket;
+			}
+		}
+		var ret=Math.max(ccnt_bracket,ccnt_indent)
 		if(ret>=ccnt){ret=-1;}
 		return ret
 	},
@@ -484,10 +493,10 @@ var CallParseMore=function(){
 			}
 			UI.NextTick(fcallmore)
 		}else{
-			g_is_parse_more_running=0
+			g_is_parse_more_running=0;
 		}
 	});
-	g_is_parse_more_running=1
+	g_is_parse_more_running=1;
 	UI.NextTick(fcallmore)
 };
 
@@ -522,6 +531,39 @@ var fsave_code_editor=UI.HackCallback(function(){
 		this.CreateNotification({id:'saving_progress',icon:'错',text:"Failed to save it"})
 	}
 });
+
+var find_context_prototype={
+	CreateHighlight:function(ccnt0,ccnt1){
+		var doc=this.m_owner.doc
+		var locator_0=doc.ed.CreateLocator(ccnt0,-1);locator_0.undo_tracked=0;
+		var locator_1=doc.ed.CreateLocator(ccnt1,-1);locator_1.undo_tracked=0;
+		var hlobj=doc.ed.CreateHighlight(locator_0,locator_1,-1)
+		hlobj.color=this.m_owner.find_item_highlight_color;
+		hlobj.invertible=0;
+		this.m_highlight_ranges.push(hlobj);
+		this.m_locators.push(locator_0);
+		this.m_locators.push(locator_1);
+		UI.Refresh()
+	},
+	ReportMatchForward:function(ccnt0,ccnt1){
+		this.m_forward_matches.push(ccnt0,ccnt1)
+		this.CreateHighlight(ccnt0,ccnt1)
+		return 1024
+	},
+	ReportMatchBackward:function(ccnt0,ccnt1){
+		this.m_backward_matches.push(ccnt0,ccnt1)
+		this.CreateHighlight(ccnt0,ccnt1)
+		return 1024
+	},
+	Cancel:function(){
+		for(var i=0;i<this.m_highlight_ranges.length;i++){
+			this.m_highlight_ranges[i].discard()
+		}
+		for(var i=0;i<this.m_locators.length;i++){
+			this.m_locators[i].discard()
+		}
+	},
+};
 
 W.CodeEditorWidget_prototype={
 	m_current_wrap_width:1024,
@@ -821,37 +863,8 @@ W.CodeEditorWidget_prototype={
 			m_current_merged_item:0,
 			m_y_extent_backward:0,
 			m_y_extent_forward:0,
-			CreateHighlight:function(ccnt0,ccnt1){
-				var doc=this.m_owner.doc
-				var locator_0=doc.ed.CreateLocator(ccnt0,-1);locator_0.undo_tracked=0;
-				var locator_1=doc.ed.CreateLocator(ccnt1,-1);locator_1.undo_tracked=0;
-				var hlobj=doc.ed.CreateHighlight(locator_0,locator_1,-1)
-				hlobj.color=this.m_owner.find_item_highlight_color;
-				hlobj.invertible=0;
-				this.m_highlight_ranges.push(hlobj);
-				this.m_locators.push(locator_0);
-				this.m_locators.push(locator_1);
-				UI.Refresh()
-			},
-			ReportMatchForward:function(ccnt0,ccnt1){
-				this.m_forward_matches.push(ccnt0,ccnt1)
-				this.CreateHighlight(ccnt0,ccnt1)
-				return 1024
-			},
-			ReportMatchBackward:function(ccnt0,ccnt1){
-				this.m_backward_matches.push(ccnt0,ccnt1)
-				this.CreateHighlight(ccnt0,ccnt1)
-				return 1024
-			},
-			Cancel:function(){
-				for(var i=0;i<this.m_highlight_ranges.length;i++){
-					this.m_highlight_ranges[i].discard()
-				}
-				for(var i=0;i<this.m_locators.length;i++){
-					this.m_locators[i].discard()
-				}
-			},
 		}
+		ctx.__proto__=find_context_prototype;
 		this.m_current_find_context=ctx
 		var y_id=doc.ed.XYFromCcnt(ccnt).y
 		var y_id0=Math.max(y_id-hc,0),y_id1=Math.min(y_id+hc*2,ytot)
@@ -1447,7 +1460,9 @@ W.CodeEditorWidget_prototype={
 				ns[0]=item
 				//if(!i){
 				//item.x_shake=this.x_shake_notification
-				this.notification_list[item.id].dx_shake=this.dx_shake_notification
+				if(this.notification_list&&this.notification_list[item.id]){
+					this.notification_list[item.id].dx_shake=this.dx_shake_notification
+				}
 				//}
 				return
 			}
@@ -1667,6 +1682,12 @@ var DetectRepository=function(fname){
 	return ret;
 }
 
+UI.ClearFileListingCache=function(){
+	g_repo_from_file={}
+	g_repo_list={}
+	g_is_repo_detected={}
+}
+
 var FILE_LISTING_BUDGET=100
 W.FileItemOnDemand=function(){
 	if(this.git_repo_to_list){
@@ -1869,6 +1890,7 @@ var OpenInPlace=function(obj,name){
 	obj.m_is_preview=undefined;
 	UI.top.app.quit_on_zero_tab=0;
 	UI.m_current_file_list=undefined
+	UI.ClearFileListingCache();
 	UI.Refresh()
 }
 
@@ -1918,10 +1940,10 @@ W.FileItem=function(id,attrs){
 					icon_code='开'.charCodeAt(0)
 				}
 				if(obj.name_to_create){
-					ext_color=0xff000000
+					ext_color=0x55000000
 					icon_code='新'.charCodeAt(0)
 				}
-				var sel_bgcolor=ext_color
+				var sel_bgcolor=(ext_color|0xff000000)
 				//////////////
 				var icon_font=UI.Font(UI.icon_font_name,obj.h_icon)
 				var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
@@ -1933,16 +1955,17 @@ W.FileItem=function(id,attrs){
 				}
 				UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-obj.h_icon)*0.5,ext_color,icon_code)
 				var sname=GetSmartFileName(obj)
+				if(obj.name_to_create){sname="";}
 				var lg_basepath=obj.name.length-sname.length
 				if(lg_basepath>0){
 					W.Text("",{x:obj.x+w_icon,y:obj.y+4,
 						font:obj.name_font,text:obj.name.substr(0,lg_basepath),
-						color:obj.selected?obj.sel_basepath_color:obj.basepath_color})
+						color:obj.name_to_create?(obj.selected?obj.sel_misc_color:obj.misc_color):(obj.selected?obj.sel_basepath_color:obj.basepath_color)})
 				}
 				W.Text("",{x:obj.x+w_icon+UI.MeasureText(obj.name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+4,
 					font:obj.name_font,text:sname,
 					color:obj.selected?obj.sel_name_color:obj.name_color})
-				if(obj.history_hl_ranges){
+				if(obj.history_hl_ranges&&!obj.name_to_create){
 					//highlight keywords in history items only
 					//var base_offset=obj.selected?0:(obj.name.length-sname.length);
 					for(var i=0;i<obj.history_hl_ranges.length;i+=2){
@@ -1974,7 +1997,7 @@ W.FileItem=function(id,attrs){
 					W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
 						font:ext_font,text:s_ext,
 						color:ext_color})
-				}else if(desc.file_icon=="プ"){
+				}else if(desc.file_icon=="プ"||obj.name_to_create){
 					s_ext=s_ext.toUpperCase()
 					var ext_dims=UI.MeasureText(UI.Font(UI.eng_font_name,24),s_ext)
 					var ext_font=UI.Font(UI.eng_font_name,Math.min(24*24/ext_dims.w,24))
@@ -2267,7 +2290,8 @@ var fnewpage_findbar_plugin=function(){
 				editor_widget.m_file_name_before_preview=undefined
 			}
 		}
-		UI.m_current_file_list=undefined
+		UI.m_current_file_list=undefined;
+		UI.ClearFileListingCache();
 		UI.Refresh()
 	})
 	var fpassthrough=function(key,event){
@@ -2543,44 +2567,46 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
 		{key:"SHIFT+CTRL+D",text:"edit_up",icon:"上",tooltip:'Prev - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),action:fprev},
 		{key:"ALT+A",text:"edit_all",icon:"换",tooltip:'All - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),action:fall},
 		{key:"CTRL+D",text:"edit_down",icon:"下",tooltip:'Next - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),action:fnext}])
-	var sz_button=obj.autoedit_button_size;
-	var padding=obj.autoedit_button_padding;
-	var x_button_box=x-sz_button-padding*2;
-	var y_button_box=y-sz_button*1.5-padding;
-	var w_button_box=sz_button+padding*2;
-	var h_button_box=sz_button*3+padding*2;
-	UI.RoundRect({
-		x:x_button_box-obj.accands_shadow_size, y:y_button_box, 
-		w:w_button_box+obj.accands_shadow_size*2, h:h_button_box+obj.accands_shadow_size,
-		round:obj.accands_shadow_size,
-		border_width:-obj.accands_shadow_size,
-		color:obj.accands_shadow_color})
-	UI.RoundRect({
-		x:x_button_box, y:y_button_box,
-		w:w_button_box, h:h_button_box,
-		border_width:obj.accands_border_width,
-		border_color:obj.accands_border_color,
-		round:obj.accands_round,
-		color:obj.accands_bgcolor})
-	//do the three buttons
-	W.Button("button_edit_up",{style:UI.default_styles.check_button,
-		x:x_button_box+padding,y:y_button_box+sz_button*0+padding,
-		w:sz_button,h:sz_button,
-		font:UI.icon_font_20,text:"上",tooltip:stext2.replace("@1","prev")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),
-		tooltip_placement:'right',
-		OnClick:fprev})
-	W.Button("button_edit_all",{style:UI.default_styles.check_button,
-		x:x_button_box+padding,y:y_button_box+sz_button*1+padding,
-		w:sz_button,h:sz_button,
-		font:UI.icon_font_20,text:"换",tooltip:stext2.replace("@1","all")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),
-		tooltip_placement:'right',
-		OnClick:fall})
-	W.Button("button_edit_down",{style:UI.default_styles.check_button,
-		x:x_button_box+padding,y:y_button_box+sz_button*2+padding,
-		w:sz_button,h:sz_button,
-		font:UI.icon_font_20,text:"下",tooltip:stext2.replace("@1","next")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),
-		tooltip_placement:'right',
-		OnClick:fnext})
+	if(obj.doc.m_user_just_typed_char){
+		var sz_button=obj.autoedit_button_size;
+		var padding=obj.autoedit_button_padding;
+		var x_button_box=x-sz_button-padding*2;
+		var y_button_box=y-sz_button*1.5-padding;
+		var w_button_box=sz_button+padding*2;
+		var h_button_box=sz_button*3+padding*2;
+		UI.RoundRect({
+			x:x_button_box-obj.accands_shadow_size, y:y_button_box, 
+			w:w_button_box+obj.accands_shadow_size*2, h:h_button_box+obj.accands_shadow_size,
+			round:obj.accands_shadow_size,
+			border_width:-obj.accands_shadow_size,
+			color:obj.accands_shadow_color})
+		UI.RoundRect({
+			x:x_button_box, y:y_button_box,
+			w:w_button_box, h:h_button_box,
+			border_width:obj.accands_border_width,
+			border_color:obj.accands_border_color,
+			round:obj.accands_round,
+			color:obj.accands_bgcolor})
+		//do the three buttons
+		W.Button("button_edit_up",{style:UI.default_styles.check_button,
+			x:x_button_box+padding,y:y_button_box+sz_button*0+padding,
+			w:sz_button,h:sz_button,
+			font:UI.icon_font_20,text:"上",tooltip:stext2.replace("@1","prev")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),
+			tooltip_placement:'right',
+			OnClick:fprev})
+		W.Button("button_edit_all",{style:UI.default_styles.check_button,
+			x:x_button_box+padding,y:y_button_box+sz_button*1+padding,
+			w:sz_button,h:sz_button,
+			font:UI.icon_font_20,text:"换",tooltip:stext2.replace("@1","all")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),
+			tooltip_placement:'right',
+			OnClick:fall})
+		W.Button("button_edit_down",{style:UI.default_styles.check_button,
+			x:x_button_box+padding,y:y_button_box+sz_button*2+padding,
+			w:sz_button,h:sz_button,
+			font:UI.icon_font_20,text:"下",tooltip:stext2.replace("@1","next")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),
+			tooltip_placement:'right',
+			OnClick:fnext})
+	}
 }
 
 UI.ED_ParseMore_callback=function(fn){
@@ -2717,6 +2743,7 @@ W.CodeEditor=function(id,attrs){
 			//top hint in a separate area
 			if(obj.show_top_hint&&!obj.show_find_bar){
 				var top_hints=[];
+				//var top_hints_indent=[];
 				var rendering_ccnt0=doc.SeekXY(doc.scroll_x,doc.scroll_y)
 				var ccnt=doc.GetEnhancedHome(doc.sel1.ccnt)
 				//prev_h_top_hint
@@ -2725,7 +2752,14 @@ W.CodeEditor=function(id,attrs){
 					ccnt=doc.FindOuterLevel(ccnti)
 					if(ccnt<0||ccnt>=ccnti){break}
 					if(ccnt<rendering_ccnt0){
+						//var ilevel=doc.GetIndentLevel(ccnt);
+						//remove the under-indented: #endif and stuff in C
+						//while(top_hints_indent.length&&top_hints_indent[top_hints_indent.length-1]<ilevel){
+						//	top_hints.pop()
+						//	top_hints_indent.pop()
+						//}
 						top_hints.push(ccnt)
+						//top_hints_indent.push(ilevel)
 					}
 					if(top_hints.length>=obj.top_hint_max_levels){break;}
 				}
@@ -2733,8 +2767,18 @@ W.CodeEditor=function(id,attrs){
 					//convert to bbs
 					var top_hint_inv=[];
 					for(var i=top_hints.length-1;i>=0;i--){
-						top_hint_inv.push(top_hints[i]);
+						var ccnt=top_hints[i];
+						if(doc.ed.GetUtf8CharNeighborhood(ccnt)[1]==0x7B){
+							//lonely { case
+							var ccnt_ehome=doc.ed.MoveToBoundary(ccnt,-1,"space");
+							if(doc.ed.GetUtf8CharNeighborhood(ccnt_ehome)[0]==10&&ccnt_ehome>0){
+								//\n space {, guilty
+								ccnt=ccnt_ehome-1;
+							}
+						}
+						top_hint_inv.push(ccnt);
 					}
+					top_hints=undefined;
 					var line_xys=doc.ed.GetXYEnMasse(top_hint_inv)
 					var hc=UI.GetCharacterHeight(doc.font)
 					var eps=hc/16;
@@ -2826,15 +2870,14 @@ W.CodeEditor=function(id,attrs){
 				var rendering_ccnt0=doc.SeekXY(scroll_x,y0_rendering)
 				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,y1_rendering)
 				obj.ResetFindingContext(UI.m_ui_metadata.find_state.m_current_needle,UI.m_ui_metadata.find_state.m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
-				var ctx=obj.m_current_find_context
-				current_find_context=ctx
-				//print(UI.GetSearchFrontierCcnt(ctx.m_backward_frontier),UI.GetSearchFrontierCcnt(ctx.m_forward_frontier),ctx.m_backward_frontier,ctx.m_forward_frontier,ctx.m_flags)
-				if(!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)&&UI.GetSearchFrontierCcnt(ctx.m_backward_frontier)>rendering_ccnt0){
-					ctx.m_backward_frontier=UI.ED_Search(doc.ed,ctx.m_backward_frontier,-1,ctx.m_needle,ctx.m_flags,65536,ctx.ReportMatchBackward,ctx)
+				current_find_context=obj.m_current_find_context
+				//print(UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier),UI.GetSearchFrontierCcnt(current_find_context.m_forward_frontier),current_find_context.m_backward_frontier,current_find_context.m_forward_frontier,current_find_context.m_flags)
+				if(!UI.IsSearchFrontierCompleted(current_find_context.m_backward_frontier)&&UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier)>rendering_ccnt0){
+					current_find_context.m_backward_frontier=UI.ED_Search(doc.ed,current_find_context.m_backward_frontier,-1,current_find_context.m_needle,current_find_context.m_flags,65536,current_find_context.ReportMatchBackward,current_find_context)
 					UI.Refresh()
 				}
-				if(!UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)&&UI.GetSearchFrontierCcnt(ctx.m_forward_frontier)<rendering_ccnt1){
-					ctx.m_forward_frontier=UI.ED_Search(doc.ed,ctx.m_forward_frontier,1,ctx.m_needle,ctx.m_flags,65536,ctx.ReportMatchForward,ctx);
+				if(!UI.IsSearchFrontierCompleted(current_find_context.m_forward_frontier)&&UI.GetSearchFrontierCcnt(current_find_context.m_forward_frontier)<rendering_ccnt1){
+					current_find_context.m_forward_frontier=UI.ED_Search(doc.ed,current_find_context.m_forward_frontier,1,current_find_context.m_needle,current_find_context.m_flags,65536,current_find_context.ReportMatchForward,current_find_context);
 					UI.Refresh()
 				}
 			}
@@ -3837,10 +3880,11 @@ W.CodeEditor=function(id,attrs){
 							for(;;){
 								ccnt=doc.FindOuterLevel(ccnt);
 								if(!(ccnt>=0)){ccnt=0;}
+								var ccnt_query=ccnt;
 								if(doc.m_diff_from_save){
-									ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
+									ccnt_query=doc.m_diff_from_save.CurrentToBase(ccnt_query)
 								}
-								var ccnt_decl=UI.ED_QueryDecl(doc,ccnt,id)
+								var ccnt_decl=UI.ED_QueryDecl(doc,ccnt_query,id)
 								if(ccnt_decl>=0){
 									if(doc.m_diff_from_save){
 										ccnt_decl=doc.m_diff_from_save.BaseToCurrent(ccnt_decl)
@@ -3887,6 +3931,8 @@ W.CodeEditor=function(id,attrs){
 					}.bind(obj)})
 				}
 				doc.CallHooks('menu')
+				menu_edit=undefined;
+				menu_search=undefined;
 			}
 		}
 		if(UI.enable_timing){
@@ -4037,6 +4083,8 @@ W.CodeEditor=function(id,attrs){
 	if(UI.enable_timing){
 		print('CodeEditor time=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
 	}
+	//wiping
+	current_find_context=undefined;
 	return obj
 }
 
@@ -4150,9 +4198,7 @@ UI.NewCodeEditorTab=function(fname0){
 UI.RegisterLoaderForExtension("*",function(fname){return UI.NewCodeEditorTab(fname)})
 
 UI.OpenEditorWindow=function(fname,fcallback){
-	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-		fname=fname.toLowerCase()
-	}
+	fname=IO.NormalizeFileName(fname);
 	var obj_tab=undefined;
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		if(UI.g_all_document_windows[i].file_name==fname){
@@ -4251,4 +4297,15 @@ UI.ForgetFile=function(obj_fileitem){
 	UI.Refresh()
 }
 
-//UI.enable_timing=1
+UI.ED_IndexGC=function(){
+	UI.ED_IndexGCBegin()
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var obj_tab=UI.g_all_document_windows[i]
+		if(obj_tab.main_widget&&obj_tab.main_widget.doc&&!obj_tab.main_widget.m_is_preview){
+			UI.ED_IndexGCMark(obj_tab.main_widget.file_name);
+		}
+	}
+	UI.ED_IndexGCEnd()
+}
+
+UI.enable_timing=1

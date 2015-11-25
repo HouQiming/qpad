@@ -3285,6 +3285,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			else
 				sinsert.push(s_target_indent)
 				sinsert.push(sline[pindent_first:])
+			if sinsert.n&&sinsert[sinsert.n-1]=='\r':
+				sinsert.pop()
 			sinsert.push('\n')
 		//sinsert.pop()
 		return JS.Return(sinsert)
