@@ -2423,8 +2423,8 @@ UI.RegisterEditorPlugin(function(){
 	//})
 }).prototype.name="Wrapping";
 
-var ApplyAutoEdit=function(obj,cur_autoedit_ops,line_id){
-	var locs=obj.m_autoedit_locators;
+var ApplyAutoEdit=function(doc,cur_autoedit_ops,line_id){
+	var locs=doc.m_autoedit_locators;
 	var ccnt0=locs[line_id+0].ccnt
 	var ccnt1=locs[line_id+1].ccnt
 	var ret=[]
@@ -2444,13 +2444,15 @@ var ApplyAutoEdit=function(obj,cur_autoedit_ops,line_id){
 	}
 	if(ops_now.length>0){
 		var ccnt=ops_now[ops_now.length-3]
-		obj.SetSelection(ccnt,ccnt)
-		obj.HookedEdit(ops_now);
+		doc.SetSelection(ccnt,ccnt)
+		doc.HookedEdit(ops_now);
 		var s=ops_now[ops_now.length-1]
 		if(s){
-			var ccnt=obj.GetSelection()[0]
-			obj.SetSelection(ccnt,ccnt+Duktape.__byte_length(s))
+			var ccnt=doc.GetSelection()[0]
+			doc.SetSelection(ccnt,ccnt+Duktape.__byte_length(s))
 		}
+		doc.CallOnChange();
+		doc.CallOnSelectionChange();
 	}
 	//removed the processed edit ops
 	return ret
@@ -2604,21 +2606,7 @@ UI.RegisterEditorPlugin(function(){
 		var ed=this.ed
 		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		if(renderer.m_tentative_editops&&renderer.m_tentative_editops.length>0){
-			var locs=this.m_autoedit_locators
-			var sel=this.GetSelection()
-			var line_id=-1;
-			//the line(s) intersected by ops... multi-line edit should cancel it
-			for(var i=0;i<locs.length;i+=2){
-				if(locs[i+1].ccnt>=sel[1]){
-					if(locs[i+0].ccnt<=sel[0]){
-						line_id=i
-						break
-					}
-				}
-			}
-			var cur_autoedit_ops=renderer.m_tentative_editops
 			var menu_edit=UI.BigMenu("&Edit")
-			var this_outer=this;
 			menu_edit.AddSeparator()
 			var ed_caret=this.GetIMECaretXY();
 			var y_caret=(ed_caret.y-this.visible_scroll_y);
@@ -2626,36 +2614,75 @@ UI.RegisterEditorPlugin(function(){
 			UI.DrawPrevNextAllButtons(this.owner,
 				this.owner.x+this.owner.w_line_numbers,this.owner.y+y_caret+hc*0.5, menu_edit,"Apply changes","Apply @1",
 				function(){
+					var locs=this.m_autoedit_locators
+					var sel=this.GetSelection()
+					var line_id=-1;
+					//the line(s) intersected by ops... multi-line edit should cancel it
+					for(var i=0;i<locs.length;i+=2){
+						if(locs[i+1].ccnt>=sel[1]){
+							if(locs[i+0].ccnt<=sel[0]){
+								line_id=i
+								break
+							}
+						}
+					}
+					var cur_autoedit_ops=renderer.m_tentative_editops
 					if(line_id>0){
-						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id-2);
+						renderer.m_tentative_editops=ApplyAutoEdit(this,cur_autoedit_ops,line_id-2);
 						renderer.ResetTentativeOps()
 					}
-				},function(){
+				}.bind(this),function(){
+					var locs=this.m_autoedit_locators
+					var sel=this.GetSelection()
+					var line_id=-1;
+					//the line(s) intersected by ops... multi-line edit should cancel it
+					for(var i=0;i<locs.length;i+=2){
+						if(locs[i+1].ccnt>=sel[1]){
+							if(locs[i+0].ccnt<=sel[0]){
+								line_id=i
+								break
+							}
+						}
+					}
+					var cur_autoedit_ops=renderer.m_tentative_editops
 					if(cur_autoedit_ops.length>0){
 						var ccnt=cur_autoedit_ops[cur_autoedit_ops.length-3];
-						this_outer.SetSelection(ccnt,ccnt);
+						this.SetSelection(ccnt,ccnt);
 					}
-					this_outer.HookedEdit(cur_autoedit_ops);
+					this.HookedEdit(cur_autoedit_ops);
 					if(cur_autoedit_ops.length>0){
 						var s=cur_autoedit_ops[cur_autoedit_ops.length-1]
 						if(s){
-							var ccnt=this_outer.GetSelection()[0]
-							this_outer.SetSelection(ccnt,ccnt+Duktape.__byte_length(s))
+							var ccnt=this.GetSelection()[0]
+							this.SetSelection(ccnt,ccnt+Duktape.__byte_length(s))
 						}
 					}
 					renderer.m_tentative_editops=undefined
 					renderer.ResetTentativeOps()
-					var tmp=this_outer.m_autoedit_example_line_id;
-					this_outer.m_autoedit_example_line_id=-1;
-					this_outer.CallOnChange()
-					this_outer.m_autoedit_example_line_id=tmp;
-					InvalidateAutoEdit.call(this_outer)
-				},function(){
+					var tmp=this.m_autoedit_example_line_id;
+					this.m_autoedit_example_line_id=-1;
+					this.CallOnChange()
+					this.m_autoedit_example_line_id=tmp;
+					InvalidateAutoEdit.call(this)
+				}.bind(this),function(){
+					var locs=this.m_autoedit_locators
+					var sel=this.GetSelection()
+					var line_id=-1;
+					//the line(s) intersected by ops... multi-line edit should cancel it
+					for(var i=0;i<locs.length;i+=2){
+						if(locs[i+1].ccnt>=sel[1]){
+							if(locs[i+0].ccnt<=sel[0]){
+								line_id=i
+								break
+							}
+						}
+					}
+					var cur_autoedit_ops=renderer.m_tentative_editops
 					if(line_id+2<locs.length){
-						renderer.m_tentative_editops=ApplyAutoEdit(this_outer,cur_autoedit_ops,line_id+2)
+						renderer.m_tentative_editops=ApplyAutoEdit(this,cur_autoedit_ops,line_id+2)
 						renderer.ResetTentativeOps()
 					}
-				})
+				}.bind(this))
 			menu_edit=undefined;
 		}
 	})
