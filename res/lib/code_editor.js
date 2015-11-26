@@ -10,8 +10,8 @@ require("res/lib/global_doc");
 var Language=require("res/lib/langdef");
 var MAX_PARSABLE=33554432
 var TOK_TYPE=0x20000000
-var KEY_DECL_CLASS=TOK_TYPE*0
-var KEY_DECL_FUNCTION=TOK_TYPE*1;
+var KEY_DECL_CLASS=TOK_TYPE*1
+var KEY_DECL_FUNCTION=TOK_TYPE*0
 var CALL_GC_DOC_SIZE_THRESHOLD=4194304;
 
 if(!UI.m_ui_metadata.find_state){
@@ -1526,14 +1526,14 @@ var ffindbar_plugin=function(){
 		this.CancelFind();
 	})
 	this.AddEventHandler('RETURN',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		obj.show_find_bar=0;
 		obj.doc.AutoScroll('center')
 		obj.doc.scrolling_animation=undefined
 		UI.Refresh()
 	})
 	this.AddEventHandler('change',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		obj.doc.sel0.ccnt=obj.m_sel0_before_find
 		obj.doc.sel1.ccnt=obj.m_sel1_before_find
 		obj.DestroyReplacingContext();
@@ -1541,7 +1541,7 @@ var ffindbar_plugin=function(){
 		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags|find_flag_mode)
 	})
 	this.AddEventHandler('UP',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			ctx.m_home_end=undefined;
@@ -1553,7 +1553,7 @@ var ffindbar_plugin=function(){
 		}
 	})
 	this.AddEventHandler('DOWN',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			ctx.m_home_end=undefined;
@@ -1566,7 +1566,7 @@ var ffindbar_plugin=function(){
 	})
 	//////////////////////////////////////////////////
 	this.AddEventHandler('PGUP',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			ctx.m_find_scroll_visual_y-=ctx.m_current_visual_h
@@ -1577,7 +1577,7 @@ var ffindbar_plugin=function(){
 		}
 	})
 	this.AddEventHandler('PGDN',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			ctx.m_find_scroll_visual_y+=ctx.m_current_visual_h
@@ -1588,7 +1588,7 @@ var ffindbar_plugin=function(){
 		}
 	})
 	this.AddEventHandler('CTRL+HOME',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			obj.SeekFindItemByVisualY(ctx.m_y_extent_backward,0)
@@ -1598,7 +1598,7 @@ var ffindbar_plugin=function(){
 		}
 	})
 	this.AddEventHandler('CTRL+END',function(){
-		var obj=this.owner
+		var obj=this.find_bar_owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			obj.SeekFindItemByVisualY(ctx.m_y_extent_forward,1e17)
@@ -1618,7 +1618,7 @@ var ParseGit=function(spath){
 		if(match[0].indexOf(':')>=0){
 			return;
 		}
-		var fname=spath+"/"+match[0]
+		var fname=IO.NormalizeFileName(spath+"/"+match[0])
 		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			fname=fname.toLowerCase()
 		}
@@ -1748,6 +1748,7 @@ W.FileItemOnDemand=function(){
 			return ret
 		}
 		UI.g_file_listing_budget--;
+		fnext.name=IO.NormalizeFileName(fnext.name);
 		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			fnext.name=fnext.name.toLowerCase()
 		}
@@ -2378,6 +2379,9 @@ var FILE_RELEVANCE_SCORE_DECAY=0.99
 //var FILE_RELEVANCE_SAME_REPO_NON_HIST=16
 W.SXS_NewPage=function(id,attrs){
 	//todo: proper refreshing on metadata change
+	//if(!UI.context_parent[id]){
+	//	UI.InvalidateCurrentFrame()
+	//}
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
 	UI.Begin(obj)
 		UI.RoundRect(obj)
@@ -2523,13 +2527,17 @@ W.SXS_NewPage=function(id,attrs){
 			dimension:'y',layout_spacing:0,layout_align:'fill',
 			OnDemand:W.FileItemOnDemand,
 			OnChange:function(value){
-				if(this.value==value){return;}
+				//if(this.value==value){return;}
 				W.ListView_prototype.OnChange.call(this,value)
 				this.OpenPreview(value,"explicit")
 			},
 			OpenPreview:function(value,is_explicit){
 				var editor_widget=obj.owner
 				if(!editor_widget.m_is_brand_new||!UI.HasFocus(obj.find_bar_edit)&&!is_explicit){return;}
+				if(!this.items.length){return;}
+				if(!this.items[value].name||this.items[value].is_dir){return;}
+				var fn=IO.NormalizeFileName(this.items[value].name)
+				if(editor_widget.file_name==fn){return;}
 				if(editor_widget.m_file_name_before_preview){
 					//clear preview first
 					editor_widget.file_name=editor_widget.m_file_name_before_preview
@@ -2538,18 +2546,15 @@ W.SXS_NewPage=function(id,attrs){
 					editor_widget.m_is_preview=0
 					editor_widget.m_file_name_before_preview=undefined
 				}
-				if(!this.items.length){return;}
-				if(!this.items[value].name||this.items[value].is_dir){return;}
-				var fn=this.name
 				if(!editor_widget.m_file_name_before_preview){
 					editor_widget.m_file_name_before_preview=editor_widget.file_name
 				}
-				editor_widget.file_name=this.items[value].name
+				editor_widget.file_name=fn
 				editor_widget.doc=undefined
 				editor_widget.m_language_id=undefined
 				editor_widget.m_is_brand_new=1
 				editor_widget.m_is_preview=1
-				UI.InvalidateCurrentFrame()
+				//UI.InvalidateCurrentFrame()
 				UI.Refresh()
 			},
 			item_template:{
@@ -3666,10 +3671,10 @@ W.CodeEditor=function(id,attrs){
 					plugin_language_desc:doc.plugin_language_desc,
 					style:obj.find_bar_editor_style,
 					x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
-					owner:obj,
+					find_bar_owner:obj,
 					plugins:[ffindbar_plugin],
 					CancelFind:function(){
-						var obj=this.owner
+						var obj=this.find_bar_owner
 						obj.show_find_bar=0;
 						obj.doc.sel0.ccnt=obj.m_sel0_before_find
 						obj.doc.sel1.ccnt=obj.m_sel1_before_find
@@ -4109,14 +4114,20 @@ UI.NewCodeEditorTab=function(fname0){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
 			if(this.main_widget){this.file_name=this.main_widget.file_name}
-			var body=W.CodeEditor("body",{
+			var attrs={
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
 				'file_name':this.file_name,
-			})
+			};
+			if(!this.main_widget){
+				attrs.m_is_brand_new=(!fname0&&this.auto_focus_file_search)
+				if(attrs.m_is_brand_new){
+					UI.InvalidateCurrentFrame();
+				}
+			}
+			var body=W.CodeEditor("body",attrs)
 			if(!this.main_widget){
 				this.main_widget=body;
-				body.m_is_brand_new=(!fname0&&this.auto_focus_file_search)
 				if(this.opening_callbacks.length){
 					if(body.m_finished_loading){
 						var cbs=this.opening_callbacks
@@ -4129,9 +4140,6 @@ UI.NewCodeEditorTab=function(fname0){
 						body.opening_callbacks=this.opening_callbacks
 					}
 					this.opening_callbacks=[]
-				}
-				if(body.m_is_brand_new){
-					UI.InvalidateCurrentFrame();
 				}
 			}
 			var doc=body.doc;

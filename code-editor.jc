@@ -2009,8 +2009,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret.m_kd_color=-1
 		//a unified color theme for now
 		ret.m_key_decl_color_ids=[
-			getWordColorID("color_key_decl_class"),
 			getWordColorID("color_key_decl_func"),
+			getWordColorID("color_key_decl_class"),
 			getWordColorID("color_key_decl_macro")]
 		init_state_by_kwset=new int[]
 		for ksi=0:m_keyword_sets.length()-1
@@ -3283,11 +3283,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					sinsert.push(s_target_indent[:max(s_target_indent.n+pindent-pindent_first,0)-1])
 					sinsert.push(sline[pindent:])
 			else
-				sinsert.push(s_target_indent)
+				if sinsert.n:
+					sinsert.push(s_target_indent)
 				sinsert.push(sline[pindent_first:])
 			if sinsert.n&&sinsert[sinsert.n-1]=='\r':
 				sinsert.pop()
 			sinsert.push('\n')
+		if sinsert.n:
+			sinsert.push(s_target_indent)
 		//sinsert.pop()
 		return JS.Return(sinsert)
 	}

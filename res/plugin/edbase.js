@@ -1117,10 +1117,10 @@ UI.RegisterEditorPlugin(function(){
 				var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
 				var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
 				var ccnt_new=ccnt_lh;
-				if(ccnt_lh<=sel[0]){
-					this.HookedEdit([ccnt_lh,0,sinsert,sel[0],sel[1]-sel[0],undefined])
+				if(ccnt_corrected<=sel[0]){
+					this.HookedEdit([ccnt_corrected,0,sinsert,sel[0],sel[1]-sel[0],undefined])
 				}else{
-					this.HookedEdit([sel[0],sel[1]-sel[0],undefined,ccnt_lh,0,sinsert])
+					this.HookedEdit([sel[0],sel[1]-sel[0],undefined,ccnt_corrected,0,sinsert])
 					ccnt_new-=(sel[1]-sel[0])
 				}
 				this.CallOnChange()
@@ -1435,7 +1435,7 @@ UI.RegisterEditorPlugin(function(){
 
 //bookmarking
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	//the numbered guys
 	for(var i=0;i<10;i++){
 		(function(i){
@@ -1470,19 +1470,26 @@ UI.RegisterEditorPlugin(function(){
 		}).call(this,i)
 	}
 	//the unmarked guys
-	this.AddEventHandler('SHIFT+CTRL+Q',function(){
-		var ed=this.ed;
-		var ccnt=this.sel1.ccnt;
-		var bm0=this.FindNearestBookmark(ccnt,1)
-		if(bm0&&bm0.ccnt==ccnt){
-			this.DeleteBookmark(bm0)
-		}else{
-			this.m_unkeyed_bookmarks.push(ed.CreateLocator(ccnt,-1))
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			//don't put anything up for the numbered guys
+			menu_search.AddSeparator();
+			menu_search.AddNormalItem({text:"Set &bookmark",icon:"签",enable_hotkey:1,key:'SHIFT+CTRL+Q',action:function(){
+				var ed=this.ed;
+				var ccnt=this.sel1.ccnt;
+				var bm0=this.FindNearestBookmark(ccnt,1)
+				if(bm0&&bm0.ccnt==ccnt){
+					this.DeleteBookmark(bm0)
+				}else{
+					this.m_unkeyed_bookmarks.push(ed.CreateLocator(ccnt,-1))
+				}
+				UI.Refresh()
+				return 0;
+			}.bind(this)})
 		}
-		UI.Refresh()
-		return 0;
 	});
-	//todo: menu
 }).prototype.name="Bookmarks";
 
 //point of interest
@@ -2630,6 +2637,9 @@ UI.RegisterEditorPlugin(function(){
 					if(line_id>0){
 						renderer.m_tentative_editops=ApplyAutoEdit(this,cur_autoedit_ops,line_id-2);
 						renderer.ResetTentativeOps()
+						if(!renderer.m_tentative_editops.length){
+							InvalidateAutoEdit.call(this)
+						}
 					}
 				}.bind(this),function(){
 					var locs=this.m_autoedit_locators
@@ -2681,6 +2691,9 @@ UI.RegisterEditorPlugin(function(){
 					if(line_id+2<locs.length){
 						renderer.m_tentative_editops=ApplyAutoEdit(this,cur_autoedit_ops,line_id+2)
 						renderer.ResetTentativeOps()
+						if(!renderer.m_tentative_editops.length){
+							InvalidateAutoEdit.call(this)
+						}
 					}
 				}.bind(this))
 			menu_edit=undefined;

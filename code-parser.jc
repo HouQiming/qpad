@@ -829,8 +829,8 @@ struct TDeclItem
 struct TPrototypeItem
 	int id
 	iptr ptr_prototype
-KEY_DECL_CLASS=TOK_TYPE*0
-KEY_DECL_FUNCTION=TOK_TYPE*1
+KEY_DECL_CLASS=TOK_TYPE*1
+KEY_DECL_FUNCTION=TOK_TYPE*0
 KEY_DECL_MACRO=TOK_TYPE*2
 KEY_DECL_MASK=TOK_TYPE_MASK
 struct TKeyDeclItem
@@ -1074,6 +1074,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					sc=scopes[scopes.n-1]
 					tok0=(i>0?toks[i-1].tok:int(';'))
 					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					if (tok1&TOK_TYPE_MASK)==TOK_ID&&!keyword_map[tok1-TOK_ID]:
+						//followed by another non-keyword id, not a decl
+						break
 					if (!sc.in_assignment||tok1=='=')&&!sc.blevel:
 						//'=' force-cancels assignment to deal with ;-less JS
 						if tok0=='.'&&tok1=='=':
