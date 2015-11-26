@@ -2234,11 +2234,11 @@ var FSTreeView_prototype={
 		}else if(UI.IsHotkey(event,"DOWN")){
 			this.SelectAtY(this.selection_y+this.h_item);
 		}else if(UI.IsHotkey(event,"RETURN")){
-			this.OnEnter()
+			this.OnEnter()
 		}else if(UI.IsHotkey(event,"LEFT")){
-			this.OnEnter("LEFT")
+			this.OnEnter("LEFT")
 		}else if(UI.IsHotkey(event,"RIGHT")){
-			this.OnEnter("RIGHT")
+			this.OnEnter("RIGHT")
 		}
 	},
 }

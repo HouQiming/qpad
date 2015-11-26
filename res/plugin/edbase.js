@@ -68,6 +68,28 @@ var ProcessIncludePaths=function(paths){
 	return ret
 }
 
+var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?[
+	"%INCLUDE%",
+	"%VS120COMNTOOLS%../../VC/include",
+	"%VS110COMNTOOLS%../../VC/include",
+	"%VS100COMNTOOLS%../../VC/include",
+	"%VS90COMNTOOLS%../../VC/include",
+	"%VS80COMNTOOLS%../../VC/include",
+	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/um",
+	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
+	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
+	"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/um",
+	"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
+	"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
+	"%VS90COMNTOOLS%../../../Microsoft SDKs/Windows/v5.0/Include",
+	"c:/mingw/include"
+]:[
+	"${INCLUDE}",
+	"/usr/include",
+	"/usr/local/include",
+	//todo: mac paths
+]);
+
 Language.Register({
 	name:"C/C++",parser:"C",
 	extensions:["c","cxx","cpp","cc","h","hpp"],
@@ -81,27 +103,7 @@ Language.Register({
 			type:['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t','size_t']
 		},1)
 	},
-	include_paths:ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?[
-		"%INCLUDE%",
-		"%VS120COMNTOOLS%../../VC/include",
-		"%VS110COMNTOOLS%../../VC/include",
-		"%VS100COMNTOOLS%../../VC/include",
-		"%VS90COMNTOOLS%../../VC/include",
-		"%VS80COMNTOOLS%../../VC/include",
-		"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/um",
-		"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
-		"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
-		"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/um",
-		"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
-		"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
-		"%VS90COMNTOOLS%../../../Microsoft SDKs/Windows/v5.0/Include",
-		"c:/mingw/include"
-	]:[
-		"${INCLUDE}",
-		"/usr/include",
-		"/usr/local/include",
-		//todo: mac paths
-	])
+	include_paths:standard_c_include_paths
 })
 
 //Language.Register({
@@ -226,7 +228,8 @@ Language.Register({
 				'ushort2','ushort3','ushort4',
 				'uint2','uint3','uint4'],
 		},1)
-	}
+	},
+	include_paths:standard_c_include_paths
 });
 
 Language.Register({
@@ -1858,6 +1861,27 @@ UI.RegisterEditorPlugin(function(){
 			}
 		}
 		return 1
+	})
+	this.AddEventHandler('BACKSPACE',function(){
+		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
+		var ccnt_pos=this.sel1.ccnt;
+		var lineno=this.GetLC(ccnt_pos)[0]
+		var ccnt_lh=this.SeekLC(lineno,0)
+		if(ccnt_pos!=this.ed.MoveToBoundary(ccnt_lh,1,"space")){return 1}
+		var ccnt_indent=this.FindOuterIndentation(ccnt_pos);
+		var ccnt_indent_lh=this.ed.MoveToBoundary(ccnt_indent,-1,"space")
+		var n_remaining=ccnt_indent-ccnt_indent_lh;
+		if(!n_remaining||ccnt_lh+n_remaining<this.ed.GetTextSize()&&this.ed.GetText(ccnt_indent_lh,n_remaining)==this.ed.GetText(ccnt_lh,n_remaining)){
+			if(ccnt_lh+n_remaining<ccnt_pos){
+				//delete to previous indent
+				this.HookedEdit([ccnt_lh+n_remaining,ccnt_pos-(ccnt_lh+n_remaining),null])
+				this.CallOnChange()
+				this.CallOnSelectionChange()
+				UI.Refresh()
+				return 0;
+			}
+		}
+		return 1;
 	})
 	var f_key_test=function(C){
 		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
