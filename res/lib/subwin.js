@@ -159,7 +159,9 @@ W.TabbedDocument_prototype={
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		if(tab.OnDestroy){tab.OnDestroy()}
 		this.CancelTabDragging();
-		UI.SaveWorkspace();
+		if(!this.m_is_close_pending){
+			UI.SaveWorkspace();
+		}
 		UI.Refresh()
 		UI.CallGCLater()
 		if(UI.Platform.BUILD=="debug"){

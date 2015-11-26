@@ -1714,6 +1714,7 @@ UI.RegisterEditorPlugin(function(){
 	//bracket-related auto-indent
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('RETURN RETURN2',function(){
+		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
 		var ed=this.ed;
 		var lang=this.plugin_language_desc
 		var ccnt_pos=this.sel1.ccnt
@@ -1727,7 +1728,6 @@ UI.RegisterEditorPlugin(function(){
 		var blevel=this.GetBracketLevel(ccnt_pos)
 		var ccnt_lbra=this.FindBracket(blevel-1,ccnt_pos,-1)
 		var snewline="\n"
-		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
 		//if(ed.LineEndingMode=="DOS"){
 		//	snewline="\r\n"
 		//}else{
@@ -2151,11 +2151,11 @@ UI.RegisterEditorPlugin(function(){
 			var ccnt1=this.sel1.ccnt
 			if(ccnt1+Duktape.__byte_length(C)==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
 				this.HookedEdit([ccnt1,Duktape.__byte_length(C),C])
-				this.CallOnChange()
 				this.SetCaretTo(ccnt1+Duktape.__byte_length(C))
-				this.CallOnSelectionChange()
 				this.m_user_just_typed_char=1
 				ctx.PopBacStack()
+				this.CallOnChange()
+				this.CallOnSelectionChange()
 				return 0
 			}
 			return 1

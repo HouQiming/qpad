@@ -74,6 +74,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
 		this.m_unkeyed_bookmarks=[];
 		if(this.m_is_main_editor){this.m_diff_from_save=this.ed.CreateDiffTracker()}
+		if(this.owner){
+			this.owner.OnEditorCreate();
+		}
 	},
 	ResetSaveDiff:function(){
 		if(this.m_diff_from_save){
@@ -1688,7 +1691,9 @@ UI.ClearFileListingCache=function(){
 	g_is_repo_detected={}
 }
 
-var FILE_LISTING_BUDGET=100
+//var FILE_LISTING_BUDGET=100
+var FILE_LISTING_BUDGET=16
+UI.g_file_listing_budget=FILE_LISTING_BUDGET;
 W.FileItemOnDemand=function(){
 	if(this.git_repo_to_list){
 		var repo=g_repo_list[this.git_repo_to_list]
@@ -1730,7 +1735,7 @@ W.FileItemOnDemand=function(){
 		this.m_find_context=IO.CreateEnumFileContext(this.name_to_find,3)
 	}
 	var ret=[];
-	for(var i=0;i<FILE_LISTING_BUDGET;i++){
+	while(UI.g_file_listing_budget>0){
 		var fnext=this.m_find_context()
 		if(!fnext){
 			this.m_find_context=undefined;
@@ -1742,6 +1747,7 @@ W.FileItemOnDemand=function(){
 			}
 			return ret
 		}
+		UI.g_file_listing_budget--;
 		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			fnext.name=fnext.name.toLowerCase()
 		}
@@ -1792,7 +1798,8 @@ var GetSmartFileName=function(obj_param){
 					//need to re-get obj0's name
 					obj0.display_name=undefined
 					redo_queue.push(obj0)
-					UI.InvalidateCurrentFrame()
+					//it's OK to display wrong name for a frame
+					//UI.InvalidateCurrentFrame()
 					UI.Refresh()
 					arv[cur_name]='screwed'
 				}
@@ -2401,6 +2408,7 @@ W.SXS_NewPage=function(id,attrs){
 		}
 		////////////////////////////////////////////
 		UI.m_current_file_list=obj.m_current_file_list
+		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
 		var files=obj.m_file_list;
 		var first_time=0
 		if(!files){
@@ -2515,6 +2523,7 @@ W.SXS_NewPage=function(id,attrs){
 			dimension:'y',layout_spacing:0,layout_align:'fill',
 			OnDemand:W.FileItemOnDemand,
 			OnChange:function(value){
+				if(this.value==value){return;}
 				W.ListView_prototype.OnChange.call(this,value)
 				this.OpenPreview(value,"explicit")
 			},
@@ -2885,7 +2894,7 @@ W.CodeEditor=function(id,attrs){
 		//hopefully 8 is the widest char
 		if(obj.show_line_numbers){
 			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
-			w_line_numbers=lmax.toString().length*UI.GetCharacterAdvance(obj.line_number_font,56);
+			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(obj.line_number_font,56);
 		}
 		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4
 		w_line_numbers+=obj.padding+w_bookmark;
@@ -3152,12 +3161,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			if(!doc){
-				//initiate progressive loading
-				//Init
 				doc=obj.doc
-				obj.OnEditorCreate()
-				UI.InvalidateCurrentFrame()
-				UI.Refresh()
 			}
 			if(obj.m_replace_context){
 				//replace hint
@@ -3251,7 +3255,7 @@ W.CodeEditor=function(id,attrs){
 						obj.m_fhint_ctx=fhctx
 					}
 					if(fhctx&&doc.sel1.ccnt-ccnt_fcall_bracket<MAX_PARSABLE_FCALL){
-						var ccnt_rbracket=doc.ed.MoveToBoundary(doc.sel1.ccnt,1,"space")
+						var ccnt_rbracket=doc.ed.MoveToBoundary(doc.sel1.ccnt,1,"space_newline")
 						if(doc.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]==')'.charCodeAt(0)){
 							//do the parsing in native code, GetStateAt then ComputeCharColorID, then do the deed
 							var n_commas=UI.ED_CountCommas(doc.ed,ccnt_fcall_bracket,doc.sel1.ccnt)
@@ -3260,7 +3264,7 @@ W.CodeEditor=function(id,attrs){
 								for(var i=0;i<prototypes.length;i++){
 									var proto_i=prototypes[i]
 									if(n_commas>=proto_i.length){continue;}
-									var ccnt_lcomma=doc.ed.MoveToBoundary(doc.sel1.ccnt,-1,"space")
+									var ccnt_lcomma=doc.ed.MoveToBoundary(doc.sel1.ccnt,-1,"space_newline")
 									var ch_prev=String.fromCharCode(doc.ed.GetUtf8CharNeighborhood(ccnt_lcomma)[0]);
 									var was_comma=(ch_prev==','||ch_prev=='(');
 									var array_fhint=[]
@@ -3813,7 +3817,7 @@ W.CodeEditor=function(id,attrs){
 					UI.Refresh()
 				};
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find})
-				W.Hotkey("",{text:"CTRL+R",action:finvoke_find})
+				W.Hotkey("",{key:"CTRL+R",action:finvoke_find})
 				menu_search.AddButtonRow({text:"Find previous / next"},[
 					{key:"SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+F3',action:function(){
 						obj.FindNext(-1)
@@ -3939,7 +3943,7 @@ W.CodeEditor=function(id,attrs){
 			print('before minimap=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
 		}
 		//minimap / scroll bar
-		if(doc&&w_scrolling_area>0){
+		if(doc&&w_scrolling_area>0&&!UI.m_frame_is_invalid){
 			var y_scrolling_area=obj.y
 			var effective_scroll_y=doc.visible_scroll_y
 			var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
@@ -4049,12 +4053,14 @@ W.CodeEditor=function(id,attrs){
 				color:obj.separator_color})
 		}
 		if(f_draw_accands){
-			f_draw_accands()
+			f_draw_accands();
+			UI.HackCallback(f_draw_accands);
+			f_draw_accands=undefined;
 		}
 		if(UI.enable_timing){
 			print('before notifications=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
 		}
-		if(obj.m_notifications&&!obj.show_find_bar){
+		if(obj.m_notifications&&!obj.show_find_bar&&!UI.m_frame_is_invalid){
 			W.ListView('notification_list',{x:obj.x+w_obj_area-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:h_obj_area-8,
 				dimension:'y',layout_spacing:8,layout_align:'left',is_single_click_mode:1,no_region:1,no_clipping:1,
 				item_template:{
@@ -4123,6 +4129,9 @@ UI.NewCodeEditorTab=function(fname0){
 						body.opening_callbacks=this.opening_callbacks
 					}
 					this.opening_callbacks=[]
+				}
+				if(body.m_is_brand_new){
+					UI.InvalidateCurrentFrame();
 				}
 			}
 			var doc=body.doc;
