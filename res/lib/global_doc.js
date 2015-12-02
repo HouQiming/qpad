@@ -102,6 +102,7 @@ UI.LoadZipDocument=function(fname){
 }
 
 UI.OpenFile=function(fname){
+	fname=IO.NormalizeFileName(fname.replace(new RegExp("\\\\","g"),"/"));
 	var active_document=UI.m_the_document_area.active_tab
 	if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 		UI.m_the_document_area.CloseTab();
@@ -112,7 +113,7 @@ UI.OpenFile=function(fname){
 	return parser(fname)
 }
 
-UI.RegisterLoaderForExtension("mo",function(fname){return UI.LoadZipDocument(fname)})
+//UI.RegisterLoaderForExtension("mo",function(fname){return UI.LoadZipDocument(fname)})
 
 //////////////////////////
 UI.internal_clipboard={}

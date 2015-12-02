@@ -867,7 +867,7 @@ UI.Application=function(id,attrs){
 				UI.UpdateNewDocumentSearchPath()
 				var fn=IO.DoFileDialog(["All File","*.*"],UI.m_new_document_search_path+"/*");
 				if(!fn){return;}
-				UI.OpenFile(fn.replace(new RegExp("\\\\","g"),"/"));
+				UI.OpenFile(fn);
 				UI.Refresh()
 			}});
 			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){

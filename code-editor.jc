@@ -806,7 +806,7 @@ class CLayouter_programmer
 						scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 			return 
 		//the \t\n ignorant hiding
-		HideChars(ed,ccnt_base,color_ids)
+		HideChars(ed,ccnt_base,color_ids,s)
 		enable_hidden=m_enable_hidden
 		//it's OK to have a negative dx_extra
 		//maintain x normally
@@ -1418,7 +1418,7 @@ class CLayouter_programmer
 		p1=m_hidden_ccnts.InlineBisect(inline(i64 a){return a<=ccnt1})
 		return p0==p1&&(p0&1)
 	}
-	HideChars=function(CEditableText ed,i64 ccnt0,u8[] color_ids){
+	HideChars=function(CEditableText ed,i64 ccnt0,u8[] color_ids,string s){
 		//if !m_enable_hidden:return
 		if !m_hidden_ranges_prepared:
 			PrepareHiddenRanges(ed)
@@ -1427,9 +1427,10 @@ class CLayouter_programmer
 			return
 		ccnt_next=m_hidden_ccnts[p]-ccnt0
 		enable_hidden=(m_enable_hidden>=0)
+		i_prev=0L
 		for i=0L:color_ids.n-1
 			if i==ccnt_next:
-				if i&&enable_hidden:color_ids[i-1]|=u8(128)
+				if i&&enable_hidden:color_ids[i_prev]|=u8(128)
 				p++
 				if p>=m_hidden_ccnts.n:
 					return
@@ -1439,8 +1440,10 @@ class CLayouter_programmer
 					color_ids[i]=u8(255)
 				else
 					color_ids[i]|=u8(128)
+			if i32(u8(s[i]))&0xc0!=0x80:
+				i_prev=i
 		if enable_hidden&&color_ids.n==ccnt_next&&color_ids.n:
-			color_ids[color_ids.n-1]|=u8(128)
+			color_ids[i_prev]|=u8(128)
 	}
 	JS_HideRange=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
