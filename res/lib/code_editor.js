@@ -1,6 +1,3 @@
-//todo: long file list perf - "ready" state - begin/end auto-delete
-//todo: degrading performance - could be AC
-//could somehow optimize the current gui2d pipeline - the packing, *the vbo gen*: they are related
 //cacheglyph for composite font
 //wrap-around in search
 var UI=require("gui2d/ui");
@@ -2074,7 +2071,7 @@ var FSTreeItem_prototype={
 		this.owner.selection_y=this.y_abs
 		//icon test for dirs
 		if(this.is_dir){
-			if(event.x-this.x<UI.GetCharacterAdvance(obj.icon_font,0x2b)){
+			if(event.x-this.x<UI.GetCharacterAdvance(this.owner.icon_font,0x2b)){
 				this.owner.OnEnter();
 			}
 		}
@@ -2093,7 +2090,7 @@ var DrawFSTreeItem=function(parent, item,x_abs,y_abs){
 	W.PureRegion(id,obj)
 	//just icon and name
 	var selected=(parent.selection_y==y_abs);
-	var ext_color=(desc.file_icon_color||parent.file_icon_color)
+	var ext_color;
 	var icon_code=0;
 	if(obj.is_dir){
 		ext_color=0xffb4771f
@@ -2103,17 +2100,18 @@ var DrawFSTreeItem=function(parent, item,x_abs,y_abs){
 		var language_id=Language.GetNameByExt(s_ext)
 		var desc=Language.GetDescObjectByName(language_id)
 		icon_code=(desc.file_icon||'档').charCodeAt(0)
+		ext_color=(desc.file_icon_color||parent.file_icon_color);
 	}
 	var w_icon=UI.GetCharacterAdvance(parent.icon_font,icon_code)
 	if(selected){
 		ext_color=parent.sel_file_icon_color
 		UI.RoundRect({
 			x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
-			color:sel_bgcolor})
+			color:parent.sel_bgcolor})
 	}
-	UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-UI.GetFontHeight(parent.icon_font))*0.5,ext_color,icon_code)
+	UI.DrawChar(parent.icon_font,obj.x,obj.y+(obj.h-UI.GetFontHeight(parent.icon_font))*0.5,ext_color,icon_code)
 	W.Text("",{x:obj.x+w_icon,y:obj.y+(obj.h-UI.GetFontHeight(parent.name_font))*0.5,
-		font:parent.name_font,text:obj.name,
+		font:parent.name_font,text:obj.is_dir?obj.name+"/":obj.name,
 		color:selected?parent.sel_name_color:parent.name_color})
 	return obj;
 }
@@ -2129,8 +2127,9 @@ var DrawFSTreeView=function(parent, items, x_abs,y0,h){
 			break;
 		}
 		y_vis=y-parent.visible_scroll_y;
-		if(y_vis<h&&y_vis+item_i.h>0){
-			//visible, draw 
+		//print(y_vis,h,item_i.total_size)
+		if(y_vis<h&&y_vis+item_i.total_size>0){
+			//visible, draw
 			DrawFSTreeItem(parent, item_i,x_abs,y);
 			if(item_i.is_dir==2){
 				//expanded, recurse
@@ -2151,13 +2150,14 @@ var DrawFSTreeView=function(parent, items, x_abs,y0,h){
 
 var FSTreeView_prototype={
 	GetItemByYDfs:function(obj,y0,y_pinpoint){
-		var items=obj.items;
-		var pfile=items.length;
 		var y=y0;
 		if(this!=obj&&y_pinpoint>=y&&y_pinpoint<y+this.h_item){
 			return {'item':obj,'y':y};
 		}
-		y+=this.h_item;
+		var items=obj.items;
+		if(!items){return undefined;}
+		var pfile=items.length;
+		y+=(obj==this?0:this.h_item);
 		for(var i=0;i<items.length;i++){
 			var item_i=items[i];
 			if(!item_i.is_dir){
@@ -2166,8 +2166,14 @@ var FSTreeView_prototype={
 			}
 			if(y_pinpoint>=y&&(y_pinpoint<y+item_i.total_size||i==items.length-1)){
 				//recurse 
-				var ret=GetItemByYDfs(item_i,y,y_pinpoint)
-				ret.path=item_i.name+'/'+ret.path;
+				var ret=this.GetItemByYDfs(item_i,y,y_pinpoint)
+				if(ret){
+					if(ret.path){
+						ret.path=item_i.name+'/'+ret.path;
+					}else{
+						ret.path=item_i.name+'/';
+					}
+				}
 				return ret;
 			}
 			y+=item_i.total_size;
@@ -2180,23 +2186,25 @@ var FSTreeView_prototype={
 		return this.GetItemByYDfs(this,0,y_pinpoint);
 	},
 	HeightDfs:function(obj,y0,y_pinpoint){
-		var items=obj.items;
-		var pfile=items.length;
 		var y=y0+(obj==this?0:this.h_item);
-		for(var i=0;i<items.length;i++){
-			var item_i=items[i];
-			if(!item_i.is_dir){
-				pfile=i;
-				break;
+		var items=obj.items;
+		if(items){
+			var pfile=items.length;
+			for(var i=0;i<items.length;i++){
+				var item_i=items[i];
+				if(!item_i.is_dir){
+					pfile=i;
+					break;
+				}
+				if(y_pinpoint==undefined||y_pinpoint>=y&&y_pinpoint<y+item_i.total_size){
+					//recurse 
+					this.HeightDfs(item_i,y,y_pinpoint==y?undefined:y_pinpoint)
+				}
+				y+=item_i.total_size;
 			}
-			if(y_pinpoint==undefined||y_pinpoint>=y&&y_pinpoint<y+item_i.total_size){
-				//recurse 
-				this.HeightDfs(item_i,y,y_pinpoint==y?undefined:y_pinpoint)
-			}
-			y+=item_i.total_size;
+			y+=(items.length-pfile)*this.h_item;
 		}
-		y+=(items.length-pfile)*this.h_item;
-		obj.total_size=y;
+		obj.total_size=y-y0;
 	},
 	OnEnter:function(key){
 		var item_yabs=this.GetItemByY(this.selection_y);
@@ -2205,21 +2213,28 @@ var FSTreeView_prototype={
 			OpenInPlace(this.owner,item.name)
 			return;
 		}
-		item.is_dir=3-item.is_dir;
+		if(key=="LEFT"){
+			item.is_dir=1;
+		}else if(key=="RIGHT"){
+			item.is_dir=2;
+		}else{
+			item.is_dir=3-item.is_dir;
+		}
 		if(item.is_dir==1){
 			item.items=undefined
 		}else{
-			var find_context=IO.CreateEnumFileContext(item_yabs.path,3)
+			var find_context=IO.CreateEnumFileContext(item_yabs.path+'*',3)
 			var items=[];
-			for(;;){
+			for(;find_context;){
 				var fnext=find_context()
 				if(!fnext){
 					find_context=undefined;
 					break;
 				}
-				items.push({'name':UI.RemovePath(fnext.name),'is_dir':fnext.is_dir})
+				items.push({'name':UI.RemovePath(fnext.name),'is_dir':fnext.is_dir?1:0})
 			}
-			item.items=items
+			items.sort(function(a,b){return b.is_dir-a.is_dir;})
+			item.items=items;
 		}
 		this.HeightDfs(this,0,item_yabs.y)
 	},
@@ -2233,7 +2248,7 @@ var FSTreeView_prototype={
 		this.AutoScroll();
 		UI.Refresh();
 	},
-	OnKeyDown:function(){
+	OnKeyDown:function(event){
 		if(0){
 		}else if(UI.IsHotkey(event,"UP")){
 			this.SelectAtY(this.selection_y-this.h_item);
@@ -2250,7 +2265,6 @@ var FSTreeView_prototype={
 }
 W.FSTreeView=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"fs_tree_view",FSTreeView_prototype);
-	//todo: actually call it
 	//todo: top overlay for the over-indented case
 	W.PureRegion(id,obj)
 	UI.Begin(obj);
@@ -2272,7 +2286,7 @@ W.FSTreeView=function(id,attrs){
 		obj.counter=0;
 		obj.min_indent=1e15;
 		if(!obj.selection_y){obj.selection_y=0;}
-		DrawFSTreeView(obj, obj.items,0,obj.h);
+		DrawFSTreeView(obj, obj.items,0,0,obj.h);
 		if(obj.counter>0){
 			obj.scroll_x=Math.max(obj.min_indent-obj.w_indent,0);
 		}
@@ -2381,16 +2395,34 @@ var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 var FILE_RELEVANCE_SWITCH_SCORE=32
 var FILE_RELEVANCE_REPO_SCORE=8
 var FILE_RELEVANCE_BASE_SCORE=4
-var FILE_RELEVANCE_SCORE_DECAY=0.99
+var FILE_RELEVANCE_SCORE_DECAY=0.99;
+var g_root_items;
+(function(){
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		g_root_items=[];
+		for(var i=2;i<26;i++){
+			g_root_items.push({"name":String.fromCharCode(97+i)+":","is_dir":1});
+		}
+	}else{
+		g_root_items=[{"name":"","is_dir":1}];
+	}
+})()
 //var FILE_RELEVANCE_SAME_REPO_NON_HIST=16
 W.SXS_NewPage=function(id,attrs){
-	//todo: proper refreshing on metadata change
-	//if(!UI.context_parent[id]){
-	//	UI.InvalidateCurrentFrame()
-	//}
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
 	UI.Begin(obj)
 		UI.RoundRect(obj)
+		if(UI.m_ui_metadata.new_page_mode=='tree_view'){
+			W.FSTreeView("tree_view",{
+				x:obj.x+4,y:obj.y+4,w:obj.w-8,h:obj.h-8,
+				default_focus:2,
+				items:g_root_items});
+			if(obj.file_list){
+				obj.__children.push(obj.file_list)
+			}
+			UI.End()
+			return obj
+		}
 		////////////////////////////////////////////
 		//the find bar
 		UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h_find_bar,

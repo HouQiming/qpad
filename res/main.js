@@ -647,6 +647,16 @@ UI.Theme_CustomWidget=function(C){
 			},
 			text_color:0xff999999,//dummy
 		},
+		fs_tree_view:{
+			h_item:32,
+			w_indent:24,
+			icon_font:UI.Font(UI.icon_font_name,20),
+			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
+			name_color:0xff000000,
+			sel_name_color:0xffffffff,
+			sel_bgcolor:C[0],
+			sel_file_icon_color:0xffffffff,
+		}
 	};
 	var s0=UI.default_styles;
 	for(var key in custom_styles){
@@ -930,6 +940,12 @@ UI.Application=function(id,attrs){
 			var fopen_brand_new=function(){
 				var active_document=UI.m_the_document_area.active_tab
 				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
+					//repeated alt+q
+					if(UI.m_ui_metadata.new_page_mode=='tree_view'){
+						UI.m_ui_metadata.new_page_mode='hist_view';
+					}else{
+						UI.m_ui_metadata.new_page_mode='tree_view';
+					}
 					return;
 				}
 				UI.UpdateNewDocumentSearchPath()

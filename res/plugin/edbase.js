@@ -1868,6 +1868,7 @@ UI.RegisterEditorPlugin(function(){
 		var lineno=this.GetLC(ccnt_pos)[0]
 		var ccnt_lh=this.SeekLC(lineno,0)
 		if(ccnt_pos!=this.ed.MoveToBoundary(ccnt_lh,1,"space")){return 1}
+		if(this.ed.GetUtf8CharNeighborhood(ccnt_pos)[0]!=32){return 1;}//only do this for space indent
 		var ccnt_indent=this.FindOuterIndentation(ccnt_pos);
 		var ccnt_indent_lh=this.ed.MoveToBoundary(ccnt_indent,-1,"space")
 		var n_remaining=ccnt_indent-ccnt_indent_lh;
