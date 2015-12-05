@@ -2119,7 +2119,6 @@ var DrawFSTreeItem=function(parent, item,x_abs,y_abs){
 var DrawFSTreeView=function(parent, items, x_abs,y0,h){
 	var pfile=items.length;
 	var y=y0,y_vis=y;
-	parent.min_indent=Math.min(parent.min_indent,x_abs);
 	for(var i=0;i<items.length;i++){
 		var item_i=items[i];
 		if(!item_i.is_dir){
@@ -2130,6 +2129,7 @@ var DrawFSTreeView=function(parent, items, x_abs,y0,h){
 		//print(y_vis,h,item_i.total_size)
 		if(y_vis<h&&y_vis+item_i.total_size>0){
 			//visible, draw
+			parent.min_indent=Math.min(parent.min_indent,x_abs);
 			DrawFSTreeItem(parent, item_i,x_abs,y);
 			if(item_i.is_dir==2){
 				//expanded, recurse
@@ -2138,11 +2138,13 @@ var DrawFSTreeView=function(parent, items, x_abs,y0,h){
 		}
 		y+=item_i.total_size;
 	}
-	var p0=pfile+(Math.floor(Math.max(-y,0)/parent.h_item)|0);
-	var p1=Math.min(pfile+(Math.ceil((h-y)/parent.h_item)|0),items.length);
+	var p0=pfile+(Math.floor(Math.max(parent.visible_scroll_y-y,0)/parent.h_item)|0);
+	var p1=Math.min(pfile+(Math.ceil((parent.visible_scroll_y+h-y)/parent.h_item)|0),items.length);
+	y+=parent.h_item*(p0-pfile);
 	for(var i=p0;i<p1;i++){
 		var item_i=items[i];
-		DrawFSTreeItem(parent, item_i,x_abs,parent.y+y);
+		parent.min_indent=Math.min(parent.min_indent,x_abs);
+		DrawFSTreeItem(parent, item_i,x_abs,y);
 		y+=parent.h_item;
 	}
 }
@@ -2210,7 +2212,11 @@ var FSTreeView_prototype={
 		var item_yabs=this.GetItemByY(this.selection_y);
 		var item=item_yabs.item;
 		if(!item.is_dir){
-			OpenInPlace(this.owner,item.name)
+			if(!key){
+				OpenInPlace(this.owner,item.name);
+			}else if(key=="LEFT"){
+				//todo: go up
+			}
 			return;
 		}
 		if(key=="LEFT"){
@@ -2233,25 +2239,28 @@ var FSTreeView_prototype={
 				}
 				items.push({'name':UI.RemovePath(fnext.name),'is_dir':fnext.is_dir?1:0})
 			}
-			items.sort(function(a,b){return b.is_dir-a.is_dir;})
+			items.sort(function(a,b){return b.is_dir-a.is_dir||(a.name<b.name?-1:1);})
 			item.items=items;
 		}
 		this.HeightDfs(this,0,item_yabs.y)
+		UI.Refresh()
 	},
 	AutoScroll:function(){
-		this.scroll_y=Math.min(Math.max(this.scroll_y,this.selection_y),this.selection_y-this.h+this.h_item)
-		this.scroll_y=Math.min(Math.max(this.scroll_y,0),this.total_size-this.h+this.h_item)
+		this.scroll_y=Math.max(Math.min(this.scroll_y||0,this.selection_y),this.selection_y-this.h+this.h_item);
+		this.scroll_y=Math.max(Math.min(this.scroll_y,this.total_size-this.h+this.h_item),0);
 	},
 	SelectAtY:function(y){
 		var item_yabs=this.GetItemByY(y);
-		this.selection_y=item_yabs.y;
-		this.AutoScroll();
-		UI.Refresh();
+		if(item_yabs){
+			this.selection_y=item_yabs.y;
+			this.AutoScroll();
+			UI.Refresh();
+		}
 	},
 	OnKeyDown:function(event){
 		if(0){
 		}else if(UI.IsHotkey(event,"UP")){
-			this.SelectAtY(this.selection_y-this.h_item);
+			if(this.selection_y-this.h_item>=0){this.SelectAtY(this.selection_y-this.h_item);}
 		}else if(UI.IsHotkey(event,"DOWN")){
 			this.SelectAtY(this.selection_y+this.h_item);
 		}else if(UI.IsHotkey(event,"RETURN")){
@@ -2416,6 +2425,7 @@ W.SXS_NewPage=function(id,attrs){
 			W.FSTreeView("tree_view",{
 				x:obj.x+4,y:obj.y+4,w:obj.w-8,h:obj.h-8,
 				default_focus:2,
+				owner:obj.owner,
 				items:g_root_items});
 			if(obj.file_list){
 				obj.__children.push(obj.file_list)

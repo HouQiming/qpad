@@ -653,9 +653,11 @@ UI.Theme_CustomWidget=function(C){
 			icon_font:UI.Font(UI.icon_font_name,20),
 			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
 			name_color:0xff000000,
+			file_icon_color:0xff000000,
 			sel_name_color:0xffffffff,
 			sel_bgcolor:C[0],
 			sel_file_icon_color:0xffffffff,
+			scroll_transition_dt:0.1,
 		}
 	};
 	var s0=UI.default_styles;
