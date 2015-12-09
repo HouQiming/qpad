@@ -2149,11 +2149,11 @@ var DrawFSTreeView=function(parent, items, x_abs,y0,h){
 	}
 }
 
-
 var FSTreeView_prototype={
 	GetItemByYDfs:function(obj,y0,y_pinpoint){
 		var y=y0;
 		if(this!=obj&&y_pinpoint>=y&&y_pinpoint<y+this.h_item){
+			!?
 			return {'item':obj,'y':y};
 		}
 		var items=obj.items;
@@ -2263,6 +2263,14 @@ var FSTreeView_prototype={
 			if(this.selection_y-this.h_item>=0){this.SelectAtY(this.selection_y-this.h_item);}
 		}else if(UI.IsHotkey(event,"DOWN")){
 			this.SelectAtY(this.selection_y+this.h_item);
+		}else if(UI.IsHotkey(event,"PGUP")){
+			this.SelectAtY(Math.max(this.selection_y-this.h,0));
+		}else if(UI.IsHotkey(event,"PGDN")){
+			this.SelectAtY(Math.min(this.selection_y+this.h,this.total_size-this.h_item));
+		}else if(UI.IsHotkey(event,"HOME CTRL+HOME")){
+			this.SelectAtY(0);
+		}else if(UI.IsHotkey(event,"END CTRL+END")){
+			this.SelectAtY(this.total_size-this.h_item);
 		}else if(UI.IsHotkey(event,"RETURN")){
 			this.OnEnter()
 		}else if(UI.IsHotkey(event,"LEFT")){
