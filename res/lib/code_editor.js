@@ -1610,6 +1610,18 @@ var ffindbar_plugin=function(){
 			UI.Refresh()
 		}
 	})
+	this.AddEventHandler('CTRL+F',function(){
+		var obj=this.find_bar_owner;
+		obj.show_find_bar="find";
+		this.CallOnChange();
+		UI.Refresh()
+	})
+	this.AddEventHandler('CTRL+G',function(){
+		var obj=this.find_bar_owner;
+		obj.show_find_bar="goto";
+		this.CallOnChange();
+		UI.Refresh()
+	})
 }
 
 var g_repo_from_file={}
@@ -1696,6 +1708,7 @@ UI.ClearFileListingCache=function(){
 
 //var FILE_LISTING_BUDGET=100
 var FILE_LISTING_BUDGET=16
+var FILE_LISTING_BUDGET_FS_VIEW=32
 UI.g_file_listing_budget=FILE_LISTING_BUDGET;
 W.FileItemOnDemand=function(){
 	if(this.git_repo_to_list){
@@ -2085,7 +2098,7 @@ W.FileItem=function(id,attrs){
 var fnewpage_findbar_plugin=function(){
 	this.AddEventHandler('ESC',function(){
 		var obj=this.owner
-		if(this.m_close_on_esc){
+		if(obj.m_close_on_esc){
 			UI.top.app.document_area.CloseTab()
 			for(var i=0;i<UI.g_all_document_windows.length;i++){
 				if(UI.g_all_document_windows[i].file_name==UI.m_previous_document){
@@ -2251,11 +2264,15 @@ W.SXS_NewPage=function(id,attrs){
 		if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 			W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 				font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-				text:"Search"})
+				text:UI.m_ui_metadata.new_page_mode=='fs_view'?UI._("Path"):UI._("Search")})
 		}
 		////////////////////////////////////////////
 		UI.m_current_file_list=obj.m_current_file_list
-		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
+		if(UI.m_ui_metadata.new_page_mode=='fs_view'){
+			UI.g_file_listing_budget=FILE_LISTING_BUDGET_FS_VIEW;
+		}else{
+			UI.g_file_listing_budget=FILE_LISTING_BUDGET;
+		}
 		var files=obj.m_file_list;
 		var first_time=0
 		if(!files){
@@ -4025,7 +4042,7 @@ UI.NewCodeEditorTab=function(fname0){
 			if(this.auto_focus_file_search&&body.sxs_visualizer&&body.sxs_visualizer.find_bar_edit){
 				this.auto_focus_file_search=0
 				UI.SetFocus(body.sxs_visualizer.find_bar_edit)
-				body.sxs_visualizer.find_bar_edit.m_close_on_esc=1
+				body.sxs_visualizer.m_close_on_esc=1
 				UI.Refresh()
 			}
 			/////////////////

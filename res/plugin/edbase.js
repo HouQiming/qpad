@@ -2067,7 +2067,7 @@ UI.RegisterEditorPlugin(function(){
 			var chprev=ch_neibs[0]
 			var chnext=ch_neibs[1]
 			if(chbraac){
-				if(this.IsLeftBracket(String.fromCharCode(C))&&chbraac!="'"&&chbraac!="\""&&chbraac!="$"){
+				if(this.IsLeftBracket(C.charCodeAt(0))&&chbraac!="'"&&chbraac!="\""&&chbraac!="$"){
 					//the syntax has to actually consider it as a bracket, or it has to be a quote
 					chbraac=0;
 				}else if(!this.IsBracketEnabledAt(ccnt_pos)){
@@ -2132,7 +2132,10 @@ UI.RegisterEditorPlugin(function(){
 						is_fcall_like=0
 					}
 				}
-				if((is_lineend||chbraac==C&&!UI.IsWordChar(chnext)&&!UI.IsWordChar(chprev))&&!is_manual_match||ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1==ctx.current_bracket_ac_ccnt_range[1].ccnt||is_fcall_like){
+				if((is_lineend||
+				chbraac==C&&!UI.IsWordChar(chnext)&&!UI.IsWordChar(chprev))&&'?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&!is_manual_match||
+				ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1==ctx.current_bracket_ac_ccnt_range[1].ccnt||
+				is_fcall_like){
 					if(ctx.current_bracket_ac){
 						ctx.bac_stack.push(ctx.current_bracket_ac_ccnt_range)
 						ctx.bac_stack.push(ctx.current_bracket_ac_bralevel)
