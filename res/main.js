@@ -513,7 +513,11 @@ UI.Theme_CustomWidget=function(C){
 			},
 		},
 		file_item:{
-			h:56,h_icon:48,
+			h:56,h_dense:32,
+			h_icon:48,
+			icon_font:UI.Font(UI.icon_font_name,48),
+			h_icon_dense:28,
+			icon_font_dense:UI.Font(UI.icon_font_name,28),
 			file_icon_color:0xff444444,
 			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
 			name_font_bold:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,100):UI.Font(UI.font_name,24,100),
@@ -647,18 +651,6 @@ UI.Theme_CustomWidget=function(C){
 			},
 			text_color:0xff999999,//dummy
 		},
-		fs_tree_view:{
-			h_item:32,
-			w_indent:24,
-			icon_font:UI.Font(UI.icon_font_name,20),
-			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
-			name_color:0xff000000,
-			file_icon_color:0xff000000,
-			sel_name_color:0xffffffff,
-			sel_bgcolor:C[0],
-			sel_file_icon_color:0xffffffff,
-			scroll_transition_dt:0.1,
-		}
 	};
 	var s0=UI.default_styles;
 	for(var key in custom_styles){
@@ -943,10 +935,18 @@ UI.Application=function(id,attrs){
 				var active_document=UI.m_the_document_area.active_tab
 				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 					//repeated alt+q
-					if(UI.m_ui_metadata.new_page_mode=='tree_view'){
+					if(UI.m_ui_metadata.new_page_mode=='fs_view'){
 						UI.m_ui_metadata.new_page_mode='hist_view';
 					}else{
-						UI.m_ui_metadata.new_page_mode='tree_view';
+						UI.m_ui_metadata.new_page_mode='fs_view';
+					}
+					if(active_document.main_widget.sxs_visualizer){
+						var obj_find_bar_edit=active_document.main_widget.sxs_visualizer.find_bar_edit;
+						if(obj_find_bar_edit){
+							if(obj_find_bar_edit.OnDestroy){obj_find_bar_edit.OnDestroy();}
+							active_document.main_widget.sxs_visualizer.find_bar_edit=undefined;
+						}
+						active_document.main_widget.sxs_visualizer.m_file_list=undefined;
 					}
 					return;
 				}
@@ -954,6 +954,7 @@ UI.Application=function(id,attrs){
 				UI.NewCodeEditorTab().auto_focus_file_search=1
 				UI.Refresh()
 			};
+			//todo: directly switch to fs / hist view, alt+Q,Q
 			menu_file.AddNormalItem({icon:"时",text:"Recen&t...",key:"ALT+Q",enable_hotkey:1,action:fopen_brand_new})
 			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
 				menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
