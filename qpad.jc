@@ -345,9 +345,19 @@ if Platform.BUILD=="debug":
 		return JS.Return(new CProcessWrapper(){proc:pproc})
 	}
 	/////////////
-	Duktape=JS.GetGlobal()["Duktape"]
+	Duktape=JS.GetGlobal()["Duktape"].as(JSObject)
 	Duktape["__utf8_fromCharCode"]=function(JSContext JS){
-		return JS.Return(System.Algorithm.Unicode32ToUtf8([JS.Param(0).or(0)]))
+		ch=JS.Param(0).or(0)
+		return JS.Return(System.Algorithm.Unicode32ToUtf8([ch]))
+	}
+	Duktape["__commonPrefixLength"]=function(JSContext JS){
+		s0=JS.Param(0).or("")
+		s1=JS.Param(1).or("")
+		lg=0L
+		for i=0:min(s0.n,s1.n)-1
+			if s0[i]!=s1[i]:break
+			lg=i+1
+		return JS.Return(lg)
 	}
 	/////////////
 	Gui2D.g_log_file=System.Env.GetStoragePath()+"/log.txt"

@@ -736,7 +736,25 @@ UI.TranslateHotkey=function(s){
 var g_all_document_windows=[];
 UI.g_all_document_windows=g_all_document_windows
 UI.NewTab=function(tab){
-	g_all_document_windows.push(tab)
+	var current_tab_id=g_all_document_windows.length-1;
+	if(UI.top.app.document_area&&UI.top.app.document_area.current_tab_id!=undefined){
+		current_tab_id=UI.top.app.document_area.current_tab_id;
+	}
+	var new_tab_id=current_tab_id+1;
+	if(new_tab_id<g_all_document_windows.length){
+		var n=g_all_document_windows.length;
+		var area=UI.top.app.document_area;
+		for(j=n;j>new_tab_id;j--){
+			area[j]=area[j-1];
+			g_all_document_windows[j]=g_all_document_windows[j-1];
+		}
+		area[new_tab_id]=undefined;
+		g_all_document_windows[new_tab_id]=tab;
+		area.current_tab_id=new_tab_id;
+	}else{
+		g_all_document_windows.push(tab);
+		UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
+	}
 	UI.Refresh()
 	return tab;
 }
@@ -901,43 +919,6 @@ UI.Application=function(id,attrs){
 				}});
 			}
 			menu_file.AddSeparator();
-			W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
-			W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
-			W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
-			menu_file.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
-				{text:"-",tooltip:'CTRL -',action:function(){
-					UI.ZoomRelative(1/ZOOM_RATE)
-				}},{text:"100%",tooltip:'CTRL+0',action:function(){
-					UI.ZoomReset()
-				}},{text:"+",tooltip:'CTRL +',action:function(){
-					UI.ZoomRelative(ZOOM_RATE)
-				}}])
-			//todo: drag-loading
-			if(!UI.Platform.IS_MOBILE){
-				//OS shell
-				menu_file.AddSeparator();
-				menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:function(){
-					UI.UpdateNewDocumentSearchPath()
-					if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-						IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
-					}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
-						IO.Shell(["xterm",
-							"-e",'cd '+UI.m_new_document_search_path+'; bash'])
-					}else{
-						//mac
-						//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
-						IO.Shell(["osascript",
-							"-e",'tell application "Terminal" to activate'])
-						IO.Shell(["osascript",
-							"-e",'tell application "System Events" to delay 0.1'])
-						IO.Shell(["osascript",
-							"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
-						IO.Shell(["osascript",	
-							"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
-					}
-				}})
-			}
-			menu_file.AddSeparator();
 			var fopen_brand_new=function(force_mode){
 				var active_document=UI.m_the_document_area.active_tab
 				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
@@ -965,15 +946,20 @@ UI.Application=function(id,attrs){
 					return;
 				}
 				UI.UpdateNewDocumentSearchPath()
-				UI.NewCodeEditorTab().auto_focus_file_search=1
+				var tab=UI.NewCodeEditorTab();
+				tab.auto_focus_file_search=1
+				tab.title=UI._("New Tab");
 				UI.Refresh()
 			};
-			menu_file.AddNormalItem({text:"Browse...",
-				key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
-				enable_hotkey:0,action:fopen_brand_new.bind(undefined,'fs_view')})
 			menu_file.AddNormalItem({icon:"时",text:"Recen&t...",
 				key:UI.m_ui_metadata.new_page_mode!='fs_view'?"ALT+Q":"ALT+Q,Q",
 				enable_hotkey:0,action:fopen_brand_new.bind(undefined,'hist_view')})
+			menu_file.AddNormalItem({text:"&Browse...",
+				key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
+				enable_hotkey:0,action:fopen_brand_new.bind(undefined,'fs_view')})
+			menu_file.AddNormalItem({text:"Arrange tabs",
+				enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
+			//obj.ArrangeTabs.bind(obj.current_tab_id)
 			W.Hotkey("",{key:"ALT+Q",action:fopen_brand_new})
 			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
 				menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
@@ -985,6 +971,42 @@ UI.Application=function(id,attrs){
 						}
 						UI.OpenEditorWindow(fn);
 						UI.Refresh();
+					}
+				}})
+			}
+			menu_file.AddSeparator();
+			W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
+			W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
+			W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
+			menu_file.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
+				{text:"-",tooltip:'CTRL -',action:function(){
+					UI.ZoomRelative(1/ZOOM_RATE)
+				}},{text:"100%",tooltip:'CTRL+0',action:function(){
+					UI.ZoomReset()
+				}},{text:"+",tooltip:'CTRL +',action:function(){
+					UI.ZoomRelative(ZOOM_RATE)
+				}}])
+			if(!UI.Platform.IS_MOBILE){
+				//OS shell
+				menu_file.AddSeparator();
+				menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:function(){
+					UI.UpdateNewDocumentSearchPath()
+					if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+						IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
+					}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+						IO.Shell(["xterm",
+							"-e",'cd '+UI.m_new_document_search_path+'; bash'])
+					}else{
+						//mac
+						//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
+						IO.Shell(["osascript",
+							"-e",'tell application "Terminal" to activate'])
+						IO.Shell(["osascript",
+							"-e",'tell application "System Events" to delay 0.1'])
+						IO.Shell(["osascript",
+							"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
+						IO.Shell(["osascript",	
+							"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
 					}
 				}})
 			}

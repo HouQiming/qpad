@@ -418,7 +418,8 @@ W.NotificationItem=function(id,attrs){
 	obj.w=obj.padding*2+obj.w_icon+obj.w_text
 	obj.h=obj.padding*2+Math.max(obj.w_icon,tmp.h_text)
 	UI.StdAnchoring(id,obj);
-	UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width,y:obj.y,w:obj.w+obj.shadow_size*0.75,h:obj.h+obj.shadow_size*0.75,
+	UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width-obj.shadow_size*0.375,y:obj.y-obj.shadow_size*0.375,
+		w:obj.w+obj.shadow_size*1.125,h:obj.h+obj.shadow_size*1.125,
 		color:fadein(obj.shadow_color,obj.alpha),
 		round:obj.shadow_size,
 		border_width:-obj.shadow_size})
@@ -593,6 +594,7 @@ W.CodeEditorWidget_prototype={
 			}else{
 				obj.DismissNotification('replace_hint')
 			}
+			this.m_hide_prev_next_buttons=1;
 		})
 		doc.AddEventHandler('beforeEdit',function(ops){
 			var obj=this.owner
@@ -1355,6 +1357,7 @@ W.CodeEditorWidget_prototype={
 		hlobj.color=this.find_item_highlight_color;
 		hlobj.invertible=0;
 		rctx.m_highlight=hlobj
+		doc.m_hide_prev_next_buttons=0;
 		this.m_replace_context=rctx;
 	},
 	DestroyReplacingContext:function(do_dismiss){
@@ -2022,7 +2025,7 @@ W.FileItem=function(id,attrs){
 									//conflicted
 									name_color=obj.color_git_conflicted;
 									s_git_icon="叹";
-								}else if(s_git_status[1]=='A'){
+								}else if(s_git_status[0]=='A'||s_git_status[1]=='A'){
 									//new
 									name_color=obj.color_git_new;
 									s_git_icon="加";
@@ -2503,7 +2506,7 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
 		{key:"SHIFT+CTRL+D",text:"edit_up",icon:"上",tooltip:'Prev - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),action:fprev},
 		{key:"ALT+A",text:"edit_all",icon:"换",tooltip:'All - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),action:fall},
 		{key:"CTRL+D",text:"edit_down",icon:"下",tooltip:'Next - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),action:fnext}])
-	if(obj.doc.m_user_just_typed_char){
+	if(!obj.doc.m_hide_prev_next_buttons){
 		var sz_button=obj.autoedit_button_size;
 		var padding=obj.autoedit_button_padding;
 		var x_button_box=x-sz_button-padding*2;
@@ -3104,6 +3107,10 @@ W.CodeEditor=function(id,attrs){
 					s_replace=doc.ed.GetText(srep_ccnt0,srep_ccnt1-srep_ccnt0)
 				}else{
 					s_replace='';
+				}
+				if(srep_ccnt0<=doc.sel0.ccnt&&doc.sel0.ccnt<=srep_ccnt1&&
+				srep_ccnt0<=doc.sel1.ccnt&&doc.sel1.ccnt<=srep_ccnt1){
+					doc.m_hide_prev_next_buttons=0;
 				}
 				obj.DismissNotification('replace_hint')
 				if(rctx.m_needle==s_replace){
@@ -4021,7 +4028,8 @@ W.CodeEditor=function(id,attrs){
 		if(obj.m_notifications&&!obj.show_find_bar){
 			//&&!UI.m_frame_is_invalid
 			//we need to keep it alive
-			W.ListView('notification_list',{x:obj.x+w_obj_area-w_scrolling_area-obj.w_notification-8,y:obj.y,w:obj.w_notification,h:h_obj_area-8,
+			W.ListView('notification_list',{
+				x:obj.x+w_obj_area-w_scrolling_area-obj.w_notification-8,y:obj.y+4,w:obj.w_notification,h:h_obj_area-8,
 				dimension:'y',layout_spacing:8,layout_align:'left',is_single_click_mode:1,no_region:1,no_clipping:1,
 				item_template:{
 					object_type:W.NotificationItem,
@@ -4099,7 +4107,7 @@ UI.NewCodeEditorTab=function(fname0){
 			}
 			var doc=body.doc;
 			if(body.m_is_brand_new){
-				body.title="New Tab"
+				body.title=UI._("New Tab");
 				body.tooltip=undefined
 			}else{
 				body.title=UI.RemovePath(body.file_name)

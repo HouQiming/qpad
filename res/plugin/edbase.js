@@ -2631,6 +2631,7 @@ UI.RegisterEditorPlugin(function(){
 		//print(ops)
 		//highlight ops - fill out the overlay system
 		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		this.m_hide_prev_next_buttons=0;
 		renderer.m_tentative_editops=ops
 		renderer.ResetTentativeOps()
 		UI.Refresh()
@@ -2771,6 +2772,9 @@ UI.RegisterEditorPlugin(function(){
 		InvalidateAutoEdit.call(this)
 		var ctx=UI.ED_AutoEdit_Start(this.ed,line_ccnts)
 		this.m_autoedit_context=ctx
+		if(this.owner){
+			this.owner.DestroyReplacingContext();
+		}
 		if(ctx){
 			StartAutoEdit.call(this,ctx.m_cclines,"explicit")
 		}

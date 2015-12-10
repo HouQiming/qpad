@@ -55,6 +55,11 @@ W.TabLabel_prototype={
 		this.owner.OnTabUp(this.tabid)
 		UI.ReleaseMouse(this);
 	},
+	OnClick:function(event){
+		if(event.clicks==2){
+			this.owner.ArrangeTabs(this.tabid)
+		}
+	},
 }
 W.TabLabel=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
@@ -150,8 +155,11 @@ W.TabbedDocument_prototype={
 		var window_list=this.items
 		var n2=tabid;
 		for(var i=tabid+1;i<window_list.length;i++){
-			window_list[n2++]=window_list[i]
+			window_list[n2]=window_list[i]
+			this[n2]=this[i];
+			n2++;
 		}
+		this[window_list.length-1]=undefined;
 		window_list.pop()
 		if(this.current_tab_id>tabid){this.current_tab_id--}
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
@@ -164,11 +172,11 @@ W.TabbedDocument_prototype={
 		}
 		UI.Refresh()
 		UI.CallGCLater()
-		if(UI.Platform.BUILD=="debug"){
-			print(">>> window closed");
-			Duktape.gc();
-			UI.dumpMemoryUsage();
-		}
+		//if(UI.Platform.BUILD=="debug"){
+		//	print(">>> window closed");
+		//	Duktape.gc();
+		//	UI.dumpMemoryUsage();
+		//}
 	},
 	SetTab:function(tabid){
 		var tabid0=this.current_tab_id
@@ -336,6 +344,30 @@ W.TabbedDocument_prototype={
 			if(UI.nd_captured){UI.ReleaseMouse(UI.nd_captured)}
 		}
 	},
+	ArrangeTabs:function(tabid){
+		if(tabid==undefined){tabid=this.current_tab_id;}
+		if(!(tabid>=0&&tabid<this.items.length)){return;}
+		var sname0=GetTabFileName(this.items[tabid]);
+		var bk_ui_item=[];
+		for(var i=0;i<this.items.length;i++){
+			var item_i=this.items[i];
+			var sname_i=GetTabFileName(item_i);
+			item_i.m_id_original=i;
+			item_i.m_arrangement_score=Duktape.__commonPrefixLength(sname0,sname_i);
+			if(i==tabid){item_i.m_arrangement_score=1e15;}
+			bk_ui_item[i]=this[i];
+		}
+		this.items.sort(function(a,b){return b.m_arrangement_score-a.m_arrangement_score||a.m_id_original-b.m_id_original})
+		//reshuffle UI items
+		for(var i=0;i<this.items.length;i++){
+			var item_i=this.items[i];
+			this[i]=bk_ui_item[item_i.m_id_original];
+			item_i.m_id_original=undefined;
+			item_i.m_arrangement_score=undefined;
+		}
+		this.current_tab_id=0;
+		UI.Refresh()
+	},
 }
 W.TabbedDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabbedDocument_prototype);
@@ -345,15 +377,15 @@ W.TabbedDocument=function(id,attrs){
 	if((obj.n_tabs_last_checked||0)<items.length){
 		//new tab activating
 		//this doesn't count as a meaningful switch
-		obj.current_tab_id=(items.length-1);
+		//obj.current_tab_id=(items.length-1);
 		obj.m_is_in_menu=0
 		obj.CancelTabDragging();
 		UI.SaveWorkspace();
-		if(UI.Platform.BUILD=="debug"){
-			print(">>> window opened");
-			Duktape.gc();
-			UI.dumpMemoryUsage();
-		}
+		//if(UI.Platform.BUILD=="debug"){
+		//	print(">>> window opened");
+		//	Duktape.gc();
+		//	UI.dumpMemoryUsage();
+		//}
 	}
 	obj.n_tabs_last_checked=items.length;
 	if(!items.length&&obj.m_is_close_pending){
@@ -371,7 +403,7 @@ W.TabbedDocument=function(id,attrs){
 		//the big menu
 		var bk_menu=UI.m_global_menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
-		UI.BigMenu("&File")
+		UI.BigMenu("&File");
 		w_label_area-=obj.w_menu_button+obj.padding*2
 		if(obj.m_is_in_menu){
 			w_menu=w_label_area-(obj.w_current_tab_label_width||0)
