@@ -672,7 +672,7 @@ W.CFancyMenuDesc.prototype={
 		var children=this.$
 		children.push({type:'text',icon:attrs.icon,text:attrs.text,
 			color:attrs.action?style.text_color:style.hotkey_color,
-			icon_color:attrs.icon=="对"?style.icon_color:style.text_color,
+			icon_color:attrs.icon=="■"||attrs.icon=="□"?style.icon_color:style.text_color,
 			sel_icon_color:style.text_sel_color,
 			sel_color:style.text_sel_color})
 		if(attrs.action){attrs.action=WrapMenuAction(attrs.action);}

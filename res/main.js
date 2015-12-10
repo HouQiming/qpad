@@ -518,6 +518,8 @@ UI.Theme_CustomWidget=function(C){
 			icon_font:UI.Font(UI.icon_font_name,48),
 			h_icon_dense:28,
 			icon_font_dense:UI.Font(UI.icon_font_name,28),
+			h_icon_git:16,
+			icon_font_git:UI.Font(UI.icon_font_name,16),
 			file_icon_color:0xff444444,
 			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
 			name_font_bold:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,100):UI.Font(UI.font_name,24,100),
@@ -533,6 +535,10 @@ UI.Theme_CustomWidget=function(C){
 			tag_padding:4,
 			tag_round:8,
 			tag_border_width:0,
+			color_git_untracked:0xff9a3d6a,
+			color_git_conflicted:0xff1c1ae3,
+			color_git_new:0xff2ca033,
+			color_git_modified:UI.lerp_rgba(0xff000000,0xff1c1ae3,0.5),
 			button_style:{
 				transition_dt:0.1,
 				font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
@@ -597,6 +603,7 @@ UI.Theme_CustomWidget=function(C){
 			h_menu_line:32,
 			h_button:28,
 			w_icon:24,
+			checkbox_bgcolor:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
 			button_style:{
 				transition_dt:0.1,
 				round:0.1,border_width:1,padding:0,

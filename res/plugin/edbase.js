@@ -2431,7 +2431,7 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit.AddSeparator()
 			menu_edit.AddNormalItem({
 					text:"Auto &wrap",
-					icon:this.owner.m_enable_wrapping?"对":undefined,
+					icon:this.owner.m_enable_wrapping?"■":"□",
 					enable_hotkey:1,key:"SHIFT+CTRL+W",
 					action:function(){
 				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)

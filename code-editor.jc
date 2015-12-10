@@ -675,10 +675,13 @@ class CLayouter_programmer
 			//non-word chars should immediately terminate the DFA
 			color_id=0
 			cid=color_ids[max(iptr(word_ccnt0-ccnt_base),0L)]
-			st=m_lang.m_word_dfa_initial_state[cid]
-			if trigger_chars&&ch_before_word<128&&trigger_chars.IndexOf(char(ch_before_word))>=0:
-				//it's immediately after the trigger char, use the alternative initial state
-				st=m_lang.m_word_dfa_initial_state_triggered[cid]
+			if u32(cid)<u32(m_lang.m_word_dfa_initial_state.n):
+				st=m_lang.m_word_dfa_initial_state[cid]
+				if trigger_chars&&ch_before_word<128&&trigger_chars.IndexOf(char(ch_before_word))>=0:
+					//it's immediately after the trigger char, use the alternative initial state
+					st=m_lang.m_word_dfa_initial_state_triggered[cid]
+			else
+				st=~0
 			if st>=0:
 				budget=GRACEFUL_WORD_SIZE
 				foreach ch,I in ed.enumCharsForward(word_ccnt0)//it's 8-bit here, not UTF8!
