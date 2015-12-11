@@ -44,21 +44,29 @@ W.TabLabel_prototype={
 		return this.mouse_state
 	},
 	OnMouseDown:function(event){
-		UI.CaptureMouse(this);
-		this.owner.OnTabDown(this.tabid,event)
+		if(this.tabid==undefined){return;}
+		if(event.clicks!=2){
+			UI.CaptureMouse(this);
+			this.owner.OnTabDown(this.tabid,event)
+		}
 	},
 	OnMouseMove:function(event){
+		if(this.tabid==undefined){return;}
 		this.owner.OnTabMove(this.tabid,event)
 	},
 	OnMouseUp:function(event){
+		if(this.tabid==undefined){return;}
 		this.owner.OnTabMove(this.tabid,event)
-		this.owner.OnTabUp(this.tabid)
+		if(event.clicks==2){
+			this.m_dragging_tab_label_x_abs=undefined;
+		}else{
+			this.owner.OnTabUp(this.tabid)
+			this.tabid=undefined;
+		}
 		UI.ReleaseMouse(this);
 	},
 	OnClick:function(event){
-		if(event.clicks==2){
-			this.owner.OnTabUp(this.tabid)
-			UI.ReleaseMouse(this);
+		if(event.clicks==2&&this.tabid!=undefined){
 			this.owner.ArrangeTabs(this.tabid)
 		}
 	},
@@ -340,6 +348,7 @@ W.TabbedDocument_prototype={
 			this.current_tab_id=tabid_new
 			this.items[dstid]=item_src
 			this[dstid]=label_src
+			UI.Refresh()
 		}
 	},
 	CancelTabDragging:function(){

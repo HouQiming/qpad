@@ -848,6 +848,7 @@ class CFileIndex
 	TKeyDeclItem[] m_all_key_decls
 	int[] m_all_prototypes
 	int2[] m_p_prototypes
+	int[] m_toplevel_ids
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
 	//dependency
@@ -1206,7 +1207,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				scopes[scopes.n-1].in_typedef=i8(0)
 			break
 		}
+	n_before_top=all_decls.n
 	popScope()
+	toplevel_ids=[all_decls[i].id for i=n_before_top:all_decls.n-1]
 	///////////
 	just_ids.push(keywords)
 	unique_ids=ComputeIDOrderingMaps(just_ids)
@@ -1243,6 +1246,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		m_dep_file_name_tokens:dep_file_name_tokens,
 		m_all_prototypes:all_prototypes,
 		m_p_prototypes:p_prototypes,
+		m_toplevel_ids:toplevel_ids,
 	}
 
 auto parseAsText(string sdata,JSObject options)
@@ -1425,6 +1429,8 @@ auto BuildColorTable(CFileIndex fidx)
 					temp_color_table[gkd.id_type&~KEY_DECL_MASK]=int(u32(gkd.id_type)/u32(TOK_TYPE))+1
 					kd_ids.push(gkd.id_type&~KEY_DECL_MASK)
 					//Writeln(getIdString(gkd.id_type&~KEY_DECL_MASK),' ',int(u32(gkd.id_type)/u32(TOK_TYPE)))
+				if kdfile.fidx.m_toplevel_ids:
+					kd_ids.push(kdfile.fidx.m_toplevel_ids)
 				auto p_prototypes=kdfile.fidx.m_p_prototypes
 				if p_prototypes:
 					auto base_addr=kdfile.fidx.m_all_prototypes.d

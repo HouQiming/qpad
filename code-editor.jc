@@ -380,7 +380,6 @@ class CLayouter_programmer
 				p=iptr(ccnt_last_known-ccnt_base)
 				x=x_last_known
 				foreach ch,I in Utf8Chars(s[p:])
-					if x>=x_goal:return I+p
 					if ch=='\t':
 						x=(x/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
 					else if ch=='\n':
@@ -388,11 +387,9 @@ class CLayouter_programmer
 					else if ch!='\r':
 						dx=charWidth(ch)
 						x+=dx
+					if x>x_goal:return I+p
 				return s.n
 		foreach ch,I in Utf8Chars(s)
-			if x>=x_goal:
-				//Writeln('SeekInBlock ',x,' ',x_goal,' ',I,' ',int(ch))
-				return I
 			if ch=='\t':
 				x=(x/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
 			else if ch=='\n':
@@ -400,6 +397,8 @@ class CLayouter_programmer
 			else if ch!='\r':
 				dx=charWidth(ch)
 				x+=dx
+			if x>x_goal:
+				return I
 		return s.n
 	}
 	/////////////////
