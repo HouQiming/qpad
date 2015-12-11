@@ -57,6 +57,8 @@ W.TabLabel_prototype={
 	},
 	OnClick:function(event){
 		if(event.clicks==2){
+			this.owner.OnTabUp(this.tabid)
+			UI.ReleaseMouse(this);
 			this.owner.ArrangeTabs(this.tabid)
 		}
 	},
@@ -161,7 +163,7 @@ W.TabbedDocument_prototype={
 		}
 		this[window_list.length-1]=undefined;
 		window_list.pop()
-		if(this.current_tab_id>tabid){this.current_tab_id--}
+		if(this.current_tab_id>=tabid){this.current_tab_id--}
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
 		//this doesn't count as a meaningful switch
 		if(this.current_tab_id<0){this.current_tab_id=0;}
@@ -183,10 +185,12 @@ W.TabbedDocument_prototype={
 		if(tabid0!=undefined){
 			var tab0=this.items[tabid0]
 			var tab1=this.items[tabid]
-			if(tab0.main_widget&&tab0.main_widget.m_tabswitch_count&&tab1.file_name){
-				var fn=GetTabFileName(tab1);
-				var counts=tab0.main_widget.m_tabswitch_count
-				UI.IncrementTabSwitchCount(counts,fn,1)
+			if(tab0&&tab1){
+				if(tab0.main_widget&&tab0.main_widget.m_tabswitch_count&&tab1.file_name){
+					var fn=GetTabFileName(tab1);
+					var counts=tab0.main_widget.m_tabswitch_count
+					UI.IncrementTabSwitchCount(counts,fn,1)
+				}
 			}
 		}
 		this.current_tab_id=tabid
@@ -288,7 +292,7 @@ W.TabbedDocument_prototype={
 	},
 	OnTabMove:function(tabid,event){
 		var xs=this.m_dragging_tab_label_x_abs;
-		if(!xs){return;}
+		if(xs==undefined){return;}
 		this.m_dragging_tab_delta=this.scroll_x+event.x-this.m_dragging_tab_x_base
 		var l=0;
 		var r=xs.length-2;
@@ -308,8 +312,8 @@ W.TabbedDocument_prototype={
 		}
 		UI.Refresh()
 	},
-	OnTabUp:function(tabid){
-		if(!this.m_dragging_tab_label_x_abs){return;}
+	OnTabUp:function(tabid){
+		if(this.m_dragging_tab_label_x_abs==undefined){return;}
 		this.m_dragging_tab_label_x_abs=undefined
 		if(!this.m_dragging_tab_moved){
 			//this.SetTab(tabid)
@@ -339,7 +343,7 @@ W.TabbedDocument_prototype={
 		}
 	},
 	CancelTabDragging:function(){
-		if(this.m_dragging_tab_label_x_abs){
+		if(this.m_dragging_tab_label_x_abs==undefined){
 			this.m_dragging_tab_label_x_abs=undefined
 			if(UI.nd_captured){UI.ReleaseMouse(UI.nd_captured)}
 		}
@@ -478,7 +482,7 @@ W.TabbedDocument=function(id,attrs){
 		for(var i=0;i<n;i++){
 			var item_i=items[i]
 			var x_delta=0
-			if(obj.m_dragging_tab_label_x_abs){
+			if(obj.m_dragging_tab_label_x_abs!=undefined){
 				if(i==obj.m_dragging_tab_src_tabid){
 					x_delta=obj.m_dragging_tab_delta
 				}else if(i>=obj.m_dragging_tab_src_tabid&&i<=obj.m_dragging_tab_dst_tabid){
@@ -488,7 +492,7 @@ W.TabbedDocument=function(id,attrs){
 				}
 			}
 			var label_i;
-			if(obj.m_dragging_tab_label_x_abs&&i==tabid){
+			if(obj.m_dragging_tab_label_x_abs!=undefined&&i==tabid){
 				label_i={w:obj.m_dragging_tab_label_x_abs[i+1]-obj.m_dragging_tab_label_x_abs[i]}
 				x_acc_dragging_tab=x_acc+x_delta;
 			}else{
@@ -503,7 +507,7 @@ W.TabbedDocument=function(id,attrs){
 			tab_label_x_abs[i]=x_acc_abs
 			x_acc_abs+=label_i.w
 		}
-		if(obj.m_dragging_tab_label_x_abs&&tabid!=undefined){
+		if(obj.m_dragging_tab_label_x_abs!=undefined&&tabid!=undefined){
 			{
 				var i=tabid;
 				var item_i=items[i]
@@ -634,10 +638,15 @@ W.SaveDialog=function(id,attrs){
 			var y_text=obj.y+(obj.h-h_content)*0.5
 			var y_buttons=y_text+sz_text.h+obj.space_middle
 			var x_buttons=obj.x+(obj.w-sz_buttons.w)*0.5
-			var w_dlg_rect=Math.max(sz_text.w,sz_buttons.w)+obj.space_dlg_rect*2
+			var w_dlg_rect=Math.max(sz_text.w,sz_buttons.w)+obj.space_dlg_rect_x*2
 			var h_dlg_rect=h_content+obj.space_dlg_rect*2
+			UI.RoundRect({
+				x:obj.x+(obj.w-w_dlg_rect)*0.5,y:obj.y+(obj.h-h_dlg_rect)*0.5,
+				w:w_dlg_rect+obj.shadow_size*0.5,h:h_dlg_rect+obj.shadow_size*0.5,
+				round:obj.shadow_size,border_width:-obj.shadow_size,color:obj.shadow_color
+			})
 			UI.RoundRect({x:obj.x+(obj.w-w_dlg_rect)*0.5,y:obj.y+(obj.h-h_dlg_rect)*0.5,w:w_dlg_rect,h:h_dlg_rect,
-				round:obj.round_dlg_rect,border_width:-obj.round_dlg_rect,color:obj.color_dlg_rect
+				round:obj.round_dlg_rect,border_width:obj.border_width,border_color:obj.border_color,color:obj.color_dlg_rect
 			})
 			W.Text("",{x:obj.x+(obj.w-sz_text.w)*0.5,y:y_text, font:obj.font_text,text:s_text0,color:obj.text_color})
 			var fyes=function(){

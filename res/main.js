@@ -121,22 +121,27 @@ UI.Theme_CustomWidget=function(C){
 			color:0x00d0d0d0,
 			$:{
 				active:{
-					color:0x7fffffff,
+					color:0x7f000000,
 				},
 				inactive:{
-					color:0x00ffffff,
+					color:0x00000000,
 				},
 			},
 			///////////
-			space_dlg_rect:56,
+			shadow_color:0xff000000,
+			shadow_size:32,
+			border_color:0xff444444,
+			border_width:0,
 			round_dlg_rect:32,
+			space_dlg_rect_x:48,
+			space_dlg_rect:32,
 			color_dlg_rect:0xf0ffffff,
 			font_text:UI.Font(UI.font_name,40,-50),
 			text_color:0xff000000,
-			font_buttons:UI.Font(UI.font_name,24,-50),
-			space_middle:40,
-			space_button:96,
-			h_button:32,
+			font_buttons:UI.Font(UI.font_name,28,-50),
+			space_middle:32,
+			space_button:80,
+			h_button:48,
 			good_button_style:{
 				transition_dt:0.1,
 				round:32,border_width:0,padding:24,
@@ -300,6 +305,9 @@ UI.Theme_CustomWidget=function(C){
 				bgcolor_selection:C[0]&0x55ffffff,
 				tab_width:4,
 				scroll_transition_dt:0.075,
+				/////////////
+				//rectex_styles:[{color:0,w:32,h:32,round:8,border_width:3,border_color:0xff1c1aa3}],
+				rectex_styles:[{color:0x7f00ffff,w:32,h:32,round:8,border_width:-8}],
 			},
 			bgcolor:0xffe8e8e8,
 			padding:6,
@@ -371,6 +379,7 @@ UI.Theme_CustomWidget=function(C){
 				color_keyword:0xffb4771f,
 				color_type:0xffbc470f,
 				color_symbol:0xff7f7f7f,
+				rectex_styles:[{color:0}],
 				bgcolor_selection:C[0]&0x55ffffff,
 				tab_width:4,
 			},
@@ -382,7 +391,7 @@ UI.Theme_CustomWidget=function(C){
 			find_item_shadow_color:0x7f000000,
 			find_item_shadow_size:4,
 			find_mode_bgcolor:0xffc0c0c0,
-			find_item_highlight_color:0x55007fff,
+			//find_item_replace_highlight_color:0x55007fff,
 			find_message_font:UI.Font(UI.font_name,32,-50),
 			find_message_color:0xff444444,
 			///////
@@ -882,7 +891,7 @@ UI.Application=function(id,attrs){
 			//////////////////////////
 			var menu_file=UI.BigMenu("&File")
 			menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:1,action:function(){
-				var active_document=UI.m_the_document_area.active_tab
+				var active_document=UI.top.app.document_area.active_tab
 				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 					app.document_area.CloseTab();
 				}
@@ -913,14 +922,14 @@ UI.Application=function(id,attrs){
 					app.document_area.CloseTab();
 				}});
 				menu_file.AddSeparator();
-				menu_file.AddNormalItem({text:"Revert",action:function(){
+				menu_file.AddNormalItem({text:"Revert changes",action:function(){
 					var obj_tab=app.document_area.active_tab;
 					if(obj_tab&&obj_tab.Reload){obj_tab.Reload();};
 				}});
 			}
 			menu_file.AddSeparator();
 			var fopen_brand_new=function(force_mode){
-				var active_document=UI.m_the_document_area.active_tab
+				var active_document=UI.top.app.document_area.active_tab
 				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 					//repeated alt+q
 					if(!force_mode||force_mode!=UI.m_ui_metadata.new_page_mode){
@@ -964,10 +973,14 @@ UI.Application=function(id,attrs){
 			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
 				menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
 					if(UI.m_closed_windows.length>0){
-						var active_document=UI.m_the_document_area.active_tab
+						var active_document=UI.top.app.document_area.active_tab
 						var fn=UI.m_closed_windows.pop();
 						if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
-							app.document_area.CloseTab();
+							UI.top.app.document_area.CloseTab();
+						}
+						if(g_all_document_windows.length>0){
+							//hack: put the tab at the end of it
+							UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
 						}
 						UI.OpenEditorWindow(fn);
 						UI.Refresh();

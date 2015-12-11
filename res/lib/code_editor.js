@@ -537,8 +537,10 @@ var find_context_prototype={
 		var locator_0=doc.ed.CreateLocator(ccnt0,-1);locator_0.undo_tracked=0;
 		var locator_1=doc.ed.CreateLocator(ccnt1,-1);locator_1.undo_tracked=0;
 		var hlobj=doc.ed.CreateHighlight(locator_0,locator_1,-1)
-		hlobj.color=this.m_owner.find_item_highlight_color;
+		//hlobj.color=this.m_owner.find_item_highlight_color;
 		hlobj.invertible=0;
+		hlobj.display_mode=UI.HL_DISPLAY_MODE_RECTEX;
+		hlobj.depth=1
 		this.m_highlight_ranges.push(hlobj);
 		this.m_locators.push(locator_0);
 		this.m_locators.push(locator_1);
@@ -1354,9 +1356,11 @@ W.CodeEditorWidget_prototype={
 		rctx.m_locators[0].undo_tracked=1
 		rctx.m_locators[1].undo_tracked=1
 		var hlobj=doc.ed.CreateHighlight(rctx.m_locators[0],rctx.m_locators[1],-1)
-		hlobj.color=this.find_item_highlight_color;
+		//hlobj.color=this.find_item_replace_highlight_color;
 		hlobj.invertible=0;
-		rctx.m_highlight=hlobj
+		hlobj.display_mode=UI.HL_DISPLAY_MODE_RECTEX;
+		hlobj.depth=1
+		rctx.m_highlight=hlobj;
 		doc.m_hide_prev_next_buttons=0;
 		this.m_replace_context=rctx;
 	},
@@ -1546,14 +1550,17 @@ var ffindbar_plugin=function(){
 		var find_flag_mode=(obj.show_find_bar=="goto"?UI.SEARCH_FLAG_GOTO_MODE:0)
 		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags|find_flag_mode)
 	})
-	//todo: skip zero
+	//skip zero
 	this.AddEventHandler('UP',function(){
 		var obj=this.find_bar_owner
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			ctx.m_home_end=undefined;
 			if(ctx.m_current_point>-((ctx.m_backward_matches.length>>1))){
-				ctx.m_current_point--
+				ctx.m_current_point--;
+				if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length>>1))){
+					ctx.m_current_point--;
+				}
 				obj.AutoScrollFindItems()
 				UI.Refresh()
 			}
@@ -1566,6 +1573,9 @@ var ffindbar_plugin=function(){
 			ctx.m_home_end=undefined;
 			if(ctx.m_current_point<(ctx.m_forward_matches.length>>1)){
 				ctx.m_current_point++
+				if(!ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length>>1)){
+					ctx.m_current_point++;
+				}
 				obj.AutoScrollFindItems()
 				UI.Refresh()
 			}
@@ -1578,6 +1588,9 @@ var ffindbar_plugin=function(){
 			var ctx=obj.m_current_find_context
 			ctx.m_find_scroll_visual_y-=ctx.m_current_visual_h
 			obj.SeekFindItemByVisualY(ctx.m_current_visual_y-ctx.m_current_visual_h,1e17)
+			if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length>>1))){
+				ctx.m_current_point--;
+			}
 			ctx.m_home_end=undefined;
 			obj.AutoScrollFindItems()
 			UI.Refresh()
@@ -1589,6 +1602,9 @@ var ffindbar_plugin=function(){
 			var ctx=obj.m_current_find_context
 			ctx.m_find_scroll_visual_y+=ctx.m_current_visual_h
 			obj.SeekFindItemByVisualY(ctx.m_current_visual_y+ctx.m_current_visual_h,0)
+			if(!ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length>>1)){
+				ctx.m_current_point++;
+			}
 			ctx.m_home_end=undefined;
 			obj.AutoScrollFindItems()
 			UI.Refresh()

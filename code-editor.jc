@@ -21,18 +21,18 @@ import CodeParser.*
 import GL.*
 
 //text -> i64[]
-auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
+auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line, int m_tab_width)
 	styles=new CStyleHolder(){m_styles:[new CStyle(){font:font}],m_enable_ligatures:0}
 	ret=new i64[]
 	foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 		n0=ret.n
-		(atoms,eatoms,tail_style_id)=TextToLayoutAtom(hyp,s,0,styles,CEmbededObject[].NULL)
+		(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,m_tab_width,0,styles,CEmbededObject[].NULL)
 		line_breaks=GreedyLayoutGeneral(atoms,w_line)
 		GenerateTextLayout(
 			styles,
-			s,atoms,eatoms,line_breaks,tail_style_id,
-			int(I),w_line,s.EndsWith("\n"),
-			function(int style_id, int ccnt0,int ccnt1){
+			s,atoms,line_breaks,tail_style_id,
+			int(I),w_line,s.EndsWith("\n"),0,
+			inline(int style_id, int ccnt0,int ccnt1){
 				//char range
 				assert(ccnt0>=0&&ccnt1>ccnt0)
 				ret.push((i64(ccnt1)<<32)+i64(ccnt0))
@@ -41,7 +41,7 @@ auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
 				//value0=int(atom_i)
 				//assert(value0>=0&&value1>value0)
 			},
-			function(i64 dw,int ccnt){
+			inline(i64 dw,int ccnt){
 				//space
 				assert(dw>=0LL&&dw==i64(int(dw)))
 				ret.push((i64(0x80000000|int(ccnt))<<32)+i64(dw))
@@ -53,7 +53,7 @@ auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
 				//		Writeln(ccnt,' ',dw)
 				//	assert(value0>=0&&value1>value0)
 			},
-			function(i64 h_up,i64 h_line,int aflag_ccnt){
+			inline(i64 h_up,i64 h_line,int aflag_ccnt){
 				//line
 				//there is only one style, we know the heights
 				assert(aflag_ccnt>=0)
@@ -63,7 +63,7 @@ auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line)
 				//value0=int(atom_i)
 				//if value1>=0:assert(value0>=0&&value1>value0)
 			},
-			function(int oid, int ccnt){
+			inline(int oid, int ccnt){
 				//object
 				//do nothing
 			})
@@ -92,7 +92,12 @@ failure case:
 REAL_TYPE_MOV=0;
 REAL_TYPE_XOR=1;
 REAL_TYPE_ADD=2;
-DEFAULT_WRAP_WIDTH_IN_CHARS=2048LL
+//DEFAULT_WRAP_WIDTH_IN_CHARS=2048LL
+/*
+at 65536 chars we have about 27 bits in m_wrap_width_in_fp, that leaves 37 bits for line numbers
+this is well enough for a wiki dump
+*/
+DEFAULT_WRAP_WIDTH_IN_CHARS=65536LL
 GRACEFUL_WORD_SIZE=256
 MAX_ALLOWED_INDENTATION=20
 MAX_SPECIAL_COLOR_ID_SIZE=iptr(GRACEFUL_WORD_SIZE)
@@ -165,8 +170,8 @@ auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
 		if need_clipping:
 			g_renderer.PopCliprect()
 
-HL_DISPLAY_MODE_EMBOLDEN=1
-HL_DISPLAY_MODE_TILDE=2
+HL_DISPLAY_MODE_EMBOLDEN=2
+HL_DISPLAY_MODE_TILDE=3
 //U_ELLIPSIS=0x2026
 struct TEllipsisItem
 	float x,y,scale
@@ -256,7 +261,7 @@ class CLayouter_programmer
 	PreprocessBlock=function(CEditableText caller,i64[] a,string s){
 		if m_enable_advanced_wrapping:
 			//-' '-1LL to avoid OOB values
-			return WrapTextSimple(m_hyp,s, m_font,m_wrap_width_in_fp-charWidth(int(' '))-1LL)
+			return WrapTextSimple(m_hyp,s, m_font,m_wrap_width_in_fp-charWidth(int(' '))-1LL, m_tab_width)
 		else
 			return i64[].NULL
 	}
@@ -418,6 +423,7 @@ class CLayouter_programmer
 		m_tab_width_in_fp=i64(m_tab_width)*charWidth(int(' '))
 		if !(m_wrap_width>0.f):
 			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
+			//Writeln(m_wrap_width_in_fp)
 		else
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
 		obj["displayed_wrap_width"]=fixed2double(m_wrap_width_in_fp)
@@ -1240,33 +1246,36 @@ class CLayouter_programmer
 				//ignore RTL reversal here - conceptually it goes LTR, and we just flip it "visually"
 				//and precompute the ranges
 				//arabic transformations - in the recursion
-				__inline_loop_body TranslateArabic(iptr ccnt0,string s_part)
-					auto su32=[int2(ch,int(ccnt0+I)) foreach ch,I in Utf8Chars(s_part)]
-					for J=0:su32.n-1
-						ch32=su32[J].x
-						if isArabic(ch32):
-							prev_arabic=(J>0&&isArabic(su32[J-1].x))
-							next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
-							ch32=g_arabic_table[(ch32-0x600)*4+next_arabic*2+prev_arabic]
-						//ch32
-						if ch32=='\t':ch32=int(' ')
-						dx_temp=charKerning(ch32_prev,ch32)
-						x+=dx_temp
-						flat_x+=dx_temp
-						OfsCheck(su32[J].y)
-						if mode==MODE_RENDER:
-							if ch32!=' '&&ch32!='\r'&&ch32!='\n':
-								color=m_cached_colors[int(color_ids[su32[J].y])]
-								myDrawChar(ch32)
-							else
-								while TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
-									x+=m_overlays[p_overlay].delta_x
-									p_overlay++
-						dx_temp=charWidth(ch32)
-						x+=dx_temp
-						flat_x+=dx_temp
-						ch32_prev=ch32
-						SeekCheck(su32[J].y)
+				//__inline_loop_body TranslateArabic(iptr ccnt0,string s_part)
+				//	auto su32=[int2(ch,int(ccnt0+I)) foreach ch,I in Utf8Chars(s_part)]
+				//	for J=0:su32.n-1
+				//		ch32=su32[J].x
+				//		if isArabic(ch32):
+				//			prev_arabic=(J>0&&isArabic(su32[J-1].x))
+				//			next_arabic=(J<su32.n-1&&isArabic(su32[J+1].x))
+				//			ch32=g_arabic_table[(ch32-0x600)*4+next_arabic*2+prev_arabic]
+				//		//ch32
+				//		//if ch32=='\t':ch32=int(' ')
+				//		dx_temp=charKerning(ch32_prev,ch32)
+				//		x+=dx_temp
+				//		flat_x+=dx_temp
+				//		OfsCheck(su32[J].y)
+				//		if mode==MODE_RENDER:
+				//			if ch32!=' '&&ch32!='\r'&&ch32!='\n':
+				//				color=m_cached_colors[int(color_ids[su32[J].y])]
+				//				myDrawChar(ch32)
+				//			else
+				//				while TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+				//					x+=m_overlays[p_overlay].delta_x
+				//					p_overlay++
+				//		if ch32=='\t':
+				//			dx_temp=charWidth(ch32)*4
+				//		else
+				//			dx_temp=charWidth(ch32)
+				//		x+=dx_temp
+				//		flat_x+=dx_temp
+				//		ch32_prev=ch32
+				//		SeekCheck(su32[J].y)
 				//__inline_loop_body AddLigature(iptr ccnt0,iptr nc,string s_ligature)
 				//	ch32=0
 				//	foreach ch in Utf8Chars(s_ligature)
@@ -1301,7 +1310,32 @@ class CLayouter_programmer
 					//	AddLigature(value0+p,p_last-p,ligatures[id*2+1])
 					//if p_last<spart.n:
 					//	TranslateArabic(value0+p_last,spart[p_last:])
-					TranslateArabic(value0,spart)
+					//TranslateArabic(value0,spart)
+					foreach ch32,I in Utf8Chars(spart)
+						//ch32
+						//if ch32=='\t':ch32=int(' ')
+						dx_temp=charKerning(ch32_prev,ch32)
+						x+=dx_temp
+						flat_x+=dx_temp
+						OfsCheck(value0+I)
+						if mode==MODE_RENDER:
+							if ch32!=' '&&ch32!='\r'&&ch32!='\n':
+								color=m_cached_colors[int(color_ids[value0+I])]
+								myDrawChar(ch32)
+							else
+								while TestOverlay(p_overlay, fnt_scaled,scale,flat_x,projectXY):
+									x+=m_overlays[p_overlay].delta_x
+									p_overlay++
+						if ch32=='\t':
+							//tab
+							dx_temp=charWidth(32)*m_tab_width
+						else
+							dx_temp=charWidth(ch32)
+						x+=dx_temp
+						flat_x+=dx_temp
+						ch32_prev=ch32
+						SeekCheck(value0+I)
+					
 		NewlineCheck()
 		if mode==MODE_SEEK:
 			return i64(s.n)

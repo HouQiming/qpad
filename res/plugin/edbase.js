@@ -486,10 +486,11 @@ Language.Register({
 	rules:function(lang){
 		lang.DefineDefaultColor("color")
 		var bid_title=lang.ColoredDelimiter("key","#","\n","color_type");
-		lang.SetSpellCheckedColor("color")
+		var bid_code2=lang.ColoredDelimiter("key","\t","\n","color_string");
+		var bid_code=lang.ColoredDelimiter("key","`","`","color_string");
 		/////////////
 		return (function(lang){
-			//nothing
+			lang.SetExclusive([bid_title,bid_code,bid_code2])
 		});
 	}
 });
