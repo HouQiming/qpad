@@ -533,6 +533,7 @@ UI.Theme_CustomWidget=function(C){
 			icon_font_dense:UI.Font(UI.icon_font_name,28),
 			h_icon_git:16,
 			icon_font_git:UI.Font(UI.icon_font_name,16),
+			dir_icon_color:0xffb4771f,
 			file_icon_color:0xff444444,
 			name_font_size:UI.Platform.ARCH=="mac"?20:24,
 			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),

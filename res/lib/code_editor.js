@@ -1994,14 +1994,14 @@ W.FileItem=function(id,attrs){
 				var s_ext=UI.GetFileNameExtension(obj.name)
 				var language_id=Language.GetNameByExt(s_ext)
 				var desc=Language.GetDescObjectByName(language_id)
-				var ext_color=(desc.file_icon_color||obj.file_icon_color)
+				var ext_color=obj.file_icon_color;//(desc.file_icon_color||obj.file_icon_color)
 				var icon_code=(desc.file_icon||'档').charCodeAt(0)
 				if(obj.is_dir){
-					ext_color=0xffb4771f
+					ext_color=obj.dir_icon_color;
 					icon_code='开'.charCodeAt(0)
 				}
 				if(obj.name_to_create){
-					ext_color=0x55000000
+					ext_color=0x55444444
 					icon_code='新'.charCodeAt(0)
 				}
 				//var sel_bgcolor=(ext_color|0xff000000)
