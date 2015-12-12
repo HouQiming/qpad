@@ -318,7 +318,7 @@ UI.Theme_CustomWidget=function(C){
 			top_hint_shadow_size:8,
 			top_hint_border_width:2,
 			top_hint_border_color:0xffaaaaaa,
-			top_hint_max_lines:5,
+			top_hint_max_lines:3,
 			top_hint_max_levels:20,
 			x_scroll_shadow_color:0x7f000000,
 			x_scroll_shadow_size:8,
@@ -453,6 +453,10 @@ UI.Theme_CustomWidget=function(C){
 			status_bar_font:UI.Font(UI.font_name,20,-50),
 			status_bar_padding:4,
 			status_bar_text_color:0xff444444,
+			///////
+			wrap_bar_size:3,
+			wrap_bar_region_size:8,
+			wrap_bar_color:0x2f000000,
 		},
 		code_editor_notification:{
 			transition_dt:0.1,
@@ -530,6 +534,7 @@ UI.Theme_CustomWidget=function(C){
 			h_icon_git:16,
 			icon_font_git:UI.Font(UI.icon_font_name,16),
 			file_icon_color:0xff444444,
+			name_font_size:UI.Platform.ARCH=="mac"?20:24,
 			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
 			name_font_bold:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,100):UI.Font(UI.font_name,24,100),
 			misc_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,16,-50):UI.Font(UI.font_name,18,-50),
@@ -550,21 +555,25 @@ UI.Theme_CustomWidget=function(C){
 			color_git_modified:UI.lerp_rgba(0xff000000,0xff1c1ae3,0.5),
 			button_style:{
 				transition_dt:0.1,
-				font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
-				round:0,border_width:2,padding:6,
-				color:0,
+				round:0.1,border_width:1,padding:4,
+				font:UI.Font(UI.font_name,24,-50),
+				icon_font:UI.Font(UI.icon_font_name,18),
 				$:{
 					out:{
-						border_color:0x00ffffff,
-						text_color:0xffcccccc,
-					},
-					over:{
-						border_color:0xffffffff,
+						//border_color:0xff444444,color:0xffffffff,
+						border_color:0,color:[{x:0,y:0,color:C[0]},{x:0,y:1,color:C[0]}],
+						icon_color:0xffffffff,
 						text_color:0xffffffff,
 					},
+					over:{
+						border_color:0xff444444,color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
+						icon_color:0xff000000,
+						text_color:0xff000000,
+					},
 					down:{
-						border_color:0xffe8e8e8,
-						text_color:0xffe8e8e8,
+						border_color:0xff7f7f7f,color:[{x:0,y:0,color:0xff7f7f7f},{x:0,y:1,color:0xff7f7f7f}],
+						icon_color:0xff000000,
+						text_color:0xff000000,
 					},
 				}
 			},

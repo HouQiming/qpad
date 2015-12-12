@@ -1494,6 +1494,43 @@ UI.RegisterEditorPlugin(function(){
 			}.bind(this)})
 		}
 	});
+	this.ToggleBookmarkOnLine=function(line){
+		var line_ccnts=this.SeekAllLinesBetween(line,line+2,"valid_only");
+		if(line_ccnts[0]<line_ccnts[1]){
+			//detect
+			var ccnt0=line_ccnts[0];
+			var ccnt1=line_ccnts[1];
+			if(ccnt1==this.ed.GetTextSize()){
+				ccnt1++;
+			}
+			var did=0;
+			for(var i=0;i<this.m_bookmarks.length;i++){
+				if(this.m_bookmarks[i]&&this.m_bookmarks[i].ccnt>=ccnt0&&this.m_bookmarks[i].ccnt<ccnt1){
+					this.m_bookmarks[i].discard();
+					this.m_bookmarks[i]=undefined;
+					did=1;
+				}
+			}
+			var bm_new=[];
+			for(var i=0;i<this.m_unkeyed_bookmarks.length;i++){
+				var bm_i=this.m_unkeyed_bookmarks[i];
+				if(bm_i&&bm_i.ccnt>=ccnt0&&bm_i.ccnt<ccnt1){
+					bm_i.discard();
+					bm_i=undefined;
+					did=1;
+				}else{
+					bm_new.push(bm_i);
+				}
+			}
+			if(did){
+				this.m_unkeyed_bookmarks=bm_new;
+				UI.Refresh();
+				return;
+			}
+		}
+		this.m_unkeyed_bookmarks.push(this.ed.CreateLocator(ccnt0,-1));
+		UI.Refresh();
+	}
 }).prototype.name="Bookmarks";
 
 //point of interest
@@ -2537,10 +2574,11 @@ UI.RegisterEditorPlugin(function(){
 		var ed=this.ed;
 		var ln=this.GetLC(this.GetSelection()[0])[0]
 		var ccnt_lh=this.SeekLC(ln,0)
+		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		//still-in-range test
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
-			if(this.m_autoedit_mode=="explicit"){
+			if(this.m_autoedit_mode=="explicit"&&!renderer.m_tentative_editops){
 				//if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt)
 				//if(ccnt_lh==locs[0].ccnt){
 				//	return;
@@ -2548,8 +2586,8 @@ UI.RegisterEditorPlugin(function(){
 				return;
 			}else if(this.m_autoedit_example_line_id>=0){
 				var line_id=this.m_autoedit_example_line_id;
-				//if(ccnt_lh>=locs[line_id+0].ccnt&&ccnt_lh<locs[line_id+1].ccnt)
-				if(ccnt_lh==locs[line_id+0].ccnt){
+				//if(ccnt_lh==locs[line_id+0].ccnt)
+				if(ccnt_lh>=locs[line_id+0].ccnt&&ccnt_lh<locs[line_id+1].ccnt){
 					return;
 				}
 			}else{

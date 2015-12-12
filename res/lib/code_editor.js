@@ -10,6 +10,7 @@ var TOK_TYPE=0x20000000
 var KEY_DECL_CLASS=TOK_TYPE*1
 var KEY_DECL_FUNCTION=TOK_TYPE*0
 var CALL_GC_DOC_SIZE_THRESHOLD=4194304;
+var GRACEFUL_WORD_SIZE=256;
 
 if(!UI.m_ui_metadata.find_state){
 	UI.m_ui_metadata.find_state={
@@ -339,19 +340,24 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 
 W.MinimapThingy_prototype={
 	dimension:'y',
+	value_min:0,
+	value_max:1,
 	OnMouseDown:function(event){
 		this.anchored_value=this.value
-		this.anchored_xy=event.y
+		this.anchored_xy=event[this.dimension]
 		UI.CaptureMouse(this)
 	},
 	OnMouseUp:function(event){
+		if(this.anchored_value==undefined){return;}
+		this.OnMouseMove(event);
 		UI.ReleaseMouse(this)
 		this.anchored_value=undefined
+		if(this.OnApply){this.OnApply(this.value);}
 		UI.Refresh()
 	},
 	OnMouseMove:function(event){
 		if(this.anchored_value==undefined){return;}
-		this.OnChange(Math.min(Math.max(this.anchored_value+(event.y-this.anchored_xy)/this.factor,0),1))
+		this.OnChange(Math.min(Math.max(this.anchored_value+(event[this.dimension]-this.anchored_xy)/this.factor,this.value_min),this.value_max))
 	},
 }
 
@@ -1998,7 +2004,8 @@ W.FileItem=function(id,attrs){
 					ext_color=0x55000000
 					icon_code='新'.charCodeAt(0)
 				}
-				var sel_bgcolor=(ext_color|0xff000000)
+				//var sel_bgcolor=(ext_color|0xff000000)
+				var sel_bgcolor=obj.sel_bgcolor;
 				//////////////
 				var icon_font=obj.icon_font;
 				var h_icon=obj.h_icon;
@@ -2079,16 +2086,25 @@ W.FileItem=function(id,attrs){
 						color:obj.selected?obj.sel_misc_color:obj.misc_color})
 				}else{
 					UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-h_icon)*0.5,ext_color,icon_code)
+					var name_font=obj.name_font;
+					var name_font_bold=obj.name_font_bold;
 					var sname=GetSmartFileName(obj)
 					if(obj.name_to_create){sname="";}
+					var w_name=Math.max(obj.w-20-w_icon,64);
+					var dims=UI.MeasureText(name_font,obj.name);
+					if(dims.w>w_name){
+						var size=obj.name_font_size*(w_name/dims.w);
+						name_font=UI.Font(UI.font_name,size,-50);
+						name_font_bold=UI.Font(UI.font_name,size,100);
+					}
 					var lg_basepath=obj.name.length-sname.length
 					if(lg_basepath>0){
 						W.Text("",{x:obj.x+w_icon,y:obj.y+4,
-							font:obj.name_font,text:obj.name.substr(0,lg_basepath),
+							font:name_font,text:obj.name.substr(0,lg_basepath),
 							color:obj.name_to_create?(obj.selected?obj.sel_misc_color:obj.misc_color):(obj.selected?obj.sel_basepath_color:obj.basepath_color)})
 					}
-					W.Text("",{x:obj.x+w_icon+UI.MeasureText(obj.name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+4,
-						font:obj.name_font,text:sname,
+					W.Text("",{x:obj.x+w_icon+UI.MeasureText(name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+4,
+						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:obj.name_color})
 					if(obj.history_hl_ranges&&!obj.name_to_create){
 						//highlight keywords in history items only
@@ -2097,9 +2113,9 @@ W.FileItem=function(id,attrs){
 							var p0=obj.history_hl_ranges[i+0];//Math.max(obj.history_hl_ranges[i+0]-base_offset,0);
 							var p1=obj.history_hl_ranges[i+1];//Math.max(obj.history_hl_ranges[i+1]-base_offset,0);
 							if(p0<p1){
-								var x=obj.x+w_icon+UI.MeasureText(obj.name_font,obj.name.substr(0,p0)).w
+								var x=obj.x+w_icon+UI.MeasureText(name_font,obj.name.substr(0,p0)).w
 								W.Text("",{x:x,y:obj.y+4,
-									font:obj.name_font_bold,text:obj.name.substr(p0,p1-p0),
+									font:name_font_bold,text:obj.name.substr(p0,p1-p0),
 									color:obj.selected?obj.sel_name_color:obj.name_color})
 							}
 						}
@@ -2201,6 +2217,10 @@ var fnewpage_findbar_plugin=function(){
 		UI.ClearFileListingCache();
 		UI.Refresh()
 	})
+	this.OnMouseWheel=function(event){
+		var obj=this.owner
+		obj.file_list.OnMouseWheel(event)
+	}
 	var fpassthrough=function(key,event){
 		var obj=this.owner
 		obj.file_list.OnKeyDown(event)
@@ -2796,8 +2816,21 @@ W.CodeEditor=function(id,attrs){
 			//var line_ccnts=doc.SeekAllLinesBetween(line_current,line_current+2)
 			doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
 			doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
+			var s_autofind_needle=undefined;
+			if(!obj.show_find_bar){
+				s_autofind_needle=UI.m_ui_metadata.find_state.m_current_needle;
+				var sel=doc.GetSelection();
+				if(sel[1]-sel[0]<=GRACEFUL_WORD_SIZE){
+					var sel0x=doc.ed.MoveToBoundary(sel[1],-1,"word_boundary_left");
+					var sel1x=doc.ed.MoveToBoundary(sel[0],1,"word_boundary_right");
+					if(sel0x==sel[0]&&sel1x==sel[1]){
+						//sel auto highlight
+						s_autofind_needle=doc.ed.GetText(sel[0],sel[1]-sel[0])
+					}
+				}
+			}
 			//find highlight
-			if(!obj.show_find_bar&&UI.m_ui_metadata.find_state.m_current_needle&&!obj.m_hide_find_highlight){
+			if(!obj.show_find_bar&&s_autofind_needle&&!obj.m_hide_find_highlight){
 				//repeat the animation to get correct the correct scrolling information
 				UI.Begin(doc)
 					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
@@ -2824,7 +2857,9 @@ W.CodeEditor=function(id,attrs){
 				}
 				var rendering_ccnt0=doc.SeekXY(scroll_x,y0_rendering)
 				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,y1_rendering)
-				obj.ResetFindingContext(UI.m_ui_metadata.find_state.m_current_needle,UI.m_ui_metadata.find_state.m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
+				var s_bk=UI.m_ui_metadata.find_state.m_current_needle;
+				obj.ResetFindingContext(s_autofind_needle,UI.m_ui_metadata.find_state.m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
+				UI.m_ui_metadata.find_state.m_current_needle=s_bk;
 				current_find_context=obj.m_current_find_context
 				//print(UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier),UI.GetSearchFrontierCcnt(current_find_context.m_forward_frontier),current_find_context.m_backward_frontier,current_find_context.m_forward_frontier,current_find_context.m_flags)
 				if(!UI.IsSearchFrontierCompleted(current_find_context.m_backward_frontier)&&UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier)>rendering_ccnt0){
@@ -2861,7 +2896,7 @@ W.CodeEditor=function(id,attrs){
 		}else{
 			obj.DismissNotification('loading_progress')
 		}
-		var DrawLineNumbers=function(scroll_x,scroll_y,area_w,area_y,area_h){
+		var DrawLineNumbers=function(scroll_x,scroll_y,area_w,area_y,area_h,do_bookmark_regions){
 			var hc=UI.GetCharacterHeight(doc.font)
 			if(bm_xys){
 				UI.PushCliprect(obj.x,area_y,w_obj_area,area_h)
@@ -2915,6 +2950,19 @@ W.CodeEditor=function(id,attrs){
 								w:6,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
 								color:obj.color_diff_tag})
 						}
+					}
+					if(do_bookmark_regions){
+						W.Region("$bookmark_l"+(line0+i),{
+							x:obj.x,y:y,
+							w:w_line_numbers,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
+							line_id:line0+i,
+							mouse_cursor:"arrow",
+							OnClick:function(){
+								if(obj.doc.ToggleBookmarkOnLine){
+									obj.doc.ToggleBookmarkOnLine(this.line_id)
+								}
+							}
+						})
 					}
 					W.Text("",{x:obj.x+x,y:y, font:obj.line_number_font,text:s_line_number,color:line0+i==line_current?obj.line_number_color_focus:obj.line_number_color})
 				}
@@ -3044,6 +3092,65 @@ W.CodeEditor=function(id,attrs){
 				},W.CodeEditor_prototype);
 				if(UI.enable_timing){
 					print('before bookmark and ln=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
+				}
+				//wrap width widget
+				if(wrap_width>0){
+					var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+2;
+					if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
+						UI.RoundRect({
+							x:obj.x+x_wrap_bar,
+							y:obj.y,
+							w:obj.wrap_bar_size,
+							h:h_obj_area,
+							color:obj.wrap_bar_color})
+						//the mouse interaction
+						W.Region('wrapbar_widget',{
+							x:obj.x+x_wrap_bar+(obj.wrap_bar_size-obj.wrap_bar_region_size)*0.5,
+							y:obj.y,
+							w:obj.wrap_bar_region_size,
+							h:h_obj_area,
+							owner:obj,
+							dimension:'x',
+							mouse_cursor:'sizewe',
+							value:obj.doc.displayed_wrap_width,
+							value_min:64,
+							value_max:65536,
+							factor:1,
+							OnChange:function(value){
+								var doc=this.owner.doc
+								if(!doc||!this.owner.m_enable_wrapping){return;}
+								doc.displayed_wrap_width=value;
+								this.value=value;
+								UI.Refresh()
+							},
+							OnApply:function(value){
+								var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+								var ed_caret_original=doc.GetCaretXY();
+								var scroll_y_original=doc.scroll_y;
+								obj.m_current_wrap_width=value;
+								renderer.ResetWrapping(value,doc)
+								doc.caret_is_wrapped=0
+								doc.ed.InvalidateStates([0,doc.ed.GetTextSize()])
+								var ed_caret_new=doc.GetCaretXY();
+								doc.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
+								doc.AutoScroll("show")
+								doc.scrolling_animation=undefined
+								obj.SaveMetaData()
+								UI.Refresh()
+							}
+						},W.MinimapThingy_prototype)
+						//todo: could shadow it
+						//UI.PushCliprect(obj.x+x_wrap_bar,obj.y,w_obj_area-w_scrolling_area-x_wrap_bar,h_obj_area)
+						//UI.RoundRect({
+						//	x:obj.x+x_wrap_bar-x_shadow_size_max*2+x_shadow_size,
+						//	y:obj.y-x_shadow_size_max,
+						//	w:2*x_shadow_size_max, 
+						//	h:h_obj_area+x_shadow_size_max*2,
+						//	round:x_shadow_size_max,
+						//	border_width:-x_shadow_size_max,
+						//	color:obj.x_scroll_shadow_color})
+						//UI.PopCliprect()
+					}
 				}
 				//line number bar shadow when x scrolled
 				if(doc){
@@ -3185,7 +3292,7 @@ W.CodeEditor=function(id,attrs){
 				UI.PopSubWindow()
 			}else{
 				//line numbers
-				DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h);
+				DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h,1);
 				//function prototype hint
 				var got_overlay_before=!!doc.ed.m_other_overlay;
 				var fhctx=obj.m_fhint_ctx
@@ -4147,7 +4254,7 @@ UI.NewCodeEditorTab=function(fname0){
 				var f=plugins[i]
 				if(f.prototype&&f.prototype.name){
 					//if(!menu_features){menu_features=UI.BigMenu("Fea&tures");}
-					//todo: menu_features.
+					//todo: put it as checkboxes in option window
 				}
 			}
 			return body;
