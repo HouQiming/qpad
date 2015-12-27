@@ -774,6 +774,7 @@ UI.NewTab=function(tab){
 		g_all_document_windows.push(tab);
 		UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
 	}
+	UI.top.app.document_area.just_created_a_tab=1;
 	UI.Refresh()
 	return tab;
 }
@@ -976,7 +977,7 @@ UI.Application=function(id,attrs){
 			menu_file.AddNormalItem({text:"&Browse...",
 				key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
 				enable_hotkey:0,action:fopen_brand_new.bind(undefined,'fs_view')})
-			menu_file.AddNormalItem({text:"Arrange tabs",
+			menu_file.AddNormalItem({text:"Arran&ge tabs",
 				enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
 			//obj.ArrangeTabs.bind(obj.current_tab_id)
 			W.Hotkey("",{key:"ALT+Q",action:fopen_brand_new})
@@ -988,10 +989,10 @@ UI.Application=function(id,attrs){
 						if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
 							UI.top.app.document_area.CloseTab();
 						}
-						if(g_all_document_windows.length>0){
-							//hack: put the tab at the end of it
-							UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
-						}
+						//if(g_all_document_windows.length>0){
+						//	//hack: put the tab at the end of it
+						//	UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
+						//}
 						UI.OpenEditorWindow(fn);
 						UI.Refresh();
 					}

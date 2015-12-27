@@ -489,6 +489,7 @@ Language.Register({
 		var bid_code2=lang.ColoredDelimiter("key","\t","\n","color_string");
 		var bid_code=lang.ColoredDelimiter("key","`","`","color_string");
 		/////////////
+		lang.SetSpellCheckedColor("color")
 		return (function(lang){
 			lang.SetExclusive([bid_title,bid_code,bid_code2])
 		});
@@ -1138,6 +1139,62 @@ UI.RegisterEditorPlugin(function(){
 	})
 }).prototype.name="Smart paste";
 
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.owner||!this.plugin_language_desc.spell_checker){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddNormalItem({
+					text:"Check &spelling",
+					icon:(this.m_spell_checker&&this.m_spell_checker!="none")?"■":"□",
+					action:function(){
+				this.m_spell_checker=(this.m_spell_checker&&this.m_spell_checker!="none"?"none":this.plugin_language_desc.spell_checker)
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				renderer.ResetSpellChecker(this)
+				UI.Refresh()
+			}.bind(this)})
+			menu_edit=undefined;
+		}
+	})
+}).prototype.name="Spell check";
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.owner){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddSeparator()
+			menu_edit.AddNormalItem({
+					text:"Auto &wrap",
+					icon:this.owner.m_enable_wrapping?"■":"□",
+					enable_hotkey:1,key:"SHIFT+CTRL+W",
+					action:function(){
+				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				var ed_caret_original=this.GetCaretXY();
+				var scroll_y_original=this.scroll_y;
+				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0,this)
+				this.caret_is_wrapped=0
+				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+				var ed_caret_new=this.GetCaretXY();
+				this.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
+				this.AutoScroll("show")
+				this.scrolling_animation=undefined
+				UI.Refresh()
+			}.bind(this)})
+			menu_edit=undefined;
+		}
+	})
+	//this.AddEventHandler('load',function(){
+	//	var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+	//	//print(this.owner.file_name,this.owner.m_enable_wrapping)
+	//	renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
+	//	this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+	//})
+}).prototype.name="Wrapping";
+
 //cut line / delete word
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
@@ -1605,7 +1662,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 		}
 		//spell error
-		//todo: native searcher - call colorer, find word, test color, spell check
+		//there are too many of them, not worth it
 		//actually go there
 		if(ccnt_next==undefined){return 1;}
 		if(is_sel){
@@ -2251,6 +2308,9 @@ UI.RegisterEditorPlugin(function(){
 		if(ccnt_reend<ccnt_lend&&this.sel1.ccnt!=ccnt_reend){
 			//auto-strip the trailing space
 			ccnt_lend=this.SeekLC(this.GetLC(ccnt_reend)[0],1e17)
+			if(ccnt_lend>ccnt_reend&&this.ed.GetUtf8CharNeighborhood(ccnt_lend)[0]==13){
+				ccnt_lend--;
+			}
 			if(ccnt_reend<ccnt_lend){
 				this.HookedEdit([ccnt_reend,ccnt_lend-ccnt_reend,null])
 				this.CallOnChange()
@@ -2459,42 +2519,6 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 }).prototype.name="Unicode conversion";
-
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.owner){return;}
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var sel=this.GetSelection();
-			var menu_edit=UI.BigMenu("&Edit")
-			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({
-					text:"Auto &wrap",
-					icon:this.owner.m_enable_wrapping?"■":"□",
-					enable_hotkey:1,key:"SHIFT+CTRL+W",
-					action:function(){
-				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
-				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-				var ed_caret_original=this.GetCaretXY();
-				var scroll_y_original=this.scroll_y;
-				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0,this)
-				this.caret_is_wrapped=0
-				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
-				var ed_caret_new=this.GetCaretXY();
-				this.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
-				this.AutoScroll("show")
-				this.scrolling_animation=undefined
-				UI.Refresh()
-			}.bind(this)})
-			menu_edit=undefined;
-		}
-	})
-	//this.AddEventHandler('load',function(){
-	//	var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-	//	//print(this.owner.file_name,this.owner.m_enable_wrapping)
-	//	renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
-	//	this.ed.InvalidateStates([0,this.ed.GetTextSize()])
-	//})
-}).prototype.name="Wrapping";
 
 var ApplyAutoEdit=function(doc,cur_autoedit_ops,line_id){
 	var locs=doc.m_autoedit_locators;

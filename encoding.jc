@@ -1,0 +1,267 @@
+import "system.jc"
+import System.Math.*
+import System.Algorithm.*
+import System.Console.*
+
+MAX_ENCODING_DETECTION_LENGTH=8192L
+ENCODING_INVALID=0
+ENCODING_ISO8859=1
+ENCODING_UTF8=2
+ENCODING_GB2312=3
+ENCODING_SHIFT_JIS=4
+ENCODING_BIG5=5
+ENCODING_UTF16=7
+ENCODING_DETECT=-1
+
+g_model_cn=CEncodingModel.NULL
+g_model_jp=CEncodingModel.NULL
+g_model_b5=CEncodingModel.NULL
+g_model_jpgb=CEncodingModel.NULL
+
+class CEncodingModel
+	u16[] d
+	auto __init__(u32[] a)
+		d=new u16[65536]
+		cc=0
+		foreach ch,I in a
+			cc+=int(ch>>16)
+			cc&=0xffff
+			d[cc]=u16(ch&0xffffu)
+	int sjis
+	int n_bad,n_bad_cjk,n_cjk,n_ascii,n_hkatakana
+	u32 p_cjk
+	int high_byte
+	auto clear()
+		n_bad=0
+		n_bad_cjk=0
+		n_cjk=0
+		n_ascii=0
+		n_hkatakana=0
+		p_cjk=0u
+		high_byte=0
+	add=inline(int ch){
+		if high_byte:
+			c2=high_byte*256+ch
+			if d[c2]:
+				n_cjk++
+				p_cjk+=u32(d[c2])
+			else
+				n_bad_cjk++
+			high_byte=0
+		else
+			if ch>=0x80:
+				if sjis&&ch>=0xa1&&ch<=0xdf:
+					n_hkatakana++
+				else
+					high_byte=ch
+			else if ch==0x7f||ch<0x20&&ch!=9&&ch!=10&&ch!=13:
+				n_bad++
+			else
+				n_ascii++
+	}
+	score=function(){
+		//Writeln(.n_bad_cjk,' ',.n_cjk,' ',.p_cjk/max(u32(.n_cjk),1u),' ',.n_bad)
+		if n_bad_cjk*128>=n_cjk+n_hkatakana:return -1u
+		if n_bad*256>=n_cjk+n_ascii+n_hkatakana:return -1u
+		if !n_cjk&&n_hkatakana:
+			return 1000u
+		if !n_cjk:return -1u
+		return p_cjk/u32(n_cjk)
+	}
+
+auto DetectEncoding(string s)
+	//BOM first
+	if s.StartsWith([char(0xef),char(0xbb),char(0xbf)]):return ENCODING_UTF8
+	if s.StartsWith([char(0xff),char(0xfe)]):return ENCODING_UTF16
+	//CN, JP, BINARY
+	s2=s[:min(MAX_ENCODING_DETECTION_LENGTH,s.n)-1]
+	//utf8 test
+	nnxt=0
+	is_bad_utf8=0
+	n_control_char=0
+	n_high_char=0
+	foreach chc,I in s2
+		ch=int(u8(chc))
+		if ch>=128:
+			n_high_char++
+			if ch&0x40:
+				if nnxt>0||ch==0xc0||ch==0xc1:
+					is_bad_utf8=1
+					break
+				ch0=(ch&0x1f)
+				nnxt=1
+				if ch&0x20:
+					nnxt++
+					if ch&0x10:
+						nnxt++
+						if ch&8:
+							nnxt=0
+							is_bad_utf8=1
+							break
+						ch0&=7
+			else
+				if !nnxt:
+					is_bad_utf8=1
+					break
+				ch0=(ch0<<6)+(ch&63)
+				nnxt--
+			if nnxt:continue
+	foreach chc,I in s2
+		ch=int(u8(chc))
+		if ch<0x20&&ch!=9&&ch!=10&&ch!=13:
+			n_control_char++
+	if !is_bad_utf8:
+		if n_control_char*256<s2.n:
+			return ENCODING_UTF8
+	//utf16 test
+	n_newline=0L
+	n_newline_unicode=0L
+	zcount=[0,0]
+	foreach chc,I in s2
+		if !chc:
+			zcount[int(I&1)]++
+		else if chc=='\n'||chc=='\r':
+			if I<s2.n-1&&s2[I+1]==0&&!(I&1):
+				n_newline_unicode++
+			n_newline++
+	//Writeln(zcount[0],' ',zcount[1])
+	if zcount[1]>=(s2.n>>2)&&zcount[0]*256<s2.n:
+		return ENCODING_UTF16
+	//CJK encodings test
+	g_model_cn.clear()
+	g_model_jp.clear()
+	g_model_b5.clear()
+	g_model_jpgb.clear()
+	foreach chc,I in s2
+		ch=int(u8(chc))
+		g_model_cn.add(ch)
+		g_model_jp.add(ch)
+		g_model_b5.add(ch)
+		g_model_jpgb.add(ch)
+	//Japanese in GB should be more tolerant
+	g_model_jpgb.n_bad_cjk>>=1
+	score_cn=min(g_model_cn.score(),g_model_jpgb.score())
+	score_jp=g_model_jp.score()
+	score_b5=g_model_b5.score()
+	//GB encodes everything and needs a higher threshold
+	//Writeln(g_model_cn.score(),' ',g_model_jpgb.score(),' ',score_cn,' ',score_jp,' ',score_b5)
+	//Writeln(n_high_char*10,' ',s.n)
+	if score_cn>13000u&&score_jp>10000u&&score_b5>10000u:
+		//detect western encoding
+		//should be less permissive
+		n_high_char=0
+		foreach chc,I in s2
+			ch=int(u8(chc))
+			if ch>=128:
+				n_high_char++
+		if n_high_char*10<s2.n&&n_control_char*128<s.n:
+			return ENCODING_ISO8859
+		else if g_model_jp.n_hkatakana*32>s.n&&n_control_char*128<s.n:
+			//half-width katakana document detection
+			return ENCODING_SHIFT_JIS
+		else
+			//out of luck, leave it alone
+			return ENCODING_INVALID
+	smin=min(min(score_cn,score_jp),score_b5)
+	if score_cn<=smin:return ENCODING_GB2312
+	if score_jp<=smin:return ENCODING_SHIFT_JIS
+	if score_b5<=smin:return ENCODING_BIG5
+	assert(0)
+	return ENCODING_INVALID
+
+auto OSConvertString(int win_codepage,string iconv_name,string s)
+	if Platform.IS_WINDOWS:
+		MultiByteToWideChar=__c_function(iptr,"MultiByteToWideChar","windows.h")
+		MB_PRECOMPOSED=1
+		/////////////
+		nu=MultiByteToWideChar(win_codepage,MB_PRECOMPOSED,s,int(s.n),NULL,0)
+		us=new i16[nu]
+		nu=MultiByteToWideChar(win_codepage,MB_PRECOMPOSED,s,int(s.n),us,int(us.n))
+		return UnicodeToUtf8(us)
+	else
+		iconv_open=__c_function(iptr,"iconv_open","iconv.h")
+		iconv=__c_function(iptr,"iconv","iconv.h")
+		iconv_close=__c_function(iptr,"iconv_close","iconv.h")
+		//nix API is shit here, we have to new something big
+		//since we're doing CJK, *2 should be well enough
+		//then again, hopefully, we won't have to do this shit on nix
+		handle=iconv_open("UTF-8",iconv_name)
+		if handle==-1L:
+			//failed
+			return s
+		s_out=new string[s.n*2+1024]
+		param_buffer=[s.d,s.n,s_out.d,s_out.n]
+		iconv(handle,
+			__pointer(param_buffer.d+sizeof(iptr)*0),
+			__pointer(param_buffer.d+sizeof(iptr)*1),
+			__pointer(param_buffer.d+sizeof(iptr)*2),
+			__pointer(param_buffer.d+sizeof(iptr)*3))
+		s_out.n-=param_buffer[3]
+		iconv_close(handle)
+		if !s_out.n:
+			return s
+		else
+			return s_out
+
+auto ConvertToUTF8(int encoding,string s)
+	s_utf8=s
+	s_lingering=string.NULL
+	switch(encoding){
+	default:
+		pchop=s.n
+		for i=s.n-1:-1:max(0,s.n-8)
+			c0mask=(int(u8(s[i]))&0xc0)
+			if c0mask==0x80:
+				//do nothing
+			else if c0mask==0xc0:
+				pchop=i
+				break
+			else
+				pchop=i+1
+				break
+		if pchop<s.n:
+			s_utf8=s[:pchop-1]
+			s_lingering=s[pchop:]
+		else
+			s_utf8=s
+			s_lingering=string.NULL
+		break;
+	case ENCODING_ISO8859:
+		s_utf8=OSConvertString(1252,"ISO-8859-1",s)
+		break;
+	case ENCODING_GB2312,ENCODING_SHIFT_JIS,ENCODING_BIG5:
+		is_high=0
+		foreach ch,I in s
+			if is_high:
+				is_high=0
+			else if int(ch)&0x80:
+				is_high=1
+		if is_high:
+			s_in=s[:s.n-2]
+			s_lingering=new(s[s.n-1:])
+		else
+			s_in=s
+			s_lingering=string.NULL
+		switch(encoding){
+		case ENCODING_GB2312: 
+			s_utf8=OSConvertString(936,"GBK",s_in)
+			break
+		case ENCODING_SHIFT_JIS:
+			s_utf8=OSConvertString(932,"SHIFT_JIS",s_in)
+			break;
+		case ENCODING_BIG5:
+			s_utf8=OSConvertString(950,"BIG-5",s_in)
+			break;
+		}
+		break;
+	case ENCODING_UTF16:
+		if s.n&1:
+			s_in=s[:s.n-2]
+			s_lingering=new(s[s.n-1:])
+		else
+			s_in=s[0:]
+		su16=s_in.ConvertToAsBinary(i16)
+		s_utf8=UnicodeToUtf8(su16)
+		break;
+	}
+	return (s_utf8,s_lingering)

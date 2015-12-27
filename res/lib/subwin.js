@@ -171,7 +171,14 @@ W.TabbedDocument_prototype={
 		}
 		this[window_list.length-1]=undefined;
 		window_list.pop()
-		if(this.current_tab_id>=tabid){this.current_tab_id--}
+		if(this.just_created_a_tab){
+			//just closed, go to previous tab
+			if(this.current_tab_id>=tabid){this.current_tab_id--}
+		}else{
+			//switched, go to next tab
+			if(this.current_tab_id>tabid){this.current_tab_id--}
+		}
+		this.just_created_a_tab=0;
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
 		//this doesn't count as a meaningful switch
 		if(this.current_tab_id<0){this.current_tab_id=0;}
@@ -200,6 +207,10 @@ W.TabbedDocument_prototype={
 					UI.IncrementTabSwitchCount(counts,fn,1)
 				}
 			}
+		}
+		if(this.current_tab_id!=tabid){
+			//for close hack
+			this.just_created_a_tab=0;
 		}
 		this.current_tab_id=tabid
 		UI.Refresh()
@@ -237,6 +248,7 @@ W.TabbedDocument_prototype={
 			if(tab_i.need_save){
 				if(ret==0){
 					//this doesn't count as a meaningful switch
+					this.just_created_a_tab=0;
 					this.current_tab_id=i;
 					tab_i.in_save_dialog=1
 				}
@@ -266,6 +278,7 @@ W.TabbedDocument_prototype={
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		UI.SaveMetaData()
 		UI.Refresh()
+		this.just_created_a_tab=0;
 		this.m_is_close_pending=1
 		return ret
 	},
@@ -345,6 +358,7 @@ W.TabbedDocument_prototype={
 				}
 			}
 			if(this.current_tab_id==srcid){tabid_new=dstid;}
+			this.just_created_a_tab=0;
 			this.current_tab_id=tabid_new
 			this.items[dstid]=item_src
 			this[dstid]=label_src
@@ -378,6 +392,7 @@ W.TabbedDocument_prototype={
 			item_i.m_id_original=undefined;
 			item_i.m_arrangement_score=undefined;
 		}
+		this.just_created_a_tab=0;
 		this.current_tab_id=0;
 		UI.Refresh()
 	},
@@ -595,6 +610,7 @@ W.TabbedDocument=function(id,attrs){
 			if(num_id<0){return;}
 			num_id++;if(num_id>=items.length){num_id=0;}
 			//this doesn't count as a meaningful switch, it's in-transit
+			obj.just_created_a_tab=0;
 			obj.current_tab_id=num_id
 			UI.Refresh()
 		}});
@@ -604,6 +620,7 @@ W.TabbedDocument=function(id,attrs){
 			if(!num_id){num_id=items.length;}
 			num_id--;
 			//this doesn't count as a meaningful switch, it's in-transit
+			obj.just_created_a_tab=0;
 			obj.current_tab_id=num_id
 			UI.Refresh()
 		}});

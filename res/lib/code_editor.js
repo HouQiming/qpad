@@ -25,11 +25,12 @@ UI.m_code_editor_persistent_members=[
 	"m_language_id",
 	"m_current_wrap_width",
 	"m_enable_wrapping",
-	"m_hyphenator_name",
-	"m_spell_checker",
 	"m_tabswitch_count",
 ]
-UI.m_code_editor_persistent_members_doc=[]
+UI.m_code_editor_persistent_members_doc=[
+	"m_hyphenator_name",
+	"m_spell_checker",
+]
 UI.RegisterCodeEditorPersistentMember=function(name){
 	UI.m_code_editor_persistent_members_doc.push(name)
 }
@@ -37,6 +38,15 @@ require("res/plugin/edbase");
 
 ///////////////////////////////////////////////////////
 //the code editor
+var g_encoding_names={
+	'0':"an unknown",
+	'1':"the ISO-8859-1",
+	'2':"the UTF-8",
+	'3':"the GBK",
+	'4':"the Shift-JIS",
+	'5':"the Big-5",
+	'7':"the UTF-16",
+}
 W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	tab_is_char:1,
 	plugin_class:'code_editor',
@@ -53,7 +63,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks['menu']=[]
 		this.m_event_hooks['beforeEdit']=[]
 		//before creating the editor, try to call a language callback
-		var loaded_metadata=(this.file_name&&UI.m_ui_metadata[this.file_name]||{})
+		var loaded_metadata=(this.m_file_name&&UI.m_ui_metadata[this.m_file_name]||{})
 		var hyp_name=(loaded_metadata.m_hyphenator_name||this.plugin_language_desc&&this.plugin_language_desc.default_hyphenator_name)
 		if(hyp_name){
 			this.hyphenator=Language.GetHyphenator(hyp_name)
@@ -125,7 +135,14 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var ed=this.ed;
 		var is_preview=this.m_is_preview
 		this.m_loaded_time=IO.GetFileTimestamp(fn)
-		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216))
+		this.owner.DismissNotification('saving_progress');
+		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216),function(encoding){
+			this.owner.CreateNotification({id:'saving_progress',icon:'警',
+				text:"The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.".replace(
+					"@1",g_encoding_names[encoding]||"an unknown"),
+			})
+			return 0
+		}.bind(this))
 		//abandonment should work as is...
 		var floadNext=(function(){
 			if(this.m_is_destroyed){
@@ -1318,6 +1335,7 @@ W.CodeEditorWidget_prototype={
 		ctx.ffind_next();
 	},
 	BeforeQuickFind:function(direction){
+		if(!this.doc){return;}
 		var sel=this.doc.GetSelection()
 		//this.show_find_bar=1
 		this.m_sel0_before_find=this.doc.sel0.ccnt
@@ -1325,17 +1343,20 @@ W.CodeEditorWidget_prototype={
 		if(!(sel[0]<sel[1])){
 			var ccnt=this.doc.sel1.ccnt
 			var ed=this.doc.ed
-			sel[0]=this.doc.SkipInvisibles(ccnt,-1);
-			sel[0]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[0],-1),-1,"word_boundary_left"),-1)
-			////print('SkipInvisibles',sel[0],ccnt)
-			//sel[0]=ed.SnapToCharBoundary(sel[0],-1);
-			////print('SnapToCharBoundary',sel[0],ccnt)
-			//sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left");
-			////print('word_boundary_left',sel[0],ccnt)
-			//sel[0]=this.doc.SnapToValidLocation(sel[0],-1);
-			////print('SnapToValidLocation',sel[0],ccnt)
-			sel[1]=this.doc.SkipInvisibles(ccnt,1);
-			sel[1]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[1],1),1,"word_boundary_right"),1)
+			var neib=ed.GetUtf8CharNeighborhood(ccnt);
+			if(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1])){
+				sel[0]=this.doc.SkipInvisibles(ccnt,-1);
+				sel[0]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[0],-1),-1,"word_boundary_left"),-1)
+				////print('SkipInvisibles',sel[0],ccnt)
+				//sel[0]=ed.SnapToCharBoundary(sel[0],-1);
+				////print('SnapToCharBoundary',sel[0],ccnt)
+				//sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left");
+				////print('word_boundary_left',sel[0],ccnt)
+				//sel[0]=this.doc.SnapToValidLocation(sel[0],-1);
+				////print('SnapToValidLocation',sel[0],ccnt)
+				sel[1]=this.doc.SkipInvisibles(ccnt,1);
+				sel[1]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[1],1),1,"word_boundary_right"),1)
+			}
 		}
 		if(sel[0]<sel[1]){
 			if(this.m_current_find_context){
@@ -1346,7 +1367,9 @@ W.CodeEditorWidget_prototype={
 			if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
 				UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
 			}
+			return 1;
 		}
+		return 0;
 	},
 	///////////////////////////////////
 	SetReplacingContext:function(ccnt0,ccnt1){
@@ -2499,6 +2522,7 @@ W.SXS_NewPage=function(id,attrs){
 				if(!this.items[value].name||this.items[value].is_dir){return;}
 				var fn=IO.NormalizeFileName(this.items[value].name)
 				if(editor_widget.file_name==fn){return;}
+				if(!IO.FileExists(fn)){return;}
 				if(editor_widget.m_file_name_before_preview){
 					//clear preview first
 					editor_widget.file_name=editor_widget.m_file_name_before_preview
@@ -2655,7 +2679,7 @@ W.CodeEditor=function(id,attrs){
 		}
 	}
 	if(!obj.m_language_id){
-		var s_ext=UI.GetFileNameExtension(obj.file_name)
+		var s_ext=UI.GetFileNameExtension(obj.file_name||"")
 		obj.m_language_id=Language.GetNameByExt(s_ext)
 	}
 	var sxs_visualizer=obj.m_sxs_visualizer;
@@ -3914,11 +3938,13 @@ W.CodeEditor=function(id,attrs){
 					}}])
 				menu_search.AddButtonRow({text:"Find the current word"},[
 					{key:"SHIFT+CTRL+F3",text:"word_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+F3',action:function(){
-						obj.BeforeQuickFind(-1);
-						obj.FindNext(-1)
+						if(obj.BeforeQuickFind(-1)){
+							obj.FindNext(-1);
+						}
 					}},{key:"CTRL+F3",text:"word_down",icon:"下",tooltip:'Next - CTRL+F3',action:function(){
-						obj.BeforeQuickFind(1);
-						obj.FindNext(1)
+						if(obj.BeforeQuickFind(1)){
+							obj.FindNext(1);
+						}
 					}}])
 				if(obj.m_replace_context){
 					//menu_search.AddSeparator()
