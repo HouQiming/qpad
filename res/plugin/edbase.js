@@ -10,6 +10,17 @@ Language.Register({
 	}
 })
 
+Language.Register({
+	name_sort_hack:' Binary blob',name:'Binary blob',parser:'none',
+	is_binary:1,
+	extensions:['bin','bz2'],
+	////////////////////////
+	rules:function(lang){
+		lang.DefineDefaultColor("color")
+		return function(){}
+	}
+});
+
 var f_C_like=function(lang,keywords,has_preprocessor){
 	lang.DefineDefaultColor("color_symbol")
 	var bid_preprocessor
@@ -1592,6 +1603,7 @@ UI.RegisterEditorPlugin(function(){
 
 //point of interest
 UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	var fnextbm=function(dir,is_sel){
 		var ccnt=this.sel1.ccnt;
 		var sz=this.ed.GetTextSize()

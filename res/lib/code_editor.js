@@ -1842,6 +1842,17 @@ W.FileItemOnDemand=function(){
 
 W.FileItemOnDemandSort=function(obj){
 	obj.items.sort(function(a,b){return !!a.name_to_find-!!b.name_to_find||b.is_dir-a.is_dir||(a.name<b.name?-1:(a.name==b.name?0:1));})
+	var s_try_to_focus=(obj.item_template.owner.m_try_to_focus);
+	if(s_try_to_focus){
+		for(var i=0;i<obj.items.length;i++){
+			if(obj.items[i].name&&obj.items[i].name==s_try_to_focus){
+				obj.value=i;
+				obj.AutoScroll();
+				obj.item_template.owner.m_try_to_focus=undefined;
+				break;
+			}
+		}
+	}
 }
 
 var GetSmartFileName=function(obj_param){
@@ -2051,6 +2062,7 @@ W.FileItem=function(id,attrs){
 				if(UI.m_ui_metadata.new_page_mode=='fs_view'){
 					var name_color=obj.name_color;
 					var sname=UI.RemovePath(obj.name);
+					if(obj.is_dir){sname=sname+"/";}
 					if(obj.owner.m_file_list_repo){
 						var repos=g_repo_from_file[obj.name]
 						if(repos){
@@ -2251,6 +2263,7 @@ var fnewpage_findbar_plugin=function(){
 	this.AddEventHandler('change',function(){
 		var obj=this.owner
 		obj.m_file_list=undefined
+		obj.m_try_to_focus=undefined;
 		UI.Refresh()
 	})
 	this.AddEventHandler('RETURN RETURN2',fpassthrough)
@@ -2320,6 +2333,9 @@ var fnewpage_findbar_plugin=function(){
 		if(!(n_removed>0)){return 1;}
 		this.HookedEdit([0,ccnt_end,s2+'/'])
 		this.CallOnChange()
+		if(s.length>0){
+			this.owner.m_try_to_focus=s.substr(0,s.length-1);
+		}
 		ccnt_end=this.ed.GetTextSize();
 		this.SetSelection(ccnt_end,ccnt_end);
 		return 0;
@@ -2606,6 +2622,13 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
 			tooltip_placement:'right',
 			OnClick:fnext})
 	}
+}
+
+UI.ED_GetFileLanguage=function(fn){
+	var s_ext=UI.GetFileNameExtension(fn)
+	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
+	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
+	return Language.GetDescObjectByName(language_id)
 }
 
 UI.ED_ParseMore_callback=function(fn){
@@ -3107,7 +3130,9 @@ W.CodeEditor=function(id,attrs){
 					style:editor_style,
 					wrap_width:wrap_width,
 					///////////////
-					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_find,w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,h:h_obj_area-h_top_find-h_bottom_find,
+					x:obj.x+w_line_numbers+obj.padding,y:obj.y+h_top_find,
+					w:w_obj_area-w_line_numbers-obj.padding-w_scrolling_area,
+					h:h_obj_area-h_top_find-h_bottom_find,
 					///////////////
 					owner:obj,
 					m_is_preview:obj.m_is_preview,
@@ -3163,7 +3188,6 @@ W.CodeEditor=function(id,attrs){
 								UI.Refresh()
 							}
 						},W.MinimapThingy_prototype)
-						//todo: could shadow it
 						//UI.PushCliprect(obj.x+x_wrap_bar,obj.y,w_obj_area-w_scrolling_area-x_wrap_bar,h_obj_area)
 						//UI.RoundRect({
 						//	x:obj.x+x_wrap_bar-x_shadow_size_max*2+x_shadow_size,
@@ -4319,7 +4343,6 @@ UI.NewCodeEditorTab=function(fname0){
 		Reload:function(){
 			if(this.main_widget){this.main_widget.Reload();}
 		},
-		property_windows:[],
 		color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
 };
@@ -4337,7 +4360,12 @@ UI.OpenEditorWindow=function(fname,fcallback){
 		}
 	}
 	if(!obj_tab){
-		obj_tab=UI.NewCodeEditorTab(fname)
+		var lang=UI.ED_GetFileLanguage(fname);
+		if(lang.is_binary){
+			obj_tab=UI.NewBinaryEditorTab(fname)
+		}else{
+			obj_tab=UI.NewCodeEditorTab(fname)
+		}
 	}
 	if(fcallback){
 		if(obj_tab.main_widget){
@@ -4437,4 +4465,4 @@ UI.ED_IndexGC=function(){
 	UI.ED_IndexGCEnd()
 }
 
-UI.enable_timing=0
+//UI.enable_timing=1

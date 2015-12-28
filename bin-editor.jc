@@ -1,0 +1,249 @@
+import "system.jc"
+import "gui2d.jc"
+import "javascript.jc"
+import System.Math.*
+import System.Algorithm.*
+import System.Console.*
+import Gui2D.detail.*
+import Javascript.*
+
+TYPE_BYTE=0
+TYPE_INT=1
+TYPE_UINT=2
+TYPE_FLOAT=3
+TYPE_MASK_BE=16
+makeType=inline(t,log2_bytesz){
+	return t*4+(log2_bytesz)
+}
+
+struct TDisplayRange
+	int color
+	int tid
+	i64 ofs0
+	i64 ofs1
+class CBinaryView
+	TDisplayRange[] ranges
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["BIN_CreateView"]=function(JSContext JS){
+		obj_view=JS.Param(0).as(JSObject)
+		n_ranges=obj_view["length"].as(iptr)
+		ranges=new TDisplayRange[n_ranges]
+		ret=new CBinaryView(){ranges:ranges}
+		for i=0:n_ranges-1
+			ranges[i].color=obj_view[i]["color"].as(int)
+			ranges[i].tid=obj_view[i]["tid"].as(int)
+			ranges[i].ofs0=i64(obj_view[i]["ofs"].as(double))
+			ranges[i].ofs1=ranges[i].ofs0+i64(obj_view[i]["size"].as(double))
+		ranges.Sortby(inline(a){return a.ofs0})
+		ranges.push(TDisplayRange(){ofs0:(1LL<<63)-1LL,ofs1:(1LL<<63)-1LL})
+		return JS.Return(ret)
+	}
+	JS_UI["BIN_MapCopyOnWrite"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		s=System.IO.MapFile(fn,System.IO.OPEN_READ|System.IO.OPEN_COPY_ON_WRITE).ConvertToAsBinary(u8)
+		return JS.Return(s)
+	}
+	JS_UI["BIN_GetTypeAt"]=function(JSContext JS){
+		obj=JS.Param(0).as(JSObject)
+		addr=JS.Param(1).as(i64)
+		ranges=obj["m_native_view"].as(CBinaryView).ranges
+		p=ranges.InlineBisect(inline(a){return a.ofs1<=addr})
+		rg=ranges[p]
+		if addr>=rg.ofs0&&addr<rg.ofs1:
+			tid=rg.tid
+			ofs0=rg.ofs0
+		else
+			tid=makeType(TYPE_BYTE,0)
+			ofs0=0LL
+		ret=JS.New()
+		ret["tid"]=tid
+		ret["ofs"]=ofs0
+		return JS.Return(ret)
+	}
+	JS_UI["BIN_Render"]=function(JSContext JS){
+		scale=Gui2D.detail.g_renderer.m_pixels_per_unit
+		x=JS.Param(0).as(float)*scale
+		y=JS.Param(1).as(float)*scale
+		w=JS.Param(2).as(float)*scale
+		h=JS.Param(3).as(float)*scale
+		obj=JS.Param(4).as(JSObject)
+		addr0=JS.Param(5).as(i64)
+		ranges=obj["m_native_view"].as(CBinaryView).ranges
+		m_font=obj["font"].as(TFont)
+		fnt_scaled=m_font
+		fnt_scaled.h*=scale
+		fnt_typei=fnt_scaled
+		fnt_typei.h*=0.8f
+		fnt_typef=fnt_scaled
+		fnt_typef.h*=0.625f
+		if g_renderer.m_srgb_supported:
+			fnt_scaled.SmartEmbolden(0xff000000)
+			fnt_typei.SmartEmbolden(0xff000000)
+			fnt_typef.SmartEmbolden(0xff000000)
+		fonts=[fnt_scaled,fnt_typei,fnt_typef]
+		hcs=[g_renderer.GetCharacterHeight(fnt) foreach fnt in fonts]
+		p=ranges.InlineBisect(inline(a){return a.ofs1<=addr0})
+		data=obj["m_data"].as(u8[])
+		w_bytes=obj["m_w_bytes"].as(i64)
+		color0=obj["text_color"].as(int)
+		fntid=-1
+		//determine the rendering dims
+		hc=g_renderer.GetCharacterHeight(fnt_scaled)
+		n_lines=i64(floor(h/hc))
+		addr1=addr0+w_bytes*i64(n_lines)
+		w_digit=g_renderer.GetCharacterAdvance(fnt_scaled,48)
+		w_space1=w_digit*0.75f
+		w_space4=w_digit*0.25f
+		w_space8=w_digit*0.25f
+		w_bytes_i=int(w_bytes)
+		for(addr=addr0;addr<addr1;)
+			if addr>=ranges[p].ofs1:
+				p++
+			rg=ranges[p]
+			if addr>=rg.ofs0&&addr<rg.ofs1:
+				C=rg.color
+				tid=rg.tid
+				ofs=int(addr-rg.ofs0)&15
+			else
+				C=color0
+				tid=makeType(TYPE_BYTE,0)
+				ofs=0
+			sz=1<<(tid&3)
+			addr+=(sz-ofs)&(sz-1)//align left
+			d=0uLL
+			if tid&TYPE_MASK_BE:
+				for j=0:sz-1
+					addrj=iptr(addr)+iptr(j)
+					d<<=8
+					if addrj<data.n:
+						d+=u64(data[addrj])
+			else
+				for j=0:sz-1
+					addrj=iptr(addr)+iptr(j)
+					if addrj<data.n:
+						d+=u64(data[addrj])<<(j*8)
+			if addr>=data.n:break
+			////////////////////
+			//draw it
+			s_disp=string.NULL
+			fntid_a=0
+			switch(tid&~TYPE_MASK_BE){
+			case makeType(TYPE_BYTE,0):
+				s_disp=formatNumber(u32(d),{base:16,align:2})
+				fntid_a=0
+				break
+			case makeType(TYPE_BYTE,1):
+				s_disp=formatNumber(u32(d),{base:16,align:4})
+				fntid_a=0
+				break
+			case makeType(TYPE_BYTE,2):
+				s_disp=formatNumber(u32(d),{base:16,align:8})
+				fntid_a=0
+				break
+			case makeType(TYPE_BYTE,3):
+				s_disp=formatNumber(u64(d),{base:16,align:16})
+				fntid_a=0
+				break
+			/////////
+			case makeType(TYPE_INT,0):
+				s_disp=formatNumber(i32(i8(u8(d))),{base:10})
+				fntid_a=2
+				break
+			case makeType(TYPE_INT,1):
+				s_disp=formatNumber(i32(i16(u16(d))),{base:10})
+				fntid_a=1
+				break
+			case makeType(TYPE_INT,2):
+				s_disp=formatNumber(i32(u32(d)),{base:10})
+				fntid_a=1
+				break
+			case makeType(TYPE_INT,3):
+				s_disp=formatNumber(i64(d),{base:10})
+				fntid_a=1
+				break
+			/////////
+			case makeType(TYPE_UINT,0):
+				s_disp=formatNumber(u32(d),{base:10})
+				fntid_a=2
+				break
+			case makeType(TYPE_UINT,1):
+				s_disp=formatNumber(u32(d),{base:10})
+				fntid_a=1
+				break
+			case makeType(TYPE_UINT,2):
+				s_disp=formatNumber(u32(d),{base:10})
+				fntid_a=1
+				break
+			case makeType(TYPE_UINT,3):
+				s_disp=formatNumber(u64(d),{base:10})
+				fntid_a=1
+				break
+			/////////
+			case makeType(TYPE_FLOAT,1):
+				d32=i32(u32(d))
+				expo=(d32>>10)&31
+				manti=d32&1023
+				if expo>0:
+					manti+=1024
+				else
+					manti+=manti
+				flt=f32(manti)*pow(2.f,f32(expo-25))
+				if d32&32768:flt=-flt
+				//if abs(flt)>=1e-2:
+				s_disp=formatNumber(flt,{frac:5})
+				if s_disp.n>6:
+					s_disp.n=6
+				//else
+				//	s_disp=formatNumber(flt,{frac:3,scientific:1})
+				fntid_a=2
+				break
+			case makeType(TYPE_FLOAT,2):
+				flt=__int_as_float(i32(u32(d)))
+				if abs(flt)>=1e-3&&abs(flt)<=1e7:
+					s_disp=formatNumber(flt,{frac:7})
+					if s_disp.n>12:
+						s_disp.n=12
+				else
+					s_disp=formatNumber(flt,{frac:7,scientific:1})
+				fntid_a=2
+				break
+			case makeType(TYPE_FLOAT,3):
+				dbl=__longlong_as_double(i64(d))
+				if abs(dbl)>=1e-6&&abs(dbl)<=1e20:
+					s_disp=formatNumber(dbl,{frac:20})
+					if s_disp.n>25:
+						s_disp.n=25
+				else
+					s_disp=formatNumber(dbl,{frac:20,scientific:1})
+				fntid_a=2
+				break
+			}
+			////////////////////
+			//draw the shit
+			if fntid!=fntid_a:
+				fntid=fntid_a
+				g_renderer.SetFastDrawCharFont(fonts[fntid])
+			daddr=int(addr+sz-1-addr0)
+			daddr_y=daddr/w_bytes_i
+			daddr_x=daddr-daddr_y*w_bytes_i
+			x_right=x+w_digit*2.f*f32(daddr_x+1)+w_space1*f32(daddr_x)+w_space4*f32(daddr_x>>2)+w_space8*f32(daddr_x>>3)
+			y_top=y+hc*f32(daddr_y)+(hc-hcs[fntid])*0.5f
+			foreach chc,j in s_disp.ReverseOrder()
+				ch=int(u8(chc))
+				citem=g_renderer.GetFastDrawCharCacheItem(ch)
+				if !citem.gcitem:continue
+				x_right-=citem.gcitem.dx
+				if x_right<x:
+					daddr_x=w_bytes_i-1
+					x_right=x+w_digit*2.f*f32(daddr_x+1)+w_space1*f32(daddr_x)+w_space4*f32(daddr_x>>2)+w_space8*f32(daddr_x>>3)
+					y_top-=hc
+					if y_top<y:break
+					x_right-=citem.gcitem.dx
+				g_renderer.FastDrawChar(x_right,y_top,C,ch)
+			//todo: text / minimap
+			////////////////////
+			addr+=sz
+		return 0
+	}
+})

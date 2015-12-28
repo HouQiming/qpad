@@ -2,6 +2,7 @@ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("gui2d/dockbar");
 require("res/lib/code_editor");
+require("res/lib/bin_editor");
 require("res/lib/subwin");
 
 UI.ChooseScalingFactor({designated_screen_size:1080})
@@ -524,6 +525,20 @@ UI.Theme_CustomWidget=function(C){
 				bgcolor_selection:C[0]&0x3fffffff,
 				tab_width:4,
 			},
+		},
+		binary_editor:{
+			font:UI.Font("res/fonts/inconsolata.ttf",24),
+			line_number_font:UI.Font("res/fonts/inconsolata.ttf",14),
+			line_number_font_small:UI.Font("res/fonts/inconsolata.ttf",8),
+			line_number_bgcolor:0xffd0d0d0,
+			line_number_color:0xff7f7f7f,
+			line_number_color_focus:0xff000000,
+			caret_width:2,
+			caret_color:0xff000000,
+			caret_flicker:500,
+			text_color:0xff000000,
+			bgcolor:0xffe8e8e8,
+			bgcolor_selection:C[0]&0x55ffffff,
 		},
 		file_item:{
 			h:56,h_dense:32,

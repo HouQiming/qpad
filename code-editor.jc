@@ -422,6 +422,8 @@ class CLayouter_programmer
 		m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width=obj["wrap_width"].or(0.f)
 		m_tab_width_in_fp=i64(m_tab_width)*charWidth(int(' '))
+		m_hyp=obj["hyphenator"].as(CHyphenator)
+		m_enable_advanced_wrapping=!!m_hyp
 		if !(m_wrap_width>0.f):
 			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
 			//Writeln(m_wrap_width_in_fp)
@@ -431,8 +433,6 @@ class CLayouter_programmer
 		////////////
 		BeginRender(obj)
 		/////////
-		m_hyp=obj["hyphenator"].as(CHyphenator)
-		m_enable_advanced_wrapping=!!m_hyp
 		sname=obj["m_spell_checker"].as(string)
 		if sname&&sname.n:
 			m_spell_checker=Hunspell.getSpeller(sname)
