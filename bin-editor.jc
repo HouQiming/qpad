@@ -26,6 +26,124 @@ struct TDisplayRange
 class CBinaryView
 	TDisplayRange[] ranges
 
+g_tostring=JSObject.NULL
+auto readToStringAt(JSContext JS,u8[] data,i64 addr,int tid)
+	sz=1<<(tid&3)
+	d=0uLL
+	if tid&TYPE_MASK_BE:
+		for j=0:sz-1
+			addrj=iptr(addr)+iptr(j)
+			d<<=8
+			if addrj<data.n:
+				d+=u64(data[addrj])
+	else
+		for j=0:sz-1
+			addrj=iptr(addr)+iptr(j)
+			if addrj<data.n:
+				d+=u64(data[addrj])<<(j*8)
+	////////////////////
+	//draw it
+	s_disp=string.NULL
+	fntid_a=0
+	switch(tid&~TYPE_MASK_BE){
+	case makeType(TYPE_BYTE,0):
+		s_disp=formatNumber(u32(d),{base:16,align:2})
+		fntid_a=0
+		break
+	case makeType(TYPE_BYTE,1):
+		s_disp=formatNumber(u32(d),{base:16,align:4})
+		fntid_a=0
+		break
+	case makeType(TYPE_BYTE,2):
+		s_disp=formatNumber(u32(d),{base:16,align:8})
+		fntid_a=0
+		break
+	case makeType(TYPE_BYTE,3):
+		s_disp=formatNumber(u64(d),{base:16,align:16})
+		fntid_a=0
+		break
+	/////////
+	case makeType(TYPE_INT,0):
+		s_disp=formatNumber(i32(i8(u8(d))),{base:10})
+		fntid_a=2
+		break
+	case makeType(TYPE_INT,1):
+		s_disp=formatNumber(i32(i16(u16(d))),{base:10})
+		fntid_a=1
+		break
+	case makeType(TYPE_INT,2):
+		s_disp=formatNumber(i32(u32(d)),{base:10})
+		fntid_a=1
+		break
+	case makeType(TYPE_INT,3):
+		s_disp=formatNumber(i64(d),{base:10})
+		fntid_a=1
+		break
+	/////////
+	case makeType(TYPE_UINT,0):
+		s_disp=formatNumber(u32(d),{base:10})
+		fntid_a=2
+		break
+	case makeType(TYPE_UINT,1):
+		s_disp=formatNumber(u32(d),{base:10})
+		fntid_a=1
+		break
+	case makeType(TYPE_UINT,2):
+		s_disp=formatNumber(u32(d),{base:10})
+		fntid_a=1
+		break
+	case makeType(TYPE_UINT,3):
+		s_disp=formatNumber(u64(d),{base:10})
+		fntid_a=1
+		break
+	/////////
+	case makeType(TYPE_FLOAT,1):
+		d32=i32(u32(d))
+		expo=(d32>>10)&31
+		manti=d32&1023
+		if expo>0:
+			manti+=1024
+		else
+			manti+=manti
+		flt=f32(manti)*pow(2.f,f32(expo-25))
+		if d32&32768:flt=-flt
+		//if abs(flt)>=1e-2:
+		s_disp=formatNumber(flt,{frac:5})
+		if s_disp.n>6:
+			s_disp.n=6
+		//else
+		//	s_disp=formatNumber(flt,{frac:3,scientific:1})
+		fntid_a=2
+		break
+	case makeType(TYPE_FLOAT,2):
+		flt=__int_as_float(i32(u32(d)))
+		if abs(flt)>=1e-3&&abs(flt)<=1e7:
+			s_disp=formatNumber(flt,{frac:7})
+			if s_disp.n>12:
+				s_disp.n=12
+		else
+			s_disp=formatNumber(flt,{frac:7,scientific:1})
+		fntid_a=2
+		break
+	case makeType(TYPE_FLOAT,3):
+		dbl=__longlong_as_double(i64(d))
+		if !g_tostring:
+			g_tostring=JS["Number"]["prototype"]["toString"].as(JSObject)
+		s_disp=g_tostring.CallAsMethod(string,dbl)
+		//if abs(dbl)>=1e-6&&abs(dbl)<=1e20:
+		//	s_disp=formatNumber(dbl,{frac:20})
+		//	if s_disp.n>25:
+		//		s_disp.n=25
+		//else
+		//	s_disp=formatNumber(dbl,{frac:20,scientific:1})
+		fntid_a=2
+		break
+	}
+	return (s_disp,fntid_a)
+
+auto searchRanges(TDisplayRange[] ranges,i64 addr)
+	return ranges.InlineBisect(inline(a){return a.ofs1<=addr})
+	
 g_minimap_tex=GLuint(0)
 g_minimap_w=0
 g_minimap_h=0
@@ -53,7 +171,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		obj=JS.Param(0).as(JSObject)
 		addr=JS.Param(1).as(i64)
 		ranges=obj["m_native_view"].as(CBinaryView).ranges
-		p=ranges.InlineBisect(inline(a){return a.ofs1<=addr})
+		p=searchRanges(ranges,addr)
 		rg=ranges[p]
 		if addr>=rg.ofs0&&addr<rg.ofs1:
 			color=rg.color
@@ -93,7 +211,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			fnt_typef.SmartEmbolden(0xff000000)
 		fonts=[fnt_scaled,fnt_typei,fnt_typef]
 		hcs=[g_renderer.GetCharacterHeight(fnt) foreach fnt in fonts]
-		p0=ranges.InlineBisect(inline(a){return a.ofs1<=addr0})
+		p0=searchRanges(ranges,addr0)
 		data=obj["m_data"].as(u8[])
 		w_bytes=obj["m_w_bytes"].as(i64)
 		color0=obj["text_color"].as(int)
@@ -122,114 +240,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				ofs=0
 			sz=1<<(tid&3)
 			addr+=(sz-ofs)&(sz-1)//align left
-			d=0uLL
-			if tid&TYPE_MASK_BE:
-				for j=0:sz-1
-					addrj=iptr(addr)+iptr(j)
-					d<<=8
-					if addrj<data.n:
-						d+=u64(data[addrj])
-			else
-				for j=0:sz-1
-					addrj=iptr(addr)+iptr(j)
-					if addrj<data.n:
-						d+=u64(data[addrj])<<(j*8)
 			if addr>=data.n:break
-			////////////////////
-			//draw it
-			s_disp=string.NULL
-			fntid_a=0
-			switch(tid&~TYPE_MASK_BE){
-			case makeType(TYPE_BYTE,0):
-				s_disp=formatNumber(u32(d),{base:16,align:2})
-				fntid_a=0
-				break
-			case makeType(TYPE_BYTE,1):
-				s_disp=formatNumber(u32(d),{base:16,align:4})
-				fntid_a=0
-				break
-			case makeType(TYPE_BYTE,2):
-				s_disp=formatNumber(u32(d),{base:16,align:8})
-				fntid_a=0
-				break
-			case makeType(TYPE_BYTE,3):
-				s_disp=formatNumber(u64(d),{base:16,align:16})
-				fntid_a=0
-				break
-			/////////
-			case makeType(TYPE_INT,0):
-				s_disp=formatNumber(i32(i8(u8(d))),{base:10})
-				fntid_a=2
-				break
-			case makeType(TYPE_INT,1):
-				s_disp=formatNumber(i32(i16(u16(d))),{base:10})
-				fntid_a=1
-				break
-			case makeType(TYPE_INT,2):
-				s_disp=formatNumber(i32(u32(d)),{base:10})
-				fntid_a=1
-				break
-			case makeType(TYPE_INT,3):
-				s_disp=formatNumber(i64(d),{base:10})
-				fntid_a=1
-				break
-			/////////
-			case makeType(TYPE_UINT,0):
-				s_disp=formatNumber(u32(d),{base:10})
-				fntid_a=2
-				break
-			case makeType(TYPE_UINT,1):
-				s_disp=formatNumber(u32(d),{base:10})
-				fntid_a=1
-				break
-			case makeType(TYPE_UINT,2):
-				s_disp=formatNumber(u32(d),{base:10})
-				fntid_a=1
-				break
-			case makeType(TYPE_UINT,3):
-				s_disp=formatNumber(u64(d),{base:10})
-				fntid_a=1
-				break
-			/////////
-			case makeType(TYPE_FLOAT,1):
-				d32=i32(u32(d))
-				expo=(d32>>10)&31
-				manti=d32&1023
-				if expo>0:
-					manti+=1024
-				else
-					manti+=manti
-				flt=f32(manti)*pow(2.f,f32(expo-25))
-				if d32&32768:flt=-flt
-				//if abs(flt)>=1e-2:
-				s_disp=formatNumber(flt,{frac:5})
-				if s_disp.n>6:
-					s_disp.n=6
-				//else
-				//	s_disp=formatNumber(flt,{frac:3,scientific:1})
-				fntid_a=2
-				break
-			case makeType(TYPE_FLOAT,2):
-				flt=__int_as_float(i32(u32(d)))
-				if abs(flt)>=1e-3&&abs(flt)<=1e7:
-					s_disp=formatNumber(flt,{frac:7})
-					if s_disp.n>12:
-						s_disp.n=12
-				else
-					s_disp=formatNumber(flt,{frac:7,scientific:1})
-				fntid_a=2
-				break
-			case makeType(TYPE_FLOAT,3):
-				dbl=__longlong_as_double(i64(d))
-				if abs(dbl)>=1e-6&&abs(dbl)<=1e20:
-					s_disp=formatNumber(dbl,{frac:20})
-					if s_disp.n>25:
-						s_disp.n=25
-				else
-					s_disp=formatNumber(dbl,{frac:20,scientific:1})
-				fntid_a=2
-				break
-			}
+			(s_disp,fntid_a)=readToStringAt(JS,data,addr,tid)
 			////////////////////
 			//draw the shit
 			if fntid!=fntid_a:
@@ -280,6 +292,20 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				g_renderer.FastDrawChar(x_text,y_top,C,ch)
 				x_text+=w_digit
 		return 0
+	}
+	JS_UI["BIN_ReadToString"]=function(JSContext JS){
+		obj=JS.Param(0).as(JSObject)
+		addr=JS.Param(1).as(i64)
+		ranges=obj["m_native_view"].as(CBinaryView).ranges
+		p=searchRanges(ranges,addr)
+		rg=ranges[p]
+		if addr>=rg.ofs0&&addr<rg.ofs1:
+			tid=rg.tid
+		else
+			tid=makeType(TYPE_BYTE,0)
+		data=obj["m_data"].as(u8[])
+		(s_disp,fntid_a)=readToStringAt(JS,data,addr,tid)
+		return JS.Return(s_disp)
 	}
 	JS_UI["BIN_RenderMinimap"]=function(JSContext JS){
 		scale=Gui2D.detail.g_renderer.m_pixels_per_unit

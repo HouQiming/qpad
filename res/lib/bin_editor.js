@@ -2,6 +2,11 @@ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/global_doc");
 
+var TYPE_BYTE=0;
+var TYPE_INT=1;
+var TYPE_UINT=2;
+var TYPE_FLOAT=3;
+var TYPE_MASK_BE=16;
 W.BinaryEditor_prototype={
 	ResetWBytes:function(w_bytes){
 		this.m_w_bytes=w_bytes;
@@ -43,6 +48,20 @@ W.BinaryEditor_prototype={
 	GetNLinesDisp:function(){
 		var hc=UI.GetCharacterHeight(this.font);
 		return Math.max((this.h-this.m_h_addr)/hc,1)|0;
+	},
+	StartEdit:function(s,event){
+		if(this.m_sel1>=this.m_data.length){return;}
+		this.m_sel1=Math.min(this.m_sel0,this.m_sel1);
+		this.m_sel0=this.m_sel1;
+		this.m_show_edit=1
+		this.m_edit_event=[s,event];
+		UI.Refresh();
+	},
+	OnTextEdit:function(event){
+		this.StartEdit("OnTextEdit",event);
+	},
+	OnTextInput:function(event){
+		this.StartEdit("OnTextInput",event);
 	},
 	OnKeyDown:function(event){
 		var is_shift=event.keymod&(UI.KMOD_LSHIFT|UI.KMOD_RSHIFT);
@@ -91,10 +110,11 @@ W.BinaryEditor_prototype={
 			this.m_sel1=0;
 		}else if(IsHotkey(event,"CTRL+END SHIFT+CTRL+END")){
 			this.m_sel1=this.m_data.length;
+		}else if(IsHotkey(event,"CTRL+V")){
+			this.StartEdit("onKeyDown",event);
 		}else{
 			return;
 		}
-		//todo: editing, ctrl+ ..., diff tracking
 		this.ValidateSelection(is_shift,validation_dir);
 		UI.Refresh()
 	},
@@ -138,13 +158,13 @@ W.BinaryEditor_prototype={
 				//pgup
 				var n_lines_disp=this.GetNLinesDisp();
 				this.m_scroll-=this.m_w_bytes*n_lines_disp;
-				UI.ValidateScroll()
+				this.ValidateScroll()
 				UI.Refresh()
 			}else{
 				//pgdn
 				var n_lines_disp=this.GetNLinesDisp();
 				this.m_scroll+=this.m_w_bytes*n_lines_disp;
-				UI.ValidateScroll()
+				this.ValidateScroll()
 				UI.Refresh()
 			}
 		}else{
@@ -324,8 +344,10 @@ W.BinaryEditor=function(id,attrs){
 	UI.Begin(obj)
 		if(!obj.m_data){
 			var loaded_metadata=(UI.m_ui_metadata[obj.file_name]||{});
-			obj.m_data=UI.BIN_MapCopyOnWrite(obj.file_name)
-			//todo: parse it
+			obj.m_data=Buffer(Duktape.Buffer(UI.BIN_MapCopyOnWrite(obj.file_name)))
+			if(!loaded_metadata.ranges){
+				//todo: default parsing script
+			}
 			obj.m_ranges=(loaded_metadata.ranges||[]);
 			obj.m_native_view=UI.BIN_CreateView(obj.m_ranges);
 			obj.m_scroll=(loaded_metadata.m_scroll||0);
@@ -498,7 +520,6 @@ W.BinaryEditor=function(id,attrs){
 		UI.RoundRect({
 			x:x_minimap+obj.minimap_padding*0.5, y:obj.y+minimap_page_y1-obj.minimap_page_border_width, w:w_minimap_bars, h:obj.minimap_page_border_width,
 			color:obj.minimap_page_border_color})
-		//todo: mouse scrolling, mouse sel
 		///////////////
 		//panel
 		//todo: fix panel size, x_scroll the main area
@@ -592,14 +613,149 @@ W.BinaryEditor=function(id,attrs){
 		obj.m_minimap_page_y1=obj.y+minimap_page_y1;
 		obj.m_scroll_max=scroll_max;
 		///////////////
-		if(UI.HasFocus(obj)){
-			var caret_xy=XYFromCcnt(obj.m_sel1);
-			var x_caret=obj.x+obj.m_w_addr+caret_xy.x;
-			var y_caret=obj.y+obj.m_h_addr+caret_xy.y*hc;
-			UI.SetCaret(UI.context_window,
-				x_caret*UI.pixels_per_unit,y_caret*UI.pixels_per_unit,
-				obj.caret_width*UI.pixels_per_unit,hc*UI.pixels_per_unit,
-				obj.caret_color,obj.caret_flicker);
+		var caret_xy=XYFromCcnt(obj.m_sel1);
+		var x_caret=obj.x+obj.m_w_addr+caret_xy.x;
+		var y_caret=obj.y+obj.m_h_addr+caret_xy.y*hc;
+		if(obj.m_show_edit){
+			//edit box at caret
+			var caret_r_xy=XYFromCcnt(obj.m_sel1+(1<<(rg.tid&3))-1);
+			if(caret_r_xy.y>caret_xy.y){
+				caret_r_xy.x=dx_text;
+			}
+			x_caret_r=obj.x+obj.m_w_addr+caret_r_xy.x+2*w_digit;
+			var s_text="";
+			if(obj.m_edit_event){
+				s_text=UI.BIN_ReadToString(obj,obj.m_sel1);
+				if((rg.tid>>3)==TYPE_BYTE){
+					s_text="0x"+s_text;
+				}
+			}
+			UI.RoundRect({
+				x:x_caret-obj.padding_edit-obj.border_width_edit,y:y_caret,w:x_caret_r-x_caret+(obj.padding_edit+obj.border_width_edit)*2,h:hc,
+				color:obj.bgcolor_edit,border_width:obj.border_width_edit,border_color:obj.border_color_edit,
+				round:obj.round_edit,
+			})
+			var hc_editing=UI.GetCharacterHeight(obj.font_edit);
+			W.Edit("value_edit",{
+				x:x_caret-obj.padding_edit,y:y_caret+(hc-hc_editing)*0.5,w:x_caret_r-x_caret+obj.padding_edit*2,h:hc_editing,
+				font:obj.font_edit, tid:rg.tid, color:rg.color, text:s_text,
+				is_single_line:1,right_side_autoscroll_margin:0.5,
+				owner:obj,
+				additional_hotkeys:[{key:"ESCAPE",action:function(){
+					//cancel the change
+					var obj=this.owner
+					obj.m_show_edit=0;
+					UI.Refresh()
+				}}],
+				OnBlur:function(){
+					//apply the change - binary patch / undo queue
+					var obj=this.owner
+					obj.m_show_edit=0;
+					var ret;
+					try{
+						ret=JSON.parse(Duktape.__eval_expr_sandbox(this.ed.GetText()))
+					}catch(e){
+						//todo: present error to user - notification / script error / ...
+						//print(e.stack)
+						UI.Refresh()
+						return;
+					}
+					if(!this.tid&&(typeof ret)=='string'){
+						//string case
+						var buf_str=new Buffer(ret);
+						buf_str.copy(obj.m_data,obj.m_sel1,0,Math.min(obj.m_data.length-obj.m_sel1,buf_str.length));
+						UI.Refresh()
+						return;
+					}
+					//todo: i64/u64/f16 special cases - try to parse the raw string, change tracking / rendering / undo / redo
+					switch(this.tid){
+					case 0://b8
+					case 4://i8
+					case 16+0://b8BE
+					case 16+4://i8BE
+						obj.m_data.writeInt8(ret,obj.m_sel1);
+						break;
+					case 1://b16
+					case 5://i16
+						obj.m_data.writeInt16LE(ret,obj.m_sel1);
+						break;
+					case 16+1://b16BE
+					case 16+5://i16BE
+						obj.m_data.writeInt16BE(ret,obj.m_sel1);
+						break;
+					case 2://b32
+					case 6://i32
+						obj.m_data.writeInt32LE(ret,obj.m_sel1);
+						break;
+					case 16+2://b32BE
+					case 16+6://i32BE
+						obj.m_data.writeInt32BE(ret,obj.m_sel1);
+						break;
+					case 3://b64
+					case 7://i64
+					case 16+3://b64BE
+					case 16+7://i64BE
+						//todo
+						break;
+					case 8://u8
+					case 16+8://u8BE
+						obj.m_data.writeUInt8(ret,obj.m_sel1);
+						break;
+					case 9://u16
+						obj.m_data.writeUInt16LE(ret,obj.m_sel1);
+						break;
+					case 16+9://u16BE
+						obj.m_data.writeUInt16BE(ret,obj.m_sel1);
+						break;
+					case 10://u32
+						obj.m_data.writeUInt32LE(ret,obj.m_sel1);
+						break;
+					case 16+10://u32BE
+						obj.m_data.writeUInt32BE(ret,obj.m_sel1);
+						break;
+					case 11://u64
+					case 16+11://u64BE
+						//todo
+						break;
+					case 13://f16
+						//todo
+						break;
+					case 16+13://f16BE
+						//todo
+						break;
+					case 14://f32
+						obj.m_data.writeFloatLE(ret,obj.m_sel1);
+						break;
+					case 16+14://f32BE
+						obj.m_data.writeFloatBE(ret,obj.m_sel1);
+						break;
+					case 15://f64
+						obj.m_data.writeDoubleLE(ret,obj.m_sel1);
+						break;
+					case 16+15://f64BE
+						obj.m_data.writeDoubleBE(ret,obj.m_sel1);
+						break;
+					}
+					UI.Refresh()
+				},
+				OnEnter:function(){
+					this.OnBlur()
+				},
+			});
+			if(obj.m_edit_event){
+				UI.SetFocus(obj.value_edit)
+				obj.value_edit.SetSelection(0,obj.value_edit.ed.GetTextSize())
+				obj.value_edit[obj.m_edit_event[0]].call(obj.value_edit,obj.m_edit_event[1]);
+				obj.m_edit_event=undefined;
+			}
+		}else{
+			//binary editor caret
+			if(UI.HasFocus(obj)){
+				UI.SetCaret(UI.context_window,
+					x_caret*UI.pixels_per_unit,y_caret*UI.pixels_per_unit,
+					obj.caret_width*UI.pixels_per_unit,hc*UI.pixels_per_unit,
+					obj.caret_color,obj.caret_flicker);
+			}
 		}
 	UI.End()
 	UI.PopCliprect()

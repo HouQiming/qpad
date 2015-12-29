@@ -555,6 +555,12 @@ UI.Theme_CustomWidget=function(C){
 		},
 		binary_editor:{
 			font:UI.Font("res/fonts/inconsolata.ttf",24),
+			font_edit:UI.Font("res/fonts/inconsolata.ttf",16),
+			padding_edit:8,
+			bgcolor_edit:0xffffffff,
+			border_width_edit:2,
+			border_color_edit:C[0],
+			round_edit:4,
 			line_number_font:UI.Font("res/fonts/inconsolata.ttf",14,200),
 			line_number_font_small:UI.Font("res/fonts/inconsolata.ttf",8,200),
 			line_number_bgcolor:0xffd0d0d0,

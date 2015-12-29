@@ -69,6 +69,7 @@ if Platform.BUILD=="debug":
 (function(){
 	Gui2D.ProvideGLFunctions()
 	JS=new JSContext
+	JS_script_sandbox=new JSContext
 	sbox=setupModuleSystem(JS,1)
 	sbox.UILoadZip(string.NULL)
 	/////////////
@@ -359,6 +360,20 @@ if Platform.BUILD=="debug":
 			if s0[i]!=s1[i]:break
 			lg=i+1
 		return JS.Return(lg)
+	}
+	Duktape_sandbox=JS_script_sandbox.GetGlobal()["Duktape"].as(JSObject)
+	JS_script_sandbox.evalVoid("Duktape.__eval_expr=function(){try{var ret=JSON.stringify(eval(Duktape.__code));Duktape.__error=undefined;return ret;}catch(e){Duktape.__error=e.stack;return undefined;}}","<eval-sandbox>")
+	Duktape["__eval_expr_sandbox"]=function(JSContext JS){
+		s=JS.Param(0).as(string)
+		Duktape_sandbox["__code"]=s;
+		s_ret=JS_script_sandbox.eval(string,"Duktape.__eval_expr()")
+		if s_ret:
+			return JS.Return(s_ret)
+		else
+			s_error=Duktape_sandbox["__error"].as(string)
+			if s_error:
+				return JS.ReturnError(s_error)
+		return 0
 	}
 	/////////////
 	Gui2D.g_log_file=System.Env.GetStoragePath()+"/log.txt"
