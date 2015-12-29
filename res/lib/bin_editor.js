@@ -98,8 +98,35 @@ W.BinaryEditor_prototype={
 		this.ValidateSelection(is_shift,validation_dir);
 		UI.Refresh()
 	},
+	MapMouseToAddr:function(event,rgid){
+		var hc=UI.GetCharacterHeight(this.font);
+		var w_digit=UI.GetCharacterAdvance(this.font,48);
+		var w_space1=w_digit*0.75;
+		var w_space4=w_digit*0.25;
+		var w_space8=w_digit*0.25;
+		var mapXLeft=function(daddr_x){
+			return w_digit*2*daddr_x+w_space1*(daddr_x)+w_space4*(daddr_x>>2)+w_space8*(daddr_x>>3);
+		};
+		var daddr_y=Math.floor((event.y-(this.y+this.m_h_addr))/hc);
+		var daddr_x=0;
+		if(rgid=="rgn_text"){
+			daddr_x=Math.floor((event.x-this.m_x_text)/w_digit);
+		}else{
+			daddr_x=0;
+			for(var x=0;x<this.m_w_bytes;x++){
+				if(this.m_x_main+mapXLeft(x)<event.x){
+					daddr_x=x;
+				}else{
+					break;
+				}
+			}
+		}
+		return this.m_scroll+daddr_y*this.m_w_bytes+daddr_x;
+	},
 	OnMouseDown:function(event,rgid){
 		if(this.is_preview){return;}
+		UI.SetFocus(this)
+		if(!rgid){return;}
 		if(rgid=="rgn_minimap"){
 			//minimap scrolling, pgup / pgdn / *the-thing*
 			if(event.y>=this.m_minimap_page_y0&&event.y<=this.m_minimap_page_y1){
@@ -122,20 +149,51 @@ W.BinaryEditor_prototype={
 			}
 		}else{
 			//text selection
-			//todo: double / triple click
+			this.m_sel1=this.MapMouseToAddr(event,rgid);
+			this.ValidateSelection(0,-1)
+			if(event.clicks==2){
+				//double-click
+				this.m_sel1=Math.floor(this.m_sel1/4)*4;
+				this.ValidateSelection(0,-1)
+				//non-shift updates sel0, now update sel1 again
+				this.m_sel1+=4;
+				this.ValidateSelection(1,1)
+			}else if(event.clicks>=3){
+				//triple-click
+				this.m_sel1=Math.floor(this.m_sel1/this.m_w_bytes)*this.m_w_bytes;
+				this.ValidateSelection(0,-1)
+				//non-shift updates sel0, now update sel1 again
+				this.m_sel1+=this.m_w_bytes;
+				this.ValidateSelection(1,1)
+			}
 			this.is_dragging=rgid;
-			this.drag_value0=this.m_scroll;
-			//todo
+			this.drag_value0=this.m_sel0;
+			this.drag_value1=this.m_sel1;
+			UI.Refresh()
 		}
 	},
 	OnMouseMove:function(event,rgid){
+		if(!this.is_dragging){return;}
 		if(this.is_dragging=="rgn_minimap"){
 			var h_scrollable=Math.max(this.h-(this.m_minimap_page_y1-this.m_minimap_page_y0),1);
 			this.m_scroll=Math.floor(this.drag_value0+(event.y-this.drag_y0)/h_scrollable*this.m_scroll_max);
 			this.ValidateScroll();
 			UI.Refresh()
 		}else{
-			//todo
+			var mouse_sel=this.MapMouseToAddr(event,this.is_dragging);
+			if(mouse_sel>=this.drag_value0&&mouse_sel<=this.drag_value1){
+				this.m_sel0=this.drag_value0;
+				this.m_sel1=this.drag_value1;
+			}else{
+				if(mouse_sel<this.drag_value0){
+					this.m_sel0=this.drag_value1;
+				}else{
+					this.m_sel0=this.drag_value0;
+				}
+				this.m_sel1=mouse_sel;
+			}
+			this.AutoScroll()
+			UI.Refresh()
 		}
 	},
 	OnMouseUp:function(event,rgid){
@@ -525,8 +583,10 @@ W.BinaryEditor=function(id,attrs){
 		///////////////
 		//create mouse regions
 		//obj.m_x_ranges=[obj.x+obj.m_w_addr,obj.x+obj.m_w_addr+dx_text,x_minimap_min,x_minimap,x_panel]
-		W.Region("rgn_main",{owner:obj,x:obj.x+obj.m_w_addr,y:obj.y+obj.m_h_addr,w:dx_text,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
-		W.Region("rgn_text",{owner:obj,x:obj.x+obj.m_w_addr+dx_text,y:obj.y+obj.m_h_addr,w:w_digit*this.m_w_bytes,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
+		obj.m_x_main=obj.x+obj.m_w_addr;
+		obj.m_x_text=obj.x+obj.m_w_addr+dx_text;
+		W.Region("rgn_main",{owner:obj,x:obj.m_x_main,y:obj.y+obj.m_h_addr,w:dx_text,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
+		W.Region("rgn_text",{owner:obj,x:obj.m_x_text,y:obj.y+obj.m_h_addr,w:w_digit*obj.m_w_bytes,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
 		W.Region("rgn_minimap",{owner:obj,x:x_minimap,y:obj.y,w:x_panel-x_minimap,h:obj.h},W.SlaveRegion_prototype)
 		obj.m_minimap_page_y0=obj.y+minimap_page_y0;
 		obj.m_minimap_page_y1=obj.y+minimap_page_y1;
