@@ -353,6 +353,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		this.ed.Edit(ops);
 	},
+	OnMouseDown:function(event){
+		if(this.m_is_preview){return;}
+		W.Edit_prototype.OnMouseDown.call(this,event)
+	},
 })
 
 W.MinimapThingy_prototype={
@@ -688,6 +692,15 @@ W.CodeEditorWidget_prototype={
 			UI.Refresh()
 			return 1
 		})
+		//current line highlight
+		var hl_items=doc.CreateTransientHighlight({'depth':-100,'color':this.color_cur_line_highlight,'invertible':0});
+		doc.cur_line_p0=hl_items[0]
+		doc.cur_line_p1=hl_items[1]
+		doc.cur_line_hl=hl_items[2]
+		var line_current=doc.GetLC(doc.sel1.ccnt)[0]
+		var ed_caret=doc.GetCaretXY();
+		doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
+		doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
 	},
 	OnDestroy:function(){
 		if(this.doc){
@@ -771,10 +784,11 @@ W.CodeEditorWidget_prototype={
 		var doc=this.doc
 		if(this.m_is_preview||doc&&doc.ed.hfile_loading){return;}
 		if(!doc||!IO.FileExists(this.file_name)){return;}
-		var new_metadata={m_bookmarks:[],m_unkeyed_bookmarks:[],
-			sel0:doc.sel0.ccnt,
-			sel1:doc.sel1.ccnt,
-		}
+		var new_metadata=(UI.m_ui_metadata[this.file_name]||{});
+		new_metadata.m_bookmarks=[];
+		new_metadata.m_unkeyed_bookmarks=[];
+		new_metadata.sel0=doc.sel0.ccnt;
+		new_metadata.sel1=doc.sel1.ccnt;
 		for(var i=0;i<UI.m_code_editor_persistent_members.length;i++){
 			var name_i=UI.m_code_editor_persistent_members[i]
 			new_metadata[name_i]=this[name_i]
@@ -1978,6 +1992,12 @@ var OpenInPlace=function(obj,name){
 			return
 		}
 	}
+	var lang=UI.ED_GetFileLanguage(fn);
+	if(lang.is_binary){
+		UI.top.app.document_area.CloseTab(my_tabid)
+		UI.NewBinaryEditorTab(fn)
+		return
+	}
 	obj.file_name=fn
 	obj.doc=undefined
 	obj.m_language_id=undefined
@@ -2546,6 +2566,7 @@ W.SXS_NewPage=function(id,attrs){
 					editor_widget.m_language_id=undefined
 					editor_widget.m_is_preview=0
 					editor_widget.m_file_name_before_preview=undefined
+					editor_widget.bin_preview=undefined;
 				}
 				if(!editor_widget.m_file_name_before_preview){
 					editor_widget.m_file_name_before_preview=editor_widget.file_name
@@ -2555,6 +2576,7 @@ W.SXS_NewPage=function(id,attrs){
 				editor_widget.m_language_id=undefined
 				editor_widget.m_is_brand_new=1
 				editor_widget.m_is_preview=1
+				editor_widget.bin_preview=undefined;
 				//UI.InvalidateCurrentFrame()
 				UI.Refresh()
 			},
@@ -2852,12 +2874,6 @@ W.CodeEditor=function(id,attrs){
 			//	if(!UI.nd_captured){doc.AutoScroll("show");}
 			//}
 			//current line highlight
-			if(!doc.cur_line_hl){
-				var hl_items=doc.CreateTransientHighlight({'depth':-100,'color':obj.color_cur_line_highlight,'invertible':0});
-				doc.cur_line_p0=hl_items[0]
-				doc.cur_line_p1=hl_items[1]
-				doc.cur_line_hl=hl_items[2]
-			}
 			var line_current=doc.GetLC(doc.sel1.ccnt)[0]
 			var ed_caret=doc.GetCaretXY();
 			//var line_ccnts=doc.SeekAllLinesBetween(line_current,line_current+2)
@@ -3067,6 +3083,8 @@ W.CodeEditor=function(id,attrs){
 			//////////////////
 			PrepareBookmarks()
 			DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h);
+		}else if(obj.m_is_preview&&!doc&&(obj.bin_preview||UI.ED_GetFileLanguage(obj.file_name).is_binary)){
+			W.BinaryEditor("bin_preview",{x:obj.x,y:obj.y,w:obj.w,h:obj.h,is_preview:1,file_name:obj.file_name})
 		}else{
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar
@@ -4464,5 +4482,24 @@ UI.ED_IndexGC=function(){
 	}
 	UI.ED_IndexGCEnd()
 }
+
+Language.Register({
+	name_sort_hack:" Plain Text",name:"Plain text",parser:"text",
+	rules:function(lang){
+		lang.DefineDefaultColor("color")
+		return function(){}
+	}
+})
+
+Language.Register({
+	name_sort_hack:' Binary blob',name:'Binary blob',parser:'none',
+	is_binary:1,
+	extensions:['bin','bz2'],
+	////////////////////////
+	rules:function(lang){
+		lang.DefineDefaultColor("color")
+		return function(){}
+	}
+});
 
 //UI.enable_timing=1

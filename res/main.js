@@ -33,6 +33,33 @@ UI.Theme_CustomWidget=function(C){
 			triangle_font:UI.Font("res/fonts/dsanscn.ttc,!",32,0),
 			triangle_font2:UI.Font("res/fonts/dsanscn.ttc,!",32,250),
 		},
+		check_button:{
+			transition_dt:0.1,
+			round:0,border_width:2,padding:12,
+			icon_color:0xff444444,
+			text_color:0xff444444,
+			$:{
+				out:{
+					border_color:C[0]&0x00ffffff,color:0x00ffffff,
+				},
+				over:{
+					border_color:C[0],color:0x00ffffff,
+				},
+				down:{
+					border_color:C_dark,color:0x00ffffff,
+				},
+				////////////////////
+				checked_out:{
+					border_color:C[0]&0x00ffffff,color:C_sel,
+				},
+				checked_over:{
+					border_color:C[0],color:C_sel,
+				},
+				checked_down:{
+					border_color:C_dark,color:C_sel,
+				},
+			}
+		},
 		sub_window:{
 			transition_dt:0.1,
 			round:0,border_width:2,
@@ -528,8 +555,8 @@ UI.Theme_CustomWidget=function(C){
 		},
 		binary_editor:{
 			font:UI.Font("res/fonts/inconsolata.ttf",24),
-			line_number_font:UI.Font("res/fonts/inconsolata.ttf",14),
-			line_number_font_small:UI.Font("res/fonts/inconsolata.ttf",8),
+			line_number_font:UI.Font("res/fonts/inconsolata.ttf",14,200),
+			line_number_font_small:UI.Font("res/fonts/inconsolata.ttf",8,200),
 			line_number_bgcolor:0xffd0d0d0,
 			line_number_color:0xff7f7f7f,
 			line_number_color_focus:0xff000000,
@@ -539,6 +566,19 @@ UI.Theme_CustomWidget=function(C){
 			text_color:0xff000000,
 			bgcolor:0xffe8e8e8,
 			bgcolor_selection:C[0]&0x55ffffff,
+			separator_color:0xff999999,
+			minimap_padding:12,
+			minimap_page_shadow:0x55000000,
+			minimap_page_border_width:2,
+			minimap_page_border_color:0xffaaaaaa,
+			sxs_shadow_size:6,
+			sxs_shadow_color:0xaa000000,
+			sxs_bgcolor:0xffffffff,
+			font_panel:UI.Font(UI.font_name,24),
+			font_panel_icon:UI.Font(UI.icon_font_name,22),
+			font_panel_fixed:UI.Font("res/fonts/inconsolata.ttf",22),
+			text_color_panel:0xff000000,
+			w_panel:320,
 		},
 		file_item:{
 			h:56,h_dense:32,
@@ -1065,7 +1105,8 @@ UI.Application=function(id,attrs){
 		if(workspace){
 			var current_tab_id=undefined
 			for(var i=0;i<workspace.length;i++){
-				UI.NewCodeEditorTab(workspace[i])
+				//UI.NewCodeEditorTab(workspace[i])
+				UI.OpenEditorWindow(workspace[i])
 				if(workspace[i]==fn_current_tab){
 					current_tab_id=i;
 				}

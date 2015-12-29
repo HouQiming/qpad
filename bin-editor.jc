@@ -1,11 +1,13 @@
 import "system.jc"
 import "gui2d.jc"
 import "javascript.jc"
+import "g-l.jc"
 import System.Math.*
 import System.Algorithm.*
 import System.Console.*
 import Gui2D.detail.*
 import Javascript.*
+import GL.*
 
 TYPE_BYTE=0
 TYPE_INT=1
@@ -24,6 +26,9 @@ struct TDisplayRange
 class CBinaryView
 	TDisplayRange[] ranges
 
+g_minimap_tex=GLuint(0)
+g_minimap_w=0
+g_minimap_h=0
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["BIN_CreateView"]=function(JSContext JS){
 		obj_view=JS.Param(0).as(JSObject)
@@ -44,19 +49,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		s=System.IO.MapFile(fn,System.IO.OPEN_READ|System.IO.OPEN_COPY_ON_WRITE).ConvertToAsBinary(u8)
 		return JS.Return(s)
 	}
-	JS_UI["BIN_GetTypeAt"]=function(JSContext JS){
+	JS_UI["BIN_GetRangeAt"]=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)
 		addr=JS.Param(1).as(i64)
 		ranges=obj["m_native_view"].as(CBinaryView).ranges
 		p=ranges.InlineBisect(inline(a){return a.ofs1<=addr})
 		rg=ranges[p]
 		if addr>=rg.ofs0&&addr<rg.ofs1:
+			color=rg.color
 			tid=rg.tid
 			ofs0=rg.ofs0
 		else
+			color=obj["text_color"].as(int)
 			tid=makeType(TYPE_BYTE,0)
 			ofs0=0LL
 		ret=JS.New()
+		ret["color"]=color
 		ret["tid"]=tid
 		ret["ofs"]=ofs0
 		return JS.Return(ret)
@@ -71,6 +79,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		addr0=JS.Param(5).as(i64)
 		ranges=obj["m_native_view"].as(CBinaryView).ranges
 		m_font=obj["font"].as(TFont)
+		//Writeln('pfnt: ',!!m_font.pfnt)
+		//if !m_font.pfnt:return 0
 		fnt_scaled=m_font
 		fnt_scaled.h*=scale
 		fnt_typei=fnt_scaled
@@ -83,20 +93,21 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			fnt_typef.SmartEmbolden(0xff000000)
 		fonts=[fnt_scaled,fnt_typei,fnt_typef]
 		hcs=[g_renderer.GetCharacterHeight(fnt) foreach fnt in fonts]
-		p=ranges.InlineBisect(inline(a){return a.ofs1<=addr0})
+		p0=ranges.InlineBisect(inline(a){return a.ofs1<=addr0})
 		data=obj["m_data"].as(u8[])
 		w_bytes=obj["m_w_bytes"].as(i64)
 		color0=obj["text_color"].as(int)
 		fntid=-1
 		//determine the rendering dims
 		hc=g_renderer.GetCharacterHeight(fnt_scaled)
-		n_lines=i64(floor(h/hc))
+		n_lines=i64(ceil(h/hc))
 		addr1=addr0+w_bytes*i64(n_lines)
 		w_digit=g_renderer.GetCharacterAdvance(fnt_scaled,48)
 		w_space1=w_digit*0.75f
 		w_space4=w_digit*0.25f
 		w_space8=w_digit*0.25f
 		w_bytes_i=int(w_bytes)
+		p=p0
 		for(addr=addr0;addr<addr1;)
 			if addr>=ranges[p].ofs1:
 				p++
@@ -234,16 +245,93 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				citem=g_renderer.GetFastDrawCharCacheItem(ch)
 				if !citem.gcitem:continue
 				x_right-=citem.gcitem.dx
-				if x_right<x:
+				if x_right<x-1.f:
 					daddr_x=w_bytes_i-1
 					x_right=x+w_digit*2.f*f32(daddr_x+1)+w_space1*f32(daddr_x)+w_space4*f32(daddr_x>>2)+w_space8*f32(daddr_x>>3)
 					y_top-=hc
 					if y_top<y:break
 					x_right-=citem.gcitem.dx
 				g_renderer.FastDrawChar(x_right,y_top,C,ch)
-			//todo: text / minimap
 			////////////////////
 			addr+=sz
+		//text
+		w_bin_part=w_digit*2.f*f32(w_bytes_i)+w_space1*f32(w_bytes_i)+w_space4*f32(w_bytes_i>>2)+w_space8*f32(w_bytes_i>>3)
+		g_renderer.SetFastDrawCharFont(fnt_scaled)
+		p=p0
+		for(addr=addr0;addr<addr1;addr+=w_bytes)
+			daddr=int(addr-addr0)
+			daddr_y=daddr/w_bytes_i
+			x_text=x+w_bin_part
+			y_top=y+hc*f32(daddr_y)
+			for j=0:w_bytes_i-1
+				addrj=addr+i64(j)
+				if addrj>=ranges[p].ofs1:
+					p++
+				rg=ranges[p]
+				if addrj>=rg.ofs0&&addrj<rg.ofs1:
+					C=rg.color
+				else
+					C=color0
+				if addrj<data.n:
+					ch=int(u8(data[addrj]))
+				else
+					ch=32
+				if ch<32||ch>=127:ch=0x2e
+				g_renderer.FastDrawChar(x_text,y_top,C,ch)
+				x_text+=w_digit
 		return 0
+	}
+	JS_UI["BIN_RenderMinimap"]=function(JSContext JS){
+		scale=Gui2D.detail.g_renderer.m_pixels_per_unit
+		x=JS.Param(0).as(float)*scale
+		y=JS.Param(1).as(float)*scale
+		w=JS.Param(2).as(float)*scale
+		h=JS.Param(3).as(float)*scale
+		obj=JS.Param(4).as(JSObject)
+		addr0=JS.Param(5).as(i64)
+		ramp=JS.Param(6).as(int[])
+		/////////////////////
+		data=obj["m_data"].as(u8[])
+		w_bytes=obj["m_w_bytes"].as(int)
+		color0=obj["text_color"].as(int)
+		w_true=int(w_bytes)
+		h_true=int(ceil(h))
+		tex_data=[addr0+i64(i)<data.n?ramp[int(u8(data[addr0+i64(i)]))]:0 for i=0:w_true*h_true-1]
+		if g_minimap_tex&&(g_minimap_w!=w_true||g_minimap_h!=h_true):
+			texs=[g_minimap_tex]
+			glDeleteTextures(1,__pointer(texs.d))
+			texs[0]=0u
+			g_minimap_tex=0u
+		if !g_minimap_tex:
+			g_minimap_tex=glCreateTexture(GL_RGBA8,w_true,h_true,GL_LINEAR,GL_CLAMP,GL_CLAMP,NULL)
+		g_minimap_w=w_true
+		g_minimap_h=h_true
+		glBindTexture(GL_TEXTURE_2D,g_minimap_tex)
+		glTexSubImage2D(GL_TEXTURE_2D,0,0,0,w_true,h_true,GL_RGBA,GL_UNSIGNED_BYTE,__pointer(tex_data.d))
+		glBindTexture(GL_TEXTURE_2D,0u)
+		tex_data.discard()
+		tech=JS_UI["g_binary_minimap_technique"].as(GLTechnique)
+		if !tech:
+			tech=new GLTechnique
+			tech.SetVarying("vec2 uv;")
+			tech.SetVertexShader("
+			void main(){
+				vec2 P_scr=P*scale;
+				gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
+				uv=uv_vert;
+			}")
+			tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
+			//tech.SetFragmentShader("void main(){vec4 C=texture2D(tex0,uv);gl_FragColor=vec4(1.0,0.0,1.0,1.0);}")
+			JS_UI["g_binary_minimap_technique"]=tech
+		prev_viewport=new int[4]
+		glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
+		tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
+		tech.SetTexture2D("tex0",g_minimap_tex)
+		xf=floor(x)
+		yf=floor(y)
+		tech.SetVertexArray("P",[float2(xf,yf), float2(xf+float(w_true),yf), float2(xf+float(w_true),yf+float(h_true)), float2(xf,yf+float(h_true))])
+		tech.SetVertexArray("uv_vert",[float2(0.f,0.f), float2(1.f,0.f), float2(1.f,1.f), float2(0.f,1.f)])
+		tech.Draw(0u,GL_QUADS,4)
+		return JS.Return(w_true)
 	}
 })

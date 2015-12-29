@@ -2,25 +2,6 @@ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
 
-Language.Register({
-	name_sort_hack:" Plain Text",name:"Plain text",parser:"text",
-	rules:function(lang){
-		lang.DefineDefaultColor("color")
-		return function(){}
-	}
-})
-
-Language.Register({
-	name_sort_hack:' Binary blob',name:'Binary blob',parser:'none',
-	is_binary:1,
-	extensions:['bin','bz2'],
-	////////////////////////
-	rules:function(lang){
-		lang.DefineDefaultColor("color")
-		return function(){}
-	}
-});
-
 var f_C_like=function(lang,keywords,has_preprocessor){
 	lang.DefineDefaultColor("color_symbol")
 	var bid_preprocessor
