@@ -110,6 +110,12 @@ W.BinaryEditor_prototype={
 			this.m_sel1=0;
 		}else if(IsHotkey(event,"CTRL+END SHIFT+CTRL+END")){
 			this.m_sel1=this.m_data.length;
+		}else if(IsHotkey(event,"CTRL+Z")||IsHotkey(event,"ALT+BACKSPACE")){
+			this.Undo()
+			return;
+		}else if(IsHotkey(event,"SHIFT+CTRL+Z")||IsHotkey(event,"CTRL+Y")){
+			this.Redo()
+			return;
 		}else if(IsHotkey(event,"CTRL+V")){
 			this.StartEdit("onKeyDown",event);
 		}else{
@@ -212,6 +218,7 @@ W.BinaryEditor_prototype={
 				}
 				this.m_sel1=mouse_sel;
 			}
+			this.ValidateSelection(1,-1)
 			this.AutoScroll()
 			UI.Refresh()
 		}
@@ -229,6 +236,32 @@ W.BinaryEditor_prototype={
 		new_metadata.w_bytes=this.m_w_bytes;
 		new_metadata.m_scroll=this.m_scroll;
 		UI.m_ui_metadata[this.file_name]=new_metadata
+	},
+	PushUndo:function(addr,sz){
+		//change tracking / rendering / undo / redo
+		sz=Math.min(sz,this.m_data.length-addr);
+		var buf=new Buffer(this.m_data.slice(addr,addr+sz));
+		this.m_undo_queue.push({addr:addr,buf:buf});
+		//this.SetRange(addr,addr+sz,{color:this.color_edited});
+	},
+	UndoImpl:function(undo_queue,redo_queue){
+		if(!undo_queue.length){return 0;}
+		var item=undo_queue.pop();
+		var addr=item.addr;
+		var sz=item.buf.length;
+		var buf=new Buffer(this.m_data.slice(addr,addr+sz));
+		redo_queue.push({addr:addr,buf:buf});
+		item.buf.copy(this.m_data,addr);
+		this.m_sel0=addr
+		this.m_sel1=addr
+		UI.Refresh()
+		return 1;
+	},
+	Undo:function(){
+		return this.UndoImpl(this.m_undo_queue,this.m_redo_queue)
+	},
+	Redo:function(){
+		return this.UndoImpl(this.m_redo_queue,this.m_undo_queue)
 	},
 	Save:function(){
 		//todo
@@ -310,10 +343,6 @@ W.SlaveRegion_prototype={
 
 var g_types=['b','i','u','f'];
 var g_sizes=[8,16,32,64];
-var g_colors=[
-	0xffb4771f,0xff2ca033,0xff1c1ae3,0xff007fff,0xff9a3d6a,
-	0xffe3cea6,0xff8adfb2,0xff999afb,0xff6fbffd,0xffd6b2ca,
-	0xff00ffff,0xff8888b8,0xff000080,0xff7f7f7f,0xff000000];
 W.BinaryEditor=function(id,attrs){
 	//could do the main view in pure JS... minimap is a different story though
 	//	the duktape f32/f64 <-> text code is more precise
@@ -343,8 +372,10 @@ W.BinaryEditor=function(id,attrs){
 	UI.PushCliprect(obj.x,obj.y,obj.w,obj.h)
 	UI.Begin(obj)
 		if(!obj.m_data){
+			//init
 			var loaded_metadata=(UI.m_ui_metadata[obj.file_name]||{});
-			obj.m_data=Buffer(Duktape.Buffer(UI.BIN_MapCopyOnWrite(obj.file_name)))
+			obj.m_data_raw=UI.BIN_MapCopyOnWrite(obj.file_name);//we need to keep a reference
+			obj.m_data=Buffer(Duktape.Buffer(obj.m_data_raw));
 			if(!loaded_metadata.ranges){
 				//todo: default parsing script
 			}
@@ -397,6 +428,9 @@ W.BinaryEditor=function(id,attrs){
 				//bih0.palette[i]=u32(i*0x010101)
 				obj.m_ramp[i]=(((B|0)+(G|0)*256+(R|0)*65536))|0xff000000;
 			}
+			obj.m_undo_queue=[];
+			obj.m_redo_queue=[];
+			UI.BumpHistory(obj.file_name)
 		}
 		var hc=UI.GetCharacterHeight(obj.font);
 		var n_lines_disp=Math.max((obj.h-obj.m_h_addr)/hc,1)|0;
@@ -466,6 +500,24 @@ W.BinaryEditor=function(id,attrs){
 					UI.DrawChar(obj.m_line_number_font,x_linenumber,y_linenumber0+i*hc+8,C,ch);
 				}
 			}
+		}
+		//draw edit history - we won't be editing much
+		var Q=obj.m_undo_queue;
+		var x_main=obj.x+obj.m_w_addr;
+		var y_main=obj.y+obj.m_h_addr;
+		for(var i=0;i<Q.length;i++){
+			var item=Q[i];
+			var xy0=XYFromCcnt(item.addr);
+			if(xy0.y<0||xy0.y>obj.h){continue;}
+			var xy1=XYFromCcnt(item.addr+item.buf.length-1);
+			if(xy1.y>xy0.y){
+				xy1.x=dx_text;
+			}else{
+				xy1.x+=w_digit*2;
+			}
+			UI.RoundRect({x:x_main+xy0.x-obj.edit_rect_blur,y:y_main+xy0.y*hc,w:xy1.x-xy0.x+obj.edit_rect_blur*2,h:hc,
+				round:obj.edit_rect_blur,border_width:-obj.edit_rect_blur,
+				color:obj.edit_rect_color})
 		}
 		//draw selection
 		if(obj.m_sel0!=obj.m_sel1){
@@ -570,7 +622,7 @@ W.BinaryEditor=function(id,attrs){
 							obj.SetRange(sel0,sel1,{tid:tid});
 						}
 						UI.Refresh()
-					}).bind(undefined,tid==12?rg.tid^16:tid),
+					}).bind(undefined,tid==12?rg.tid^16:tid+(rg.tid&16)),
 					font:obj.font_panel_fixed,
 					text:tid==12?"BE":g_types[i]+g_sizes[j]});
 			}
@@ -578,7 +630,8 @@ W.BinaryEditor=function(id,attrs){
 		y_current+=28*4+4;
 		W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display color",color:obj.text_color_panel})
 		y_current+=28;
-		for(var i=0;i<3;i++){
+		var g_colors=obj.color_choices;
+		for(var i=0;i<2;i++){
 			for(var j=0;j<5;j++){
 				var C=(g_colors[i*5+j]|0);
 				W.Button("btn_C"+C,{
@@ -621,23 +674,31 @@ W.BinaryEditor=function(id,attrs){
 			var caret_r_xy=XYFromCcnt(obj.m_sel1+(1<<(rg.tid&3))-1);
 			if(caret_r_xy.y>caret_xy.y){
 				caret_r_xy.x=dx_text;
+			}else{
+				caret_r_xy.x+=2*w_digit;
 			}
-			x_caret_r=obj.x+obj.m_w_addr+caret_r_xy.x+2*w_digit;
+			x_caret_r=obj.x+obj.m_w_addr+caret_r_xy.x;
 			var s_text="";
 			if(obj.m_edit_event){
 				s_text=UI.BIN_ReadToString(obj,obj.m_sel1);
-				if((rg.tid>>3)==TYPE_BYTE){
+				if(((rg.tid>>2)&3)==TYPE_BYTE){
 					s_text="0x"+s_text;
 				}
 			}
 			UI.RoundRect({
-				x:x_caret-obj.padding_edit-obj.border_width_edit,y:y_caret,w:x_caret_r-x_caret+(obj.padding_edit+obj.border_width_edit)*2,h:hc,
-				color:obj.bgcolor_edit,border_width:obj.border_width_edit,border_color:obj.border_color_edit,
-				round:obj.round_edit,
+				x:x_caret-obj.edit_padding-obj.edit_shadow_size-obj.edit_border_width,y:y_caret,
+				w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_shadow_size+obj.edit_border_width)*2,h:hc+obj.edit_shadow_size,
+				color:obj.edit_shadow_color,border_width:-obj.edit_shadow_size,
+				round:obj.edit_shadow_size,
+			})
+			UI.RoundRect({
+				x:x_caret-obj.edit_padding-obj.edit_border_width,y:y_caret,w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_border_width)*2,h:hc,
+				color:obj.edit_bgcolor,border_width:obj.edit_border_width,border_color:obj.edit_border_color,
+				round:obj.edit_round,
 			})
 			var hc_editing=UI.GetCharacterHeight(obj.font_edit);
 			W.Edit("value_edit",{
-				x:x_caret-obj.padding_edit,y:y_caret+(hc-hc_editing)*0.5,w:x_caret_r-x_caret+obj.padding_edit*2,h:hc_editing,
+				x:x_caret-obj.edit_padding,y:y_caret+(hc-hc_editing)*0.5,w:x_caret_r-x_caret+obj.edit_padding*2,h:hc_editing,
 				font:obj.font_edit, tid:rg.tid, color:rg.color, text:s_text,
 				is_single_line:1,right_side_autoscroll_margin:0.5,
 				owner:obj,
@@ -648,26 +709,33 @@ W.BinaryEditor=function(id,attrs){
 					UI.Refresh()
 				}}],
 				OnBlur:function(){
+					var obj=this.owner
+					obj.m_show_edit=0;
+					UI.Refresh()
+				},
+				OnEnter:function(){
 					//apply the change - binary patch / undo queue
 					var obj=this.owner
 					obj.m_show_edit=0;
 					var ret;
+					var stext_raw=this.ed.GetText();
 					try{
-						ret=JSON.parse(Duktape.__eval_expr_sandbox(this.ed.GetText()))
+						ret=JSON.parse(Duktape.__eval_expr_sandbox(stext_raw))
 					}catch(e){
 						//todo: present error to user - notification / script error / ...
-						//print(e.stack)
+						//print(e.message)
 						UI.Refresh()
 						return;
 					}
 					if(!this.tid&&(typeof ret)=='string'){
 						//string case
 						var buf_str=new Buffer(ret);
+						obj.PushUndo(obj.m_sel1,buf_str.length)
 						buf_str.copy(obj.m_data,obj.m_sel1,0,Math.min(obj.m_data.length-obj.m_sel1,buf_str.length));
 						UI.Refresh()
 						return;
 					}
-					//todo: i64/u64/f16 special cases - try to parse the raw string, change tracking / rendering / undo / redo
+					obj.PushUndo(obj.m_sel1,1<<(this.tid&3))
 					switch(this.tid){
 					case 0://b8
 					case 4://i8
@@ -693,9 +761,11 @@ W.BinaryEditor=function(id,attrs){
 						break;
 					case 3://b64
 					case 7://i64
+					case 11://u64
 					case 16+3://b64BE
 					case 16+7://i64BE
-						//todo
+					case 16+11://u64BE
+						UI.BIN_write64(obj.m_data,stext_raw,this.tid,ret,obj.m_sel1)
 						break;
 					case 8://u8
 					case 16+8://u8BE
@@ -713,15 +783,11 @@ W.BinaryEditor=function(id,attrs){
 					case 16+10://u32BE
 						obj.m_data.writeUInt32BE(ret,obj.m_sel1);
 						break;
-					case 11://u64
-					case 16+11://u64BE
-						//todo
-						break;
 					case 13://f16
-						//todo
+						obj.m_data.writeUInt16LE(UI.BIN_float2half(ret),obj.m_sel1);
 						break;
 					case 16+13://f16BE
-						//todo
+						obj.m_data.writeUInt16BE(UI.BIN_float2half(ret),obj.m_sel1);
 						break;
 					case 14://f32
 						obj.m_data.writeFloatLE(ret,obj.m_sel1);
@@ -738,13 +804,10 @@ W.BinaryEditor=function(id,attrs){
 					}
 					UI.Refresh()
 				},
-				OnEnter:function(){
-					this.OnBlur()
-				},
 			});
 			if(obj.m_edit_event){
 				UI.SetFocus(obj.value_edit)
-				obj.value_edit.SetSelection(0,obj.value_edit.ed.GetTextSize())
+				obj.value_edit.SetSelection((rg.tid&12)==TYPE_BYTE*4?2:0,obj.value_edit.ed.GetTextSize())
 				obj.value_edit[obj.m_edit_event[0]].call(obj.value_edit,obj.m_edit_event[1]);
 				obj.m_edit_event=undefined;
 			}
@@ -797,15 +860,13 @@ UI.NewBinaryEditorTab=function(fname0){
 					this.opening_callbacks=[]
 				}
 			}
-			var doc=body.doc;
 			body.title=UI.RemovePath(body.file_name)
 			body.tooltip=body.file_name
-			//todo
 			this.need_save=0
-			//if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
-			//	body.title=body.title+'*'
-			//	this.need_save=1
-			//}
+			if((body.saved_point||0)!=body.m_undo_queue.length){
+				body.title=body.title+'*'
+				this.need_save=1
+			}
 			return body;
 		},
 		Save:function(){
@@ -815,12 +876,11 @@ UI.NewBinaryEditorTab=function(fname0){
 				return
 			}
 			this.main_widget.Save();
-			var doc=this.main_widget.doc;
-			//todo
 			this.need_save=0
-			//if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
-			//	this.need_save=1
-			//}
+			if((body.saved_point||0)!=body.m_undo_queue.length){
+				body.title=body.title+'*'
+				this.need_save=1
+			}
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}

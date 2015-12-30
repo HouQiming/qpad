@@ -362,7 +362,7 @@ if Platform.BUILD=="debug":
 		return JS.Return(lg)
 	}
 	Duktape_sandbox=JS_script_sandbox.GetGlobal()["Duktape"].as(JSObject)
-	JS_script_sandbox.evalVoid("Duktape.__eval_expr=function(){try{var ret=JSON.stringify(eval(Duktape.__code));Duktape.__error=undefined;return ret;}catch(e){Duktape.__error=e.stack;return undefined;}}","<eval-sandbox>")
+	JS_script_sandbox.evalVoid("Duktape.__eval_expr=function(){try{var ret=JSON.stringify(eval(Duktape.__code));Duktape.__error=undefined;return ret;}catch(e){Duktape.__error=e.message;return undefined;}}","<eval-sandbox>")
 	Duktape["__eval_expr_sandbox"]=function(JSContext JS){
 		s=JS.Param(0).as(string)
 		Duktape_sandbox["__code"]=s;

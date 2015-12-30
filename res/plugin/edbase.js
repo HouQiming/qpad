@@ -2915,9 +2915,9 @@ UI.RegisterEditorPlugin(function(){
 			var doc=this;
 			menu_search.AddSeparator();
 			menu_search.AddButtonRow({text:"Navigate"},[
-				{text:"back",tooltip:"CTRL+ALT+'-'",action:function(){
+				{text:"\u2190",tooltip:"Back - CTRL+ALT+'-'",action:function(){
 					fprevhist.call(doc)
-				}},{text:"forward",tooltip:"CTRL+ALT+'+'",action:function(){
+				}},{text:"\u2192",tooltip:"Forward - CTRL+ALT+'+'",action:function(){
 					//text:"&select to"
 					fnexthist.call(doc)
 				}}])

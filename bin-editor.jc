@@ -143,6 +143,33 @@ auto readToStringAt(JSContext JS,u8[] data,i64 addr,int tid)
 
 auto searchRanges(TDisplayRange[] ranges,i64 addr)
 	return ranges.InlineBisect(inline(a){return a.ofs1<=addr})
+
+auto float2half(float f)
+	i=__float_as_int(f);
+	s =  (i >> 16) & 0x00008000;
+	e = ((i >> 23) & 0x000000ff) - (127 - 15);
+	m =   i 	   & 0x007fffff;
+	if (e <= 0)
+		if (e < -10)
+			return 0;
+		m = (m | 0x00800000) >> (1 - e);
+		if(m&0x00001000): m += 0x00002000;
+		return s | (m >> 13);
+	else if (e == 0xff - (127 - 15))
+		if (m == 0)
+			return s | 0x7c00;
+		else
+			m >>= 13;
+			return s | 0x7c00 | m | (m == 0);
+	else
+		if (m &  0x00001000)
+			m += 0x00002000;
+			if (m & 0x00800000)
+				m =  0;
+				e += 1;
+		if (e > 30)
+			return s | 0x7c00;
+		return s | (e << 10) | (m >> 13);
 	
 g_minimap_tex=GLuint(0)
 g_minimap_w=0
@@ -359,5 +386,52 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		tech.SetVertexArray("uv_vert",[float2(0.f,0.f), float2(1.f,0.f), float2(1.f,1.f), float2(0.f,1.f)])
 		tech.Draw(0u,GL_QUADS,4)
 		return JS.Return(w_true)
+	}
+	JS_UI["BIN_float2half"]=function(JSContext JS){
+		f=JS.Param(0).as(float)
+		return JS.Return(float2half(f))
+	}
+	JS_UI["BIN_write64"]=function(JSContext JS){
+		data=JS.Param(0).as(u8[])
+		stext=JS.Param(1).as(string)
+		tid=JS.Param(2).as(int)
+		dval=JS.Param(3).as(double)
+		ptr=JS.Param(4).as(iptr)
+		buf=new u64[1]
+		is_neg=0
+		if stext.StartsWith("-"):
+			is_neg=1
+			stext=stext[1:]
+		if stext.StartsWith('0x'):
+			cset="0123456789ABCDEFabcdef"
+		else
+			cset="0123456789"
+		is_bad=0
+		for i=2:stext.n-1
+			if cset.IndexOf(stext[i])<0:
+				is_bad=1
+				break
+		if !is_bad:
+			ret=0uLL
+			if stext.StartsWith('0x'):
+				ret=stext[2:].asHex(u64)
+			else
+				ret=stext.as(u64)
+			if is_neg:
+				ret=-ret
+			buf[0]=ret
+		else
+			if dval>=f64(1uLL<<63):
+				buf[0]=u64(dval)
+			else
+				buf[0]=u64(i64(dval))
+		buf8=buf.ConvertToAsBinary(u8)
+		if tid&TYPE_MASK_BE:
+			for i=0:3
+				tmp=buf8[i]
+				buf8[i]=buf8[7-i]
+				buf8[7-i]=tmp
+		copy(data[ptr:],buf8)
+		return 0
 	}
 })

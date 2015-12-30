@@ -925,7 +925,22 @@ W.CodeEditorWidget_prototype={
 			var matches=[]
 			//try to go to line number first
 			var line_id=parseInt(sneedle)
+			ctx.m_goto_line_error=undefined;
 			if(line_id>0){
+				var line_id_eval=line_id;
+				var err=undefined;
+				try{
+					line_id_eval=JSON.parse(Duktape.__eval_expr_sandbox(sneedle))
+				}catch(e){
+					err=e.message;
+					line_id_eval=undefined;
+				}
+				if(typeof line_id_eval=='number'){
+					line_id=Math.floor(line_id_eval);
+				}else{
+					ctx.m_goto_line_error=err;
+				}
+				ctx.m_goto_line_number=line_id;
 				var line_ccnts=doc.SeekAllLinesBetween(line_id-1,line_id+1)
 				if(line_ccnts[0]<line_ccnts[1]){
 					var line_ccnt0=doc.ed.MoveToBoundary(line_ccnts[0],1,"space");
@@ -1254,6 +1269,8 @@ W.CodeEditorWidget_prototype={
 			var s_bof_message;
 			if(!UI.IsSearchFrontierCompleted(ctx.m_backward_frontier)){
 				s_bof_message=UI._("Searching @1%").replace("@1",((1-UI.GetSearchFrontierCcnt(ctx.m_backward_frontier)/ccnt_tot)*100).toFixed(0))
+			}else if((ctx.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&ctx.m_goto_line_number!=undefined){
+				s_bof_message=UI._("Go to line @1").replace("@1",ctx.m_goto_line_number.toString())
 			}else{
 				s_bof_message=UI._("No more '@1' above".replace("@1",ctx.m_needle))
 			}
@@ -1283,6 +1300,8 @@ W.CodeEditorWidget_prototype={
 			var s_eof_message;
 			if(!UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){
 				s_eof_message=UI._("Searching @1%").replace("@1",((UI.GetSearchFrontierCcnt(ctx.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
+			}else if((ctx.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&ctx.m_goto_line_number!=undefined){
+				s_eof_message=UI._("Go to line @1").replace("@1",ctx.m_goto_line_number.toString())
 			}else{
 				s_eof_message=UI._("No more '@1' below").replace("@1",ctx.m_needle)
 			}
@@ -3763,6 +3782,12 @@ W.CodeEditor=function(id,attrs){
 						font:obj.find_bar_hint_font,
 						color:UI.lerp_rgba(obj.disclaimer_color&0x00ffffff,obj.disclaimer_color,disclaimer_alpha),
 						text:"fuzzy search"})
+				}else if(obj.m_current_find_context&&obj.m_current_find_context.m_goto_line_error){
+					W.Text("",{x:8,
+						anchor:rect_bar,anchor_align:'right',anchor_yalign:'up',
+						font:obj.find_bar_hint_font,
+						color:obj.disclaimer_color,
+						text:obj.m_current_find_context.m_goto_line_error})
 				}
 				if(show_flag_buttons){
 					var btn_case=W.Button("find_button_case",{style:UI.default_styles.check_button,
@@ -4007,7 +4032,7 @@ W.CodeEditor=function(id,attrs){
 						function(){obj.DoReplaceFromUI( 1);})
 				}
 				menu_search.AddSeparator();
-				menu_search.AddNormalItem({text:"&Go to...",enable_hotkey:1,key:"CTRL+G",action:function(){
+				menu_search.AddNormalItem({text:"&Go to...",icon:'去',enable_hotkey:1,key:"CTRL+G",action:function(){
 					var sel=obj.doc.GetSelection()
 					obj.show_find_bar="goto"
 					obj.m_sel0_before_find=obj.doc.sel0.ccnt
