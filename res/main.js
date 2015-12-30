@@ -556,6 +556,7 @@ UI.Theme_CustomWidget=function(C){
 		binary_editor:{
 			font:UI.Font("res/fonts/inconsolata.ttf",24),
 			font_edit:UI.Font("res/fonts/inconsolata.ttf",16),
+			mouse_wheel_speed:4,
 			edit_padding:8,
 			edit_bgcolor:0xffffffff,
 			edit_border_width:2,
@@ -563,7 +564,7 @@ UI.Theme_CustomWidget=function(C){
 			edit_round:4,
 			edit_shadow_color:0x7f000000,
 			edit_shadow_size:8,
-			edit_rect_color:0x7f2ca033,
+			edit_rect_color:0xaa8adfb2,
 			edit_rect_blur:8,
 			line_number_font:UI.Font("res/fonts/inconsolata.ttf",14,200),
 			line_number_font_small:UI.Font("res/fonts/inconsolata.ttf",8,200),
@@ -588,7 +589,7 @@ UI.Theme_CustomWidget=function(C){
 			font_panel_icon:UI.Font(UI.icon_font_name,22),
 			font_panel_fixed:UI.Font("res/fonts/inconsolata.ttf",22),
 			text_color_panel:0xff000000,
-			w_panel:320,
+			w_panel:232,
 			color_choices:[
 				0xffb4771f,0xff2ca033,0xff1c1ae3,0xff007fff,0xff9a3d6a,
 				//0xffe3cea6,0xff8adfb2,0xff999afb,0xff6fbffd,0xffd6b2ca,

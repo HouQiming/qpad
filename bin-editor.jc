@@ -117,7 +117,8 @@ auto readToStringAt(JSContext JS,u8[] data,i64 addr,int tid)
 		break
 	case makeType(TYPE_FLOAT,2):
 		flt=__int_as_float(i32(u32(d)))
-		if abs(flt)>=1e-3&&abs(flt)<=1e7:
+		//s_disp=g_tostring.CallAsMethod(string,flt)
+		if abs(flt)>=1e-3&&abs(flt)<=1e7||!flt:
 			s_disp=formatNumber(flt,{frac:7})
 			if s_disp.n>12:
 				s_disp.n=12
@@ -127,8 +128,6 @@ auto readToStringAt(JSContext JS,u8[] data,i64 addr,int tid)
 		break
 	case makeType(TYPE_FLOAT,3):
 		dbl=__longlong_as_double(i64(d))
-		if !g_tostring:
-			g_tostring=JS["Number"]["prototype"]["toString"].as(JSObject)
 		s_disp=g_tostring.CallAsMethod(string,dbl)
 		//if abs(dbl)>=1e-6&&abs(dbl)<=1e20:
 		//	s_disp=formatNumber(dbl,{frac:20})
@@ -215,6 +214,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return JS.Return(ret)
 	}
 	JS_UI["BIN_Render"]=function(JSContext JS){
+		if !g_tostring:
+			g_tostring=JS["Number"]["prototype"]["toString"].as(JSObject)
 		scale=Gui2D.detail.g_renderer.m_pixels_per_unit
 		x=JS.Param(0).as(float)*scale
 		y=JS.Param(1).as(float)*scale
@@ -295,13 +296,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			addr+=sz
 		//text
 		w_bin_part=w_digit*2.f*f32(w_bytes_i)+w_space1*f32(w_bytes_i)+w_space4*f32(w_bytes_i>>2)+w_space8*f32(w_bytes_i>>3)
-		g_renderer.SetFastDrawCharFont(fnt_scaled)
+		g_renderer.SetFastDrawCharFont(fnt_typef)
 		p=p0
 		for(addr=addr0;addr<addr1;addr+=w_bytes)
 			daddr=int(addr-addr0)
 			daddr_y=daddr/w_bytes_i
 			x_text=x+w_bin_part
-			y_top=y+hc*f32(daddr_y)
+			y_top=y+hc*f32(daddr_y)+(hc*(1.f-0.625f)*0.5f)
 			for j=0:w_bytes_i-1
 				addrj=addr+i64(j)
 				if addrj>=ranges[p].ofs1:
@@ -317,7 +318,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					ch=32
 				if ch<32||ch>=127:ch=0x2e
 				g_renderer.FastDrawChar(x_text,y_top,C,ch)
-				x_text+=w_digit
+				x_text+=w_digit*0.625f
 		return 0
 	}
 	JS_UI["BIN_ReadToString"]=function(JSContext JS){
