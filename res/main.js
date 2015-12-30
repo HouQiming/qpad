@@ -594,6 +594,8 @@ UI.Theme_CustomWidget=function(C){
 				0xffb4771f,0xff2ca033,0xff1c1ae3,0xff007fff,0xff9a3d6a,
 				//0xffe3cea6,0xff8adfb2,0xff999afb,0xff6fbffd,0xffd6b2ca,
 				0xff00aaaa,0xff8888b8,0xff000080,0xff7f7f7f,0xff000000],
+			font_error:UI.Font(UI.font_name,40),
+			error_color:0xff444444,
 		},
 		file_item:{
 			h:56,h_dense:32,

@@ -3046,35 +3046,26 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
-		var menu_lang=UI.BigMenu("&Language")
-		var langs=Language.m_all_languages
-		var got_separator=0
-		langs.sort(function(a,b){
-			a=(a.name_sort_hack||a.name);
-			b=(b.name_sort_hack||b.name);
-			return a>b?1:(a<b?-1:0);
-		})
-		for(var i=0;i<langs.length;i++){
-			if(!got_separator&&!langs[i].name_sort_hack){
-				menu_lang.AddSeparator()
-				got_separator=1
+		UI.FillLanguageMenu(this.owner.m_language_id,(function(name){
+			if(name==this.owner.m_language_id){return;}
+			this.owner.m_language_id=name;
+			//try to reload
+			if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
+				//make a notification
+				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file and reload for the language change to take effect"})
+				this.saved_point=-1;
+			}else{
+				//what is reload? nuke it
+				if(Language.GetDescObjectByName(name).is_binary){
+					var fn=this.owner.file_name;
+					this.owner.SaveMetaData();
+					UI.top.app.document_area.just_created_a_tab=1;
+					UI.top.app.document_area.CloseTab();
+					UI.OpenEditorWindow(fn);
+				}else{
+					this.owner.Reload()
+				}
 			}
-			menu_lang.AddNormalItem({
-				text:langs[i].name,
-				icon:(this.owner.m_language_id==langs[i].name)?"对":undefined,
-				action:function(name){
-					this.owner.m_language_id=name;
-					//try to reload
-					if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
-						//make a notification
-						this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file and reload for the language change to take effect"})
-						this.saved_point=-1;
-					}else{
-						//what is reload? nuke it
-						this.owner.Reload()
-					}
-					UI.Refresh();
-				}.bind(this,langs[i].name)})
-		}
+		}).bind(this))
 	})
 }).prototype.name="Language selection";

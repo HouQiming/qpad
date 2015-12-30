@@ -273,7 +273,30 @@ W.BinaryEditor_prototype={
 		return this.UndoImpl(this.m_redo_queue,this.m_undo_queue)
 	},
 	Save:function(){
-		//todo
+		if(this.m_file_name_mapped=="<failed>"){return;}
+		var arr=[];
+		for(var i=0;i<this.m_undo_queue.length;i++){
+			var item=this.m_undo_queue[i];
+			arr[i*2+0]=item.addr;
+			arr[i*2+1]=item.addr+item.buf.length;
+		}
+		for(var i=0;i<this.m_redo_queue.length;i++){
+			var item=this.m_redo_queue[i];
+			arr[i*2+0]=item.addr;
+			arr[i*2+1]=item.addr+item.buf.length;
+		}
+		if(!UI.BIN_Save(this,arr,this.file_name,this.file_name==this.m_file_name_mapped)){
+			return;
+		}
+		this.m_data_raw=undefined;
+		this.m_data=undefined;
+		this.m_data_raw=UI.BIN_MapCopyOnWrite(this.file_name);
+		this.m_data=Buffer(Duktape.Buffer(this.m_data_raw));
+		this.m_file_name_mapped=this.file_name;
+		////////////
+		this.saved_point=this.m_undo_queue.length
+		this.SaveMetaData();
+		UI.SaveMetaData();
 	},
 	GetRangeFromSelection:function(){
 		var sel0=this.m_sel0;
@@ -385,6 +408,12 @@ W.BinaryEditor=function(id,attrs){
 			//init
 			var loaded_metadata=(UI.m_ui_metadata[obj.file_name]||{});
 			obj.m_data_raw=UI.BIN_MapCopyOnWrite(obj.file_name);//we need to keep a reference
+			if(!obj.m_data_raw){
+				obj.m_data_raw=new Buffer(0)
+				obj.m_file_name_mapped="<failed>";
+			}else{
+				obj.m_file_name_mapped=obj.file_name;
+			}
 			obj.m_data=Buffer(Duktape.Buffer(obj.m_data_raw));
 			if(!loaded_metadata.ranges){
 				//todo: default parsing script
@@ -442,74 +471,55 @@ W.BinaryEditor=function(id,attrs){
 			obj.m_redo_queue=[];
 			UI.BumpHistory(obj.file_name)
 		}
-		var hc=UI.GetCharacterHeight(obj.font);
-		var n_lines_disp=obj.GetNLinesDisp();
-		var lg=obj.m_lg_addr;
-		var y_linenumber0;
-		var hc_linenumber=UI.GetCharacterHeight(obj.m_line_number_font);
-		if(lg<=8){
-			y_linenumber0=obj.y+(hc-hc_linenumber)*0.5
+		////////////////////////////
+		////////////////////////////
+		if(obj.m_file_name_mapped=="<failed>"){
+			UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h,color:obj.bgcolor})
+			W.Text("",{
+				anchor:'parent',anchor_align:'center',anchor_valign:'center',
+				x:0,y:0,
+				font:obj.font_error,
+				text:"Failed to load this binary file",
+				color:obj.error_color,
+			})
 		}else{
-			y_linenumber0=obj.y+(hc*0.5)
-		}
-		var rg=UI.BIN_GetRangeAt(obj,Math.min(obj.m_sel0,obj.m_sel1));
-		//line numbers
-		var dx_text=mapX(obj.m_w_bytes)-w_digit*2;
-		var x_minimap_min=obj.x+obj.m_w_addr+dx_text+w_text_char*obj.m_w_bytes;
-		//var x_minimap=x_minimap_min;
-		var w_minimap=obj.m_w_bytes/UI.pixels_per_unit;
-		var x_panel=obj.x+obj.w-obj.w_panel;
-		var x_minimap=x_panel-(w_minimap+obj.minimap_padding*1.5+obj.sxs_shadow_size*0.5);
-		var main_area_scale_factor=1;
-		if(x_minimap_min>x_minimap){
-			main_area_scale_factor=x_minimap/x_minimap_min;
-		}
-		obj.m_main_area_scale_factor=main_area_scale_factor;
-		UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h,color:obj.bgcolor})
-		if(main_area_scale_factor!=1){
-			UI.PushSubWindow(obj.x,obj.y,x_minimap-obj.x,obj.h,main_area_scale_factor);
-		}
-		UI.RoundRect({x:obj.x,y:obj.y,w:obj.m_w_addr-4,h:obj.h/main_area_scale_factor,color:obj.line_number_bgcolor})
-		UI.RoundRect({x:obj.x,y:obj.y,w:(x_minimap+obj.minimap_padding*0.5-obj.x)/main_area_scale_factor,h:obj.m_h_addr,color:obj.line_number_bgcolor})
-		var daddr=obj.m_sel1-obj.m_scroll;
-		var daddr_y=(daddr/obj.m_w_bytes)|0;
-		var daddr_x=daddr-daddr_y*obj.m_w_bytes;
-		for(var i=0;i<obj.m_w_bytes;i++){
-			var addr_value=i;
-			var x_linenumber=obj.x+obj.m_w_addr+mapX(i);
-			var C=(i==daddr_x?obj.line_number_color_focus:obj.line_number_color);
-			for(var j=0;j<2;j++){
-				var addr2=Math.floor(addr_value/16)
-				var ch=addr_value-addr2*16;
-				if(ch>=10){
-					ch+=65-10;
-				}else{
-					ch+=48;
-				}
-				addr_value=addr2;
-				x_linenumber-=obj.m_w_line_number_char;
-				UI.DrawChar(obj.m_line_number_font,x_linenumber,obj.y+4,C,ch);
+			var hc=UI.GetCharacterHeight(obj.font);
+			var n_lines_disp=obj.GetNLinesDisp();
+			var lg=obj.m_lg_addr;
+			var y_linenumber0;
+			var hc_linenumber=UI.GetCharacterHeight(obj.m_line_number_font);
+			if(lg<=8){
+				y_linenumber0=obj.y+(hc-hc_linenumber)*0.5
+			}else{
+				y_linenumber0=obj.y+(hc*0.5)
 			}
-		}
-		for(var i=0;i<=n_lines_disp;i++){
-			var x_linenumber=obj.x+obj.m_w_addr-8;
-			var addr_value=obj.m_scroll+i*obj.m_w_bytes;
-			var C=(i==daddr_y?obj.line_number_color_focus:obj.line_number_color);
-			for(var j=0;j<lg&&j<8;j++){
-				var addr2=Math.floor(addr_value/16)
-				var ch=addr_value-addr2*16;
-				if(ch>=10){
-					ch+=65-10;
-				}else{
-					ch+=48;
-				}
-				addr_value=addr2;
-				x_linenumber-=obj.m_w_line_number_char;
-				UI.DrawChar(obj.m_line_number_font,x_linenumber,y_linenumber0+i*hc+obj.m_h_addr,C,ch);
+			var rg=UI.BIN_GetRangeAt(obj,Math.min(obj.m_sel0,obj.m_sel1));
+			//line numbers
+			var dx_text=mapX(obj.m_w_bytes)-w_digit*2;
+			var x_minimap_min=obj.x+obj.m_w_addr+dx_text+w_text_char*obj.m_w_bytes;
+			//var x_minimap=x_minimap_min;
+			var w_minimap=obj.m_w_bytes/UI.pixels_per_unit;
+			var x_panel=obj.x+obj.w-obj.w_panel;
+			var x_minimap=x_panel-(w_minimap+obj.minimap_padding*1.5+obj.sxs_shadow_size*0.5);
+			var main_area_scale_factor=1;
+			if(x_minimap_min>x_minimap){
+				main_area_scale_factor=x_minimap/x_minimap_min;
 			}
-			if(lg>8){
-				x_linenumber=obj.x+obj.m_w_addr-8;
-				for(var j=0;j<8;j++){
+			obj.m_main_area_scale_factor=main_area_scale_factor;
+			UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h,color:obj.bgcolor})
+			if(main_area_scale_factor!=1){
+				UI.PushSubWindow(obj.x,obj.y,x_minimap-obj.x,obj.h,main_area_scale_factor);
+			}
+			UI.RoundRect({x:obj.x,y:obj.y,w:obj.m_w_addr-4,h:obj.h/main_area_scale_factor,color:obj.line_number_bgcolor})
+			UI.RoundRect({x:obj.x,y:obj.y,w:(x_minimap+obj.minimap_padding*0.5-obj.x)/main_area_scale_factor,h:obj.m_h_addr,color:obj.line_number_bgcolor})
+			var daddr=obj.m_sel1-obj.m_scroll;
+			var daddr_y=(daddr/obj.m_w_bytes)|0;
+			var daddr_x=daddr-daddr_y*obj.m_w_bytes;
+			for(var i=0;i<obj.m_w_bytes;i++){
+				var addr_value=i;
+				var x_linenumber=obj.x+obj.m_w_addr+mapX(i);
+				var C=(i==daddr_x?obj.line_number_color_focus:obj.line_number_color);
+				for(var j=0;j<2;j++){
 					var addr2=Math.floor(addr_value/16)
 					var ch=addr_value-addr2*16;
 					if(ch>=10){
@@ -519,347 +529,408 @@ W.BinaryEditor=function(id,attrs){
 					}
 					addr_value=addr2;
 					x_linenumber-=obj.m_w_line_number_char;
-					UI.DrawChar(obj.m_line_number_font,x_linenumber,y_linenumber0+i*hc+8,C,ch);
+					UI.DrawChar(obj.m_line_number_font,x_linenumber,obj.y+4,C,ch);
 				}
 			}
-		}
-		//draw edit history - we won't be editing much
-		var Q=obj.m_undo_queue;
-		var x_main=obj.x+obj.m_w_addr;
-		var y_main=obj.y+obj.m_h_addr;
-		for(var i=0;i<Q.length;i++){
-			var item=Q[i];
-			var xy0=XYFromCcnt(item.addr);
-			if(xy0.y<0||xy0.y>obj.h){continue;}
-			var xy1=XYFromCcnt(item.addr+item.buf.length-1);
-			if(xy1.y>xy0.y){
-				xy1.x=dx_text;
-			}else{
-				xy1.x+=w_digit*2;
-			}
-			UI.RoundRect({x:x_main+xy0.x-obj.edit_rect_blur,y:y_main+xy0.y*hc,w:xy1.x-xy0.x+obj.edit_rect_blur*2,h:hc,
-				round:obj.edit_rect_blur,border_width:-obj.edit_rect_blur,
-				color:obj.edit_rect_color})
-		}
-		//draw selection
-		if(obj.m_sel0!=obj.m_sel1){
-			var xy0=XYFromCcnt(Math.min(obj.m_sel0,obj.m_sel1));
-			var xy1=XYFromCcnt(Math.max(obj.m_sel0,obj.m_sel1));
-			var fDrawSel=function(x_left,x_right){
-				if(xy0.y<0){xy0.y=0;xy0.x=x_left;}
-				if(xy1.y>n_lines_disp){xy1.y=n_lines_disp;xy1.x=x_right;}
-				for(var i=xy0.y;i<=xy1.y;i++){
-					var x0=(i==xy0.y?xy0.x:x_left);
-					var x1=(i==xy1.y?xy1.x:x_right);
-					UI.RoundRect({
-						x:obj.x+obj.m_w_addr+x0,
-						y:obj.y+obj.m_h_addr+i*hc,
-						w:x1-x0,
-						h:hc,
-						color:obj.bgcolor_selection
-					})
+			for(var i=0;i<=n_lines_disp;i++){
+				var x_linenumber=obj.x+obj.m_w_addr-8;
+				var addr_value=obj.m_scroll+i*obj.m_w_bytes;
+				var C=(i==daddr_y?obj.line_number_color_focus:obj.line_number_color);
+				for(var j=0;j<lg&&j<8;j++){
+					var addr2=Math.floor(addr_value/16)
+					var ch=addr_value-addr2*16;
+					if(ch>=10){
+						ch+=65-10;
+					}else{
+						ch+=48;
+					}
+					addr_value=addr2;
+					x_linenumber-=obj.m_w_line_number_char;
+					UI.DrawChar(obj.m_line_number_font,x_linenumber,y_linenumber0+i*hc+obj.m_h_addr,C,ch);
+				}
+				if(lg>8){
+					x_linenumber=obj.x+obj.m_w_addr-8;
+					for(var j=0;j<8;j++){
+						var addr2=Math.floor(addr_value/16)
+						var ch=addr_value-addr2*16;
+						if(ch>=10){
+							ch+=65-10;
+						}else{
+							ch+=48;
+						}
+						addr_value=addr2;
+						x_linenumber-=obj.m_w_line_number_char;
+						UI.DrawChar(obj.m_line_number_font,x_linenumber,y_linenumber0+i*hc+8,C,ch);
+					}
 				}
 			}
-			fDrawSel(0,mapX(obj.m_w_bytes-1));
-			xy0=XYFromCcntText(Math.min(obj.m_sel0,obj.m_sel1));
-			xy1=XYFromCcntText(Math.max(obj.m_sel0,obj.m_sel1));
-			fDrawSel(dx_text,dx_text+w_text_char*obj.m_w_bytes);
-		}
-		UI.BIN_Render(obj.x+obj.m_w_addr,obj.y+obj.m_h_addr,undefined,obj.h/obj.m_main_area_scale_factor-obj.m_h_addr,obj,obj.m_scroll)
-		//main-area mouse regions
-		obj.m_x_main=obj.x+obj.m_w_addr;
-		obj.m_x_text=obj.x+obj.m_w_addr+dx_text;
-		W.Region("rgn_main",{owner:obj,x:obj.m_x_main,y:obj.y+obj.m_h_addr,w:dx_text,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
-		W.Region("rgn_text",{owner:obj,x:obj.m_x_text,y:obj.y+obj.m_h_addr,w:w_digit*obj.m_w_bytes,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
-		///////////////
-		var caret_xy=XYFromCcnt(obj.m_sel1);
-		var x_caret=obj.x+obj.m_w_addr+caret_xy.x;
-		var y_caret=obj.y+obj.m_h_addr+caret_xy.y*hc;
-		if(obj.m_show_edit){
-			//edit box at caret
-			var caret_r_xy=XYFromCcnt(obj.m_sel1+(1<<(rg.tid&3))-1);
-			if(caret_r_xy.y>caret_xy.y){
-				caret_r_xy.x=dx_text;
-			}else{
-				caret_r_xy.x+=2*w_digit;
+			//draw edit history - we won't be editing much
+			var Q=obj.m_undo_queue;
+			var phead=(obj.saved_point||0);
+			if(phead>Q.length){
+				Q=obj.m_redo_queue;
+				phead=Math.max(Q.length-(phead-obj.m_undo_queue.length),0);
 			}
-			x_caret_r=obj.x+obj.m_w_addr+caret_r_xy.x;
-			var s_text="";
-			if(obj.m_edit_event){
-				s_text=UI.BIN_ReadToString(obj,obj.m_sel1);
-				if(((rg.tid>>2)&3)==TYPE_BYTE){
-					s_text="0x"+s_text;
+			var x_main=obj.x+obj.m_w_addr;
+			var y_main=obj.y+obj.m_h_addr;
+			for(var i=phead;i<Q.length;i++){
+				var item=Q[i];
+				var xy0=XYFromCcnt(item.addr);
+				if(xy0.y<0||xy0.y>obj.h){continue;}
+				var xy1=XYFromCcnt(item.addr+item.buf.length-1);
+				if(xy1.y>xy0.y){
+					xy1.x=dx_text;
+				}else{
+					xy1.x+=w_digit*2;
 				}
+				UI.RoundRect({x:x_main+xy0.x-obj.edit_rect_blur,y:y_main+xy0.y*hc,w:xy1.x-xy0.x+obj.edit_rect_blur*2,h:hc,
+					round:obj.edit_rect_blur,border_width:-obj.edit_rect_blur,
+					color:obj.edit_rect_color})
 			}
-			UI.RoundRect({
-				x:x_caret-obj.edit_padding-obj.edit_shadow_size-obj.edit_border_width,y:y_caret,
-				w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_shadow_size+obj.edit_border_width)*2,h:hc+obj.edit_shadow_size,
-				color:obj.edit_shadow_color,border_width:-obj.edit_shadow_size,
-				round:obj.edit_shadow_size,
-			})
-			UI.RoundRect({
-				x:x_caret-obj.edit_padding-obj.edit_border_width,y:y_caret,w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_border_width)*2,h:hc,
-				color:obj.edit_bgcolor,border_width:obj.edit_border_width,border_color:obj.edit_border_color,
-				round:obj.edit_round,
-			})
-			var hc_editing=UI.GetCharacterHeight(obj.font_edit);
-			W.Edit("value_edit",{
-				x:x_caret-obj.edit_padding,y:y_caret+(hc-hc_editing)*0.5,w:x_caret_r-x_caret+obj.edit_padding*2,h:hc_editing,
-				font:obj.font_edit, tid:rg.tid, color:rg.color, text:s_text,
-				is_single_line:1,right_side_autoscroll_margin:0.5,
-				owner:obj,
-				additional_hotkeys:[{key:"ESCAPE",action:function(){
-					//cancel the change
-					var obj=this.owner
-					obj.m_show_edit=0;
-					UI.Refresh()
-				}}],
-				OnBlur:function(){
-					var obj=this.owner
-					obj.m_show_edit=0;
-					UI.Refresh()
-				},
-				OnEnter:function(){
-					//apply the change - binary patch / undo queue
-					var obj=this.owner
-					obj.m_show_edit=0;
-					var ret;
-					var stext_raw=this.ed.GetText();
-					try{
-						ret=JSON.parse(Duktape.__eval_expr_sandbox(stext_raw))
-					}catch(e){
-						//todo: present error to user - notification / script error / ...
-						//print(e.message)
+			//draw selection
+			if(obj.m_sel0!=obj.m_sel1){
+				var xy0=XYFromCcnt(Math.min(obj.m_sel0,obj.m_sel1));
+				var xy1=XYFromCcnt(Math.max(obj.m_sel0,obj.m_sel1));
+				var fDrawSel=function(x_left,x_right){
+					if(xy0.y<0){xy0.y=0;xy0.x=x_left;}
+					if(xy1.y>n_lines_disp){xy1.y=n_lines_disp;xy1.x=x_right;}
+					for(var i=xy0.y;i<=xy1.y;i++){
+						var x0=(i==xy0.y?xy0.x:x_left);
+						var x1=(i==xy1.y?xy1.x:x_right);
+						UI.RoundRect({
+							x:obj.x+obj.m_w_addr+x0,
+							y:obj.y+obj.m_h_addr+i*hc,
+							w:x1-x0,
+							h:hc,
+							color:obj.bgcolor_selection
+						})
+					}
+				}
+				fDrawSel(0,mapX(obj.m_w_bytes-1));
+				xy0=XYFromCcntText(Math.min(obj.m_sel0,obj.m_sel1));
+				xy1=XYFromCcntText(Math.max(obj.m_sel0,obj.m_sel1));
+				fDrawSel(dx_text,dx_text+w_text_char*obj.m_w_bytes);
+			}
+			UI.BIN_Render(obj.x+obj.m_w_addr,obj.y+obj.m_h_addr,undefined,obj.h/obj.m_main_area_scale_factor-obj.m_h_addr,obj,obj.m_scroll)
+			//main-area mouse regions
+			obj.m_x_main=obj.x+obj.m_w_addr;
+			obj.m_x_text=obj.x+obj.m_w_addr+dx_text;
+			W.Region("rgn_main",{owner:obj,x:obj.m_x_main,y:obj.y+obj.m_h_addr,w:dx_text,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
+			W.Region("rgn_text",{owner:obj,x:obj.m_x_text,y:obj.y+obj.m_h_addr,w:w_digit*obj.m_w_bytes,h:obj.h-obj.m_h_addr},W.SlaveRegion_prototype)
+			///////////////
+			var caret_xy=XYFromCcnt(obj.m_sel1);
+			var x_caret=obj.x+obj.m_w_addr+caret_xy.x;
+			var y_caret=obj.y+obj.m_h_addr+caret_xy.y*hc;
+			if(obj.m_show_edit){
+				//edit box at caret
+				var caret_r_xy=XYFromCcnt(obj.m_sel1+(1<<(rg.tid&3))-1);
+				if(caret_r_xy.y>caret_xy.y){
+					caret_r_xy.x=dx_text;
+				}else{
+					caret_r_xy.x+=2*w_digit;
+				}
+				x_caret_r=obj.x+obj.m_w_addr+caret_r_xy.x;
+				var s_text="";
+				if(obj.m_edit_event){
+					s_text=UI.BIN_ReadToString(obj,obj.m_sel1);
+					if(((rg.tid>>2)&3)==TYPE_BYTE){
+						s_text="0x"+s_text;
+					}
+				}
+				UI.RoundRect({
+					x:x_caret-obj.edit_padding-obj.edit_shadow_size-obj.edit_border_width,y:y_caret,
+					w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_shadow_size+obj.edit_border_width)*2,h:hc+obj.edit_shadow_size,
+					color:obj.edit_shadow_color,border_width:-obj.edit_shadow_size,
+					round:obj.edit_shadow_size,
+				})
+				UI.RoundRect({
+					x:x_caret-obj.edit_padding-obj.edit_border_width,y:y_caret,w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_border_width)*2,h:hc,
+					color:obj.edit_bgcolor,border_width:obj.edit_border_width,border_color:obj.edit_border_color,
+					round:obj.edit_round,
+				})
+				var hc_editing=UI.GetCharacterHeight(obj.font_edit);
+				W.Edit("value_edit",{
+					x:x_caret-obj.edit_padding,y:y_caret+(hc-hc_editing)*0.5,w:x_caret_r-x_caret+obj.edit_padding*2,h:hc_editing,
+					font:obj.font_edit, tid:rg.tid, color:rg.color, text:s_text,
+					is_single_line:1,right_side_autoscroll_margin:0.5,
+					owner:obj,
+					additional_hotkeys:[{key:"ESCAPE",action:function(){
+						//cancel the change
+						var obj=this.owner
+						obj.m_show_edit=0;
 						UI.Refresh()
-						return;
-					}
-					if(!this.tid&&(typeof ret)=='string'){
-						//string case
-						var buf_str=new Buffer(ret);
-						obj.PushUndo(obj.m_sel1,buf_str.length)
-						buf_str.copy(obj.m_data,obj.m_sel1,0,Math.min(obj.m_data.length-obj.m_sel1,buf_str.length));
+					}}],
+					OnBlur:function(){
+						var obj=this.owner
+						obj.m_show_edit=0;
 						UI.Refresh()
-						return;
+					},
+					OnEnter:function(){
+						//apply the change - binary patch / undo queue
+						var obj=this.owner
+						obj.m_show_edit=0;
+						var ret;
+						var stext_raw=this.ed.GetText();
+						try{
+							ret=JSON.parse(Duktape.__eval_expr_sandbox(stext_raw))
+						}catch(e){
+							//todo: present error to user - notification / script error / ...
+							//print(e.message)
+							UI.Refresh()
+							return;
+						}
+						if(!this.tid&&(typeof ret)=='string'){
+							//string case
+							var buf_str=new Buffer(ret);
+							obj.PushUndo(obj.m_sel1,buf_str.length)
+							buf_str.copy(obj.m_data,obj.m_sel1,0,Math.min(obj.m_data.length-obj.m_sel1,buf_str.length));
+							UI.Refresh()
+							return;
+						}
+						obj.PushUndo(obj.m_sel1,1<<(this.tid&3))
+						switch(this.tid){
+						case 0://b8
+						case 4://i8
+						case 16+0://b8BE
+						case 16+4://i8BE
+							obj.m_data.writeInt8(ret,obj.m_sel1);
+							break;
+						case 1://b16
+						case 5://i16
+							obj.m_data.writeInt16LE(ret,obj.m_sel1);
+							break;
+						case 16+1://b16BE
+						case 16+5://i16BE
+							obj.m_data.writeInt16BE(ret,obj.m_sel1);
+							break;
+						case 2://b32
+						case 6://i32
+							obj.m_data.writeInt32LE(ret,obj.m_sel1);
+							break;
+						case 16+2://b32BE
+						case 16+6://i32BE
+							obj.m_data.writeInt32BE(ret,obj.m_sel1);
+							break;
+						case 3://b64
+						case 7://i64
+						case 11://u64
+						case 16+3://b64BE
+						case 16+7://i64BE
+						case 16+11://u64BE
+							UI.BIN_write64(obj.m_data,stext_raw,this.tid,ret,obj.m_sel1)
+							break;
+						case 8://u8
+						case 16+8://u8BE
+							obj.m_data.writeUInt8(ret,obj.m_sel1);
+							break;
+						case 9://u16
+							obj.m_data.writeUInt16LE(ret,obj.m_sel1);
+							break;
+						case 16+9://u16BE
+							obj.m_data.writeUInt16BE(ret,obj.m_sel1);
+							break;
+						case 10://u32
+							obj.m_data.writeUInt32LE(ret,obj.m_sel1);
+							break;
+						case 16+10://u32BE
+							obj.m_data.writeUInt32BE(ret,obj.m_sel1);
+							break;
+						case 13://f16
+							obj.m_data.writeUInt16LE(UI.BIN_float2half(ret),obj.m_sel1);
+							break;
+						case 16+13://f16BE
+							obj.m_data.writeUInt16BE(UI.BIN_float2half(ret),obj.m_sel1);
+							break;
+						case 14://f32
+							obj.m_data.writeFloatLE(ret,obj.m_sel1);
+							break;
+						case 16+14://f32BE
+							obj.m_data.writeFloatBE(ret,obj.m_sel1);
+							break;
+						case 15://f64
+							obj.m_data.writeDoubleLE(ret,obj.m_sel1);
+							break;
+						case 16+15://f64BE
+							obj.m_data.writeDoubleBE(ret,obj.m_sel1);
+							break;
+						}
+						UI.Refresh()
+					},
+				});
+				if(obj.m_edit_event){
+					UI.SetFocus(obj.value_edit)
+					var edit_sel0=0;
+					if((rg.tid&12)==TYPE_BYTE*4){
+						if(obj.m_edit_event[0]=='OnTextInput'||obj.m_edit_event[0]=='OnTextEdit'){
+							var s=obj.m_edit_event[1].text;
+							if(s!=undefined&&s.length==1&&'0123456789abcdefABCDEF'.indexOf(s)>=0){
+								edit_sel0=2;
+							}
+						}
 					}
-					obj.PushUndo(obj.m_sel1,1<<(this.tid&3))
-					switch(this.tid){
-					case 0://b8
-					case 4://i8
-					case 16+0://b8BE
-					case 16+4://i8BE
-						obj.m_data.writeInt8(ret,obj.m_sel1);
-						break;
-					case 1://b16
-					case 5://i16
-						obj.m_data.writeInt16LE(ret,obj.m_sel1);
-						break;
-					case 16+1://b16BE
-					case 16+5://i16BE
-						obj.m_data.writeInt16BE(ret,obj.m_sel1);
-						break;
-					case 2://b32
-					case 6://i32
-						obj.m_data.writeInt32LE(ret,obj.m_sel1);
-						break;
-					case 16+2://b32BE
-					case 16+6://i32BE
-						obj.m_data.writeInt32BE(ret,obj.m_sel1);
-						break;
-					case 3://b64
-					case 7://i64
-					case 11://u64
-					case 16+3://b64BE
-					case 16+7://i64BE
-					case 16+11://u64BE
-						UI.BIN_write64(obj.m_data,stext_raw,this.tid,ret,obj.m_sel1)
-						break;
-					case 8://u8
-					case 16+8://u8BE
-						obj.m_data.writeUInt8(ret,obj.m_sel1);
-						break;
-					case 9://u16
-						obj.m_data.writeUInt16LE(ret,obj.m_sel1);
-						break;
-					case 16+9://u16BE
-						obj.m_data.writeUInt16BE(ret,obj.m_sel1);
-						break;
-					case 10://u32
-						obj.m_data.writeUInt32LE(ret,obj.m_sel1);
-						break;
-					case 16+10://u32BE
-						obj.m_data.writeUInt32BE(ret,obj.m_sel1);
-						break;
-					case 13://f16
-						obj.m_data.writeUInt16LE(UI.BIN_float2half(ret),obj.m_sel1);
-						break;
-					case 16+13://f16BE
-						obj.m_data.writeUInt16BE(UI.BIN_float2half(ret),obj.m_sel1);
-						break;
-					case 14://f32
-						obj.m_data.writeFloatLE(ret,obj.m_sel1);
-						break;
-					case 16+14://f32BE
-						obj.m_data.writeFloatBE(ret,obj.m_sel1);
-						break;
-					case 15://f64
-						obj.m_data.writeDoubleLE(ret,obj.m_sel1);
-						break;
-					case 16+15://f64BE
-						obj.m_data.writeDoubleBE(ret,obj.m_sel1);
-						break;
-					}
-					UI.Refresh()
-				},
+					obj.value_edit.SetSelection(edit_sel0,obj.value_edit.ed.GetTextSize())
+					obj.value_edit[obj.m_edit_event[0]].call(obj.value_edit,obj.m_edit_event[1]);
+					obj.m_edit_event=undefined;
+				}
+			}else{
+				//binary editor caret
+				var scale=UI.pixels_per_unit;
+				if(UI.HasFocus(obj)){
+					UI.SetCaret(UI.context_window,
+						x_caret*scale,y_caret*scale,
+						obj.caret_width*scale,hc*scale,
+						obj.caret_color,obj.caret_flicker);
+				}
+			}
+			if(main_area_scale_factor!=1){
+				UI.PopSubWindow()
+			}
+			///////////////
+			//minimap
+			var n_lines_disp_minimap=Math.floor(obj.h*UI.pixels_per_unit);
+			var scroll_max=Math.floor(Math.max(obj.m_data.length+obj.m_w_bytes-1-(n_lines_disp-1)*obj.m_w_bytes,0)/obj.m_w_bytes)*obj.m_w_bytes;
+			var scroll_max_minimap=Math.floor(Math.max(obj.m_data.length+obj.m_w_bytes-1-n_lines_disp_minimap*obj.m_w_bytes,0)/obj.m_w_bytes)*obj.m_w_bytes;
+			var t_scroll=obj.m_scroll/Math.max(scroll_max,1);
+			var scroll_minimap=Math.floor(t_scroll*scroll_max_minimap/obj.m_w_bytes)*obj.m_w_bytes;
+			UI.GLWidget(function(){
+				UI.BIN_RenderMinimap(
+					x_minimap+obj.minimap_padding,
+					obj.y,
+					undefined,obj.h,obj,scroll_minimap,obj.m_ramp)
 			});
-			if(obj.m_edit_event){
-				UI.SetFocus(obj.value_edit)
-				var edit_sel0=0;
-				if((rg.tid&12)==TYPE_BYTE*4){
-					if(obj.m_edit_event[0]=='OnTextInput'||obj.m_edit_event[0]=='OnTextEdit'){
-						var s=obj.m_edit_event[1].text;
-						if(s!=undefined&&s.length==1&&'0123456789abcdefABCDEF'.indexOf(s)>=0){
-							edit_sel0=2;
-						}
+			//var x_panel=x_minimap+w_minimap
+			var w_minimap_bars=x_panel-(x_minimap+obj.minimap_padding*0.5);
+			UI.RoundRect({x:x_minimap+obj.minimap_padding*0.5,y:obj.y,w:1,h:obj.h,color:obj.separator_color})
+			var minimap_page_y0=Math.max(obj.m_scroll-scroll_minimap,0)/obj.m_w_bytes/UI.pixels_per_unit;
+			var minimap_page_y1=Math.max(obj.m_scroll+n_lines_disp*obj.m_w_bytes-scroll_minimap,0)/obj.m_w_bytes/UI.pixels_per_unit;
+			UI.RoundRect({
+				x:x_minimap+obj.minimap_padding*0.5, y:obj.y+minimap_page_y0, w:w_minimap_bars, h:minimap_page_y1-minimap_page_y0,
+				color:obj.minimap_page_shadow})
+			UI.RoundRect({
+				x:x_minimap+obj.minimap_padding*0.5, y:obj.y+minimap_page_y0, w:w_minimap_bars, h:obj.minimap_page_border_width,
+				color:obj.minimap_page_border_color})
+			UI.RoundRect({
+				x:x_minimap+obj.minimap_padding*0.5, y:obj.y+minimap_page_y1-obj.minimap_page_border_width, w:w_minimap_bars, h:obj.minimap_page_border_width,
+				color:obj.minimap_page_border_color})
+			///////////////
+			//panel
+			var w_shadow=obj.sxs_shadow_size;
+			UI.RoundRect({
+				x:x_panel-w_shadow,y:obj.y-w_shadow,w:w_shadow*2,h:obj.h+w_shadow*2,
+				color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
+			})
+			UI.RoundRect({
+				x:x_panel,y:obj.y,w:obj.x+obj.w-x_panel,h:obj.h,
+				color:obj.sxs_bgcolor,
+			})
+			var y_current=obj.y+8;
+			W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display width",color:obj.text_color_panel})
+			var x_buttons=x_panel+128;
+			W.Button("btn_w16",{
+				style:UI.default_styles.check_button,
+				x:x_buttons,y:y_current,w:24,h:24,
+				value:obj.m_w_bytes==16,OnClick:function(){obj.ResetWBytes(16)},
+				font:obj.font_panel_fixed,text:"16"});x_buttons+=28;
+			W.Button("btn_w32",{
+				style:UI.default_styles.check_button,
+				x:x_buttons,y:y_current,w:24,h:24,
+				value:obj.m_w_bytes==32,OnClick:function(){obj.ResetWBytes(32)},
+				font:obj.font_panel_fixed,text:"32"});x_buttons+=28;
+			W.Button("btn_w48",{
+				style:UI.default_styles.check_button,
+				x:x_buttons,y:y_current,w:24,h:24,
+				value:obj.m_w_bytes==48,OnClick:function(){obj.ResetWBytes(48)},
+				font:obj.font_panel_fixed,text:"48"});x_buttons+=28;
+			//W.Button("btn_w64",{
+			//	style:UI.default_styles.check_button,
+			//	x:x_buttons,y:y_current,w:24,h:24,
+			//	value:obj.m_w_bytes==64,OnClick:function(){obj.ResetWBytes(64)},
+			//	font:obj.font_panel_fixed,text:"64"});x_buttons+=28;
+			y_current+=32;
+			W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display type",color:obj.text_color_panel})
+			y_current+=28;
+			//type buttons
+			for(var i=0;i<4;i++){
+				for(var j=0;j<4;j++){
+					var tid=i*4+j;
+					//if(tid==12){continue;}
+					var btn=W.Button("btn_t"+tid,{
+						style:UI.default_styles.check_button,
+						x:x_panel+24+48*i,y:y_current+28*j,w:48,h:28,
+						value:tid==12?((rg.tid&16)!=0):(tid==(rg.tid&15)),
+						OnClick:(function(tid){
+							var sel=obj.GetRangeFromSelection();
+							var sel0=sel[0],sel1=sel[1];
+							if(Math.floor((sel1-sel0)/(1<<(tid&3)))*(1<<(tid&3))==sel1-sel0&&sel1-sel0>0){
+								obj.SetRange(sel0,sel1,{tid:tid});
+							}
+							UI.Refresh()
+						}).bind(undefined,tid==12?rg.tid^16:tid+(rg.tid&16)),
+						font:obj.font_panel_fixed,
+						text:tid==12?"BE":g_types[i]+g_sizes[j]});
+					if(tid==12){
+						btn.tooltip='Big endian';
 					}
 				}
-				obj.value_edit.SetSelection(edit_sel0,obj.value_edit.ed.GetTextSize())
-				obj.value_edit[obj.m_edit_event[0]].call(obj.value_edit,obj.m_edit_event[1]);
-				obj.m_edit_event=undefined;
 			}
-		}else{
-			//binary editor caret
-			var scale=UI.pixels_per_unit;
-			if(UI.HasFocus(obj)){
-				UI.SetCaret(UI.context_window,
-					x_caret*scale,y_caret*scale,
-					obj.caret_width*scale,hc*scale,
-					obj.caret_color,obj.caret_flicker);
-			}
-		}
-		if(main_area_scale_factor!=1){
-			UI.PopSubWindow()
-		}
-		///////////////
-		//minimap
-		var n_lines_disp_minimap=Math.floor(obj.h*UI.pixels_per_unit);
-		var scroll_max=Math.floor(Math.max(obj.m_data.length+obj.m_w_bytes-1-(n_lines_disp-1)*obj.m_w_bytes,0)/obj.m_w_bytes)*obj.m_w_bytes;
-		var scroll_max_minimap=Math.floor(Math.max(obj.m_data.length+obj.m_w_bytes-1-n_lines_disp_minimap*obj.m_w_bytes,0)/obj.m_w_bytes)*obj.m_w_bytes;
-		var t_scroll=obj.m_scroll/Math.max(scroll_max,1);
-		var scroll_minimap=Math.floor(t_scroll*scroll_max_minimap/obj.m_w_bytes)*obj.m_w_bytes;
-		UI.GLWidget(function(){
-			UI.BIN_RenderMinimap(
-				x_minimap+obj.minimap_padding,
-				obj.y,
-				undefined,obj.h,obj,scroll_minimap,obj.m_ramp)
-		});
-		//var x_panel=x_minimap+w_minimap
-		var w_minimap_bars=x_panel-(x_minimap+obj.minimap_padding*0.5);
-		UI.RoundRect({x:x_minimap+obj.minimap_padding*0.5,y:obj.y,w:1,h:obj.h,color:obj.separator_color})
-		var minimap_page_y0=Math.max(obj.m_scroll-scroll_minimap,0)/obj.m_w_bytes/UI.pixels_per_unit;
-		var minimap_page_y1=Math.max(obj.m_scroll+n_lines_disp*obj.m_w_bytes-scroll_minimap,0)/obj.m_w_bytes/UI.pixels_per_unit;
-		UI.RoundRect({
-			x:x_minimap+obj.minimap_padding*0.5, y:obj.y+minimap_page_y0, w:w_minimap_bars, h:minimap_page_y1-minimap_page_y0,
-			color:obj.minimap_page_shadow})
-		UI.RoundRect({
-			x:x_minimap+obj.minimap_padding*0.5, y:obj.y+minimap_page_y0, w:w_minimap_bars, h:obj.minimap_page_border_width,
-			color:obj.minimap_page_border_color})
-		UI.RoundRect({
-			x:x_minimap+obj.minimap_padding*0.5, y:obj.y+minimap_page_y1-obj.minimap_page_border_width, w:w_minimap_bars, h:obj.minimap_page_border_width,
-			color:obj.minimap_page_border_color})
-		///////////////
-		//panel
-		var w_shadow=obj.sxs_shadow_size;
-		UI.RoundRect({
-			x:x_panel-w_shadow,y:obj.y-w_shadow,w:w_shadow*2,h:obj.h+w_shadow*2,
-			color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
-		})
-		UI.RoundRect({
-			x:x_panel,y:obj.y,w:obj.x+obj.w-x_panel,h:obj.h,
-			color:obj.sxs_bgcolor,
-		})
-		var y_current=obj.y+8;
-		W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display width",color:obj.text_color_panel})
-		var x_buttons=x_panel+128;
-		W.Button("btn_w16",{
-			style:UI.default_styles.check_button,
-			x:x_buttons,y:y_current,w:24,h:24,
-			value:obj.m_w_bytes==16,OnClick:function(){obj.ResetWBytes(16)},
-			font:obj.font_panel_fixed,text:"16"});x_buttons+=28;
-		W.Button("btn_w32",{
-			style:UI.default_styles.check_button,
-			x:x_buttons,y:y_current,w:24,h:24,
-			value:obj.m_w_bytes==32,OnClick:function(){obj.ResetWBytes(32)},
-			font:obj.font_panel_fixed,text:"32"});x_buttons+=28;
-		W.Button("btn_w48",{
-			style:UI.default_styles.check_button,
-			x:x_buttons,y:y_current,w:24,h:24,
-			value:obj.m_w_bytes==48,OnClick:function(){obj.ResetWBytes(48)},
-			font:obj.font_panel_fixed,text:"48"});x_buttons+=28;
-		//W.Button("btn_w64",{
-		//	style:UI.default_styles.check_button,
-		//	x:x_buttons,y:y_current,w:24,h:24,
-		//	value:obj.m_w_bytes==64,OnClick:function(){obj.ResetWBytes(64)},
-		//	font:obj.font_panel_fixed,text:"64"});x_buttons+=28;
-		y_current+=32;
-		W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display type",color:obj.text_color_panel})
-		y_current+=28;
-		//type buttons
-		for(var i=0;i<4;i++){
-			for(var j=0;j<4;j++){
-				var tid=i*4+j;
-				//if(tid==12){continue;}
-				var btn=W.Button("btn_t"+tid,{
-					style:UI.default_styles.check_button,
-					x:x_panel+24+48*i,y:y_current+28*j,w:48,h:28,
-					value:tid==12?((rg.tid&16)!=0):(tid==(rg.tid&15)),
-					OnClick:(function(tid){
-						var sel=obj.GetRangeFromSelection();
-						var sel0=sel[0],sel1=sel[1];
-						if(Math.floor((sel1-sel0)/(1<<(tid&3)))*(1<<(tid&3))==sel1-sel0&&sel1-sel0>0){
-							obj.SetRange(sel0,sel1,{tid:tid});
-						}
-						UI.Refresh()
-					}).bind(undefined,tid==12?rg.tid^16:tid+(rg.tid&16)),
-					font:obj.font_panel_fixed,
-					text:tid==12?"BE":g_types[i]+g_sizes[j]});
-				if(tid==12){
-					btn.tooltip='Big endian';
+			y_current+=28*4+4;
+			W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display color",color:obj.text_color_panel})
+			y_current+=28;
+			var g_colors=obj.color_choices;
+			for(var i=0;i<2;i++){
+				for(var j=0;j<5;j++){
+					var C=(g_colors[i*5+j]|0);
+					W.Button("btn_C"+C,{
+						style:UI.default_styles.check_button,
+						x:x_panel+24+28*j,y:y_current+28*i,w:28,h:28,
+						value:(rg.color==C),
+						OnClick:(function(C){
+							var sel=obj.GetRangeFromSelection();
+							var sel0=sel[0],sel1=sel[1];
+							obj.SetRange(sel0,sel1,{color:C});
+							UI.Refresh()
+						}).bind(undefined,C),
+						font:obj.font_panel_icon,
+						text_color:C,
+						text:'黑'});
 				}
 			}
+			y_current+=3*28+4;
+			//region list
+			//todo
+			//parsing script
+			//todo
+			///////////////
+			//minimap mouse region
+			W.Region("rgn_minimap",{owner:obj,x:x_minimap,y:obj.y,w:x_panel-x_minimap,h:obj.h},W.SlaveRegion_prototype)
+			obj.m_minimap_page_y0=obj.y+minimap_page_y0;
+			obj.m_minimap_page_y1=obj.y+minimap_page_y1;
+			obj.m_scroll_max=scroll_max;
+			///////////////
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:0,key:"CTRL+Z",action:function(){
+				obj.Undo()
+			}})
+			menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:0,key:"SHIFT+CTRL+Z",action:function(){
+				obj.Redo()
+			}})
+			menu_edit=undefined;
 		}
-		y_current+=28*4+4;
-		W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display color",color:obj.text_color_panel})
-		y_current+=28;
-		var g_colors=obj.color_choices;
-		for(var i=0;i<2;i++){
-			for(var j=0;j<5;j++){
-				var C=(g_colors[i*5+j]|0);
-				W.Button("btn_C"+C,{
-					style:UI.default_styles.check_button,
-					x:x_panel+24+28*j,y:y_current+28*i,w:28,h:28,
-					value:(rg.color==C),
-					OnClick:(function(C){
-						var sel=obj.GetRangeFromSelection();
-						var sel0=sel[0],sel1=sel[1];
-						obj.SetRange(sel0,sel1,{color:C});
-						UI.Refresh()
-					}).bind(undefined,C),
-					font:obj.font_panel_icon,
-					text_color:C,
-					text:'黑'});
+		UI.FillLanguageMenu('Binary blob',function(name){
+			if(name=='Binary blob'){return;}
+			var new_metadata=(UI.m_ui_metadata[obj.file_name]||{});
+			new_metadata.m_language_id=name;
+			UI.m_ui_metadata[obj.file_name]=new_metadata;
+			if((obj.saved_point||0)!=obj.m_undo_queue.length){
+				//todo: save notification
+			}else{
+				var fn=obj.file_name;
+				obj.SaveMetaData();
+				UI.top.app.document_area.just_created_a_tab=1;
+				UI.top.app.document_area.CloseTab();
+				UI.OpenEditorWindow(fn);
 			}
-		}
-		y_current+=3*28+4;
-		//region list
-		//todo
-		//parsing script
-		//todo
-		///////////////
-		//minimap mouse region
-		W.Region("rgn_minimap",{owner:obj,x:x_minimap,y:obj.y,w:x_panel-x_minimap,h:obj.h},W.SlaveRegion_prototype)
-		obj.m_minimap_page_y0=obj.y+minimap_page_y0;
-		obj.m_minimap_page_y1=obj.y+minimap_page_y1;
-		obj.m_scroll_max=scroll_max;
+		})
 	UI.End()
 	UI.PopCliprect()
 	return obj;
@@ -917,6 +988,7 @@ UI.NewBinaryEditorTab=function(fname0){
 			}
 			this.main_widget.Save();
 			this.need_save=0
+			var body=this.main_widget;
 			if((body.saved_point||0)!=body.m_undo_queue.length){
 				body.title=body.title+'*'
 				this.need_save=1

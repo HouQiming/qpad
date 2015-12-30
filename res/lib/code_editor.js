@@ -3103,7 +3103,7 @@ W.CodeEditor=function(id,attrs){
 			PrepareBookmarks()
 			DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h);
 		}else if(obj.m_is_preview&&!doc&&(obj.bin_preview||UI.ED_GetFileLanguage(obj.file_name).is_binary)){
-			W.BinaryEditor("bin_preview",{x:obj.x,y:obj.y,w:obj.w,h:obj.h,is_preview:1,file_name:obj.file_name})
+			W.BinaryEditor("bin_preview",{x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,is_preview:1,file_name:obj.file_name})
 		}else{
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar
@@ -4506,6 +4506,30 @@ UI.ED_IndexGC=function(){
 		}
 	}
 	UI.ED_IndexGCEnd()
+}
+
+UI.FillLanguageMenu=function(language_id,f_set_language_id){
+	var menu_lang=UI.BigMenu("&Language")
+	var langs=Language.m_all_languages
+	var got_separator=0
+	langs.sort(function(a,b){
+		a=(a.name_sort_hack||a.name);
+		b=(b.name_sort_hack||b.name);
+		return a>b?1:(a<b?-1:0);
+	})
+	for(var i=0;i<langs.length;i++){
+		if(!got_separator&&!langs[i].name_sort_hack){
+			menu_lang.AddSeparator()
+			got_separator=1
+		}
+		menu_lang.AddNormalItem({
+			text:langs[i].name,
+			icon:(language_id==langs[i].name)?"对":undefined,
+			action:function(name){
+				f_set_language_id(name)
+				UI.Refresh();
+			}.bind(undefined,langs[i].name)})
+	}
 }
 
 Language.Register({

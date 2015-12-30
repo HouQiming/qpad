@@ -190,8 +190,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	}
 	JS_UI["BIN_MapCopyOnWrite"]=function(JSContext JS){
 		fn=JS.Param(0).as(string)
-		s=System.IO.MapFile(fn,System.IO.OPEN_READ|System.IO.OPEN_COPY_ON_WRITE).ConvertToAsBinary(u8)
-		return JS.Return(s)
+		s0=System.IO.MapFile(fn,System.IO.OPEN_READ|System.IO.OPEN_COPY_ON_WRITE)
+		if s0:
+			s=s0.ConvertToAsBinary(u8)
+			return JS.Return(s)
+		else
+			return 0
 	}
 	JS_UI["BIN_GetRangeAt"]=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)
@@ -203,14 +207,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			color=rg.color
 			tid=rg.tid
 			ofs0=rg.ofs0
+			size=rg.ofs1-rg.ofs0
 		else
 			color=obj["text_color"].as(int)
 			tid=makeType(TYPE_BYTE,0)
 			ofs0=0LL
+			size=0LL
 		ret=JS.New()
 		ret["color"]=color
 		ret["tid"]=tid
 		ret["ofs"]=ofs0
+		ret["size"]=size
 		return JS.Return(ret)
 	}
 	JS_UI["BIN_Render"]=function(JSContext JS){
@@ -434,5 +441,55 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				buf8[7-i]=tmp
 		copy(data[ptr:],buf8)
 		return 0
+	}
+	JS_UI["BIN_Save"]=function(JSContext JS){
+		obj=JS.Param(0).as(JSObject)
+		js_addr_events=JS.Param(1).as(JSObject)
+		fn=JS.Param(2).as(string)
+		is_mapped=JS.Param(3).as(int)
+		data=obj["m_data"].as(u8[])
+		if !is_mapped:
+			f=System.IO.CreateFile(fn)
+			if !f:return 0
+			n_written=f.Write(data[0:].ConvertToAsBinary(i8))
+			f.Close()
+			if n_written<data.n:return 0
+			return JS.Return(1)
+		n=js_addr_events["length"].as(iptr)
+		addr_events=[(js_addr_events[i].as(i64)<<1)+i64(i&1) for i=0:n-1]
+		addr_events.Sort()
+		n_covered=0L
+		n2=0L
+		foreach p in addr_events
+			if p&1LL:
+				n_covered--
+				if !n_covered:
+					addr_events[n2++]=p
+			else
+				if !n_covered:
+					addr_events[n2++]=p
+				n_covered++
+		addr_events.n=n2
+		assert(!(n2&1))
+		//bufs=new u8[][n2>>1]
+		//for i=0:2:addr_events.n-2
+		//	p0=iptr(addr_events[i])
+		//	p1=iptr(addr_events[i+1])
+		//	bufs[i>>1]=new(data[p0:p1-1])
+		//obj["m_data_raw"]=0
+		//obj["m_data"]=0
+		//data.discard()
+		s_write0=System.IO.MapFile(fn,System.IO.OPEN_READ|System.IO.OPEN_WRITE)
+		if !s_write0:return 0
+		s_write=s_write0.ConvertToAsBinary(u8)
+		//for i=0:2:addr_events.n-2
+		//	p0=iptr(addr_events[i])
+		//	copy(s_write[p0:],bufs[i>>1])
+		for i=0:2:addr_events.n-2
+			p0=iptr(addr_events[i])
+			p1=iptr(addr_events[i+1])
+			copy(s_write[p0:],data[p0:p1-1])
+		s_write.discard()
+		return JS.Return(1)
 	}
 })
