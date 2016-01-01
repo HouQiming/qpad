@@ -51,12 +51,6 @@ var g_encoding_names={
 	'5':"the Big-5",
 	'7':"the UTF-16",
 }
-UI.TestOption=function(stable_name){
-	var options=(UI.m_ui_metadata["<options>"]||{});
-	var is_enabled=options[stable_name];
-	if(is_enabled==undefined){is_enabled=1;}
-	return is_enabled;
-}
 W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	tab_is_char:1,
 	plugin_class:'code_editor',
@@ -4703,6 +4697,7 @@ W.SXS_OptionsPage=function(id,attrs){
 			//special stuff
 			var plugin_items={};
 			plugin_items["Display"]=[
+				{name:'(temp) Use light theme',stable_name:'use_light_theme'},//todo: sun/moon icons
 				{name:'Highlight the current line',stable_name:'show_line_highlight'},
 				{name:'Show outer scope overlays',stable_name:'show_top_hint'},
 				{name:'Show line numbers',stable_name:'show_line_numbers'},
@@ -4732,8 +4727,8 @@ W.SXS_OptionsPage=function(id,attrs){
 			/////////////////
 			//qpad credits
 			plugin_items["About"]=[
-				{license_line:"QPad v"+UI.g_version+", by Qiming HOU",text_color_license:0xff000000},
-				{license_line:"Contact: hqm03ster@gmail.com",text_color_license:0xff000000},
+				{license_line:"QPad v"+UI.g_version+", by Qiming HOU",text_color_license:UI.default_styles.feature_item.text_color},
+				{license_line:"Contact: hqm03ster@gmail.com",text_color_license:UI.default_styles.feature_item.text_color},
 			];
 			/////////////////
 			//OSS licenses

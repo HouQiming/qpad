@@ -68,6 +68,13 @@ UI.SaveMetaData=function(){
 	IO.CreateFile(IO.GetStoragePath()+(UI.Platform.BUILD=="debug"?"/metadata_debug.json":"/metadata.json"),JSON.stringify(UI.m_ui_metadata))
 }
 
+UI.TestOption=function(stable_name){
+	var options=(UI.m_ui_metadata["<options>"]||{});
+	var is_enabled=options[stable_name];
+	if(is_enabled==undefined){is_enabled=1;}
+	return is_enabled;
+}
+
 //UI.NewFromTemplate=function(fn_template,fn_real){
 //	var ret=UI.OpenFile(IO.GetExecutablePath()+"/"+fn_template)
 //	if(!ret){

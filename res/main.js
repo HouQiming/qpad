@@ -45,7 +45,6 @@ UI.ApplyTheme=function(custom_styles){
 
 UI.ReadOptionalConfigScript("conf_translation.js");
 
-UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f);
 UI.icon_font_name='res/fonts/iconfnt.ttf,!'
 UI.icon_font=UI.Font(UI.icon_font_name,24);
 UI.icon_font_20=UI.Font(UI.icon_font_name,20);
@@ -231,7 +230,7 @@ UI.Application=function(id,attrs){
 	UI.Begin(attrs);
 		///////////////////
 		var app=UI.Begin(W.Window('app',{
-				title:'QPad',w:1280,h:720,bgcolor:0xfff0f0f0,icon:"res/icon256.png",
+				title:'QPad',w:1280,h:720,bgcolor:UI.default_styles.tabbed_document.color,icon:"res/icon256.png",
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1,
 				OnWindowBlur:function(){
