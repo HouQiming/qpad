@@ -4430,7 +4430,7 @@ UI.NewCodeEditorTab=function(fname0){
 		Reload:function(){
 			if(this.main_widget){this.main_widget.Reload();}
 		},
-		color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
+		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
 };
 

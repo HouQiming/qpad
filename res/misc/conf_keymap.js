@@ -1,0 +1,49 @@
+if(UI.Platform.ARCH=="mac"){
+	UI.g_hotkey_map={
+		"CTRL+N":"WIN+N",
+		"CTRL+O":"WIN+O",
+		"CTRL+W":"WIN+W",
+		"CTRL+S":"WIN+S",
+		"SHIFT+CTRL+S":"SHIFT+WIN+S",
+		////////////////
+		"CTRL+C":"WIN+C",
+		"CTRL+V":"WIN+V",
+		"SHIFT+CTRL+V":"SHIFT+WIN+V",
+		"CTRL+X":"WIN+X",
+		"CTRL+Z":"WIN+Z",
+		"SHIFT+CTRL+Z":"SHIFT+WIN+Z",
+		"CTRL+A":"WIN+A",
+		"CTRL+L":"WIN+L",
+		"CTRL+T":"WIN+T",
+		"SHIFT+CTRL+T":"SHIFT+WIN+T",
+		"CTRL+K":"WIN+K",
+		"SHIFT+CTRL+U":"SHIFT+WIN+U",
+		"CTRL+D":"WIN+D",
+		"SHIFT+CTRL+D":"SHIFT+WIN+D",
+		"SHIFT+CTRL+W":"SHIFT+WIN+W",
+		////////////////
+		"SHIFT+CTRL+O":"SHIFT+WIN+O",
+		"ALT+Q":"SHIFT+WIN+O",
+		"ALT+C":"CTRL+C",
+		"ALT+H":"CTRL+H",
+		"ALT+E":"CTRL+E",
+		////////////////
+		"CTRL+F":"WIN+F",
+		"CTRL+G":"WIN+G",
+		////////////////
+		"F7":"SHIFT+WIN+B",
+		"CTRL+F5":"SHIFT+WIN+R",
+		////////////////
+		"CTRL+LEFT SHIFT+CTRL+LEFT":"ALT+LEFT SHIFT+ALT+LEFT",
+		"CTRL+RIGHT SHIFT+CTRL+RIGHT":"ALT+RIGHT SHIFT+ALT+RIGHT",
+		"ALT+LEFT":"WIN+LEFT",
+		"ALT+RIGHT":"WIN+RIGHT",
+		"CTRL+UP":"WIN+UP",
+		"CTRL+DOWN":"WIN+DOWN",
+		////////////////
+		"CTRL+SHIFT+TAB":"SHIFT+WIN+LEFT",
+		"CTRL+TAB":"SHIFT+WIN+RIGHT",
+	}
+}else{
+	UI.g_hotkey_map={}
+}

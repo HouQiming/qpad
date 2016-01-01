@@ -564,9 +564,9 @@ W.TabbedDocument=function(id,attrs){
 		if(obj.active_tab){
 			var tab=obj.active_tab;
 			//theme-colored bar
-			if(UI.current_theme_color!=tab.color_theme[0]){
-				UI.Theme_Minimalistic(tab.color_theme)
-			}
+			//if(UI.current_theme_color!=tab.color_theme[0]){
+			//	UI.CustomTheme(tab.color_theme)
+			//}
 			W.RoundRect("",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
 				x:0,y:y_label_area+obj.h_caption,h:obj.h_bar,
