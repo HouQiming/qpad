@@ -1844,7 +1844,7 @@ W.FileItemOnDemand=function(){
 		var fnext=this.m_find_context()
 		if(!fnext){
 			this.m_find_context=undefined;
-			if(!ret.length&&this.create_if_not_found){
+			if(!ret.length&&this.create_if_not_found&&!IO.FileExists(this.create_if_not_found)){
 				ret.push({
 					name_to_create:this.create_if_not_found,
 					name:this.create_if_not_found,
@@ -4541,7 +4541,7 @@ Language.Register({
 })
 
 Language.Register({
-	name_sort_hack:' Binary blob',name:'Binary blob',parser:'none',
+	name_sort_hack:' Binary blob',name:'Binary',parser:'none',
 	is_binary:1,
 	extensions:['bin','bz2'],
 	////////////////////////

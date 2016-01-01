@@ -116,6 +116,12 @@ W.BinaryEditor_prototype={
 		}else if(IsHotkey(event,"SHIFT+CTRL+Z")||IsHotkey(event,"CTRL+Y")){
 			this.Redo()
 			return;
+		}else if(IsHotkey(event,"CTRL+G")){
+			if(this.goto_bar_edit){
+				UI.SetFocus(this.goto_bar_edit)
+			}
+			UI.Refresh()
+			return;
 		}else if(IsHotkey(event,"CTRL+V")){
 			this.StartEdit("onKeyDown",event);
 		}else{
@@ -180,7 +186,12 @@ W.BinaryEditor_prototype={
 		}else{
 			//text selection
 			this.m_sel1=this.MapMouseToAddr(event,rgid);
-			this.ValidateSelection(0,-1)
+			if(!UI.IsPressed("LSHIFT")&&!UI.IsPressed("RSHIFT")){
+				this.dragging_shift=0;
+			}else{
+				this.dragging_shift=1;
+			}
+			this.ValidateSelection(this.dragging_shift,-1)
 			if(event.clicks==2){
 				//double-click
 				this.m_sel1=Math.floor(this.m_sel1/4)*4;
@@ -188,6 +199,7 @@ W.BinaryEditor_prototype={
 				//non-shift updates sel0, now update sel1 again
 				this.m_sel1+=4;
 				this.ValidateSelection(1,1)
+				this.dragging_shift=0;
 			}else if(event.clicks>=3){
 				//triple-click
 				this.m_sel1=Math.floor(this.m_sel1/this.m_w_bytes)*this.m_w_bytes;
@@ -195,6 +207,7 @@ W.BinaryEditor_prototype={
 				//non-shift updates sel0, now update sel1 again
 				this.m_sel1+=this.m_w_bytes;
 				this.ValidateSelection(1,1)
+				this.dragging_shift=0;
 			}
 			this.is_dragging=rgid;
 			this.drag_value0=this.m_sel0;
@@ -211,14 +224,16 @@ W.BinaryEditor_prototype={
 			UI.Refresh()
 		}else{
 			var mouse_sel=this.MapMouseToAddr(event,this.is_dragging);
-			if(mouse_sel>=this.drag_value0&&mouse_sel<=this.drag_value1){
+			if(!this.dragging_shift&&mouse_sel>=this.drag_value0&&mouse_sel<=this.drag_value1){
 				this.m_sel0=this.drag_value0;
 				this.m_sel1=this.drag_value1;
 			}else{
-				if(mouse_sel<this.drag_value0){
-					this.m_sel0=this.drag_value1;
-				}else{
-					this.m_sel0=this.drag_value0;
+				if(!this.dragging_shift){
+					if(mouse_sel<this.drag_value0){
+						this.m_sel0=this.drag_value1;
+					}else{
+						this.m_sel0=this.drag_value0;
+					}
 				}
 				this.m_sel1=mouse_sel;
 			}
@@ -472,7 +487,6 @@ W.BinaryEditor=function(id,attrs){
 			UI.BumpHistory(obj.file_name)
 		}
 		////////////////////////////
-		////////////////////////////
 		if(obj.m_file_name_mapped=="<failed>"){
 			UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h,color:obj.bgcolor})
 			W.Text("",{
@@ -684,6 +698,8 @@ W.BinaryEditor=function(id,attrs){
 							var buf_str=new Buffer(ret);
 							obj.PushUndo(obj.m_sel1,buf_str.length)
 							buf_str.copy(obj.m_data,obj.m_sel1,0,Math.min(obj.m_data.length-obj.m_sel1,buf_str.length));
+							obj.m_sel1+=buf_str.length;
+							obj.ValidateSelection(0,-1);
 							UI.Refresh()
 							return;
 						}
@@ -754,6 +770,8 @@ W.BinaryEditor=function(id,attrs){
 							obj.m_data.writeDoubleBE(ret,obj.m_sel1);
 							break;
 						}
+						obj.m_sel1+=(1<<(this.tid&3));
+						obj.ValidateSelection(0,-1);
 						UI.Refresh()
 					},
 				});
@@ -824,6 +842,47 @@ W.BinaryEditor=function(id,attrs){
 				color:obj.sxs_bgcolor,
 			})
 			var y_current=obj.y+8;
+			//go-to bar
+			var ss_addr=["0x"];
+			var addr_value=obj.m_sel1;
+			for(var j=0;j<obj.m_lg_addr;j++){
+				var addr2=Math.floor(addr_value/16)
+				var ch=addr_value-addr2*16;
+				if(ch>=10){
+					ch+=65-10;
+				}else{
+					ch+=48;
+				}
+				addr_value=addr2;
+				ss_addr[obj.m_lg_addr-j]=String.fromCharCode(ch);
+			}
+			W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Go to",color:obj.text_color_panel})
+			var got_edit_before=!!(obj.goto_bar_edit&&obj.goto_bar_edit.edit)
+			W.EditBox("goto_bar_edit",{
+				x:x_panel+64,w:144,y:y_current+2,h:24,
+				is_single_line:1,
+				value:ss_addr.join(""),
+				font:obj.font_goto,
+				OnChange:function(value){
+					var ret=obj.m_sel1;
+					try{
+						ret=JSON.parse(Duktape.__eval_expr_sandbox(value));
+					}catch(e){
+						return;
+					}
+					if(typeof(ret)=='number'){
+						obj.m_sel1=ret;
+						obj.ValidateSelection(0,-1);
+					}
+					UI.Refresh()
+				},
+			});
+			if(!got_edit_before&&obj.goto_bar_edit.edit){
+				var doc_goto=obj.goto_bar_edit.edit;
+				doc_goto.SetSelection(2,doc_goto.ed.GetTextSize())
+			}
+			y_current+=32;
+			//width buttons
 			W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display width",color:obj.text_color_panel})
 			var x_buttons=x_panel+128;
 			W.Button("btn_w16",{
@@ -916,8 +975,8 @@ W.BinaryEditor=function(id,attrs){
 			}})
 			menu_edit=undefined;
 		}
-		UI.FillLanguageMenu('Binary blob',function(name){
-			if(name=='Binary blob'){return;}
+		UI.FillLanguageMenu('Binary',function(name){
+			if(name=='Binary'){return;}
 			var new_metadata=(UI.m_ui_metadata[obj.file_name]||{});
 			new_metadata.m_language_id=name;
 			UI.m_ui_metadata[obj.file_name]=new_metadata;

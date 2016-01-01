@@ -265,12 +265,15 @@ exports.GetDescObjectByName=function(s_name){
 	return g_desc_by_name[s_name]||g_desc_by_name["Plain text"];
 }
 
+exports.g_all_extensions=[];
 exports.Register=function(desc){
 	exports.m_all_languages.push(desc)
 	g_desc_by_name[desc.name]=desc
 	if(desc.extensions){
 		for(var i=0;i<desc.extensions.length;i++){
-			g_name_by_ext[desc.extensions[i].toLowerCase()]=desc.name
+			var s_ext_i=desc.extensions[i].toLowerCase();
+			g_name_by_ext[s_ext_i]=desc.name
+			exports.g_all_extensions.push(s_ext_i);
 		}
 	}
 }

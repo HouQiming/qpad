@@ -43,7 +43,7 @@
      showguides="true"
      inkscape:guide-bbox="true"
      inkscape:zoom="0.05675"
-     inkscape:cx="-1471.8254"
+     inkscape:cx="-4899.1382"
      inkscape:cy="-163.00365"
      inkscape:window-x="1911"
      inkscape:window-y="-9"
@@ -533,6 +533,16 @@
          id="glyph4142"
          unicode="黑"
          d="m -12,1036 1024,0 c 0,0 0,0 0,0 l 0,-1024 c 0,0 0,0 0,0 L -12,12 c 0,0 0,0 0,0 l 0,1024 c 0,0 0,0 0,0 z" />
+      <glyph
+         glyph-name="Left triangle"
+         id="glyph4154"
+         unicode="◀"
+         d="m 810.03365,130.75174 0,786.58193 -620,-395.26234 z" />
+      <glyph
+         glyph-name="Up triangle"
+         id="glyph4156"
+         unicode="▲"
+         d="M 119.51541,143.78338 500.00001,904.21663 880.48459,143.78338 z" />
     </font>
     <radialGradient
        gradientUnits="userSpaceOnUse"
@@ -804,6 +814,11 @@
        inkscape:vp_x="0 : 24 : 1"
        sodipodi:type="inkscape:persp3d" />
   </defs>
+  <path
+     inkscape:connector-curvature="0"
+     id="path3340"
+     style="font-size:2845.19970703px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Opensans;-inkscape-font-specification:Opensans"
+     d="M 119.51541,880.21662 500.00001,119.78337 880.48459,880.21662 z" />
   <path
      style="font-size:49.50927353px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none;font-family:CMU Serif;-inkscape-font-specification:CMU Serif"
      d="m -3133.3512,-1024.1499 0,704.68749 764.5,0 0,-704.68749 -764.5,0 z m 97.3437,152.43749 262.0313,137.8125 0,29.65625 -263.25,153.875 0,-46.96875 215.6562,-121.125 -214.4375,-109.375 0,-43.875 z m 304.6563,362.125 266.375,0 0,37.6875 -266.375,0 0,-37.6875 z"
@@ -2022,6 +2037,12 @@
      inkscape:connector-curvature="0" />
   <path
      style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:none"
-     d="m -12,-12 1024,0 c 0,0 0,0 0,0 l 0,1024 c 0,0 0,0 0,0 l -1024,0 c 0,0 0,0 0,0 l 0,-1024 c 0,0 0,0 0,0 z"
-     id="rect3329" />
+     d="m 1732.4934,5468.1762 1024,0 c 0,0 0,0 0,0 l 0,1024 c 0,0 0,0 0,0 l -1024,0 c 0,0 0,0 0,0 l 0,-1024 c 0,0 0,0 0,0 z"
+     id="rect3329"
+     inkscape:connector-curvature="0" />
+  <path
+     inkscape:connector-curvature="0"
+     id="path3338"
+     style="font-size:2845.19970703px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Opensans;-inkscape-font-specification:Opensans"
+     d="m 1268.1834,6461.5302 0,-786.5819 -619.99997,395.2623 z" />
 </svg>

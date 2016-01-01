@@ -4,6 +4,9 @@ require("gui2d/dockbar");
 require("res/lib/code_editor");
 require("res/lib/bin_editor");
 require("res/lib/subwin");
+var Language=require("res/lib/langdef");
+
+UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 
 UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.SetFontSharpening(1);
@@ -13,7 +16,17 @@ UI.SetFontSharpening(1);
 	UI.ResetRenderer(UI.pixels_per_unit);
 })();
 //UI.SetFontSharpening(0)
-UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
+//UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
+//todo: Japanese version of the font chains
+if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+	UI.fallback_font_names=["msyh.ttc","arialuni.ttf","simhei.ttf"]
+}else if(UI.Platform.ARCH=="mac"){
+	UI.fallback_font_names=["STHeiti Medium.ttc","LastResort.ttf"]
+}else if(UI.Platform.ARCH=="android"){
+	UI.fallback_font_names=["DroidSansFallback.ttf"]
+}else{
+	UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
+}
 UI.icon_font_name='res/fonts/iconfnt.ttf,!'
 UI.Theme_CustomWidget=function(C){
 	var C_dark=UI.lerp_rgba(C[0],0xff000000,0.15)
@@ -30,8 +43,8 @@ UI.Theme_CustomWidget=function(C){
 			text_color:0xff000000,
 			shadow_size:6,
 			shadow_color:0xaa000000,
-			triangle_font:UI.Font("res/fonts/dsanscn.ttc,!",32,0),
-			triangle_font2:UI.Font("res/fonts/dsanscn.ttc,!",32,250),
+			triangle_font:UI.Font(UI.icon_font_name,16,0),
+			triangle_font2:UI.Font(UI.icon_font_name,16,500),
 		},
 		check_button:{
 			transition_dt:0.1,
@@ -556,6 +569,7 @@ UI.Theme_CustomWidget=function(C){
 		binary_editor:{
 			font:UI.Font("res/fonts/inconsolata.ttf",24),
 			font_edit:UI.Font("res/fonts/inconsolata.ttf",16),
+			font_goto:UI.Font("res/fonts/inconsolata.ttf",16),
 			mouse_wheel_speed:4,
 			edit_padding:8,
 			edit_bgcolor:0xffffffff,
@@ -869,6 +883,114 @@ UI.ZoomReset=function(){
 UI.BeforeGC=function(){
 	UI.ED_IndexGC();
 };
+
+if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+	UI.WIN_AddRegistryItem=function(sregfile, key,name_vals){
+		sregfile.push("\n[",key,"]\n")
+		for(var i=0;i<name_vals.length;i+=2){
+			var sname=name_vals[i];
+			var sval=name_vals[i+1];
+			var stype=undefined;
+			if(sname&&sname.length){
+				var atypes=sname.split(":");
+				if(atypes.length>1){
+					stype=atypes[1];
+					sname=atypes[0];
+				}
+				sregfile.push('"')
+				sregfile.push(sname)
+				sregfile.push('"')
+			}else{
+				sregfile.push('@');
+			}
+			if(stype){
+				sregfile.push('=')
+				sregfile.push(stype)
+				sregfile.push(':')
+				sregfile.push(sval.toString())
+			}else{
+				sregfile.push("=hex(2):")
+				for(var j=0;j<sval.length;j++){
+					var cc=sval.charCodeAt(j);
+					var ch0=(cc&255).toString(16);
+					var ch1=(cc>>8).toString(16);
+					if(ch0.length<2){sregfile.push('0');}
+					sregfile.push(ch0);
+					sregfile.push(',');
+					if(ch1.length<2){sregfile.push('0');}
+					sregfile.push(ch1);
+					sregfile.push(',');
+				}
+				sregfile.push('00,00');
+			}
+			sregfile.push('\n')
+		}
+	}
+	UI.WIN_ApplyRegistryFile=function(sregfile,sprompt){
+		var sregfile=sregfile.join("");
+		var buf=new Buffer(sregfile.length*2);
+		for(var i=0;i<sregfile.length;i++){
+			buf.writeInt16LE(sregfile.charCodeAt(i),i*2);
+		}
+		var fname=IO.ProcessUnixFileName("%temp%/"+sprompt+".reg").replace(/[/]/g,"\\");
+		IO.CreateFile(fname,buf)
+		var ret=IO.Shell(["regedit","/s",fname]);
+		if(ret==0){
+			IO.WIN_SHChangeNotify();
+		}
+		IO.Shell(["del",fname])
+		return ret==0;
+	}
+	UI.InstallQPad=function(){
+		//windows installation, generate .reg and run it
+		if(UI.Platform.BUILD=="debug"){
+			print("*** WARNING: INSTALLING A DEBUG VERSION! ***")
+		}
+		var sexe=IO.m_my_name.replace(/[/]/g,"\\");
+		var sregfile=["\ufeffWindows Registry Editor Version 5.00\n"];
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\*\\shell\\edit_with_qpad",[
+			"",UI._("Edit with &QPad"),
+			"icon",sexe+",0"])
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\*\\shell\\edit_with_qpad\\command",["","\""+sexe+"\" \"%1\""])
+		var sshortname=UI.GetMainFileName(sexe).toLowerCase()
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\Applications\\@1".replace("@1",sshortname),
+			["FriendlyAppName",UI._("QPad Editor")])
+		var file_formats=[]
+		for(var i=0;i<Language.g_all_extensions.length;i++){
+			var s_ext=Language.g_all_extensions[i];
+			if(Language.GetNameByExt(s_ext)=='Binary'){
+				continue;
+			}
+			file_formats.push(s_ext);
+			file_formats.push("");
+		}
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\Applications\\@1\\SupportedTypes".replace("@1",sshortname),
+			file_formats)
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\Applications\\@1\\shell\\open\\command".replace("@1",sshortname),
+			["","\""+sexe+"\" \"%1\""])
+		var sversion=UI.g_version;
+		var version_parts=sversion.split(/[. ]/)
+		var vermajor=parseInt(version_parts[0]||"3");
+		var verminor=parseInt(version_parts[1]||"0");
+		var spath=IO.GetExecutablePath();
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@1".replace("@1",sshortname),
+			[
+				"UninstallString","\""+sexe+"\" --internal-tool --uninstall",
+				"DisplayName",UI._("QPad Text Editor"),
+				"DisplayVersion",sversion,
+				"DisplayIcon",sexe,
+				"Publisher","Hou Qiming",
+				"URLInfoAbout","www.houqiming.net/qpad/qpad.html",
+				"NoModify:dword","1",
+				"NoRepair:dword","1",
+				"VersionMajor:dword",(vermajor).toString(),
+				"VersionMinor:dword",(verminor).toString(),
+				"EstimatedSize:dword",(((IO.GetFileSize(sexe)+IO.GetFileSize(spath+'/res.zip'))>>10)+1024).toString(),
+				"InstallLocation",spath])
+		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Add QPad to explorer menus"));
+	}
+}
+//UI.InstallQPad()
 
 var g_app_inited=0;
 UI.Application=function(id,attrs){

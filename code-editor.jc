@@ -231,12 +231,12 @@ class CLayouter_programmer
 		if u32(ch)<u32(0x80):
 			ret=m_char_width_cache_ascii[ch]
 			if !ret:
-				ret=int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch))))+1
+				ret=max(int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))),1)+1
 				m_char_width_cache_ascii[ch]=ret
 		else
 			ret=m_char_width_cache[ch]
 			if !ret:
-				ret=int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch))))+1
+				ret=max(int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))),1)+1
 				m_char_width_cache[ch]=ret
 		return ret-1
 	}

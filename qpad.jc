@@ -17,8 +17,13 @@ __generate_json("js_units","gui2d/gl.js")
 __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
 __generate_json("icon_file","icon256.png")
-__generate_json("include_js","build/make_new_docs.js")
+//__generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
+if Platform.BUILD!="debug"&&Platform.IS_WINDOWS:
+	__generate_json("subsystem","windows")
+	__generate_json("c_files","jc_winmain.c")
+if Platform.IS_WINDOWS:
+	__generate_json("lib_files","shell32.lib")
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -97,7 +102,11 @@ if Platform.BUILD=="debug":
 	jsio["CreateFile"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
 		if !fn:return 0
-		data=JS.Param(1).or(new string)
+		data_u8=JS.Param(1).as(u8[])
+		if data_u8:
+			data=data_u8.ConvertToAsBinary(i8)
+		else
+			data=JS.Param(1).or(new string)
 		f=System.IO.CreateFile(fn)
 		if f:
 			lg=f.Write(data)
@@ -196,6 +205,10 @@ if Platform.BUILD=="debug":
 	jsio["GetExecutablePath"]=function(JSContext JS){
 		return JS.Return(System.Env.GetExecutablePath())
 	}
+	jsio["GetFileSize"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		return JS.Return(System.IO.GetFileSize(fn))
+	}
 	jsio["m_my_name"]=System.Env.GetExecutableName()
 	jsio["GetStoragePath"]=function(JSContext JS){
 		return JS.Return(System.Env.GetStoragePath())
@@ -239,6 +252,13 @@ if Platform.BUILD=="debug":
 			p=s_ret.IndexOf(char(0))
 			if p>=0:s_ret.resize(p)
 			return JS.Return(s_ret.Replace(["\\","/"]))
+		}
+		jsio["WIN_SHChangeNotify"]=function(JSContext JS){
+			SHChangeNotify=__c_function(int,"SHChangeNotify","Shlobj.h")
+			SHCNE_ASSOCCHANGED=0x8000000
+			SHCNF_IDLIST=0
+			SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,NULL,NULL);
+			return 0;
 		}
 	else if Platform.ARCH=="mac":
 		osal_DoFileDialogMac=__c_function(int,"osal_DoFileDialogMac","filedlg.h","c_files","filedlg_mac.m")
