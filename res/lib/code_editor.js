@@ -4203,7 +4203,7 @@ W.CodeEditor=function(id,attrs){
 					W.Region('minimap_page',{
 						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
 						value:sbar_value,
-						factor:h_scrolling_area-(minimap_page_y1-minimap_page_y0),
+						factor:Math.min(h_scrolling_area,ytot*minimap_scale)-(minimap_page_y1-minimap_page_y0),
 						OnChange:function(value){
 							doc.scroll_y=value*(ytot-h_scrolling_area)
 							doc.scrolling_animation=undefined

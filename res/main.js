@@ -17,6 +17,12 @@ UI.SetFontSharpening(1);
 })();
 //UI.SetFontSharpening(0)
 //UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
+
+UI.ReadOptionalConfigScript=function(fn){
+	var s0=IO.ReadAll(IO.GetStoragePath()+fn);
+	//todo
+}
+
 //todo: Japanese version of the font chains
 if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 	UI.fallback_font_names=["msyh.ttc","arialuni.ttf","simhei.ttf"]
@@ -27,7 +33,15 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 }else{
 	UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
 }
+
 UI.icon_font_name='res/fonts/iconfnt.ttf,!'
+if(UI.Platform.ARCH=="mac"){
+	UI.font_name="LucidaGrande,res/fonts/opensans.ttf"
+	UI.eng_font_name="res/fonts/opensans.ttf,!"
+}else{
+	UI.font_name="res/fonts/opensans.ttf"
+	UI.eng_font_name="res/fonts/opensans.ttf,!"
+}
 UI.Theme_CustomWidget=function(C){
 	var C_dark=UI.lerp_rgba(C[0],0xff000000,0.15)
 	var C_sel=UI.lerp_rgba(C[0],0xffffffff,0.66)
@@ -822,13 +836,6 @@ UI.Theme_CustomWidget=function(C){
 }
 UI.icon_font=UI.Font(UI.icon_font_name,24);
 UI.icon_font_20=UI.Font(UI.icon_font_name,20);
-if(UI.Platform.ARCH=="mac"){
-	UI.font_name="LucidaGrande,res/fonts/opensans.ttf"
-	UI.eng_font_name="res/fonts/opensans.ttf,!"
-}else{
-	UI.font_name="res/fonts/opensans.ttf"
-	UI.eng_font_name="res/fonts/opensans.ttf,!"
-}
 if(UI.Platform.BUILD=="debug"){
 	UI.Theme_Minimalistic([0xff3377cc])
 }else{
