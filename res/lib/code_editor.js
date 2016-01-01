@@ -4414,7 +4414,9 @@ UI.OpenEditorWindow=function(fname,fcallback){
 		if(obj_tab.main_widget){
 			fcallback.call(obj_tab.main_widget.doc)
 		}else{
-			obj_tab.opening_callbacks.push(fcallback)
+			if(obj_tab.opening_callbacks){
+				obj_tab.opening_callbacks.push(fcallback)
+			}
 		}
 	}
 }

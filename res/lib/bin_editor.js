@@ -1003,7 +1003,6 @@ UI.NewBinaryEditorTab=function(fname0){
 		file_name:file_name,
 		title:UI.RemovePath(file_name),
 		tooltip:file_name,
-		opening_callbacks:[],
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
@@ -1016,19 +1015,6 @@ UI.NewBinaryEditorTab=function(fname0){
 			var body=W.BinaryEditor("body",attrs)
 			if(!this.main_widget){
 				this.main_widget=body;
-				if(this.opening_callbacks.length){
-					if(body.m_finished_loading){
-						var cbs=this.opening_callbacks
-						if(cbs){
-							for(var i=0;i<cbs.length;i++){
-								cbs[i].call(body.doc);
-							}
-						}
-					}else{
-						body.opening_callbacks=this.opening_callbacks
-					}
-					this.opening_callbacks=[]
-				}
 			}
 			body.title=UI.RemovePath(body.file_name)
 			body.tooltip=body.file_name
