@@ -1453,7 +1453,7 @@ MAX_PARSABLE_SIZE=1LL<<24
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_ParserQueueFile"]=function(JSContext JS){
 		fn=JS.Param(0).as(string)
-		if System.IO.FileExists(fn)&&System.IO.GetFileSize(fn)<MAX_PARSABLE_SIZE:
+		if fn.n&&fn[0]=='*'||System.IO.FileExists(fn)&&System.IO.GetFileSize(fn)<MAX_PARSABLE_SIZE:
 			g_c_like_parse_queue.push(getid(fn))
 		return 1
 	}
@@ -1484,7 +1484,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				ret.m_ids.Sort()
 				ret.m_ids.Unique()
 			else
-				sdata=System.IO.ReadAll(fn)
+				if fn.n&&fn[0]=='*':
+					sdata=sbox.UIReadAll(fn[1:])
+				else
+					sdata=System.IO.ReadAll(fn)
 				if !sdata:continue
 				//Writeln('ED_ParserMore ',fn)
 				if sparser=="C":

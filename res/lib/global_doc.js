@@ -101,17 +101,17 @@ UI.LoadZipDocument=function(fname){
 	return doc
 }
 
-UI.OpenFile=function(fname){
-	fname=IO.NormalizeFileName(fname.replace(new RegExp("\\\\","g"),"/"));
-	var active_document=UI.m_the_document_area.active_tab
-	if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_brand_new){
-		UI.m_the_document_area.CloseTab();
-	}
-	//consult history for loader preference
-	var ext=UI.GetFileNameExtension(fname).toLowerCase()
-	var parser=(UI.m_ext_loaders[ext]||UI.m_ext_loaders["*"])
-	return parser(fname)
-}
+//UI.OpenFile=function(fname){
+//	fname=IO.NormalizeFileName(fname.replace(new RegExp("\\\\","g"),"/"));
+//	var active_document=UI.m_the_document_area.active_tab
+//	if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
+//		UI.m_the_document_area.CloseTab();
+//	}
+//	//consult history for loader preference
+//	var ext=UI.GetFileNameExtension(fname).toLowerCase()
+//	var parser=(UI.m_ext_loaders[ext]||UI.m_ext_loaders["*"])
+//	return parser(fname)
+//}
 
 //UI.RegisterLoaderForExtension("mo",function(fname){return UI.LoadZipDocument(fname)})
 
@@ -426,14 +426,14 @@ UI.SaveMetaData=function(){
 	IO.CreateFile(IO.GetStoragePath()+(UI.Platform.BUILD=="debug"?"/metadata_debug.json":"/metadata.json"),JSON.stringify(UI.m_ui_metadata))
 }
 
-UI.NewFromTemplate=function(fn_template,fn_real){
-	var ret=UI.OpenFile(IO.GetExecutablePath()+"/"+fn_template)
-	if(!ret){
-		throw new Error("invalid template "+fn_template)
-	}
-	ret.m_file_name=(fn_real||IO.GetNewDocumentName("doc","mo","document"));
-	return ret;
-}
+//UI.NewFromTemplate=function(fn_template,fn_real){
+//	var ret=UI.OpenFile(IO.GetExecutablePath()+"/"+fn_template)
+//	if(!ret){
+//		throw new Error("invalid template "+fn_template)
+//	}
+//	ret.m_file_name=(fn_real||IO.GetNewDocumentName("doc","mo","document"));
+//	return ret;
+//}
 
 ////////////////////////////////////
 UI.SaveWorkspace=function(){
@@ -441,7 +441,7 @@ UI.SaveWorkspace=function(){
 	var workspace=[]
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var wnd=UI.g_all_document_windows[i]
-		if(wnd.main_widget&&wnd.main_widget.m_is_brand_new){continue;}
+		if(wnd.main_widget&&wnd.main_widget.m_is_special_document){continue;}
 		if((wnd.main_widget&&wnd.main_widget.file_name||wnd.file_name).indexOf('<')>=0){continue;}
 		workspace.push(wnd.file_name)
 	}

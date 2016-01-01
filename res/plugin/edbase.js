@@ -629,7 +629,7 @@ UI.RegisterEditorPlugin(function(){
 			compiler.make(doc,1)
 		}})
 	})
-}).prototype.name="Compilation";
+}).prototype.desc={category:"Tools",name:"Build and run",stable_name:"build_and_run"};
 
 IO.AsyncShell=function(cmdline){
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
@@ -872,7 +872,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 0;
 	})
-}).prototype.name="Error overlays";
+}).prototype.desc={category:"Tools",name:"Error overlays",stable_name:"error_overlay"};
 
 UI.ClearCompilerErrors=function(){
 	//keep the locators for seeking but remove the highlights
@@ -1072,737 +1072,7 @@ UI.RegisterEditorPlugin(function(){
 		this.OnTextInput({"text":"\n"+this.ed.GetText(ccnt_lhome,ccnt_ehome-ccnt_lhome),"is_paste":1})
 		return 0;
 	})
-}).prototype.name="New-line indentation";
-
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)&&UI.SDL_HasClipboardText()){
-			var sel=this.GetSelection();
-			var menu_edit=UI.BigMenu("&Edit")
-			var menu_edit_children=menu_edit.$
-			var bk_children=menu_edit_children.slice(menu_edit.p_paste,menu_edit_children.length);
-			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste);
-			menu_edit_children=undefined;
-			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"SHIFT+CTRL+V",action:function(){
-				var sel=this.GetSelection();
-				var ed=this.ed;
-				/*
-				indent handling
-				line head: nothing/less (tell from the last line), good
-					if it's nothing / less, compensate to the correct ind first: move last line to first
-				match minimal indent with current line
-					ignore paste location as long as it's inside the indent
-				*/
-				var ccnt_corrected=ed.MoveToBoundary(sel[1],1,"space");
-				if(sel[1]>sel[0]&&ed.MoveToBoundary(sel[0],-1,"space")<sel[0]){
-					//line overwrite mode, use sel[0]
-					ccnt_corrected=sel[0];
-				}else if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]==10){
-					var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
-					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_corrected){
-						//empty line: simply paste before this line, do nothing
-					}else{
-						//paste to the next line if called on at eoln
-						ccnt_corrected++;
-						ccnt_corrected=ed.MoveToBoundary(ccnt_corrected,1,"space")
-					}
-				}else{
-					ccnt_corrected=sel[0];
-				}
-				var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
-				var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
-				var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
-				var ccnt_new=ccnt_lh;
-				if(ccnt_corrected<=sel[0]){
-					this.HookedEdit([ccnt_corrected,0,sinsert,sel[0],sel[1]-sel[0],undefined])
-				}else{
-					this.HookedEdit([sel[0],sel[1]-sel[0],undefined,ccnt_corrected,0,sinsert])
-					ccnt_new-=(sel[1]-sel[0])
-				}
-				this.CallOnChange()
-				ccnt_new=ed.MoveToBoundary(ccnt_new+Duktape.__byte_length(sinsert),1,"space")
-				this.SetCaretTo(ccnt_new)
-				UI.Refresh()
-			}.bind(this)})
-			menu_edit.$=menu_edit.$.concat(bk_children)
-			menu_edit=undefined;
-		}
-	})
-}).prototype.name="Smart paste";
-
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.owner||!this.plugin_language_desc.spell_checker){return;}
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var sel=this.GetSelection();
-			var menu_edit=UI.BigMenu("&Edit")
-			menu_edit.AddNormalItem({
-					text:"Check &spelling",
-					icon:(this.m_spell_checker&&this.m_spell_checker!="none")?"■":"□",
-					action:function(){
-				this.m_spell_checker=(this.m_spell_checker&&this.m_spell_checker!="none"?"none":this.plugin_language_desc.spell_checker)
-				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-				renderer.ResetSpellChecker(this)
-				UI.Refresh()
-			}.bind(this)})
-			menu_edit=undefined;
-		}
-	})
-}).prototype.name="Spell check";
-
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.owner){return;}
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var sel=this.GetSelection();
-			var menu_edit=UI.BigMenu("&Edit")
-			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({
-					text:"Auto &wrap",
-					icon:this.owner.m_enable_wrapping?"■":"□",
-					enable_hotkey:1,key:"SHIFT+CTRL+W",
-					action:function(){
-				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
-				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-				var ed_caret_original=this.GetCaretXY();
-				var scroll_y_original=this.scroll_y;
-				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0,this)
-				this.caret_is_wrapped=0
-				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
-				var ed_caret_new=this.GetCaretXY();
-				this.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
-				this.AutoScroll("show")
-				this.scrolling_animation=undefined
-				UI.Refresh()
-			}.bind(this)})
-			menu_edit=undefined;
-		}
-	})
-	//this.AddEventHandler('load',function(){
-	//	var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-	//	//print(this.owner.file_name,this.owner.m_enable_wrapping)
-	//	renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
-	//	this.ed.InvalidateStates([0,this.ed.GetTextSize()])
-	//})
-}).prototype.name="Wrapping";
-
-//cut line / delete word
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var sel=this.GetSelection();
-			var menu_edit=UI.BigMenu("&Edit")
-			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({icon:"切",text:"Cut &line",enable_hotkey:1,key:"CTRL+L",action:function(){
-				var ed=this.ed;
-				var sel=this.GetSelection();
-				sel[0]=this.SeekLC(this.GetLC(sel[0])[0],0)
-				sel[1]=this.SeekLC(this.GetLC(sel[1])[0]+1,0)
-				if(sel[0]<sel[1]){
-					this.sel0.ccnt=sel[0]
-					this.sel1.ccnt=sel[1]
-					this.Cut()
-					return 0
-				}else{
-					return 1
-				}
-			}.bind(this)})
-			menu_edit.AddNormalItem({text:"Delete word",enable_hotkey:1,key:"CTRL+T",action:function(){
-				var ed=this.ed;
-				var sel=this.GetSelection();
-				sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
-				sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
-				if(sel[0]<sel[1]){
-					this.HookedEdit([sel[0],sel[1]-sel[0],undefined])
-					this.CallOnChange()
-					this.SetCaretTo(sel[0])
-					return 0
-				}else{
-					return 1
-				}
-			}.bind(this)})
-			menu_edit=undefined;
-		}
-	})
-}).prototype.name="Line / word deletion";
-
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
-	var fcomment=function(){
-		var lang=this.plugin_language_desc
-		var ed=this.ed;
-		var sel=this.GetSelection();
-		var line0=this.GetLC(sel[0])[0];
-		var line1=this.GetLC(sel[1])[0];
-		if((line0==line1&&sel[0]<sel[1]||!lang.line_comment)&&lang.paired_comment){
-			var s0=lang.paired_comment[0]
-			var s1=lang.paired_comment[1]
-			var lg0=Duktape.__byte_length(s0)
-			var lg1=Duktape.__byte_length(s1)
-			if(ed.GetText(sel[0],lg0)==s0&&ed.GetText(sel[1]-lg1,lg1)==s1){
-				this.HookedEdit([sel[0],lg0,undefined,sel[1]-lg1,lg1,undefined])
-				this.CallOnChange()
-				this.SetSelection(sel[0],sel[1]-lg0-lg1)
-			}else{
-				this.HookedEdit([sel[0],0,s0,sel[1],0,s1])
-				this.CallOnChange()
-				this.SetSelection(sel[0],sel[1]+lg0+lg1)
-			}
-			UI.Refresh();
-			return 0;
-		}
-		if(!lang.line_comment){
-			return 1
-		}
-		if(this.SeekLC(line1,0)<sel[1]){line1++;}
-		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
-		var ops=[];
-		var is_decomment=1
-		var s0=lang.line_comment
-		var lg0=Duktape.__byte_length(s0)
-		var min_n_spaces=undefined;
-		for(var i=0;i<line_ccnts.length-1;i++){
-			var ccnt0=line_ccnts[i];
-			var ccnt_eh=ed.MoveToBoundary(ccnt0,1,"space")
-			if(min_n_spaces==undefined||min_n_spaces>(ccnt_eh-ccnt0)){
-				min_n_spaces=ccnt_eh-ccnt0;
-			}
-			ccnt_eh=Math.min(ccnt_eh,ccnt0+min_n_spaces);
-			line_ccnts[i]=ccnt_eh
-			if(is_decomment&&ed.GetText(ccnt_eh,lg0)!=s0){
-				is_decomment=0
-			}
-		}
-		for(var i=0;i<line_ccnts.length-1;i++){
-			var ccnt0=line_ccnts[i];
-			if(is_decomment){
-				ops.push(ccnt0,lg0,undefined)
-			}else{
-				ops.push(ccnt0,0,s0)
-			}
-		}
-		if(ops.length){
-			this.HookedEdit(ops)
-			this.CallOnChange()
-			UI.Refresh();
-			return 0;
-		}else{
-			return 1;
-		}
-		return 1
-	}
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var sel=this.GetSelection();
-			var menu_edit=UI.BigMenu("&Edit")
-			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({icon:"释",text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:fcomment.bind(this)})
-			menu_edit=undefined;
-		}
-	})
-}).prototype.name="Comment / uncomment";
-
-UI.RegisterEditorPlugin(function(){
-	//tab indent, shift+tab dedent
-	if(!this.tab_is_char){return;}
-	var indentText=function(delta){
-		var ed=this.ed;
-		var sel=this.GetSelection();
-		if(sel[0]==sel[1]){return 1;}
-		var line0=this.GetLC(sel[0])[0];
-		var line1=this.GetLC(sel[1])[0];
-		if(this.SeekLC(line1,0)<sel[1]){line1++;}
-		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
-		var ops=[];
-		for(var i=0;i<line_ccnts.length-1;i++){
-			var ccnt0=line_ccnts[i];
-			var ccnt1=line_ccnts[i+1];
-			if(delta>0){
-				ops.push(ccnt0,0,'\t')
-			}else{
-				if(ccnt0<ccnt1){
-					var ch=ed.GetUtf8CharNeighborhood(ccnt0)[1];
-					if(ch==32||ch==9){
-						ops.push(ccnt0,1,null)
-					}
-				}
-			}
-		}
-		if(ops.length){
-			this.HookedEdit(ops)
-			this.CallOnChange()
-			UI.Refresh();
-			return 0;
-		}else{
-			return 1;
-		}
-	}
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var sel=this.GetSelection();
-			if(sel[0]<sel[1]){
-				var menu_edit=UI.BigMenu("&Edit")
-				var obj=this
-				menu_edit.AddSeparator()
-				menu_edit.AddNormalItem({text:"&Indent selection",enable_hotkey:0,key:"TAB",action:function(){
-					return indentText.call(obj,1)
-				}})
-				menu_edit.AddNormalItem({text:"&Dedent selection",enable_hotkey:0,key:"SHIFT+TAB",action:function(){
-					return indentText.call(obj,-1)
-				}})
-				this.AddTransientHotkey('TAB',function(){
-					return indentText.call(this,1)
-				})
-				this.AddTransientHotkey('SHIFT+TAB',function(){
-					return indentText.call(this,-1)
-				})
-				menu_edit=undefined;
-			}
-		}
-	})
-}).prototype.name="Tab indent/dedent"
-
-UI.RegisterEditorPlugin(function(){
-	//alt+pgup/pgdn
-	if(this.plugin_class!="code_editor"){return;}
-	this.m_outer_scope_queue=[]
-	var fouter_scope=function(){
-		var ed=this.ed;
-		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
-		if(ccnt_new>=0){
-			this.m_outer_scope_queue.push(this.sel1.ccnt)
-			this.m_outer_scope_queue_just_pushed=ccnt_new
-			this.SetCaretTo(ccnt_new)
-			return 0;
-		}
-		return 1;
-	}
-	var finner_scope=function(){
-		if(this.m_outer_scope_queue.length){
-			var ccnt_new=this.m_outer_scope_queue.pop()
-			this.m_outer_scope_queue_just_pushed=ccnt_new
-			this.SetCaretTo(ccnt_new)
-			return 0;
-		}
-	}
-	this.AddEventHandler('ALT+PGUP',fouter_scope)
-	this.AddEventHandler('ALT+PGDN',finner_scope)
-	this.AddEventHandler('selectionChange',function(){
-		if(this.sel0.ccnt==this.m_outer_scope_queue_just_pushed&&
-		this.sel1.ccnt==this.m_outer_scope_queue_just_pushed){
-			return;
-		}
-		this.m_outer_scope_queue=[];
-		this.m_outer_scope_queue_just_pushed=undefined
-	})
-	this.AddEventHandler('change',function(){this.m_outer_scope_queue=[];})
-	//alt+up/down
-	var fscopeup=function(){
-		var ed=this.ed;
-		var id_indent=ed.m_handler_registration["seeker_indentation"]
-		var my_level=this.GetIndentLevel(this.sel1.ccnt);
-		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",Math.max(this.sel1.ccnt-1-this.GetLC(this.sel1.ccnt)[1],0),-1);
-		if(ccnt_new>=0){
-			this.SetCaretTo(ccnt_new)
-			return 0;
-		}
-		return 1
-	}
-	var fscopedown=function(){
-		var ed=this.ed;
-		var id_indent=ed.m_handler_registration["seeker_indentation"]
-		var my_level=this.GetIndentLevel(this.sel1.ccnt);
-		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",this.SeekLC(this.GetLC(this.sel1.ccnt)[0]+1),1);
-		if(ccnt_new>=0){
-			this.SetCaretTo(ccnt_new)
-			return 0;
-		}
-		return 1
-	}
-	this.AddEventHandler('ALT+UP',fscopeup)
-	this.AddEventHandler('ALT+DOWN',fscopedown)
-	/////////////////////////
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var menu_search=UI.BigMenu("&Search")
-			var doc=this;
-			menu_search.AddSeparator();
-			menu_search.AddButtonRow({text:"Scope"},[
-				{text:"scope_outer",icon:"外",tooltip:'Outer - ALT+PGUP',action:function(){
-					fouter_scope.call(doc)
-				}},{text:"scope_inner",icon:"内",tooltip:'Inner - ALT+PGDN',action:function(){
-					finner_scope.call(doc)
-				}}])
-			menu_search.AddButtonRow({text:"Lines of the same indentation"},[
-				{text:"indent_up",icon:"上",tooltip:'Prev - ALT+UP',action:function(){
-					fscopeup.call(doc)
-				}},{text:"indent_down",icon:"下",tooltip:'Next - ALT+DOWN',action:function(){
-					fscopedown.call(doc)
-				}}])
-		}
-	})
-}).prototype.name="Scope-related cursor movement";
-
-//control up/down
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class=="widget"){return;}
-	//ctrl+up/down
-	this.AddEventHandler('CTRL+UP',function(){
-		this.scroll_y-=this.GetCharacterHeightAtCaret();
-		if(!(this.scroll_y>0)){
-			this.scroll_y=0;
-		}
-		var ed_caret=this.GetCaretXY();
-		if(ed_caret.y>this.scroll_y+this.h){
-			var bk=this.x_updown;
-			this.MoveCursorToXY(this.x_updown,ed_caret.y-1.0);
-			this.sel0.ccnt=this.sel1.ccnt
-			this.x_updown=bk;
-		}
-		UI.Refresh();
-		return 0
-	})
-	this.AddEventHandler('CTRL+DOWN',function(){
-		var ed=this.ed
-		var ccnt_tot=ed.GetTextSize();
-		var ytot=ed.XYFromCcnt(ccnt_tot).y+ed.GetCharacterHeightAt(ccnt_tot);
-		var hc=this.GetCharacterHeightAtCaret();
-		var page_height=this.h;
-		this.scroll_y=Math.min(this.scroll_y+hc,ytot-page_height);
-		if(!(this.scroll_y>0)){
-			this.scroll_y=0;
-		}
-		var ed_caret=this.GetCaretXY();
-		if(ed_caret.y<this.scroll_y+(this.h_top_hint||0)){
-			var bk=this.x_updown;
-			this.MoveCursorToXY(this.x_updown,ed_caret.y+hc);
-			this.sel0.ccnt=this.sel1.ccnt
-			this.x_updown=bk;
-		}
-		UI.Refresh();
-		return 0
-	})
-}).prototype.name="Keyboard scrolling";
-
-//bookmarking
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	//the numbered guys
-	for(var i=0;i<10;i++){
-		(function(i){
-			this.AddEventHandler('SHIFT+CTRL+'+i.toString(),function(){
-				var ed=this.ed;
-				var ccnt=this.sel1.ccnt;
-				if(!this.m_bookmarks[i]){
-					this.m_bookmarks[i]=ed.CreateLocator(ccnt,-1)
-				}else{
-					if(this.m_bookmarks[i].ccnt==ccnt){
-						this.m_bookmarks[i].discard();
-						this.m_bookmarks[i]=undefined;
-					}else{
-						this.m_bookmarks[i].ccnt=ccnt
-					}
-				}
-				UI.Refresh()
-				return 0;
-			});
-			this.AddEventHandler('CTRL+'+i.toString(),function(){
-				var ed=this.ed;
-				var ccnt=this.sel1.ccnt;
-				if(this.m_bookmarks[i]){
-					//this.SetCaretTo(this.m_bookmarks[i].ccnt)
-					var ccnt_bm=this.m_bookmarks[i].ccnt
-					UI.SetSelectionEx(this,ccnt_bm,ccnt_bm,"bookmark")
-					this.AutoScroll("center")
-					return 0
-				}
-				return 1;
-			});
-		}).call(this,i)
-	}
-	//the unmarked guys
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var menu_search=UI.BigMenu("&Search")
-			var doc=this;
-			//don't put anything up for the numbered guys
-			menu_search.AddSeparator();
-			menu_search.AddNormalItem({text:"Set &bookmark",icon:"签",enable_hotkey:1,key:'SHIFT+CTRL+Q',action:function(){
-				var ed=this.ed;
-				var ccnt=this.sel1.ccnt;
-				var bm0=this.FindNearestBookmark(ccnt,1)
-				if(bm0&&bm0.ccnt==ccnt){
-					this.DeleteBookmark(bm0)
-				}else{
-					this.m_unkeyed_bookmarks.push(ed.CreateLocator(ccnt,-1))
-				}
-				UI.Refresh()
-				return 0;
-			}.bind(this)})
-		}
-	});
-	this.ToggleBookmarkOnLine=function(line){
-		var line_ccnts=this.SeekAllLinesBetween(line,line+2,"valid_only");
-		if(line_ccnts[0]<line_ccnts[1]){
-			//detect
-			var ccnt0=line_ccnts[0];
-			var ccnt1=line_ccnts[1];
-			if(ccnt1==this.ed.GetTextSize()){
-				ccnt1++;
-			}
-			var did=0;
-			for(var i=0;i<this.m_bookmarks.length;i++){
-				if(this.m_bookmarks[i]&&this.m_bookmarks[i].ccnt>=ccnt0&&this.m_bookmarks[i].ccnt<ccnt1){
-					this.m_bookmarks[i].discard();
-					this.m_bookmarks[i]=undefined;
-					did=1;
-				}
-			}
-			var bm_new=[];
-			for(var i=0;i<this.m_unkeyed_bookmarks.length;i++){
-				var bm_i=this.m_unkeyed_bookmarks[i];
-				if(bm_i&&bm_i.ccnt>=ccnt0&&bm_i.ccnt<ccnt1){
-					bm_i.discard();
-					bm_i=undefined;
-					did=1;
-				}else{
-					bm_new.push(bm_i);
-				}
-			}
-			if(did){
-				this.m_unkeyed_bookmarks=bm_new;
-				UI.Refresh();
-				return;
-			}
-		}
-		this.m_unkeyed_bookmarks.push(this.ed.CreateLocator(ccnt0,-1));
-		UI.Refresh();
-	}
-}).prototype.name="Bookmarks";
-
-//point of interest
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	var fnextbm=function(dir,is_sel){
-		var ccnt=this.sel1.ccnt;
-		var sz=this.ed.GetTextSize()
-		var ccnt_next=undefined;
-		var propose=UI.HackCallback(function(ccnt_cand){
-			if(dir>0){
-				if(ccnt<ccnt_cand&&(ccnt_next>ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
-			}else{
-				if(ccnt>ccnt_cand&&(ccnt_next<ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
-			}
-		});
-		//bookmark
-		var bm=(dir>0?this.FindNearestBookmark(ccnt+1,1):this.FindNearestBookmark(ccnt-1,-1))
-		if(bm){
-			propose(bm.ccnt);
-		}
-		//modification
-		if(this.m_diff_from_save){
-			//coulddo: round-to-line
-			var ccnt_starting=this.sel1.ccnt;
-			var ccnt_base_starting=this.m_diff_from_save.CurrentToBase(ccnt_starting)
-			var ccnt_both_starting=this.m_diff_from_save.CurrentToBoth(ccnt_starting)
-			//go to both
-			var l=0;
-			var r=(dir>0?sz-ccnt_starting:ccnt_starting);
-			while(l<=r){
-				var m=(l+r)>>1;
-				var ccnt_base_m=this.m_diff_from_save.CurrentToBase(ccnt_starting+dir*m)
-				var ccnt_both_m=this.m_diff_from_save.CurrentToBoth(ccnt_starting+dir*m)
-				if((ccnt_both_m-ccnt_both_starting)*dir>0){
-					r=m-1;
-				}else{
-					l=m+1;
-				}
-			}
-			if(r>0){
-				ccnt_starting+=r*dir;
-				var ccnt_base_starting=this.m_diff_from_save.CurrentToBase(ccnt_starting)
-				var ccnt_both_starting=this.m_diff_from_save.CurrentToBoth(ccnt_starting)
-			}
-			//go to edit
-			l=0;r=(dir>0?sz-ccnt_starting:ccnt_starting);
-			while(l<=r){
-				var m=(l+r)>>1;
-				var ccnt_base_m=this.m_diff_from_save.CurrentToBase(ccnt_starting+dir*m)
-				var ccnt_both_m=this.m_diff_from_save.CurrentToBoth(ccnt_starting+dir*m)
-				if(ccnt_both_m-ccnt_both_starting==dir*m&&ccnt_base_m-ccnt_base_starting==dir*m){
-					l=m+1;
-				}else{
-					r=m-1;
-				}
-			}
-			if(r>0){
-				ccnt_starting+=r*dir;
-				if(ccnt_starting!=0&&ccnt_starting!=sz){
-					propose(ccnt_starting);
-				}
-			}
-		}
-		//build error
-		if(this.m_error_overlays){
-			for(var i=0;i<this.m_error_overlays.length;i++){
-				var err=this.m_error_overlays[i];
-				var ccnt_err0=err.ccnt0.ccnt;
-				var ccnt_err1=err.ccnt1.ccnt;
-				if(ccnt_err0<=ccnt&&ccnt<=ccnt_err1){continue;}
-				propose(ccnt_err0);
-			}
-		}
-		//spell error
-		//there are too many of them, not worth it
-		//actually go there
-		if(ccnt_next==undefined){return 1;}
-		if(is_sel){
-			this.SetSelection(ccnt,ccnt_next)
-		}else{
-			UI.SetSelectionEx(this,ccnt_next,ccnt_next,"poi")
-		}
-		return 0;
-	}
-	this.AddEventHandler('SHIFT+F2',function(){fnextbm.call(this,-1)})
-	this.AddEventHandler('F2',function(){fnextbm.call(this,1)})
-	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)){
-			var menu_search=UI.BigMenu("&Search")
-			var doc=this;
-			menu_search.AddSeparator();
-			menu_search.AddButtonRow({text:"Go to point of interest"},[
-				{text:"bookmark_up",icon:"上",tooltip:'Prev - SHIFT+F2',action:function(){
-					fnextbm.call(doc,-1)
-				}},{text:"bookmark_down",icon:"下",tooltip:'Next - F2',action:function(){
-					//text:"&select to"
-					fnextbm.call(doc,1)
-				}}])
-			menu_search.AddButtonRow({text:"Select to point of interest"},[
-				{text:"bookmark_sel_up",icon:"上",tooltip:'Prev',action:function(){
-					fnextbm.call(doc,-1,1)
-				}},{text:"bookmark_sel_down",icon:"下",tooltip:'Next',action:function(){
-					//text:"&select to"
-					fnextbm.call(doc,1,1)
-				}}])
-		}
-	})
-}).prototype.name="Point of interest";
-
-////////////////////////////////////
-//C-like
-var MatchingBracket=function(c){
-	if(c=='('){return ')';}
-	if(c=='['){return ']';}
-	if(c=='{'){return '}';}
-	if(c=='<'){return '>';}
-	if(c==')'){return '(';}
-	if(c==']'){return '[';}
-	if(c=='}'){return '{';}
-	if(c=='>'){return '<';}
-	return c
-}
-
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	if(!this.plugin_language_desc||this.plugin_language_desc.name=="Plain text"){return;}
-	//bracket auto-matching with bold bracket highlighting
-	this.AddEventHandler('editorCreate',function(){
-		var hl_items=this.CreateTransientHighlight({
-			'depth':1,
-			'color':this.color,
-			'display_mode':UI.HL_DISPLAY_MODE_EMBOLDEN,
-			'invertible':0,
-		});
-		this.m_lbracket_p0=hl_items[0]
-		this.m_lbracket_p1=hl_items[1]
-		this.m_lbracket_hl=hl_items[2]
-		hl_items=this.CreateTransientHighlight({
-			'depth':1,
-			'color':this.color,
-			'display_mode':UI.HL_DISPLAY_MODE_EMBOLDEN,
-			'invertible':0,
-		});
-		this.m_rbracket_p0=hl_items[0]
-		this.m_rbracket_p1=hl_items[1]
-		this.m_rbracket_hl=hl_items[2]
-	})
-	var HighlightBrackets=function(doc,ccnt0,ccnt1){
-		var sz0=doc.BracketSizeAt(ccnt0,0),sz1=doc.BracketSizeAt(ccnt1,1)
-		doc.m_lbracket_p0.ccnt=ccnt0+1-sz0
-		doc.m_lbracket_p1.ccnt=ccnt0+1
-		doc.m_rbracket_p0.ccnt=ccnt1+1-sz1
-		doc.m_rbracket_p1.ccnt=ccnt1+1
-		UI.Refresh()
-	}
-	var fcheckbrackets=function(){
-		var ccnt=this.sel1.ccnt
-		var lang=this.plugin_language_desc
-		var ccnt_right=this.FindOuterBracket(ccnt,1)
-		if(ccnt_right>=0){
-			var ccnt_left=this.FindOuterBracket(ccnt,-1)
-			if(ccnt_left>=0){
-				HighlightBrackets(this,ccnt_left,ccnt_right-1)
-				return
-			}
-		}
-		this.m_lbracket_p0.ccnt=0
-		this.m_lbracket_p1.ccnt=0
-		this.m_rbracket_p0.ccnt=0
-		this.m_rbracket_p1.ccnt=0
-		//sth like IsBracketEnabled, m_lbracket_tokens, m_rbracket_tokens
-		//return ed.GetStateAt(ed.m_handler_registration["colorer"],ccnt,"lll")[1];
-	}
-	this.AddEventHandler('selectionChange',fcheckbrackets)
-	this.AddEventHandler('change',fcheckbrackets)
-	var goto_matching_bracket=function(is_sel){
-		var ccnt=this.sel1.ccnt
-		if(!(this.m_lbracket_p0.ccnt<this.m_lbracket_p1.ccnt)){
-			//coulddo: notification
-			return;
-		}
-		var ccnt_new;
-		if(ccnt==this.m_lbracket_p0.ccnt||ccnt==this.m_lbracket_p1.ccnt){
-			ccnt_new=this.m_rbracket_p0.ccnt;
-		}else if(ccnt==this.m_rbracket_p0.ccnt||ccnt==this.m_rbracket_p1.ccnt){
-			ccnt_new=this.m_lbracket_p1.ccnt;
-		}else{
-			//UI.assert(0,"panic: bracket highlighting enabled but cursor is not at a bracket?")
-			ccnt_new=this.m_lbracket_p1.ccnt;
-			//ccnt=this.m_rbracket_p1.ccnt;
-			//return;
-		}
-		if(is_sel){
-			this.SetSelection(ccnt,ccnt_new)
-		}else{
-			UI.SetSelectionEx(this,ccnt_new,ccnt_new,"parenthesis")
-		}
-		this.CallOnSelectionChange();
-	}
-	this.AddEventHandler('menu',function(){
-		var enabled=(this.m_lbracket_p0.ccnt<this.m_lbracket_p1.ccnt)
-		if(UI.HasFocus(this)&&enabled){
-			var menu_search=UI.BigMenu("&Search")
-			var doc=this;
-			var ccnt=this.sel1.ccnt
-			var sicon="｛";
-			if(ccnt==this.m_lbracket_p0.ccnt||ccnt==this.m_lbracket_p1.ccnt){
-				sicon="｝";
-			}
-			menu_search.AddSeparator();
-			menu_search.AddButtonRow({icon:"プ",text:"Parenthesis"},[
-				{text:"parenthesis_match",icon:sicon,tooltip:'Go to matching - CTRL+P',action:function(){
-					goto_matching_bracket.call(doc,0)
-				}},{text:"parenthesis_sel",icon:"选",tooltip:'Select between - SHIFT+CTRL+P',action:function(){
-					//text:"&select to"
-					goto_matching_bracket.call(doc,1);
-				}}])
-		}
-	})
-	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,0)})
-	this.AddEventHandler('SHIFT+CTRL+P',function(){goto_matching_bracket.call(this,1)})
-}).prototype.name="Parenthesis matching";
+}).prototype.desc={category:"Editing",name:"Auto-indent",stable_name:"auto_indent"};
 
 var CountSpacesAfter=function(ed,ccnt){
 	return ed.MoveToBoundary(ccnt,1,"space")-ccnt;
@@ -2003,7 +1273,737 @@ UI.RegisterEditorPlugin(function(){
 		var C=listening_keys[i];
 		this.AddEventHandler(C,f_key_test.bind(this,C))
 	}
-}).prototype.name="Auto-indent";
+}).prototype.desc={category:"Editing",name:"Advanced auto-indent",stable_name:"adv_auto_indent"};
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)&&UI.SDL_HasClipboardText()){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			var menu_edit_children=menu_edit.$
+			var bk_children=menu_edit_children.slice(menu_edit.p_paste,menu_edit_children.length);
+			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste);
+			menu_edit_children=undefined;
+			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"SHIFT+CTRL+V",action:function(){
+				var sel=this.GetSelection();
+				var ed=this.ed;
+				/*
+				indent handling
+				line head: nothing/less (tell from the last line), good
+					if it's nothing / less, compensate to the correct ind first: move last line to first
+				match minimal indent with current line
+					ignore paste location as long as it's inside the indent
+				*/
+				var ccnt_corrected=ed.MoveToBoundary(sel[1],1,"space");
+				if(sel[1]>sel[0]&&ed.MoveToBoundary(sel[0],-1,"space")<sel[0]){
+					//line overwrite mode, use sel[0]
+					ccnt_corrected=sel[0];
+				}else if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]==10){
+					var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
+					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_corrected){
+						//empty line: simply paste before this line, do nothing
+					}else{
+						//paste to the next line if called on at eoln
+						ccnt_corrected++;
+						ccnt_corrected=ed.MoveToBoundary(ccnt_corrected,1,"space")
+					}
+				}else{
+					ccnt_corrected=sel[0];
+				}
+				var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
+				var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
+				var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
+				var ccnt_new=ccnt_lh;
+				if(ccnt_corrected<=sel[0]){
+					this.HookedEdit([ccnt_corrected,0,sinsert,sel[0],sel[1]-sel[0],undefined])
+				}else{
+					this.HookedEdit([sel[0],sel[1]-sel[0],undefined,ccnt_corrected,0,sinsert])
+					ccnt_new-=(sel[1]-sel[0])
+				}
+				this.CallOnChange()
+				ccnt_new=ed.MoveToBoundary(ccnt_new+Duktape.__byte_length(sinsert),1,"space")
+				this.SetCaretTo(ccnt_new)
+				UI.Refresh()
+			}.bind(this)})
+			menu_edit.$=menu_edit.$.concat(bk_children)
+			menu_edit=undefined;
+		}
+	})
+})//.prototype.desc={category:"Editing",name:"Smart paste",stable_name:"smart_paste"};
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.owner||!this.plugin_language_desc.spell_checker){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddNormalItem({
+					text:"Check &spelling",
+					icon:(this.m_spell_checker&&this.m_spell_checker!="none")?"■":"□",
+					action:function(){
+				this.m_spell_checker=(this.m_spell_checker&&this.m_spell_checker!="none"?"none":this.plugin_language_desc.spell_checker)
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				renderer.ResetSpellChecker(this)
+				UI.Refresh()
+			}.bind(this)})
+			menu_edit=undefined;
+		}
+	})
+});//.prototype.desc={category:"Display",name:"Enable spell checks"};
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.owner){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddSeparator()
+			menu_edit.AddNormalItem({
+					text:"Auto &wrap",
+					icon:this.owner.m_enable_wrapping?"■":"□",
+					enable_hotkey:1,key:"SHIFT+CTRL+W",
+					action:function(){
+				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				var ed_caret_original=this.GetCaretXY();
+				var scroll_y_original=this.scroll_y;
+				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0,this)
+				this.caret_is_wrapped=0
+				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+				var ed_caret_new=this.GetCaretXY();
+				this.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
+				this.AutoScroll("show")
+				this.scrolling_animation=undefined
+				UI.Refresh()
+			}.bind(this)})
+			menu_edit=undefined;
+		}
+	})
+	//this.AddEventHandler('load',function(){
+	//	var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+	//	//print(this.owner.file_name,this.owner.m_enable_wrapping)
+	//	renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
+	//	this.ed.InvalidateStates([0,this.ed.GetTextSize()])
+	//})
+});//.prototype.desc={category:"Display",name:"Enable auto wrap"};
+
+//cut line / delete word
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddSeparator()
+			menu_edit.AddNormalItem({icon:"切",text:"Cut &line",enable_hotkey:1,key:"CTRL+L",action:function(){
+				var ed=this.ed;
+				var sel=this.GetSelection();
+				sel[0]=this.SeekLC(this.GetLC(sel[0])[0],0)
+				sel[1]=this.SeekLC(this.GetLC(sel[1])[0]+1,0)
+				if(sel[0]<sel[1]){
+					this.sel0.ccnt=sel[0]
+					this.sel1.ccnt=sel[1]
+					this.Cut()
+					return 0
+				}else{
+					return 1
+				}
+			}.bind(this)})
+			menu_edit.AddNormalItem({text:"Delete word",enable_hotkey:1,key:"CTRL+T",action:function(){
+				var ed=this.ed;
+				var sel=this.GetSelection();
+				sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
+				sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
+				if(sel[0]<sel[1]){
+					this.HookedEdit([sel[0],sel[1]-sel[0],undefined])
+					this.CallOnChange()
+					this.SetCaretTo(sel[0])
+					return 0
+				}else{
+					return 1
+				}
+			}.bind(this)})
+			menu_edit=undefined;
+		}
+	})
+})//.prototype.desc={category:"Editing",name:"Line / word deletion",stable_name:"line_word_del"};
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	var fcomment=function(){
+		var lang=this.plugin_language_desc
+		var ed=this.ed;
+		var sel=this.GetSelection();
+		var line0=this.GetLC(sel[0])[0];
+		var line1=this.GetLC(sel[1])[0];
+		if((line0==line1&&sel[0]<sel[1]||!lang.line_comment)&&lang.paired_comment){
+			var s0=lang.paired_comment[0]
+			var s1=lang.paired_comment[1]
+			var lg0=Duktape.__byte_length(s0)
+			var lg1=Duktape.__byte_length(s1)
+			if(ed.GetText(sel[0],lg0)==s0&&ed.GetText(sel[1]-lg1,lg1)==s1){
+				this.HookedEdit([sel[0],lg0,undefined,sel[1]-lg1,lg1,undefined])
+				this.CallOnChange()
+				this.SetSelection(sel[0],sel[1]-lg0-lg1)
+			}else{
+				this.HookedEdit([sel[0],0,s0,sel[1],0,s1])
+				this.CallOnChange()
+				this.SetSelection(sel[0],sel[1]+lg0+lg1)
+			}
+			UI.Refresh();
+			return 0;
+		}
+		if(!lang.line_comment){
+			return 1
+		}
+		if(this.SeekLC(line1,0)<sel[1]){line1++;}
+		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
+		var ops=[];
+		var is_decomment=1
+		var s0=lang.line_comment
+		var lg0=Duktape.__byte_length(s0)
+		var min_n_spaces=undefined;
+		for(var i=0;i<line_ccnts.length-1;i++){
+			var ccnt0=line_ccnts[i];
+			var ccnt_eh=ed.MoveToBoundary(ccnt0,1,"space")
+			if(min_n_spaces==undefined||min_n_spaces>(ccnt_eh-ccnt0)){
+				min_n_spaces=ccnt_eh-ccnt0;
+			}
+			ccnt_eh=Math.min(ccnt_eh,ccnt0+min_n_spaces);
+			line_ccnts[i]=ccnt_eh
+			if(is_decomment&&ed.GetText(ccnt_eh,lg0)!=s0){
+				is_decomment=0
+			}
+		}
+		for(var i=0;i<line_ccnts.length-1;i++){
+			var ccnt0=line_ccnts[i];
+			if(is_decomment){
+				ops.push(ccnt0,lg0,undefined)
+			}else{
+				ops.push(ccnt0,0,s0)
+			}
+		}
+		if(ops.length){
+			this.HookedEdit(ops)
+			this.CallOnChange()
+			UI.Refresh();
+			return 0;
+		}else{
+			return 1;
+		}
+		return 1
+	}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			var menu_edit=UI.BigMenu("&Edit")
+			menu_edit.AddSeparator()
+			menu_edit.AddNormalItem({icon:"释",text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:fcomment.bind(this)})
+			menu_edit=undefined;
+		}
+	})
+})//.prototype.desc={category:"Editing",name:"Comment / uncomment",stable_name:"toggle_comment"};
+
+UI.RegisterEditorPlugin(function(){
+	//tab indent, shift+tab dedent
+	if(!this.tab_is_char){return;}
+	var indentText=function(delta){
+		var ed=this.ed;
+		var sel=this.GetSelection();
+		if(sel[0]==sel[1]){return 1;}
+		var line0=this.GetLC(sel[0])[0];
+		var line1=this.GetLC(sel[1])[0];
+		if(this.SeekLC(line1,0)<sel[1]){line1++;}
+		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
+		var ops=[];
+		for(var i=0;i<line_ccnts.length-1;i++){
+			var ccnt0=line_ccnts[i];
+			var ccnt1=line_ccnts[i+1];
+			if(delta>0){
+				ops.push(ccnt0,0,'\t')
+			}else{
+				if(ccnt0<ccnt1){
+					var ch=ed.GetUtf8CharNeighborhood(ccnt0)[1];
+					if(ch==32||ch==9){
+						ops.push(ccnt0,1,null)
+					}
+				}
+			}
+		}
+		if(ops.length){
+			this.HookedEdit(ops)
+			this.CallOnChange()
+			UI.Refresh();
+			return 0;
+		}else{
+			return 1;
+		}
+	}
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var sel=this.GetSelection();
+			if(sel[0]<sel[1]){
+				var menu_edit=UI.BigMenu("&Edit")
+				var obj=this
+				menu_edit.AddSeparator()
+				menu_edit.AddNormalItem({text:"&Indent selection",enable_hotkey:0,key:"TAB",action:function(){
+					return indentText.call(obj,1)
+				}})
+				menu_edit.AddNormalItem({text:"&Dedent selection",enable_hotkey:0,key:"SHIFT+TAB",action:function(){
+					return indentText.call(obj,-1)
+				}})
+				this.AddTransientHotkey('TAB',function(){
+					return indentText.call(this,1)
+				})
+				this.AddTransientHotkey('SHIFT+TAB',function(){
+					return indentText.call(this,-1)
+				})
+				menu_edit=undefined;
+			}
+		}
+	})
+}).prototype.desc={category:"Editing",name:"Tab indent / dedent",stable_name:"indent_dedent"};
+
+UI.RegisterEditorPlugin(function(){
+	//alt+pgup/pgdn
+	if(this.plugin_class!="code_editor"){return;}
+	this.m_outer_scope_queue=[]
+	var fouter_scope=function(){
+		var ed=this.ed;
+		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
+		if(ccnt_new>=0){
+			this.m_outer_scope_queue.push(this.sel1.ccnt)
+			this.m_outer_scope_queue_just_pushed=ccnt_new
+			this.SetCaretTo(ccnt_new)
+			return 0;
+		}
+		return 1;
+	}
+	var finner_scope=function(){
+		if(this.m_outer_scope_queue.length){
+			var ccnt_new=this.m_outer_scope_queue.pop()
+			this.m_outer_scope_queue_just_pushed=ccnt_new
+			this.SetCaretTo(ccnt_new)
+			return 0;
+		}
+	}
+	this.AddEventHandler('ALT+PGUP',fouter_scope)
+	this.AddEventHandler('ALT+PGDN',finner_scope)
+	this.AddEventHandler('selectionChange',function(){
+		if(this.sel0.ccnt==this.m_outer_scope_queue_just_pushed&&
+		this.sel1.ccnt==this.m_outer_scope_queue_just_pushed){
+			return;
+		}
+		this.m_outer_scope_queue=[];
+		this.m_outer_scope_queue_just_pushed=undefined
+	})
+	this.AddEventHandler('change',function(){this.m_outer_scope_queue=[];})
+	//alt+up/down
+	var fscopeup=function(){
+		var ed=this.ed;
+		var id_indent=ed.m_handler_registration["seeker_indentation"]
+		var my_level=this.GetIndentLevel(this.sel1.ccnt);
+		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",Math.max(this.sel1.ccnt-1-this.GetLC(this.sel1.ccnt)[1],0),-1);
+		if(ccnt_new>=0){
+			this.SetCaretTo(ccnt_new)
+			return 0;
+		}
+		return 1
+	}
+	var fscopedown=function(){
+		var ed=this.ed;
+		var id_indent=ed.m_handler_registration["seeker_indentation"]
+		var my_level=this.GetIndentLevel(this.sel1.ccnt);
+		var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",this.SeekLC(this.GetLC(this.sel1.ccnt)[0]+1),1);
+		if(ccnt_new>=0){
+			this.SetCaretTo(ccnt_new)
+			return 0;
+		}
+		return 1
+	}
+	this.AddEventHandler('ALT+UP',fscopeup)
+	this.AddEventHandler('ALT+DOWN',fscopedown)
+	/////////////////////////
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			menu_search.AddSeparator();
+			menu_search.AddButtonRow({text:"Scope"},[
+				{text:"scope_outer",icon:"外",tooltip:'Outer - ALT+PGUP',action:function(){
+					fouter_scope.call(doc)
+				}},{text:"scope_inner",icon:"内",tooltip:'Inner - ALT+PGDN',action:function(){
+					finner_scope.call(doc)
+				}}])
+			menu_search.AddButtonRow({text:"Lines of the same indentation"},[
+				{text:"indent_up",icon:"上",tooltip:'Prev - ALT+UP',action:function(){
+					fscopeup.call(doc)
+				}},{text:"indent_down",icon:"下",tooltip:'Next - ALT+DOWN',action:function(){
+					fscopedown.call(doc)
+				}}])
+		}
+	})
+})//.prototype.desc={category:"Controls",name:"Moving across scopes",stable_name:"scope_moving"};
+
+//control up/down
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class=="widget"){return;}
+	//ctrl+up/down
+	this.AddEventHandler('CTRL+UP',function(){
+		this.scroll_y-=this.GetCharacterHeightAtCaret();
+		if(!(this.scroll_y>0)){
+			this.scroll_y=0;
+		}
+		var ed_caret=this.GetCaretXY();
+		if(ed_caret.y>this.scroll_y+this.h){
+			var bk=this.x_updown;
+			this.MoveCursorToXY(this.x_updown,ed_caret.y-1.0);
+			this.sel0.ccnt=this.sel1.ccnt
+			this.x_updown=bk;
+		}
+		UI.Refresh();
+		return 0
+	})
+	this.AddEventHandler('CTRL+DOWN',function(){
+		var ed=this.ed
+		var ccnt_tot=ed.GetTextSize();
+		var ytot=ed.XYFromCcnt(ccnt_tot).y+ed.GetCharacterHeightAt(ccnt_tot);
+		var hc=this.GetCharacterHeightAtCaret();
+		var page_height=this.h;
+		this.scroll_y=Math.min(this.scroll_y+hc,ytot-page_height);
+		if(!(this.scroll_y>0)){
+			this.scroll_y=0;
+		}
+		var ed_caret=this.GetCaretXY();
+		if(ed_caret.y<this.scroll_y+(this.h_top_hint||0)){
+			var bk=this.x_updown;
+			this.MoveCursorToXY(this.x_updown,ed_caret.y+hc);
+			this.sel0.ccnt=this.sel1.ccnt
+			this.x_updown=bk;
+		}
+		UI.Refresh();
+		return 0
+	})
+})//.prototype.desc={category:"Controls",name:"Keyboard scrolling",stable_name:"keyboard_scroll"};
+
+//bookmarking
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	//the numbered guys
+	for(var i=0;i<10;i++){
+		(function(i){
+			this.AddEventHandler('SHIFT+CTRL+'+i.toString(),function(){
+				var ed=this.ed;
+				var ccnt=this.sel1.ccnt;
+				if(!this.m_bookmarks[i]){
+					this.m_bookmarks[i]=ed.CreateLocator(ccnt,-1)
+				}else{
+					if(this.m_bookmarks[i].ccnt==ccnt){
+						this.m_bookmarks[i].discard();
+						this.m_bookmarks[i]=undefined;
+					}else{
+						this.m_bookmarks[i].ccnt=ccnt
+					}
+				}
+				UI.Refresh()
+				return 0;
+			});
+			this.AddEventHandler('CTRL+'+i.toString(),function(){
+				var ed=this.ed;
+				var ccnt=this.sel1.ccnt;
+				if(this.m_bookmarks[i]){
+					//this.SetCaretTo(this.m_bookmarks[i].ccnt)
+					var ccnt_bm=this.m_bookmarks[i].ccnt
+					UI.SetSelectionEx(this,ccnt_bm,ccnt_bm,"bookmark")
+					this.AutoScroll("center")
+					return 0
+				}
+				return 1;
+			});
+		}).call(this,i)
+	}
+	//the unmarked guys
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			//don't put anything up for the numbered guys
+			menu_search.AddSeparator();
+			menu_search.AddNormalItem({text:"Set &bookmark",icon:"签",enable_hotkey:1,key:'SHIFT+CTRL+Q',action:function(){
+				var ed=this.ed;
+				var ccnt=this.sel1.ccnt;
+				var bm0=this.FindNearestBookmark(ccnt,1)
+				if(bm0&&bm0.ccnt==ccnt){
+					this.DeleteBookmark(bm0)
+				}else{
+					this.m_unkeyed_bookmarks.push(ed.CreateLocator(ccnt,-1))
+				}
+				UI.Refresh()
+				return 0;
+			}.bind(this)})
+		}
+	});
+	this.ToggleBookmarkOnLine=function(line){
+		var line_ccnts=this.SeekAllLinesBetween(line,line+2,"valid_only");
+		if(line_ccnts[0]<line_ccnts[1]){
+			//detect
+			var ccnt0=line_ccnts[0];
+			var ccnt1=line_ccnts[1];
+			if(ccnt1==this.ed.GetTextSize()){
+				ccnt1++;
+			}
+			var did=0;
+			for(var i=0;i<this.m_bookmarks.length;i++){
+				if(this.m_bookmarks[i]&&this.m_bookmarks[i].ccnt>=ccnt0&&this.m_bookmarks[i].ccnt<ccnt1){
+					this.m_bookmarks[i].discard();
+					this.m_bookmarks[i]=undefined;
+					did=1;
+				}
+			}
+			var bm_new=[];
+			for(var i=0;i<this.m_unkeyed_bookmarks.length;i++){
+				var bm_i=this.m_unkeyed_bookmarks[i];
+				if(bm_i&&bm_i.ccnt>=ccnt0&&bm_i.ccnt<ccnt1){
+					bm_i.discard();
+					bm_i=undefined;
+					did=1;
+				}else{
+					bm_new.push(bm_i);
+				}
+			}
+			if(did){
+				this.m_unkeyed_bookmarks=bm_new;
+				UI.Refresh();
+				return;
+			}
+		}
+		this.m_unkeyed_bookmarks.push(this.ed.CreateLocator(ccnt0,-1));
+		UI.Refresh();
+	}
+})//.prototype.desc={category:"Controls",name:"Bookmarks",stable_name:"bookmarks"};
+
+//point of interest
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	var fnextbm=function(dir,is_sel){
+		var ccnt=this.sel1.ccnt;
+		var sz=this.ed.GetTextSize()
+		var ccnt_next=undefined;
+		var propose=UI.HackCallback(function(ccnt_cand){
+			if(dir>0){
+				if(ccnt<ccnt_cand&&(ccnt_next>ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
+			}else{
+				if(ccnt>ccnt_cand&&(ccnt_next<ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
+			}
+		});
+		//bookmark
+		var bm=(dir>0?this.FindNearestBookmark(ccnt+1,1):this.FindNearestBookmark(ccnt-1,-1))
+		if(bm){
+			propose(bm.ccnt);
+		}
+		//modification
+		if(this.m_diff_from_save){
+			//coulddo: round-to-line
+			var ccnt_starting=this.sel1.ccnt;
+			var ccnt_base_starting=this.m_diff_from_save.CurrentToBase(ccnt_starting)
+			var ccnt_both_starting=this.m_diff_from_save.CurrentToBoth(ccnt_starting)
+			//go to both
+			var l=0;
+			var r=(dir>0?sz-ccnt_starting:ccnt_starting);
+			while(l<=r){
+				var m=(l+r)>>1;
+				var ccnt_base_m=this.m_diff_from_save.CurrentToBase(ccnt_starting+dir*m)
+				var ccnt_both_m=this.m_diff_from_save.CurrentToBoth(ccnt_starting+dir*m)
+				if((ccnt_both_m-ccnt_both_starting)*dir>0){
+					r=m-1;
+				}else{
+					l=m+1;
+				}
+			}
+			if(r>0){
+				ccnt_starting+=r*dir;
+				var ccnt_base_starting=this.m_diff_from_save.CurrentToBase(ccnt_starting)
+				var ccnt_both_starting=this.m_diff_from_save.CurrentToBoth(ccnt_starting)
+			}
+			//go to edit
+			l=0;r=(dir>0?sz-ccnt_starting:ccnt_starting);
+			while(l<=r){
+				var m=(l+r)>>1;
+				var ccnt_base_m=this.m_diff_from_save.CurrentToBase(ccnt_starting+dir*m)
+				var ccnt_both_m=this.m_diff_from_save.CurrentToBoth(ccnt_starting+dir*m)
+				if(ccnt_both_m-ccnt_both_starting==dir*m&&ccnt_base_m-ccnt_base_starting==dir*m){
+					l=m+1;
+				}else{
+					r=m-1;
+				}
+			}
+			if(r>0){
+				ccnt_starting+=r*dir;
+				if(ccnt_starting!=0&&ccnt_starting!=sz){
+					propose(ccnt_starting);
+				}
+			}
+		}
+		//build error
+		if(this.m_error_overlays){
+			for(var i=0;i<this.m_error_overlays.length;i++){
+				var err=this.m_error_overlays[i];
+				var ccnt_err0=err.ccnt0.ccnt;
+				var ccnt_err1=err.ccnt1.ccnt;
+				if(ccnt_err0<=ccnt&&ccnt<=ccnt_err1){continue;}
+				propose(ccnt_err0);
+			}
+		}
+		//spell error
+		//there are too many of them, not worth it
+		//actually go there
+		if(ccnt_next==undefined){return 1;}
+		if(is_sel){
+			this.SetSelection(ccnt,ccnt_next)
+		}else{
+			UI.SetSelectionEx(this,ccnt_next,ccnt_next,"poi")
+		}
+		return 0;
+	}
+	this.AddEventHandler('SHIFT+F2',function(){fnextbm.call(this,-1)})
+	this.AddEventHandler('F2',function(){fnextbm.call(this,1)})
+	this.AddEventHandler('menu',function(){
+		if(UI.HasFocus(this)){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			menu_search.AddSeparator();
+			menu_search.AddButtonRow({text:"Go to point of interest"},[
+				{text:"bookmark_up",icon:"上",tooltip:'Prev - SHIFT+F2',action:function(){
+					fnextbm.call(doc,-1)
+				}},{text:"bookmark_down",icon:"下",tooltip:'Next - F2',action:function(){
+					//text:"&select to"
+					fnextbm.call(doc,1)
+				}}])
+			menu_search.AddButtonRow({text:"Select to point of interest"},[
+				{text:"bookmark_sel_up",icon:"上",tooltip:'Prev',action:function(){
+					fnextbm.call(doc,-1,1)
+				}},{text:"bookmark_sel_down",icon:"下",tooltip:'Next',action:function(){
+					//text:"&select to"
+					fnextbm.call(doc,1,1)
+				}}])
+		}
+	})
+})//.prototype.desc={category:"Controls",name:"Points of interest",stable_name:"poi_moving"};
+
+////////////////////////////////////
+//C-like
+var MatchingBracket=function(c){
+	if(c=='('){return ')';}
+	if(c=='['){return ']';}
+	if(c=='{'){return '}';}
+	if(c=='<'){return '>';}
+	if(c==')'){return '(';}
+	if(c==']'){return '[';}
+	if(c=='}'){return '{';}
+	if(c=='>'){return '<';}
+	return c
+}
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(!this.plugin_language_desc||this.plugin_language_desc.name=="Plain text"){return;}
+	//bracket auto-matching with bold bracket highlighting
+	this.AddEventHandler('editorCreate',function(){
+		var hl_items=this.CreateTransientHighlight({
+			'depth':1,
+			'color':this.color,
+			'display_mode':UI.HL_DISPLAY_MODE_EMBOLDEN,
+			'invertible':0,
+		});
+		this.m_lbracket_p0=hl_items[0]
+		this.m_lbracket_p1=hl_items[1]
+		this.m_lbracket_hl=hl_items[2]
+		hl_items=this.CreateTransientHighlight({
+			'depth':1,
+			'color':this.color,
+			'display_mode':UI.HL_DISPLAY_MODE_EMBOLDEN,
+			'invertible':0,
+		});
+		this.m_rbracket_p0=hl_items[0]
+		this.m_rbracket_p1=hl_items[1]
+		this.m_rbracket_hl=hl_items[2]
+	})
+	var HighlightBrackets=function(doc,ccnt0,ccnt1){
+		var sz0=doc.BracketSizeAt(ccnt0,0),sz1=doc.BracketSizeAt(ccnt1,1)
+		doc.m_lbracket_p0.ccnt=ccnt0+1-sz0
+		doc.m_lbracket_p1.ccnt=ccnt0+1
+		doc.m_rbracket_p0.ccnt=ccnt1+1-sz1
+		doc.m_rbracket_p1.ccnt=ccnt1+1
+		UI.Refresh()
+	}
+	var fcheckbrackets=function(){
+		var ccnt=this.sel1.ccnt
+		var lang=this.plugin_language_desc
+		var ccnt_right=this.FindOuterBracket(ccnt,1)
+		if(ccnt_right>=0){
+			var ccnt_left=this.FindOuterBracket(ccnt,-1)
+			if(ccnt_left>=0){
+				HighlightBrackets(this,ccnt_left,ccnt_right-1)
+				return
+			}
+		}
+		this.m_lbracket_p0.ccnt=0
+		this.m_lbracket_p1.ccnt=0
+		this.m_rbracket_p0.ccnt=0
+		this.m_rbracket_p1.ccnt=0
+		//sth like IsBracketEnabled, m_lbracket_tokens, m_rbracket_tokens
+		//return ed.GetStateAt(ed.m_handler_registration["colorer"],ccnt,"lll")[1];
+	}
+	this.AddEventHandler('selectionChange',fcheckbrackets)
+	this.AddEventHandler('change',fcheckbrackets)
+	var goto_matching_bracket=function(is_sel){
+		var ccnt=this.sel1.ccnt
+		if(!(this.m_lbracket_p0.ccnt<this.m_lbracket_p1.ccnt)){
+			//coulddo: notification
+			return;
+		}
+		var ccnt_new;
+		if(ccnt==this.m_lbracket_p0.ccnt||ccnt==this.m_lbracket_p1.ccnt){
+			ccnt_new=this.m_rbracket_p0.ccnt;
+		}else if(ccnt==this.m_rbracket_p0.ccnt||ccnt==this.m_rbracket_p1.ccnt){
+			ccnt_new=this.m_lbracket_p1.ccnt;
+		}else{
+			//UI.assert(0,"panic: bracket highlighting enabled but cursor is not at a bracket?")
+			ccnt_new=this.m_lbracket_p1.ccnt;
+			//ccnt=this.m_rbracket_p1.ccnt;
+			//return;
+		}
+		if(is_sel){
+			this.SetSelection(ccnt,ccnt_new)
+		}else{
+			UI.SetSelectionEx(this,ccnt_new,ccnt_new,"parenthesis")
+		}
+		this.CallOnSelectionChange();
+	}
+	this.AddEventHandler('menu',function(){
+		var enabled=(this.m_lbracket_p0.ccnt<this.m_lbracket_p1.ccnt)
+		if(UI.HasFocus(this)&&enabled){
+			var menu_search=UI.BigMenu("&Search")
+			var doc=this;
+			var ccnt=this.sel1.ccnt
+			var sicon="｛";
+			if(ccnt==this.m_lbracket_p0.ccnt||ccnt==this.m_lbracket_p1.ccnt){
+				sicon="｝";
+			}
+			menu_search.AddSeparator();
+			menu_search.AddButtonRow({icon:"プ",text:"Parenthesis"},[
+				{text:"parenthesis_match",icon:sicon,tooltip:'Go to matching - CTRL+P',action:function(){
+					goto_matching_bracket.call(doc,0)
+				}},{text:"parenthesis_sel",icon:"选",tooltip:'Select between - SHIFT+CTRL+P',action:function(){
+					//text:"&select to"
+					goto_matching_bracket.call(doc,1);
+				}}])
+		}
+	})
+	this.AddEventHandler('CTRL+P',function(){goto_matching_bracket.call(this,0)})
+	this.AddEventHandler('SHIFT+CTRL+P',function(){goto_matching_bracket.call(this,1)})
+}).prototype.desc={category:"Display",name:"Show matching parenthesis",stable_name:"parenthesis_match"};
 
 var bracket_context_prototype={
 	PopBacStack:function(){
@@ -2290,7 +2290,7 @@ UI.RegisterEditorPlugin(function(){
 		var C=listening_keys[i];
 		this.AddEventHandler(C,f_key_test.bind(this,C))
 	}
-}).prototype.name="Bracket completion";
+}).prototype.desc={category:"Editing",name:"Auto-complete parenthesis",stable_name:"parenthesis_complete"};
 
 //ignoring trailing spaces
 UI.RegisterEditorPlugin(function(){
@@ -2338,7 +2338,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 1
 	})
-}).prototype.name="Auto-strip trailing spaces";
+}).prototype.desc={category:"Editing",name:"Auto-strip trailing spaces",stable_name:"trim_trailing_spaces"};
 
 //hiding
 UI.RegisterEditorPlugin(function(){
@@ -2434,7 +2434,7 @@ UI.RegisterEditorPlugin(function(){
 		renderer.ShowRange(this.ed,sel[0]+1,sel[0]-1)
 		renderer.ShowRange(this.ed,sel[1]+1,sel[1]-1)
 	})
-}).prototype.name="Text hiding";
+})//.prototype.desc={category:"Controls",name:"Text folding",stable_name:"text_folding"};
 
 //unicode
 var ZeroPad=function(n,w){
@@ -2511,7 +2511,7 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit=undefined;
 		}
 	})
-}).prototype.name="Unicode conversion";
+}).prototype.desc={category:"Tools",name:"Unicode conversion",stable_name:"unicode_conv"};
 
 var ApplyAutoEdit=function(doc,cur_autoedit_ops,line_id){
 	var locs=doc.m_autoedit_locators;
@@ -2876,7 +2876,7 @@ UI.RegisterEditorPlugin(function(){
 		UpdateVSel();
 	})
 	//coulddo: menu items
-}).prototype.name="Auto-edit";
+}).prototype.desc={category:"Editing",name:"Auto-edit",stable_name:"auto_edit"};
 
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
@@ -2923,7 +2923,7 @@ UI.RegisterEditorPlugin(function(){
 				}}])
 		}
 	})
-}).prototype.name="Cursor history";
+})//.prototype.desc={category:"Controls",name:"Cursor history navigation",stable_name:"cursor_hist"};
 
 /*
 var g_regexp_bash_escaping=new RegExp('[#;&"\'\\\\,`:!*?$(){}\\[\\]<|> \t]','g');
@@ -3041,31 +3041,4 @@ UI.RegisterEditorPlugin(function(){
 		this.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(this.ed,this.m_diff_from_save,this.owner.h_obj_area*UI.pixels_per_unit);
 		this.m_diff_minimap_h_obj_area=this.owner.h_obj_area
 	})
-}).prototype.name="Diff minimap";
-
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	this.AddEventHandler('menu',function(){
-		UI.FillLanguageMenu(this.owner.m_language_id,(function(name){
-			if(name==this.owner.m_language_id){return;}
-			this.owner.m_language_id=name;
-			//try to reload
-			if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
-				//make a notification
-				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file and reload for the language change to take effect"})
-				this.saved_point=-1;
-			}else{
-				//what is reload? nuke it
-				if(Language.GetDescObjectByName(name).is_binary){
-					var fn=this.owner.file_name;
-					this.owner.SaveMetaData();
-					UI.top.app.document_area.just_created_a_tab=1;
-					UI.top.app.document_area.CloseTab();
-					UI.OpenEditorWindow(fn);
-				}else{
-					this.owner.Reload()
-				}
-			}
-		}).bind(this))
-	})
-}).prototype.name="Language selection";
+}).prototype.desc={category:"Display",name:"Show changed lines in scrollbar",stable_name:"changed_lines"};

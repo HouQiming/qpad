@@ -34,6 +34,10 @@ UI.m_code_editor_persistent_members_doc=[
 UI.RegisterCodeEditorPersistentMember=function(name){
 	UI.m_code_editor_persistent_members_doc.push(name)
 }
+UI.RegisterEditorPlugin=function(fplugin){
+	UI.m_editor_plugins.push(fplugin)
+	return fplugin
+}
 require("res/plugin/edbase");
 
 ///////////////////////////////////////////////////////
@@ -55,6 +59,20 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	////////////////////
 	//per-language portion
 	//language:g_language_C,
+	AddAdditionalPlugins:function(){
+		var plugins=UI.m_editor_plugins;
+		for(var i=0;i<plugins.length;i++){
+			var fplugin=plugins[i];
+			if(fplugin.prototype.desc){
+				var stable_name=fplugin.prototype.desc.stable_name;
+				var options=(UI.m_ui_metadata["<options>"]||{});
+				var is_enabled=options[stable_name];
+				if(is_enabled==undefined){is_enabled=1;}
+				if(!is_enabled){continue;}
+			}
+			fplugin.call(this)
+		}
+	},
 	Init:function(){
 		this.m_event_hooks={}
 		this.m_event_hooks['load']=[]
@@ -134,6 +152,14 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	StartLoading:function(fn){
 		var ed=this.ed;
 		var is_preview=this.m_is_preview
+		if(fn.length&&fn[0]=='*'){
+			//built-in file
+			ed.Edit([0,0,IO.UIReadAll(fn.substr(1))],1);
+			this.ResetSaveDiff()
+			this.owner.OnLoad()
+			UI.Refresh();
+			return;
+		}
 		this.m_loaded_time=IO.GetFileTimestamp(fn)
 		this.owner.DismissNotification('saving_progress');
 		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216),function(encoding){
@@ -670,7 +696,7 @@ W.CodeEditorWidget_prototype={
 				//it should work properly if the user continues typing
 				obj.m_ac_context.m_ccnt=-1;
 			}
-			obj.m_is_brand_new=0
+			//obj.m_is_special_document=0
 			var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 			renderer.m_hidden_ranges_prepared=0
 		})
@@ -2020,8 +2046,9 @@ var OpenInPlace=function(obj,name){
 	obj.file_name=fn
 	obj.doc=undefined
 	obj.m_language_id=undefined
-	obj.m_is_brand_new=undefined;
+	obj.m_is_special_document=undefined;
 	obj.m_is_preview=undefined;
+	obj.m_sxs_visualizer=undefined;
 	UI.top.app.quit_on_zero_tab=0;
 	UI.m_current_file_list=undefined
 	UI.ClearFileListingCache();
@@ -2277,7 +2304,7 @@ var fnewpage_findbar_plugin=function(){
 			}
 		}else{
 			var editor_widget=obj.owner
-			editor_widget.m_is_brand_new=0
+			editor_widget.m_is_special_document=0
 			if(editor_widget.m_file_name_before_preview){
 				//clear preview
 				editor_widget.file_name=editor_widget.m_file_name_before_preview
@@ -2572,7 +2599,7 @@ W.SXS_NewPage=function(id,attrs){
 			},
 			OpenPreview:function(value,is_explicit){
 				var editor_widget=obj.owner
-				if(!editor_widget.m_is_brand_new||!UI.HasFocus(obj.find_bar_edit)&&!is_explicit){return;}
+				if(!editor_widget.m_is_special_document||!UI.HasFocus(obj.find_bar_edit)&&!is_explicit){return;}
 				if(!this.items.length){return;}
 				if(!this.items[value].name||this.items[value].is_dir){return;}
 				var fn=IO.NormalizeFileName(this.items[value].name)
@@ -2593,7 +2620,7 @@ W.SXS_NewPage=function(id,attrs){
 				editor_widget.file_name=fn
 				editor_widget.doc=undefined
 				editor_widget.m_language_id=undefined
-				editor_widget.m_is_brand_new=1
+				editor_widget.m_is_special_document=1
 				editor_widget.m_is_preview=1
 				editor_widget.bin_preview=undefined;
 				//UI.InvalidateCurrentFrame()
@@ -2733,7 +2760,7 @@ W.CodeEditor=function(id,attrs){
 		tick0=Duktape.__ui_get_tick()
 	}
 	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
-	if(obj.m_is_brand_new&&obj.doc&&UI.HasFocus(obj.doc)){
+	if(obj.m_is_special_document&&obj.doc&&UI.HasFocus(obj.doc)){
 		if(obj.m_file_name_before_preview){
 			obj.file_name=obj.m_file_name_before_preview
 			obj.doc=undefined
@@ -2754,9 +2781,6 @@ W.CodeEditor=function(id,attrs){
 	var w_sxs_area=0
 	var h_sxs_area=0
 	var sxs_area_dim=undefined
-	if(obj.m_is_brand_new){
-		sxs_visualizer=W.SXS_NewPage
-	}
 	if(sxs_visualizer&&!obj.hide_sxs_visualizer){
 		if(w_obj_area>=h_obj_area){
 			w_obj_area*=0.618
@@ -2783,7 +2807,7 @@ W.CodeEditor=function(id,attrs){
 		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,w_scrolling_area=0,y_top_hint_scroll=0;
 		var h_scrolling_area=h_obj_area
 		var h_top_find=0,h_bottom_find=0
-		var editor_style=UI.default_styles.code_editor.editor_style
+		var editor_style=obj.editor_style
 		var top_hint_bbs=[]
 		var current_find_context=obj.m_current_find_context
 		var ytot
@@ -4278,6 +4302,7 @@ W.CodeEditor=function(id,attrs){
 	return obj
 }
 
+UI.DetectRepository=DetectRepository;
 var g_new_id=0
 UI.NewCodeEditorTab=function(fname0){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
@@ -4298,9 +4323,14 @@ UI.NewCodeEditorTab=function(fname0){
 				'x':0,'y':0,
 				'file_name':this.file_name,
 			};
-			if(!this.main_widget){
-				attrs.m_is_brand_new=(!fname0&&this.auto_focus_file_search)
-				if(attrs.m_is_brand_new){
+			if(!this.main_widget&&!fname0){
+				if(this.auto_focus_file_search){
+					attrs.m_is_special_document=1;
+					attrs.m_sxs_visualizer=W.SXS_NewPage;
+					UI.InvalidateCurrentFrame();
+				}else if(this.is_options_window){
+					attrs.m_is_special_document=1;
+					attrs.m_sxs_visualizer=W.SXS_OptionsPage;
 					UI.InvalidateCurrentFrame();
 				}
 			}
@@ -4322,33 +4352,23 @@ UI.NewCodeEditorTab=function(fname0){
 				}
 			}
 			var doc=body.doc;
-			if(body.m_is_brand_new){
-				body.title=UI._("New Tab");
+			if(body.m_is_special_document){
+				body.title=undefined;
 				body.tooltip=undefined
 			}else{
 				body.title=UI.RemovePath(body.file_name)
 				body.tooltip=body.file_name
-			}
-			this.need_save=0
-			if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
-				body.title=body.title+'*'
-				this.need_save=1
+				this.need_save=0
+				if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
+					body.title=body.title+'*'
+					this.need_save=1
+				}
 			}
 			if(this.auto_focus_file_search&&body.sxs_visualizer&&body.sxs_visualizer.find_bar_edit){
 				this.auto_focus_file_search=0
 				UI.SetFocus(body.sxs_visualizer.find_bar_edit)
 				body.sxs_visualizer.m_close_on_esc=1
 				UI.Refresh()
-			}
-			/////////////////
-			var menu_features=undefined
-			var plugins=UI.m_editor_plugins
-			for(var i=0;i<plugins.length;i++){
-				var f=plugins[i]
-				if(f.prototype&&f.prototype.name){
-					//if(!menu_features){menu_features=UI.BigMenu("Fea&tures");}
-					//todo: put it as checkboxes in option window
-				}
 			}
 			return body;
 		},
@@ -4390,10 +4410,10 @@ UI.NewCodeEditorTab=function(fname0){
 	})
 };
 
-UI.RegisterLoaderForExtension("*",function(fname){return UI.OpenEditorWindow(fname)})
+//UI.RegisterLoaderForExtension("*",function(fname){return UI.OpenEditorWindow(fname)})
 
 UI.OpenEditorWindow=function(fname,fcallback){
-	fname=IO.NormalizeFileName(fname);
+	fname=IO.NormalizeFileName(fname).replace(/[\\]/g,"/");
 	var obj_tab=undefined;
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		if(UI.g_all_document_windows[i].file_name==fname){
@@ -4425,6 +4445,7 @@ UI.OnApplicationSwitch=function(){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab=UI.g_all_document_windows[i]
 		if(obj_tab.main_widget&&obj_tab.main_widget.doc){
+			//coulddo: more reliable class test
 			var obj=obj_tab.main_widget
 			if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
 				if(obj.doc.ed.saving_context){continue;}//saving docs are OK
@@ -4552,5 +4573,194 @@ Language.Register({
 		return function(){}
 	}
 });
+
+//language selection
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('menu',function(){
+		UI.FillLanguageMenu(this.owner.m_language_id,(function(name){
+			if(name==this.owner.m_language_id){return;}
+			this.owner.m_language_id=name;
+			//try to reload
+			if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
+				//make a notification
+				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file and reload for the language change to take effect"})
+				this.saved_point=-1;
+			}else{
+				//what is reload? nuke it
+				if(Language.GetDescObjectByName(name).is_binary){
+					var fn=this.owner.file_name;
+					this.owner.SaveMetaData();
+					UI.top.app.document_area.just_created_a_tab=1;
+					UI.top.app.document_area.CloseTab();
+					UI.OpenEditorWindow(fn);
+				}else{
+					this.owner.Reload()
+				}
+			}
+		}).bind(this))
+	})
+})
+
+W.FeatureItem=function(id,attrs){
+	var obj=UI.Keep(id,attrs)
+	UI.StdStyling(id,obj,attrs, "feature_item");
+	if(obj.is_first){
+		obj.h=obj.h_first;
+	}else{
+		obj.h=obj.h_normal;
+	}
+	if(obj.h_special){obj.h+=obj.h_special;}
+	UI.StdAnchoring(id,obj);
+	UI.Begin(obj)
+		//default-enable everything
+		var options=UI.m_ui_metadata["<options>"];
+		if(obj.is_first){
+			var h_caption=obj.h_first-obj.h_normal;
+			UI.RoundRect({
+				x:obj.x-obj.caption_shadow_size,y:obj.y+h_caption-obj.caption_shadow_size,w:obj.w-12+obj.caption_shadow_size,h:obj.caption_shadow_size*2,
+				color:obj.caption_shadow_color,
+				round:obj.caption_shadow_size,
+				border_width:-obj.caption_shadow_size,
+			})
+			UI.RoundRect({
+				x:obj.x,y:obj.y,w:obj.w-12,h:h_caption,
+				color:obj.caption_color,border_color:obj.caption_border_color,
+				border_width:obj.caption_border_width,
+			})
+			W.Text("",{
+				x:obj.x+8,y:obj.y+(h_caption-UI.GetCharacterHeight(obj.caption_icon_font))*0.5,
+				font:obj.caption_icon_font,text:obj.category_icon,color:obj.caption_icon_color})
+			W.Text("",{
+				x:obj.x+32+8,y:obj.y+(h_caption-UI.GetCharacterHeight(obj.caption_font))*0.5-2,
+				font:obj.caption_font,text:obj.category,color:obj.caption_text_color})
+		}
+		if(obj.name){
+			var is_enabled=options[obj.stable_name];
+			if(is_enabled==undefined){is_enabled=1;}
+			W.Text("",{x:obj.x+16,y:obj.y+obj.h-27,font:obj.icon_fontb,text:is_enabled?"■":"□",color:obj.icon_color})
+			W.Text("",{x:obj.x+40,y:obj.y+obj.h-32,font:obj.font,text:obj.name,color:obj.text_color})
+			W.Region("checkbox_"+obj.stable_name,{
+				x:obj.x,y:obj.y+obj.h-32,w:obj.w-12,h:32,
+				OnClick:(function(new_value){
+					options[obj.stable_name]=new_value;
+					obj.editor_widget.doc=undefined;
+					UI.Refresh()
+				}).bind(undefined,!is_enabled),
+			})
+		}else if(obj.license_line){
+			W.Text("",{x:obj.x+16,y:obj.y+obj.h-32,font:obj.font,text:obj.license_line,color:obj.text_color_license})
+		}else if(obj.special){
+			if(obj.special=='install_button'){
+				W.Button("install",{x:obj.x+12,y:obj.y+obj.h-34,w:280,h:32,text:"",OnClick:function(){
+					UI.InstallQPad();
+				}})
+				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"盾",color:obj.install.text_color})
+				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:"Install shell menu integration",color:obj.install.text_color})
+			}
+		}
+		//todo: edit theme file / load preset
+		//todo: tab width
+	UI.End()
+	return obj
+}
+
+W.SXS_OptionsPage=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"sxs_options_page");
+	var options=UI.m_ui_metadata["<options>"];
+	if(!options){
+		options={};
+		UI.m_ui_metadata["<options>"]=options;
+	}
+	UI.Begin(obj)
+		UI.RoundRect(obj)
+		//just a bunch of checkboxes in a listview
+		//editor plugins, plugin files, install
+		if(!obj.plugin_view_items){
+			/////////////////
+			//special stuff
+			var plugin_items={};
+			if(UI.InstallQPad){
+				plugin_items["Tools"]=[
+					{special:'install_button',h_special:8},
+				];
+			}
+			/////////////////
+			//plugin options
+			for(var i=0;i<UI.m_editor_plugins.length;i++){
+				var desc_i=UI.m_editor_plugins[i].prototype.desc;
+				if(!desc_i){continue;}
+				var cat_list=plugin_items[desc_i.category];
+				if(!cat_list){
+					cat_list=[];
+					plugin_items[desc_i.category]=cat_list;
+				}
+				cat_list.push(desc_i);
+			}
+			/////////////////
+			//qpad credits
+			plugin_items["About"]=[
+				{license_line:"QPad v"+UI.g_version+", by Qiming HOU",text_color_license:0xff000000},
+				{license_line:"Contact: hqm03ster@gmail.com",text_color_license:0xff000000},
+			];
+			/////////////////
+			//OSS licenses
+			plugin_items["Open Source Licenses"]=[
+				{license_line:"stb: Public domain, authored from 2009-2013 by Sean Barrett"},
+				{license_line:"duktape: Copyright (c) 2013-2015 by Duktape authors"},
+				{license_line:"Hunspell: Copyright (c) N\u00e9meth L\u00e1szl\u00f3 nemeth"},
+			];
+			plugin_items["Font Licenses"]=[
+				{license_line:"Inconsolata: Copyright (c) 2006-2012, Raph Levien (firstname.lastname@gmail.com)"},
+				{license_line:"    Copyright (c) 2011-2012, Cyreal (cyreal.org)",h_special:-12},
+				{license_line:"OpenSans: Digitized data copyright © 2010-2011, Google Corporation"},
+				{license_line:"Computer Modern: Copyright (c) Authors of original metafont fonts"},
+				{license_line:"    Copyright (C) 2003-2009, Andrey V. Panov (panov@canopus.iacp.dvo.ru)",h_special:-12},
+			];
+			/////////////////
+			var view_items=[];
+			for(var i=0;i<obj.categories.length;i++){
+				var scat_i=obj.categories[i];
+				var cat_list=plugin_items[scat_i];
+				if(!cat_list){continue;}
+				for(var j=0;j<cat_list.length;j++){
+					var desc_i=cat_list[j];
+					desc_i.is_first=(j==0);
+					if(j==0){
+						desc_i.category=scat_i;
+						desc_i.category_icon=obj.category_icons[i];
+					}
+					view_items.push(desc_i);
+				}
+			}
+			if(view_items.length){view_items[0].is_first=2;}
+			for(var i=0;i<view_items.length;i++){
+				view_items[i].h=(view_items[i].is_first?UI.default_styles.feature_item.h_first:UI.default_styles.feature_item.h_normal);
+				if(view_items[i].h_special){
+					view_items[i].h+=view_items[i].h_special;
+				}
+			}
+			obj.plugin_view_items=view_items;
+		}
+		W.ListView('features_list',{
+			x:obj.x,y:obj.y,w:obj.w-4,h:obj.h,
+			mouse_wheel_speed:80,
+			dimension:'y',layout_spacing:0,layout_align:'fill',
+			is_single_click_mode:1,no_region:1,
+			item_template:{
+				object_type:W.FeatureItem,
+				editor_widget:obj.owner,
+			},items:obj.plugin_view_items})
+	UI.End()
+	return obj
+}
+
+UI.NewOptionsTab=function(){
+	var tab=UI.NewCodeEditorTab();
+	tab.is_options_window=1
+	tab.title=UI._("Preferences")
+	tab.file_name="*res/misc/example.cpp"
+	return tab;
+}
 
 //UI.enable_timing=1
