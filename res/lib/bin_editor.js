@@ -667,6 +667,8 @@ W.BinaryEditor=function(id,attrs){
 					x:x_caret-obj.edit_padding,y:y_caret+(hc-hc_editing)*0.5,w:x_caret_r-x_caret+obj.edit_padding*2,h:hc_editing,
 					font:obj.font_edit, tid:rg.tid, color:rg.color, text:s_text,
 					is_single_line:1,right_side_autoscroll_margin:0.5,
+					precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+					same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
 					owner:obj,
 					additional_hotkeys:[{key:"ESCAPE",action:function(){
 						//cancel the change

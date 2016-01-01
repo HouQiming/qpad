@@ -1563,7 +1563,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 		}
 	})
-}).prototype.desc={category:"Editing",name:"Tab indent / dedent",stable_name:"indent_dedent"};
+})//.prototype.desc={category:"Editing",name:"Tab indent / dedent",stable_name:"indent_dedent"};
 
 UI.RegisterEditorPlugin(function(){
 	//alt+pgup/pgdn

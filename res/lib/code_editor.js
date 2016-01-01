@@ -51,6 +51,12 @@ var g_encoding_names={
 	'5':"the Big-5",
 	'7':"the UTF-16",
 }
+UI.TestOption=function(stable_name){
+	var options=(UI.m_ui_metadata["<options>"]||{});
+	var is_enabled=options[stable_name];
+	if(is_enabled==undefined){is_enabled=1;}
+	return is_enabled;
+}
 W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	tab_is_char:1,
 	plugin_class:'code_editor',
@@ -64,11 +70,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		for(var i=0;i<plugins.length;i++){
 			var fplugin=plugins[i];
 			if(fplugin.prototype.desc){
-				var stable_name=fplugin.prototype.desc.stable_name;
-				var options=(UI.m_ui_metadata["<options>"]||{});
-				var is_enabled=options[stable_name];
-				if(is_enabled==undefined){is_enabled=1;}
-				if(!is_enabled){continue;}
+				if(!UI.TestOption(fplugin.prototype.desc.stable_name)){continue;}
 			}
 			fplugin.call(this)
 		}
@@ -152,6 +154,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	StartLoading:function(fn){
 		var ed=this.ed;
 		var is_preview=this.m_is_preview
+		this.m_loaded_time=IO.GetFileTimestamp(fn)
+		this.owner.DismissNotification('saving_progress');
 		if(fn.length&&fn[0]=='*'){
 			//built-in file
 			ed.Edit([0,0,IO.UIReadAll(fn.substr(1))],1);
@@ -160,8 +164,6 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			UI.Refresh();
 			return;
 		}
-		this.m_loaded_time=IO.GetFileTimestamp(fn)
-		this.owner.DismissNotification('saving_progress');
 		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216),function(encoding){
 			this.owner.CreateNotification({id:'saving_progress',icon:'警',
 				text:"The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.".replace(
@@ -537,6 +539,7 @@ var CallParseMore=function(){
 			}
 			if(obj_tab&&obj_tab.main_widget&&obj_tab.main_widget.doc){
 				obj_tab.main_widget.doc.m_file_index=ret.file_index
+				UI.Refresh()
 			}else{
 				//not-opened-yet
 				//if(UI.Platform.BUILD=="debug"){
@@ -725,8 +728,13 @@ W.CodeEditorWidget_prototype={
 		doc.cur_line_hl=hl_items[2]
 		var line_current=doc.GetLC(doc.sel1.ccnt)[0]
 		var ed_caret=doc.GetCaretXY();
-		doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
-		doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
+		if(UI.TestOption("show_line_highlight")){
+			doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
+			doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
+		}else{
+			doc.cur_line_p0.ccnt=0;
+			doc.cur_line_p1.ccnt=0;
+		}
 	},
 	OnDestroy:function(){
 		if(this.doc){
@@ -809,7 +817,7 @@ W.CodeEditorWidget_prototype={
 	SaveMetaData:function(){
 		var doc=this.doc
 		if(this.m_is_preview||doc&&doc.ed.hfile_loading){return;}
-		if(!doc||!IO.FileExists(this.file_name)){return;}
+		if(!doc||!IO.FileExists(this.file_name)&&!(this.file_name.length&&this.file_name[0]=='*')){return;}
 		var new_metadata=(UI.m_ui_metadata[this.file_name]||{});
 		new_metadata.m_bookmarks=[];
 		new_metadata.m_unkeyed_bookmarks=[];
@@ -2456,6 +2464,8 @@ W.SXS_NewPage=function(id,attrs){
 			style:obj.find_bar_editor_style,
 			x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 			owner:obj,
+			precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+			same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
 			plugins:[fnewpage_findbar_plugin],
 			default_focus:2,
 		});
@@ -2811,13 +2821,14 @@ W.CodeEditor=function(id,attrs){
 		var top_hint_bbs=[]
 		var current_find_context=obj.m_current_find_context
 		var ytot
+		var show_minimap=UI.TestOption("show_minimap");
 		if(doc){
 			//scrolling and stuff
 			var ccnt_tot=doc.ed.GetTextSize()
 			var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 			if(h_obj_area<ytot&&!obj.m_is_preview){
 				w_scrolling_area=obj.w_scroll_bar
-				if(obj.show_minimap){
+				if(show_minimap){
 					w_scrolling_area+=obj.w_minimap+obj.padding
 				}
 			}
@@ -2828,7 +2839,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 			//top hint in a separate area
-			if(obj.show_top_hint&&!obj.show_find_bar){
+			if(UI.TestOption("show_top_hint")&&!obj.show_find_bar){
 				var top_hints=[];
 				//var top_hints_indent=[];
 				var rendering_ccnt0=doc.SeekXY(doc.scroll_x,doc.scroll_y)
@@ -2920,8 +2931,13 @@ W.CodeEditor=function(id,attrs){
 			var line_current=doc.GetLC(doc.sel1.ccnt)[0]
 			var ed_caret=doc.GetCaretXY();
 			//var line_ccnts=doc.SeekAllLinesBetween(line_current,line_current+2)
-			doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
-			doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
+			if(UI.TestOption("show_line_highlight")){
+				doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
+				doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
+			}else{
+				doc.cur_line_p0.ccnt=0;
+				doc.cur_line_p1.ccnt=0;
+			}
 			var s_autofind_needle=undefined;
 			if(!obj.show_find_bar){
 				s_autofind_needle=UI.m_ui_metadata.find_state.m_current_needle;
@@ -2951,7 +2967,7 @@ W.CodeEditor=function(id,attrs){
 				var area_h=doc.h
 				var y0_rendering=scroll_y
 				var y1_rendering=scroll_y+area_h
-				if(obj.show_minimap){
+				if(show_minimap){
 					var y_scrolling_area=obj.y
 					var effective_scroll_y=doc.visible_scroll_y
 					var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
@@ -2979,7 +2995,8 @@ W.CodeEditor=function(id,attrs){
 			}
 		}
 		//hopefully 8 is the widest char
-		if(obj.show_line_numbers){
+		var show_line_numbers=UI.TestOption("show_line_numbers")
+		if(show_line_numbers){
 			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(obj.line_number_font,56);
 		}
@@ -3020,7 +3037,7 @@ W.CodeEditor=function(id,attrs){
 				}
 				UI.PopCliprect()
 			}
-			if(obj.show_line_numbers){
+			if(show_line_numbers){
 				var rendering_ccnt0=doc.SeekXY(scroll_x,scroll_y)
 				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,scroll_y+area_h)
 				var dy_line_number=(UI.GetCharacterHeight(doc.font)-UI.GetCharacterHeight(obj.line_number_font))*0.5;
@@ -3179,6 +3196,9 @@ W.CodeEditor=function(id,attrs){
 						var value_i=loaded_metadata[name_i]
 						if(value_i!=undefined){obj[name_i]=value_i;}
 					}
+					if(obj.m_sxs_visualizer==W.SXS_OptionsPage){
+						UI.InvalidateCurrentFrame()
+					}
 				}
 				var wrap_width=(obj.m_enable_wrapping?obj.m_current_wrap_width:0)
 				if(obj.m_is_preview){
@@ -3199,6 +3219,8 @@ W.CodeEditor=function(id,attrs){
 					m_is_preview:obj.m_is_preview,
 					m_file_name:obj.file_name,
 					m_is_main_editor:1,
+					precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+					same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
 				},W.CodeEditor_prototype);
 				if(UI.enable_timing){
 					print('before bookmark and ln=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
@@ -3864,6 +3886,8 @@ W.CodeEditor=function(id,attrs){
 					x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 					find_bar_owner:obj,
 					plugins:[ffindbar_plugin],
+					precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+					same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
 					CancelFind:function(){
 						var obj=this.find_bar_owner
 						obj.show_find_bar=0;
@@ -4152,7 +4176,7 @@ W.CodeEditor=function(id,attrs){
 			var y_scrolling_area=obj.y
 			var effective_scroll_y=doc.visible_scroll_y
 			var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
-			if(obj.show_minimap){
+			if(show_minimap){
 				var x_minimap=obj.x+w_obj_area-w_scrolling_area+obj.padding*0.5
 				var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
 				var h_minimap=h_scrolling_area/minimap_scale
@@ -4644,7 +4668,7 @@ W.FeatureItem=function(id,attrs){
 				x:obj.x,y:obj.y+obj.h-32,w:obj.w-12,h:32,
 				OnClick:(function(new_value){
 					options[obj.stable_name]=new_value;
-					obj.editor_widget.doc=undefined;
+					obj.editor_widget.Reload();
 					UI.Refresh()
 				}).bind(undefined,!is_enabled),
 			})
@@ -4659,8 +4683,6 @@ W.FeatureItem=function(id,attrs){
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:"Install shell menu integration",color:obj.install.text_color})
 			}
 		}
-		//todo: edit theme file / load preset
-		//todo: tab width
 	UI.End()
 	return obj
 }
@@ -4680,6 +4702,16 @@ W.SXS_OptionsPage=function(id,attrs){
 			/////////////////
 			//special stuff
 			var plugin_items={};
+			plugin_items["Display"]=[
+				{name:'Highlight the current line',stable_name:'show_line_highlight'},
+				{name:'Show outer scope overlays',stable_name:'show_top_hint'},
+				{name:'Show line numbers',stable_name:'show_line_numbers'},
+				{name:'Show minimap',stable_name:'show_minimap'},
+			];
+			plugin_items["Controls"]=[
+				{name:'Stop at both word boundaries',stable_name:'precise_ctrl_lr_stop'},
+				{name:'Allow \u2190 / \u2192 to cross lines',stable_name:'left_right_line_wrap'},
+			];
 			if(UI.InstallQPad){
 				plugin_items["Tools"]=[
 					{special:'install_button',h_special:8},
@@ -4756,6 +4788,13 @@ W.SXS_OptionsPage=function(id,attrs){
 }
 
 UI.NewOptionsTab=function(){
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		if(UI.g_all_document_windows[i].is_options_window){
+			var tab=UI.g_all_document_windows[i]
+			UI.top.app.document_area.SetTab(i)
+			return tab;
+		}
+	}
 	var tab=UI.NewCodeEditorTab();
 	tab.is_options_window=1
 	tab.title=UI._("Preferences")

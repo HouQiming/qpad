@@ -378,7 +378,7 @@ UI.Theme_CustomWidget=function(C){
 			padding:6,
 			separator_color:0xff999999,
 			///////
-			show_top_hint:1,
+			//show_top_hint:1,
 			top_hint_shadow_color:0x7f000000,
 			top_hint_shadow_size:8,
 			top_hint_border_width:2,
@@ -388,7 +388,7 @@ UI.Theme_CustomWidget=function(C){
 			x_scroll_shadow_color:0x7f000000,
 			x_scroll_shadow_size:8,
 			///////
-			show_line_numbers:1,
+			//show_line_numbers:1,
 			line_number_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,12,-50):UI.Font(UI.font_name,14,-50),
 			line_number_bgcolor:0xffd0d0d0,
 			line_number_color:0xff7f7f7f,
@@ -406,7 +406,7 @@ UI.Theme_CustomWidget=function(C){
 			color_diff_tag:[{x:0,y:0,color:0x002ca033},{x:1,y:0,color:0xff2ca033}],
 			sbar_diff_color:(0xff2ca033),
 			///////
-			show_minimap:(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="android"||UI.Platform.ARCH=="ios")?0:1,
+			//show_minimap:(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="android"||UI.Platform.ARCH=="ios")?0:1,
 			minimap_font_height:6,
 			minimap_page_shadow:0x1f000000,
 			minimap_page_border_width:2,
@@ -1297,7 +1297,6 @@ UI.Application=function(id,attrs){
 				menu_edit.AddSeparator();
 			}
 			menu_edit.AddNormalItem({text:"Preferences...",icon:"设",key:" ",enable_hotkey:0,action:function(){
-				//todo: look for existing ones
 				UI.NewOptionsTab();
 			}});
 			menu_edit=undefined;
