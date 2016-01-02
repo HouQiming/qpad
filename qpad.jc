@@ -24,6 +24,9 @@ if Platform.BUILD!="debug"&&Platform.IS_WINDOWS:
 	__generate_json("c_files","jc_winmain.c")
 if Platform.IS_WINDOWS:
 	__generate_json("lib_files","shell32.lib")
+	__generate_json("lib_files","kernel32.lib")
+	__generate_json("lib_files","user32.lib")
+	__generate_json("lib_files","gdi32.lib")
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -216,6 +219,16 @@ if Platform.BUILD=="debug":
 	}
 	/////////////
 	if Platform.IS_WINDOWS:
+		jsio["GetPID"]=function(JSContext JS){
+			GetCurrentProcessId=__c_function(int,"GetCurrentProcessId","windows.h")
+			return JS.Return(GetCurrentProcessId());
+		}
+	else
+		jsio["GetPID"]=function(JSContext JS){
+			getpid=__c_function(iptr,"getpid","unistd.h")
+			return JS.Return(getpid());
+		}
+	if Platform.IS_WINDOWS:
 		osal_DoFileDialogWin=__c_function(int,"osal_DoFileDialogWin","filedlg.h","c_files","filedlg.c")
 		__generate_json("lib_files","comdlg32.lib")
 		jsio["DoFileDialog"]=function(JSContext JS){
@@ -260,6 +273,43 @@ if Platform.BUILD=="debug":
 			SHCNF_IDLIST=0
 			SHChangeNotify(SHCNE_ASSOCCHANGED,SHCNF_IDLIST,NULL,NULL);
 			return 0;
+		}
+		jsio["IsFirstInstance"]=function(JSContext JS){
+			OpenMutex=__c_function(__pointer,"OpenMutexA","windows.h")
+			CreateMutex=__c_function(__pointer,"CreateMutexA","windows.h")
+			CloseHandle=__c_function(int,"CloseHandle","windows.h")
+			s_mutex_name=JS.Param(0).asCString()
+			MUTEX_ALL_ACCESS= 0x1f0001
+			handle=OpenMutex(MUTEX_ALL_ACCESS,0,s_mutex_name);
+			if !handle:
+				CreateMutex(0,0,s_mutex_name)
+				return JS.Return(1)
+			else
+				CloseHandle(handle)
+				return 0
+		}
+		jsio["SetForegroundProcess"]=function(JSContext JS){
+			__C(int,"@global:
+			BOOL CALLBACK sfp_enumproc(HWND hw,LPARAM lp){
+				if (IsWindowVisible(hw) && !GetParent(hw) && !GetWindow(hw,GW_OWNER)){
+					int pid=0;
+					GetWindowThreadProcessId(hw,&pid);
+					if(pid==lp){
+						SetForegroundWindow(hw);
+						if(IsIconic(hw)){
+							ShowWindow(hw,SW_SHOWNORMAL);
+						}
+						return 0;
+					};
+				}
+				return 1;
+			}
+			int SetForegroundProcess(int pid){
+				return !EnumWindows(sfp_enumproc,pid);
+			}");
+			pid=JS.Param(0).as(int)
+			SetForegroundProcess=__c_function(int,"SetForegroundProcess","windows.h")
+			return JS.Return(SetForegroundProcess(pid))
 		}
 	else if Platform.ARCH=="mac":
 		osal_DoFileDialogMac=__c_function(int,"osal_DoFileDialogMac","filedlg.h","c_files","filedlg_mac.m")

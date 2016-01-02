@@ -2,6 +2,7 @@ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 
 ///////////////////////
+UI.interpolators.tabid=function(a,b,t){return b;}
 W.TabLabel_prototype={
 	title:"",//initial empty title
 	mouse_state:'out',
@@ -237,9 +238,18 @@ W.TabbedDocument_prototype={
 		var n2=0;
 		for(var i=0;i<window_list.length;i++){
 			var tab_i=window_list[i]
-			if(tab_i.need_save){window_list[n2++]=tab_i;}else{if(this.current_tab_id>i){this.current_tab_id--}}
+			if(tab_i.need_save){
+				window_list[n2]=tab_i;
+				this[n2]=this[i];
+				n2++;
+			}else{
+				if(this.current_tab_id>i){this.current_tab_id--}
+			}
 		}
-		while(window_list.length>n2){window_list.pop();}
+		while(window_list.length>n2){
+			this[window_list.length-1]=undefined;
+			window_list.pop();
+		}
 		//this doesn't count as a meaningful switch
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
 		if(this.current_tab_id<0){this.current_tab_id=0;}
@@ -499,9 +509,9 @@ W.TabbedDocument=function(id,attrs){
 			x_acc_abs+=label_i.w
 		}
 		if(obj.m_dragging_tab_label_x_abs!=undefined&&tabid!=undefined){
-			{
-				var i=tabid;
-				var item_i=items[i]
+			var i=tabid;
+			var item_i=items[i]
+			if(item_i){
 				var x_acc=x_acc_dragging_tab;
 				W.TabLabel(i,{
 					x:x_label_area,x_animated:x_acc,y:y_label_area,h:obj.h_caption,selected:i==tabid,

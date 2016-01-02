@@ -52,7 +52,7 @@ UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
 (function(){
 	//for theme, we always eval the default theme first in case the custom one is only partially defined
 	eval(IO.UIReadAll("res/misc/conf_theme.js"));
-	var fn_full=IO.GetStoragePath()+"res/misc/conf_theme.js";
+	var fn_full=IO.GetStoragePath()+"/conf_theme.js";
 	var s0=IO.ReadAll(fn_full);
 	if(s0){
 		try{
@@ -185,7 +185,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			"",UI._("Edit with &QPad"),
 			"icon",sexe+",0"])
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\*\\shell\\edit_with_qpad\\command",["","\""+sexe+"\" \"%1\""])
-		var sshortname=UI.GetMainFileName(sexe).toLowerCase()
+		var sshortname=UI.GetMainFileName(IO.m_my_name).toLowerCase()
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\Applications\\@1".replace("@1",sshortname),
 			["FriendlyAppName",UI._("QPad Editor")])
 		var file_formats=[]
@@ -222,10 +222,21 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 				"InstallLocation",spath])
 		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Add QPad to explorer menus"));
 	}
+	UI.UninstallQPad=function(){
+		var sshortname=UI.GetMainFileName(IO.m_my_name).toLowerCase()
+		var sregfile=[
+			"\ufeffWindows Registry Editor Version 5.00\n",
+			"\n[\n-HKEY_CLASSES_ROOT\\*\\shell\\edit_with_qpad\n]\n",
+			"\n[\n-HKEY_CLASSES_ROOT\\Applications\\@1\n]\n".replace("@1",sshortname),
+			"\n[\n-HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@1\n]\n".replace("@1",sshortname),
+		];
+		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Uninstall QPad"));
+	}
 }
 //UI.InstallQPad()
 
 var g_app_inited=0;
+UI.m_cmdline_opens=[];
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -503,6 +514,14 @@ UI.Application=function(id,attrs){
 			UI.InvalidateCurrentFrame();
 			UI.Refresh()
 		}
+		if(UI.m_cmdline_opens.length){
+			for(var i=0;i<UI.m_cmdline_opens.length;i++){
+				UI.OpenEditorWindow(UI.m_cmdline_opens[i])
+			}
+			UI.InvalidateCurrentFrame();
+			UI.Refresh()
+			UI.m_cmdline_opens=[];
+		}
 		g_app_inited=1
 	}
 	if(!g_all_document_windows.length){
@@ -546,5 +565,53 @@ UI.Application=function(id,attrs){
 	}
 };
 
-UI.Run();
+if(UI.Platform.ARCH=="mac"){
+	/*
+	todo: mac
+		tell application "System Events"
+		    count (every process whose name is "BBEdit")
+		end tell
+		tell application "System Events"
+		    set theprocs to every process whose unix id is myProcessId
+		    repeat with proc in theprocs
+		        set the frontmost of proc to true
+		    end repeat
+		end tell
+	*/
+	IO.IsFirstInstance=function(){
+		//todo
+	};
+	IO.SetForegroundProcess=function(pid){
+		//todo
+	};
+}
 
+(function(){
+	var argv=IO.m_argv;
+	if(argv.length>0){argv.shift();}
+	if(argv.length>=2&&argv[0]=='--internal-tool'){
+		if(argv[1]=="--uninstall"&&UI.UninstallQPad){
+			UI.UninstallQPad();
+		}
+		return;
+	}
+	//instance check
+	//this is not safe. it could race. shouldn't happen too often though
+	//we try to open new instances when it races
+	//temp file with pid + temp file check during OnFocus
+	var is_first=IO.IsFirstInstance("qpad3_single_instance");
+	var fn_hack_pipe=IO.GetStoragePath()+"/tmp_pid.txt";
+	var fn_hack_pipe2=IO.GetStoragePath()+"/tmp_open.json";
+	if(!is_first&&IO.FileExists(fn_hack_pipe)&&!IO.FileExists(fn_hack_pipe2)){
+		//in case pid exceeds 32 bits... parseFloat it
+		var pid=parseFloat(IO.ReadAll(fn_hack_pipe))
+		IO.CreateFile(fn_hack_pipe2,JSON.stringify(argv))
+		IO.SetForegroundProcess(pid);
+	}else{
+		IO.DeleteFile(fn_hack_pipe2)//delete lingering files
+		IO.CreateFile(fn_hack_pipe,IO.GetPID().toString())
+		UI.m_cmdline_opens=argv;
+		UI.Run();
+		IO.DeleteFile(fn_hack_pipe)
+	}
+})()

@@ -4464,6 +4464,19 @@ UI.OpenEditorWindow=function(fname,fcallback){
 }
 
 UI.OnApplicationSwitch=function(){
+	var fn_hack_pipe2=IO.GetStoragePath()+"/tmp_open.json";
+	if(IO.FileExists(fn_hack_pipe2)){
+		try{
+			var cmdline_opens=JSON.parse(IO.ReadAll(fn_hack_pipe2));
+			IO.DeleteFile(fn_hack_pipe2)
+			for(var i=0;i<cmdline_opens.length;i++){
+				UI.OpenEditorWindow(cmdline_opens[i])
+			}
+		}catch(e){
+			//do nothing
+		}
+	}
+	////////////////////
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab=UI.g_all_document_windows[i]
 		if(obj_tab.main_widget&&obj_tab.main_widget.doc){

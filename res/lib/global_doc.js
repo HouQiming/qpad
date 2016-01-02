@@ -59,13 +59,13 @@ UI.RegisterLoaderForExtension=function(ext,f){
 ////////////////////////////////////
 UI.m_ui_metadata={};
 (function(){
-	var s_json=IO.ReadAll(IO.GetStoragePath()+(UI.Platform.BUILD=="debug"?"/metadata_debug.json":"/metadata.json"))
+	var s_json=IO.ReadAll(IO.GetStoragePath()+("/metadata.json"))
 	if(s_json){
 		UI.m_ui_metadata=JSON.parse(s_json)
 	}
 })();
 UI.SaveMetaData=function(){
-	IO.CreateFile(IO.GetStoragePath()+(UI.Platform.BUILD=="debug"?"/metadata_debug.json":"/metadata.json"),JSON.stringify(UI.m_ui_metadata))
+	IO.CreateFile(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata))
 }
 
 UI.TestOption=function(stable_name){
