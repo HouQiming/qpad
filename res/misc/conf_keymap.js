@@ -1,3 +1,4 @@
+// You have to restart QPad for changes to take effect
 if(UI.Platform.ARCH=="mac"){
 	UI.g_hotkey_map={
 		"CTRL+N":"WIN+N",

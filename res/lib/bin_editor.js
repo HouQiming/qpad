@@ -108,6 +108,12 @@ W.BinaryEditor_prototype={
 			this.m_sel1=Math.floor(this.m_sel1/this.m_w_bytes)*this.m_w_bytes+this.m_w_bytes-1;
 		}else if(IsHotkey(event,"CTRL+HOME SHIFT+CTRL+HOME")){
 			this.m_sel1=0;
+		}else if(IsHotkey(event,"CTRL+A")){
+			this.m_sel0=0;
+			this.m_sel1=this.m_data.length;
+			this.ValidateSelection(1,validation_dir);
+			UI.Refresh()
+			return;
 		}else if(IsHotkey(event,"CTRL+END SHIFT+CTRL+END")){
 			this.m_sel1=this.m_data.length;
 		}else if(IsHotkey(event,"CTRL+Z")||IsHotkey(event,"ALT+BACKSPACE")){
@@ -335,7 +341,7 @@ W.BinaryEditor_prototype={
 		var ranges=this.m_ranges;
 		var ranges2=[];
 		var add_sel=1;
-		if((rg_template.color==undefined||rg_template.color==this.text_color)&&(rg_template.tid==undefined||rg_template.tid==0)){
+		if((rg_template.color==undefined||((rg_template.color^this.text_color)&0xffffff)==0)&&(rg_template.tid==undefined||rg_template.tid==0)){
 			//it's effective canceling
 			add_sel=0;
 		}

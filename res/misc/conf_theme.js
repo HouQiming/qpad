@@ -1,4 +1,4 @@
-//default theme
+// You have to restart QPad for changes to take effect
 if(UI.Platform.ARCH=="mac"){
 	UI.font_name="LucidaGrande,res/fonts/opensans.ttf"
 	UI.eng_font_name="res/fonts/opensans.ttf,!"
@@ -7,9 +7,9 @@ if(UI.Platform.ARCH=="mac"){
 	UI.eng_font_name="res/fonts/opensans.ttf,!"
 }
 
-if(UI.TestOption("use_light_theme")){//light
-	UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
-	UI.CustomTheme=function(){
+UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
+UI.CustomTheme=function(){
+	if(UI.TestOption("use_light_theme")){//light
 		var C=UI.current_theme_color;
 		var C_dark=UI.lerp_rgba(C,0xff000000,0.15)
 		var C_sel=UI.lerp_rgba(C,0xffffffff,0.66)
@@ -205,22 +205,11 @@ if(UI.TestOption("use_light_theme")){//light
 			},
 			code_editor:{
 				editor_style:{
-					//wrap_width:1536,
-					//font:UI.Font("res/fonts/inconsolata.ttf",36),
-					//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",36,200),
-					//tex_font:UI.Font("res/fonts/cmunrm.ttf",36),
-					//tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",36,200),
-					//font_tilde:UI.Font(UI.icon_font_name,36,100),
 					font:UI.Font("res/fonts/inconsolata.ttf",28),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,0),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,50),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,250),
 					font_tilde:UI.Font(UI.icon_font_name,28,100),
-					//font:UI.Font("res/fonts/inconsolata.ttf",32),
-					//font_emboldened:UI.Font("res/fonts/inconsolata.ttf",32,200),
-					//tex_font:UI.Font("res/fonts/cmunrm.ttf",32),
-					//tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",32,200),
-					//font_tilde:UI.Font(UI.icon_font_name,32,100),
 					color:0xff000000,
 					color2:0xff000000,
 					color_normal:0xff000000,
@@ -255,8 +244,11 @@ if(UI.TestOption("use_light_theme")){//light
 					h_ellipsis:20,
 					/////////////
 					bgcolor_selection:C&0x55ffffff,
-					tab_width:4,
 					scroll_transition_dt:0.075,
+					/////////////
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xff000000,
+					caret_flicker:500,
 					/////////////
 					//rectex_styles:[{color:0,w:32,h:32,round:8,border_width:3,border_color:0xff1c1aa3}],
 					rectex_styles:[{color:0x7f00ffff,w:32,h:32,round:8,border_width:-8}],
@@ -318,9 +310,9 @@ if(UI.TestOption("use_light_theme")){//light
 				find_bar_button_size:28,
 				find_bar_editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",20),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",20),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",20,50),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,250),
 					//font_tilde:UI.Font(UI.icon_font_name,28,100),
 					font_tilde:UI.Font(UI.icon_font_name,26,100),
 					color:0xff000000,
@@ -335,7 +327,10 @@ if(UI.TestOption("use_light_theme")){//light
 					color_meta:0xff9a3d6a,
 					rectex_styles:[{color:0}],
 					bgcolor_selection:C&0x55ffffff,
-					tab_width:4,
+					/////////////
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xff000000,
+					caret_flicker:500,
 				},
 				find_item_scale:0.8,
 				find_item_expand_current:4,//in lines
@@ -443,6 +438,10 @@ if(UI.TestOption("use_light_theme")){//light
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,100),
 					scroll_transition_dt:0.1,
 					bgcolor_selection:C_sel,
+					/////////////
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xff000000,
+					caret_flicker:500,
 					color:0xff000000,
 					state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
 					read_only:1,
@@ -476,7 +475,9 @@ if(UI.TestOption("use_light_theme")){//light
 					font:UI.Font("res/fonts/inconsolata.ttf",20),
 					color:0xff000000,
 					bgcolor_selection:C&0x55ffffff,
-					tab_width:4,
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xff000000,
+					caret_flicker:500,
 				},
 			},
 			binary_editor:{
@@ -690,6 +691,7 @@ if(UI.TestOption("use_light_theme")){//light
 				icon_font:UI.Font(UI.icon_font_name,20),
 				icon_fontb:UI.Font(UI.icon_font_name,20,100),
 				font:UI.Font(UI.font_name,24),
+				font_small:UI.Font(UI.font_name,20),
 				text_color:0xff000000,
 				icon_color:0xff000000,//C,
 				text_color_license:0xff7f7f7f,
@@ -704,16 +706,39 @@ if(UI.TestOption("use_light_theme")){//light
 				caption_icon_color:0xff7f7f7f,
 			},
 		};
-	};
-}else{//dark
-	UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
-	//UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff999afb:0xffe3cea6);
-	UI.CustomTheme=function(){
-		var C=UI.current_theme_color;
+	}else{//dark
+		var C=UI.lerp_rgba(UI.current_theme_color,0xff000000,0.25);
 		var C_dark=UI.lerp_rgba(C,0xff000000,0.15)
 		var C_sel=UI.lerp_rgba(C,0xff444444,0.66)
-		//todo: edit box, caret color
+		var C_raw=UI.current_theme_color
 		return {//dark
+			edit:{
+				//animating edit would ruin a lot of object properties
+				transition_dt:0,
+				scroll_transition_dt:0.1,
+				bgcolor_selection:C_raw&0x22ffffff,
+				caret_width:UI.IS_MOBILE?1:2,
+				caret_color:0xffe8e8e8,
+				caret_flicker:500,
+			},
+			edit_box:{
+				transition_dt:0.1,
+				round:4,padding:8,
+				color:0xff333333,
+				hint_color:0xffaaaaaa,
+				border_width:2,
+				border_color:0xff666666,
+				font:UI.Font(UI.font_name,UI.font_size),
+				text_color:0xffe8e8e8,
+				$:{
+					blur:{
+						border_color:0xff666666,
+					},
+					focus:{
+						border_color:C,
+					},
+				},
+			},
 			tooltip:{
 				font:UI.Font(UI.font_name,24,-50),
 				padding:8,
@@ -813,22 +838,22 @@ if(UI.TestOption("use_light_theme")){//light
 					color:0,
 					$:{
 						out:{
-							text_color:0xff999999,
+							text_color:0xff7f7f7f,
 						},
 						over:{
-							text_color:C,
+							text_color:0xffe8e8e8,
 						},
 						down:{
-							text_color:UI.lerp_rgba(C,0xff000000,0.2),
+							text_color:0xffcccccc,//UI.lerp_rgba(C,0xff000000,0.2),
 						},
 						checked_out:{
-							text_color:C,
+							text_color:0xffe8e8e8,
 						},
 						checked_over:{
-							text_color:C,
+							text_color:0xffe8e8e8,
 						},
 						checked_down:{
-							text_color:UI.lerp_rgba(C,0xff000000,0.2),
+							text_color:0xffcccccc,//UI.lerp_rgba(C,0xff000000,0.2),
 						},
 					}
 				},
@@ -906,14 +931,14 @@ if(UI.TestOption("use_light_theme")){//light
 				editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",28),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,0),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,50),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,250),
 					font_tilde:UI.Font(UI.icon_font_name,28,100),
 					//////////////////
 					color:0xffbfdfdf,
 					color2:0xffbfdfdf,
 					color_normal:0xffbfdfdf,
-					color_overlay:0xff7f7f7f,
+					color_overlay:0xffaaaaaa,
 					color_string:0xff0055ff,
 					color_number:0xffcfcc8a,
 					color_comment:0xff7f9f7f,
@@ -943,8 +968,10 @@ if(UI.TestOption("use_light_theme")){//light
 					padding_ellipsis:2,
 					h_ellipsis:20,
 					/////////////
-					bgcolor_selection:C&0x22ffffff,
-					tab_width:4,
+					bgcolor_selection:C_raw&0x22ffffff,
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xffbfdfdf,
+					caret_flicker:500,
 					scroll_transition_dt:0.075,
 					/////////////
 					//rectex_styles:[{color:0,w:32,h:32,round:8,border_width:3,border_color:0xff1c1aa3}],
@@ -958,7 +985,7 @@ if(UI.TestOption("use_light_theme")){//light
 				top_hint_shadow_color:0x7f000000,
 				top_hint_shadow_size:8,
 				top_hint_border_width:2,
-				top_hint_border_color:0xff000000,
+				top_hint_border_color:0xff222222,
 				top_hint_max_lines:3,
 				top_hint_max_levels:20,
 				x_scroll_shadow_color:0x7f000000,
@@ -972,10 +999,10 @@ if(UI.TestOption("use_light_theme")){//light
 				color_cur_line_highlight:0x55666666,
 				///////
 				bookmark_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,10,200):UI.Font(UI.font_name,12,200),
-				bookmark_color:[{x:0,y:0,color:C_sel},{x:1,y:1,color:0xff222222}],
-				bookmark_text_color:C_dark,
+				bookmark_color:[{x:0,y:0,color:C_sel},{x:1,y:1,color:0xff3f3f3f}],
+				bookmark_text_color:0xffbfdfdf,
 				//bookmark_shadow:0xff000000,
-				bookmark_border_color:C_dark,
+				bookmark_border_color:0xffbfdfdf,
 				bookmark_scroll_bar_marker_size:2,
 				///////
 				//color_diff_tag:[{x:0,y:0,color:0xff2ca033&0xffffff},{x:1,y:0,color:0xff2ca033}],
@@ -988,8 +1015,8 @@ if(UI.TestOption("use_light_theme")){//light
 				minimap_page_border_width:1,
 				minimap_page_border_color:0xff000000,
 				sbar_eye_font:UI.Font(UI.icon_font_name,12,200),
-				sbar_page_shadow:0xaae8e8e8,
-				sbar_page_border_color:0xffe8e8e8,
+				sbar_page_shadow:0x7f999999,
+				sbar_page_border_color:0xff999999,
 				sbar_page_border_width:1,
 				w_minimap:128,
 				///////
@@ -1007,9 +1034,9 @@ if(UI.TestOption("use_light_theme")){//light
 				find_bar_button_size:28,
 				find_bar_editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",20),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",20),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",20,50),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,250),
 					//font_tilde:UI.Font(UI.icon_font_name,28,100),
 					font_tilde:UI.Font(UI.icon_font_name,26,100),
 					color:0xffbfdfdf,
@@ -1024,8 +1051,10 @@ if(UI.TestOption("use_light_theme")){//light
 					color_symbol2:0xffccdcdc,
 					color_meta:0xff8fafdf,
 					rectex_styles:[{color:0}],
-					bgcolor_selection:C&0x22ffffff,
-					tab_width:4,
+					bgcolor_selection:C_raw&0x22ffffff,
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xffbfdfdf,
+					caret_flicker:500,
 				},
 				find_item_scale:0.8,
 				find_item_expand_current:4,//in lines
@@ -1133,6 +1162,9 @@ if(UI.TestOption("use_light_theme")){//light
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,100),
 					scroll_transition_dt:0.1,
 					bgcolor_selection:C_sel,
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xffe8e8e8,
+					caret_flicker:500,
 					color:0xffe8e8e8,
 					state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
 					read_only:1,
@@ -1165,8 +1197,10 @@ if(UI.TestOption("use_light_theme")){//light
 				find_bar_editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",20),
 					color:0xffe8e8e8,
-					bgcolor_selection:C&0x22ffffff,
-					tab_width:4,
+					bgcolor_selection:C_raw&0x22ffffff,
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:0xffe8e8e8,
+					caret_flicker:500,
 				},
 			},
 			binary_editor:{
@@ -1189,11 +1223,11 @@ if(UI.TestOption("use_light_theme")){//light
 				line_number_color:0xff6a8264,
 				line_number_color_focus:0xff8DAC85,
 				caret_width:2,
-				caret_color:0xff000000,
+				caret_color:0xffbfdfdf,
 				caret_flicker:500,
 				text_color:0xffbfdfdf,
 				bgcolor:0xff3f3f3f,
-				bgcolor_selection:C&0x22ffffff,
+				bgcolor_selection:C_raw&0x22ffffff,
 				separator_color:0xff000000,
 				minimap_padding:12,
 				minimap_page_shadow:0x3faaaaaa,
@@ -1295,7 +1329,7 @@ if(UI.TestOption("use_light_theme")){//light
 				font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
 				text_color:0xffe8e8e8,
 				text_sel_color:0xffe8e8e8,
-				icon_color:C,
+				icon_color:C_raw,
 				hotkey_color:0xffaaaaaa,
 				hotkey_sel_color:0xffaaaaaa,
 				sel_bgcolor:C,
@@ -1379,6 +1413,7 @@ if(UI.TestOption("use_light_theme")){//light
 				icon_font:UI.Font(UI.icon_font_name,20),
 				icon_fontb:UI.Font(UI.icon_font_name,20,100),
 				font:UI.Font(UI.font_name,24),
+				font_small:UI.Font(UI.font_name,20),
 				text_color:0xffe8e8e8,
 				icon_color:0xffe8e8e8,//C,
 				text_color_license:0xffaaaaaa,
@@ -1396,4 +1431,3 @@ if(UI.TestOption("use_light_theme")){//light
 	};
 }
 
-UI.ApplyTheme(UI.CustomTheme())

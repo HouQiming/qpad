@@ -259,7 +259,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		for(var i=0;i<tokens.length;i++){
 			var s=tokens[i]
 			var lg=Duktape.__byte_length(s)
-			if(this.ed.GetText(side==0?ccnt:ccnt+1-lg,lg)==s){
+			if(ccnt+1-lg>0&&this.ed.GetText(ccnt+1-lg,lg)==s){
 				return lg
 			}
 		}
@@ -2462,6 +2462,7 @@ W.SXS_NewPage=function(id,attrs){
 			same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
 			plugins:[fnewpage_findbar_plugin],
 			default_focus:2,
+			tab_width:UI.GetOption("tab_width",4),
 		});
 		if(is_find_bar_new&&UI.m_ui_metadata.new_page_mode=='fs_view'){
 			//set initial path - UI.m_new_document_search_path
@@ -2925,6 +2926,7 @@ W.CodeEditor=function(id,attrs){
 			var line_current=doc.GetLC(doc.sel1.ccnt)[0]
 			var ed_caret=doc.GetCaretXY();
 			//var line_ccnts=doc.SeekAllLinesBetween(line_current,line_current+2)
+			doc.cur_line_hl.color=obj.color_cur_line_highlight;
 			if(UI.TestOption("show_line_highlight")){
 				doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
 				doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
@@ -3215,13 +3217,14 @@ W.CodeEditor=function(id,attrs){
 					m_is_main_editor:1,
 					precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
 					same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
+					tab_width:UI.GetOption("tab_width",4),
 				},W.CodeEditor_prototype);
 				if(UI.enable_timing){
 					print('before bookmark and ln=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
 				}
 				//wrap width widget
 				if(wrap_width>0){
-					var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+2;
+					var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+8;
 					if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
 						UI.RoundRect({
 							x:obj.x+x_wrap_bar,
@@ -3882,6 +3885,7 @@ W.CodeEditor=function(id,attrs){
 					plugins:[ffindbar_plugin],
 					precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
 					same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
+					tab_width:UI.GetOption("tab_width",4),
 					CancelFind:function(){
 						var obj=this.find_bar_owner
 						obj.show_find_bar=0;
@@ -4620,6 +4624,14 @@ UI.RegisterEditorPlugin(function(){
 	})
 })
 
+UI.CustomizeConfigScript=function(fn){
+	var fn_full=IO.GetStoragePath()+"/"+fn;
+	if(!IO.FileExists(fn)){
+		IO.CreateFile(fn_full,IO.UIReadAll("res/misc/"+fn));
+	}
+	UI.OpenEditorWindow(fn_full)
+}
+
 W.FeatureItem=function(id,attrs){
 	var obj=UI.Keep(id,attrs)
 	UI.StdStyling(id,obj,attrs, "feature_item");
@@ -4670,11 +4682,48 @@ W.FeatureItem=function(id,attrs){
 			W.Text("",{x:obj.x+16,y:obj.y+obj.h-32,font:obj.font,text:obj.license_line,color:obj.text_color_license})
 		}else if(obj.special){
 			if(obj.special=='install_button'){
-				W.Button("install",{x:obj.x+12,y:obj.y+obj.h-34,w:280,h:32,text:"",OnClick:function(){
+				var s_text=UI._("Install shell menu integration")
+				var dims=UI.MeasureText(obj.font,s_text);
+				W.Button("install",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
 					UI.InstallQPad();
 				}})
 				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"盾",color:obj.install.text_color})
-				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:"Install shell menu integration",color:obj.install.text_color})
+				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.install.text_color})
+			}else if(obj.special=='theme_button'){
+				var s_text=UI._("Dark theme / light theme")
+				var dims=UI.MeasureText(obj.font,s_text);
+				W.Button("dark_light_theme",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
+					options["use_light_theme"]=!UI.TestOption("use_light_theme");
+					UI.ApplyTheme(UI.CustomTheme())
+					obj.editor_widget.Reload();
+					obj.owner.plugin_view_items=undefined;
+					UI.Refresh()
+				}})
+				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"半",color:obj.dark_light_theme.text_color})
+				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.dark_light_theme.text_color})
+			}else if(obj.special=='tab_width'){
+				var s_text_0=UI.GetOption("tab_width",4).toString();
+				var s_text=UI._("Adjust tab width")
+				var dims0=UI.MeasureText(obj.font_small,s_text_0);
+				var dims=UI.MeasureText(obj.font,s_text);
+				W.Button("tab_width_btn",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
+					var twidth=UI.GetOption("tab_width",4);
+					twidth+=2;
+					if(!(twidth<12)){twidth=2;}
+					options["tab_width"]=twidth;
+					obj.editor_widget.Reload();
+					UI.Refresh()
+				}})
+				W.Text("",{x:obj.x+16+(20-dims0.w)*0.5,y:obj.y+obj.h-34+(28-dims0.h)*0.5,font:obj.font_small,text:s_text_0,color:obj.tab_width_btn.text_color})
+				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.tab_width_btn.text_color})
+			}else if(obj.special=='customize'){
+				var s_text=obj.text;
+				var dims=UI.MeasureText(obj.font,s_text);
+				var btn=W.Button("customize_"+obj.file,{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
+					UI.CustomizeConfigScript(obj.file)
+				}})
+				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"换",color:btn.text_color})
+				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:btn.text_color})
 			}
 		}
 	UI.End()
@@ -4697,15 +4746,17 @@ W.SXS_OptionsPage=function(id,attrs){
 			//special stuff
 			var plugin_items={};
 			plugin_items["Display"]=[
-				{name:'(temp) Use light theme',stable_name:'use_light_theme'},//todo: sun/moon icons
-				{name:'Highlight the current line',stable_name:'show_line_highlight'},
-				{name:'Show outer scope overlays',stable_name:'show_top_hint'},
-				{name:'Show line numbers',stable_name:'show_line_numbers'},
-				{name:'Show minimap',stable_name:'show_minimap'},
+				{special:'theme_button',h_special:4},
+				{special:'tab_width',h_special:4},
+				{name:UI._('Highlight the current line'),stable_name:'show_line_highlight'},
+				{name:UI._('Show outer scope overlays'),stable_name:'show_top_hint'},
+				{name:UI._('Show line numbers'),stable_name:'show_line_numbers'},
+				{name:UI._('Show minimap'),stable_name:'show_minimap'},
 			];
 			plugin_items["Controls"]=[
-				{name:'Stop at both word boundaries',stable_name:'precise_ctrl_lr_stop'},
-				{name:'Allow \u2190 / \u2192 to cross lines',stable_name:'left_right_line_wrap'},
+				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
+				{name:UI._('Stop at both word boundaries'),stable_name:'precise_ctrl_lr_stop'},
+				{name:UI._('Allow \u2190 / \u2192 to cross lines'),stable_name:'left_right_line_wrap'},
 			];
 			if(UI.InstallQPad){
 				plugin_items["Tools"]=[
@@ -4724,6 +4775,10 @@ W.SXS_OptionsPage=function(id,attrs){
 				}
 				cat_list.push(desc_i);
 			}
+			plugin_items["Display"].push(
+				{special:'customize',h_special:4,text:UI._("Customize the theme script"),file:"conf_theme.js"},
+				{special:'customize',h_special:4,text:UI._("Customize the translation script"),file:"conf_translation.js"}
+			);
 			/////////////////
 			//qpad credits
 			plugin_items["About"]=[
@@ -4776,6 +4831,7 @@ W.SXS_OptionsPage=function(id,attrs){
 			is_single_click_mode:1,no_region:1,
 			item_template:{
 				object_type:W.FeatureItem,
+				owner:obj,
 				editor_widget:obj.owner,
 			},items:obj.plugin_view_items})
 	UI.End()

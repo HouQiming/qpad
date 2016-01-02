@@ -476,10 +476,12 @@ Language.Register({
 	file_icon_color:0xff444444,
 	file_icon:'文',
 	rules:function(lang){
-		lang.DefineDefaultColor("color")
+		lang.DefineDefaultColor("color_symbol")
 		var bid_title=lang.ColoredDelimiter("key","#","\n","color_type");
 		var bid_code2=lang.ColoredDelimiter("key","\t","\n","color_string");
 		var bid_code=lang.ColoredDelimiter("key","`","`","color_string");
+		var kwset=lang.DefineKeywordSet("color_symbol");
+		kwset.DefineWordColor("color")
 		/////////////
 		lang.SetSpellCheckedColor("color")
 		return (function(lang){
@@ -2511,7 +2513,7 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit=undefined;
 		}
 	})
-}).prototype.desc={category:"Tools",name:"Unicode conversion",stable_name:"unicode_conv"};
+}).prototype.desc={category:"Tools",name:"Unicode ↔ \\u",stable_name:"unicode_conv"};
 
 var ApplyAutoEdit=function(doc,cur_autoedit_ops,line_id){
 	var locs=doc.m_autoedit_locators;
@@ -2876,7 +2878,7 @@ UI.RegisterEditorPlugin(function(){
 		UpdateVSel();
 	})
 	//coulddo: menu items
-}).prototype.desc={category:"Editing",name:"Auto-edit",stable_name:"auto_edit"};
+}).prototype.desc={category:"Editing",name:"Automatic edit propagation",stable_name:"auto_edit"};
 
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}

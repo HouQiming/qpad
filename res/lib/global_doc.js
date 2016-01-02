@@ -75,6 +75,13 @@ UI.TestOption=function(stable_name){
 	return is_enabled;
 }
 
+UI.GetOption=function(stable_name,default_value){
+	var options=(UI.m_ui_metadata["<options>"]||{});
+	var ret=options[stable_name];
+	if(ret==undefined){ret=default_value;}
+	return ret;
+}
+
 //UI.NewFromTemplate=function(fn_template,fn_real){
 //	var ret=UI.OpenFile(IO.GetExecutablePath()+"/"+fn_template)
 //	if(!ret){

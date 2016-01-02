@@ -426,6 +426,7 @@ class CLayouter_programmer
 		m_enable_advanced_wrapping=!!m_hyp
 		if !(m_wrap_width>0.f):
 			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
+			m_wrap_width_in_fp=(m_wrap_width_in_fp/m_tab_width_in_fp)*m_tab_width_in_fp
 			//Writeln(m_wrap_width_in_fp)
 		else
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
@@ -736,6 +737,8 @@ class CLayouter_programmer
 						if color_id>0:
 							color_ids[ofs]=m_cached_colors_p_word_part+color_id
 					if need_spell_check:
+						if isCJK(ch):
+							need_spell_check=0
 						if ch>=65536:
 							//surrogate pair - 2nd
 							s_word.push(char(((ch>>18)&0xf)+0xf0))
@@ -776,7 +779,7 @@ class CLayouter_programmer
 		//smart emboldening for SRGB
 		//coulddo: per-color emboldening
 		if g_renderer.m_srgb_supported:
-			fnt_scaled.SmartEmbolden(0xff000000)
+			fnt_scaled.SmartEmbolden(m_cached_colors[0])
 		hc=charHeight()
 		x=GetFlatX(a)
 		tab_width=m_tab_width_in_fp
@@ -960,7 +963,7 @@ class CLayouter_programmer
 			fnt_tilde0.h=m_font.h*scale
 			inline xyToFloat(x,y)
 				return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
-			wf=fixed2float(clip_w)
+			wf=fixed2float(min(clip_w,m_wrap_width_in_fp))
 			hcf=g_renderer.GetCharacterHeight(m_font)*scale
 			for i=0:4:xys.n-4
 				C_tilde=m_current_frame_tildes[i>>2].color
@@ -1157,7 +1160,7 @@ class CLayouter_programmer
 			fnt_scaled.h*=scale
 			//smart emboldening for SRGB - it has to be done *after* the scale
 			if g_renderer.m_srgb_supported:
-				fnt_scaled.SmartEmbolden(0xff000000)
+				fnt_scaled.SmartEmbolden(m_cached_colors[0])
 		OfsCheck=__inline_loop_body(ccnt){
 			if mode==MODE_BB&&h_line:
 				//never return before the first newline
@@ -1555,6 +1558,7 @@ class CLayouter_programmer
 		auto obj=JS.Param(1).as(JSObject)
 		if !(m_wrap_width>0.f):
 			m_wrap_width_in_fp=DEFAULT_WRAP_WIDTH_IN_CHARS*charWidth(int(' '))
+			m_wrap_width_in_fp=(m_wrap_width_in_fp/m_tab_width_in_fp)*m_tab_width_in_fp
 		else
 			m_wrap_width_in_fp=(float2fixed(m_wrap_width)/m_tab_width_in_fp)*m_tab_width_in_fp
 		m_hidden_ranges_prepared=0

@@ -1,4 +1,5 @@
-//English UI with simplified Chinese fallback fonts
+// You have to restart QPad for changes to take effect
+// Default English UI with simplified Chinese fallback fonts
 if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 	UI.fallback_font_names=["msyh.ttc","arialuni.ttf","simhei.ttf"]
 }else if(UI.Platform.ARCH=="mac"){

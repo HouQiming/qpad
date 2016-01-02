@@ -19,7 +19,7 @@ UI.SetFontSharpening(1);
 //UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
 
 UI.ReadOptionalConfigScript=function(fn){
-	var fn_full=IO.GetStoragePath()+fn;
+	var fn_full=IO.GetStoragePath()+"/"+fn;
 	var s0=IO.ReadAll(fn_full);
 	if(!s0){
 		fn_full="res/misc/"+fn;
@@ -63,6 +63,7 @@ UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
 		}
 	}
 })()
+UI.ApplyTheme(UI.CustomTheme());
 
 UI.ReadOptionalConfigScript("conf_keymap.js");
 

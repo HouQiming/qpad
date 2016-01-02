@@ -1,5 +1,8 @@
-// Sandbox file to test out different settings
-// Other files have to be reloaded for the new setting to take effect
+/*****************************************************************/
+/* This is a sandbox file to test out different settings.        */
+/* It won't be saved, so don't put anything useful here.         */
+/* Other files have to be _RELOADED_ for changes to take effect. */
+/*****************************************************************/
 #include <stdio.h>
 
 #define EXAMPLE_CONST 42
@@ -14,8 +17,8 @@ int ExampleFunction(const ExampleStruct &a){
 
 void AnotherFunction(){
 	char *example_array[20];
-	// Edit the next line to test out auto-edit
-	// e.g. edit it into 'char* Lorem=example_array[0];'
+	// Edit the lines below to test the edit propagation feature
+	// e.g. 'example_array[0]="Lorem"' → 'char* Lorem=example_array[0];'
 	example_array[0]="Lorem";
 	example_array[1]="ipsum";
 	example_array[2]="dolor";
@@ -37,7 +40,7 @@ void AnotherFunction(){
 	example_array[18]="aliqua";
 	example_array[19]="Ut";
 	///////////////////////////////////
-	// Move cursor beyond here to test out outer-scope hints
+	// Move cursor a few lines below to see outer-scope overlays
 	char concatenated[512]={0};
 	strcat(concatenated,example_array[0]);
 	strcat(concatenated,example_array[1]);
@@ -59,7 +62,9 @@ void AnotherFunction(){
 	strcat(concatenated,example_array[17]);
 	strcat(concatenated,example_array[18]);
 	strcat(concatenated,example_array[19]);
-	puts(concatenated);
+	printf("%s\n",concatenated);
+	// A unicode string for you to SHIFT+CTRL+U (⇧⌘U on Mac)
+	printf("'文' == '\u6587'\n");
 }
 
 int main(){
