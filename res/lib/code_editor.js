@@ -267,7 +267,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	FindOuterBracket_SizeFriendly:function(ccnt,delta){
 		var ccnt_raw=this.FindOuterBracket(ccnt,delta)
-		return delta<0?ccnt_raw:(ccnt_raw+1-this.BracketSizeAt(ccnt_raw,0))
+		//return delta<0?ccnt_raw:(ccnt_raw+1-this.BracketSizeAt(ccnt_raw,0))
+		return (ccnt_raw+1-this.BracketSizeAt(ccnt_raw,delta<0?0:1))
 	},
 	FindOuterLevel:function(ccnt){
 		var ccnt_bracket=this.FindOuterBracket_SizeFriendly(ccnt,-1);
@@ -378,6 +379,54 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	OnMouseDown:function(event){
 		if(this.m_is_preview){return;}
 		W.Edit_prototype.OnMouseDown.call(this,event)
+	},
+	OnClick:function(event){
+		if(event.button==UI.SDL_BUTTON_RIGHT){
+			this.OnRightClick(event);
+		}
+	},
+	OnRightClick:function(event){
+		if(!this.m_is_main_editor){return;}
+		//generate the menu right here, using current-frame menu entries
+		var menu=UI.m_global_menu;
+		if(!menu){return;}
+		var context_menu_groups={};
+		var dfs=function(menu){
+			for(var i=0;i<menu.$.length;i++){
+				var item_i=menu.$[i];
+				if(item_i.context_menu_group){
+					var group=context_menu_groups[item_i.context_menu_group];
+					if(!group){
+						group=[];
+						context_menu_groups[item_i.context_menu_group]=group;
+					}
+					group.push(item_i);
+					continue;
+				}
+				if(item_i.type=='submenu'){
+					dfs(item_i.menu);
+				}
+			}
+		}
+		dfs(menu);
+		menu=undefined;
+		//////////////////////
+		var keys=[];
+		for(var s_key in context_menu_groups){
+			keys.push(s_key)
+		}
+		if(!keys.length){return;}
+		keys.sort();
+		var menu_context=new W.CFancyMenuDesc();
+		for(var i=0;i<keys.length;i++){
+			if(i){
+				menu_context.AddSeparator()
+			}
+			menu_context.$=menu_context.$.concat(context_menu_groups[keys[i]])
+		}
+		this.m_menu_context={x:event.x,y:event.y,menu:menu_context};
+		menu_context=undefined;
+		UI.Refresh()
 	},
 })
 
@@ -3948,16 +3997,16 @@ W.CodeEditor=function(id,attrs){
 					doc.CallOnSelectionChange()
 					UI.Refresh()
 				}})
-				if(doc.sel0.ccnt<doc.sel1.ccnt){
-					menu_edit.AddNormalItem({text:"&Copy",icon:"拷",enable_hotkey:0,key:"CTRL+C",action:function(){
+				if(doc.sel0.ccnt!=doc.sel1.ccnt){
+					menu_edit.AddNormalItem({text:"&Copy",icon:"拷",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+C",action:function(){
 						doc.Copy()
 					}})
+					menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+X",action:function(){
+						doc.Cut()
+					}})
 				}
-				menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",enable_hotkey:0,key:"CTRL+X",action:function(){
-					doc.Cut()
-				}})
 				if(UI.SDL_HasClipboardText()){
-					menu_edit.AddNormalItem({text:"&Paste",enable_hotkey:0,key:"CTRL+V",action:function(){
+					menu_edit.AddNormalItem({text:"&Paste",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+V",action:function(){
 						doc.Paste()
 					}})
 				}
@@ -4089,8 +4138,9 @@ W.CodeEditor=function(id,attrs){
 					//UI.m_ui_metadata.find_state.m_current_needle=""
 					UI.Refresh()
 				}})
-				if(doc.m_file_index&&doc.m_file_index.hasDecls()){
-					menu_search.AddNormalItem({text:"Go to &definition",enable_hotkey:1,key:"F12",action:function(){
+				var neib=doc.ed.GetUtf8CharNeighborhood(doc.sel1.ccnt);
+				if(doc.m_file_index&&doc.m_file_index.hasDecls()&&(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1]))){
+					menu_search.AddNormalItem({text:"Go to &definition",context_menu_group:"definition",enable_hotkey:1,key:"F12",action:function(){
 						var obj=this
 						var doc=obj.doc
 						var sel=doc.GetSelection();
@@ -4164,6 +4214,19 @@ W.CodeEditor=function(id,attrs){
 				doc.CallHooks('menu')
 				menu_edit=undefined;
 				menu_search=undefined;
+			}
+			if(doc.m_menu_context){
+				UI.TopMostWidget(function(){
+					var is_first=!obj.context_menu;
+					var obj_submenu=W.FancyMenu("context_menu",{
+						x:doc.m_menu_context.x, y:doc.m_menu_context.y,
+						desc:doc.m_menu_context.menu,
+						HideMenu:function(){doc.m_menu_context=undefined;},
+					})
+					if(is_first){UI.SetFocus(obj_submenu);}
+				})
+			}else{
+				obj.context_menu=undefined;
 			}
 		}
 		if(UI.enable_timing){
@@ -4432,8 +4495,6 @@ UI.NewCodeEditorTab=function(fname0){
 	})
 };
 
-//UI.RegisterLoaderForExtension("*",function(fname){return UI.OpenEditorWindow(fname)})
-
 UI.OpenEditorWindow=function(fname,fcallback){
 	fname=IO.NormalizeFileName(fname).replace(/[\\]/g,"/");
 	var obj_tab=undefined;
@@ -4463,15 +4524,36 @@ UI.OpenEditorWindow=function(fname,fcallback){
 	}
 }
 
+UI.OpenForCommandLine=function(cmdline_opens){
+	for(var i=0;i<cmdline_opens.length;i++){
+		if(i+2<cmdline_opens.length&&cmdline_opens[i+1]=='--seek'){
+			var line=Math.max(parseInt(cmdline_opens[i+2])-1,0);
+			UI.OpenEditorWindow(cmdline_opens[i],function(){
+				if(!(line>=0)){
+					return;
+				}
+				var doc=this
+				var ccnt=doc.SeekLC(line,0)
+				doc.SetSelection(ccnt,ccnt)
+				doc.AutoScroll("center")
+				UI.g_cursor_history_test_same_reason=1
+				UI.Refresh()
+			})
+			i+=2;
+			continue;
+		}
+		UI.OpenEditorWindow(cmdline_opens[i])
+	}
+}
+
 UI.OnApplicationSwitch=function(){
 	var fn_hack_pipe2=IO.GetStoragePath()+"/tmp_open.json";
 	if(IO.FileExists(fn_hack_pipe2)){
 		try{
 			var cmdline_opens=JSON.parse(IO.ReadAll(fn_hack_pipe2));
 			IO.DeleteFile(fn_hack_pipe2)
-			for(var i=0;i<cmdline_opens.length;i++){
-				UI.OpenEditorWindow(cmdline_opens[i])
-			}
+			UI.OpenForCommandLine(cmdline_opens);
+			UI.Refresh();
 		}catch(e){
 			//do nothing
 		}
@@ -4768,8 +4850,8 @@ W.SXS_OptionsPage=function(id,attrs){
 			];
 			plugin_items["Controls"]=[
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
-				{name:UI._('Stop at both word boundaries'),stable_name:'precise_ctrl_lr_stop'},
-				{name:UI._('Allow \u2190 / \u2192 to cross lines'),stable_name:'left_right_line_wrap'},
+				{name:UI._('Make @1 stop at both sides').replace("@1",UI.Platform.ARCH=="mac"?"\u2325\u2190/\u2325\u2192":"CTRL+\u2190/\u2192"),stable_name:'precise_ctrl_lr_stop'},
+				{name:UI._('Allow \u2190/\u2192 to cross lines'),stable_name:'left_right_line_wrap'},
 			];
 			if(UI.InstallQPad){
 				plugin_items["Tools"]=[

@@ -18,7 +18,7 @@ int ExampleFunction(const ExampleStruct &a){
 void AnotherFunction(){
 	char *example_array[20];
 	// Edit the lines below to test the edit propagation feature
-	// e.g. 'example_array[0]="Lorem"' → 'char* Lorem=example_array[0];'
+	//   example_array[0]="Lorem"; → char* Lorem=example_array[0];
 	example_array[0]="Lorem";
 	example_array[1]="ipsum";
 	example_array[2]="dolor";

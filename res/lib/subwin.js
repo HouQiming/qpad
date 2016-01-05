@@ -716,26 +716,27 @@ W.CFancyMenuDesc.prototype={
 		children.push({type:'text',icon:attrs.icon,text:attrs.text,
 			color:attrs.action?style.text_color:style.hotkey_color,
 			icon_color:attrs.icon=="■"||attrs.icon=="□"?style.icon_color:style.text_color,
+			context_menu_group:attrs.context_menu_group,
 			sel_icon_color:style.text_sel_color,
 			sel_color:style.text_sel_color})
 		if(attrs.action){attrs.action=WrapMenuAction(attrs.action);}
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0&&attrs.action){
 			//underlined hotkey
-			children.push({type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
+			children.push({type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),context_menu_group:attrs.context_menu_group,action:attrs.action})
 			if(UI.Platform.ARCH!="mac"){
-				children.push({type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),action:attrs.action})
+				children.push({type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),context_menu_group:attrs.context_menu_group,action:attrs.action})
 			}
 		}
 		if(attrs.key){
 			children.push(
-				{type:'rubber'},
-				{type:'text',
+				{type:'rubber',context_menu_group:attrs.context_menu_group},
+				{type:'text',context_menu_group:attrs.context_menu_group,
 					text:UI.LocalizeKeyName(UI.TranslateHotkey(attrs.key)),
 					color:style.hotkey_color,sel_color:style.hotkey_sel_color})
 			if(attrs.enable_hotkey&&attrs.action){W.Hotkey("",{key:attrs.key,action:attrs.action})}
 		}
-		children.push({type:'newline',action:attrs.action})
+		children.push({type:'newline',context_menu_group:attrs.context_menu_group,action:attrs.action})
 	},
 	//todo: selection widget - bind to some property
 	AddButtonRow:function(attrs,buttons){
@@ -915,7 +916,7 @@ W.FancyMenu_prototype={
 			this.value=sel;
 			UI.Refresh()
 		}
-		else if(IsHotkey(event,"LEFT")){
+		else if(IsHotkey(event,"LEFT")&&this.parent_menu_list_view){
 			var list_view=this.parent_menu_list_view
 			n=list_view.items.length;
 			sel=(list_view.value||0)
@@ -923,7 +924,7 @@ W.FancyMenu_prototype={
 			if(sel<0){sel=n-1;}
 			list_view.OnChange(sel)
 			UI.Refresh()
-		}else if(IsHotkey(event,"RIGHT")){
+		}else if(IsHotkey(event,"RIGHT")&&this.parent_menu_list_view){
 			var list_view=this.parent_menu_list_view
 			n=list_view.items.length;
 			sel=(list_view.value||0)

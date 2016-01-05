@@ -199,6 +199,7 @@ class CLayouter_programmer
 	m_font_emboldened=TFont()
 	m_bgcolor_selection=0xff800000
 	m_color_overlay=0xff000000
+	m_color_embolden=0xff000000
 	m_color_virtual_diff_bold=0xff000000
 	//////////////
 	m_enable_advanced_wrapping=0
@@ -453,6 +454,7 @@ class CLayouter_programmer
 			m_cached_colors[m_cached_colors_p_word_part+I]=obj[color_name].or(0xff000000)
 		m_bgcolor_selection=int(obj["bgcolor_selection"].or(u32(m_bgcolor_selection)))
 		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
+		m_color_embolden=int(obj["color"].or(u32(m_color_embolden)))
 		m_cached_color_virtual_hyphen=int(obj["color_hyphen"].or(u32(m_cached_color_virtual_hyphen)))
 		if m_spell_checker:
 			m_current_frame_spell_errors=new long2[]
@@ -779,7 +781,7 @@ class CLayouter_programmer
 		//smart emboldening for SRGB
 		//coulddo: per-color emboldening
 		if g_renderer.m_srgb_supported:
-			fnt_scaled.SmartEmbolden(m_cached_colors[0])
+			fnt_scaled.SmartEmbolden(m_color_embolden)
 		hc=charHeight()
 		x=GetFlatX(a)
 		tab_width=m_tab_width_in_fp
@@ -1160,7 +1162,7 @@ class CLayouter_programmer
 			fnt_scaled.h*=scale
 			//smart emboldening for SRGB - it has to be done *after* the scale
 			if g_renderer.m_srgb_supported:
-				fnt_scaled.SmartEmbolden(m_cached_colors[0])
+				fnt_scaled.SmartEmbolden(m_color_embolden)
 		OfsCheck=__inline_loop_body(ccnt){
 			if mode==MODE_BB&&h_line:
 				//never return before the first newline

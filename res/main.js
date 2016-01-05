@@ -226,9 +226,9 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		var sshortname=UI.GetMainFileName(IO.m_my_name).toLowerCase()
 		var sregfile=[
 			"\ufeffWindows Registry Editor Version 5.00\n",
-			"\n[\n-HKEY_CLASSES_ROOT\\*\\shell\\edit_with_qpad\n]\n",
-			"\n[\n-HKEY_CLASSES_ROOT\\Applications\\@1\n]\n".replace("@1",sshortname),
-			"\n[\n-HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@1\n]\n".replace("@1",sshortname),
+			"\n[-HKEY_CLASSES_ROOT\\*\\shell\\edit_with_qpad]\n",
+			"\n[-HKEY_CLASSES_ROOT\\Applications\\@1]\n".replace("@1",sshortname),
+			"\n[-HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@1]\n".replace("@1",sshortname),
 		];
 		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Uninstall QPad"));
 	}
@@ -515,9 +515,7 @@ UI.Application=function(id,attrs){
 			UI.Refresh()
 		}
 		if(UI.m_cmdline_opens.length){
-			for(var i=0;i<UI.m_cmdline_opens.length;i++){
-				UI.OpenEditorWindow(UI.m_cmdline_opens[i])
-			}
+			UI.OpenForCommandLine(UI.m_cmdline_opens)
 			UI.InvalidateCurrentFrame();
 			UI.Refresh()
 			UI.m_cmdline_opens=[];
@@ -586,6 +584,8 @@ if(UI.Platform.ARCH=="mac"){
 	};
 }
 
+UI.OpenFile=UI.OpenEditorWindow;
+
 (function(){
 	var argv=IO.m_argv;
 	if(argv.length>0){argv.shift();}
@@ -606,12 +606,13 @@ if(UI.Platform.ARCH=="mac"){
 		//in case pid exceeds 32 bits... parseFloat it
 		var pid=parseFloat(IO.ReadAll(fn_hack_pipe))
 		IO.CreateFile(fn_hack_pipe2,JSON.stringify(argv))
-		IO.SetForegroundProcess(pid);
-	}else{
-		IO.DeleteFile(fn_hack_pipe2)//delete lingering files
-		IO.CreateFile(fn_hack_pipe,IO.GetPID().toString())
-		UI.m_cmdline_opens=argv;
-		UI.Run();
-		IO.DeleteFile(fn_hack_pipe)
+		if(IO.SetForegroundProcess(pid)){
+			return;
+		}
 	}
+	IO.DeleteFile(fn_hack_pipe2)//delete lingering files
+	IO.CreateFile(fn_hack_pipe,IO.GetPID().toString())
+	UI.m_cmdline_opens=argv;
+	UI.Run();
+	IO.DeleteFile(fn_hack_pipe)
 })()

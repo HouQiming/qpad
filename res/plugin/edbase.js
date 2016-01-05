@@ -745,6 +745,7 @@ W.SXS_BuildOutput=function(id,attrs){
 	UI.Begin(obj)
 		UI.RoundRect(obj)
 		if(UI.g_build_output_editor){
+			//coulddo: use code editor with wrap width
 			obj.doc=UI.g_build_output_editor;
 			W.Edit("doc",{
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
@@ -763,7 +764,7 @@ UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 		args=["jc"].concat(desc.args)
 	}else{
 		desc.delete_json_file=1
-		if(cmd=="run"){
+		if(cmd=="run"&&desc.pause_after_run==undefined){
 			desc.pause_after_run=1
 		}
 		var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
@@ -909,7 +910,7 @@ UI.CreateCompilerError=function(err){
 }
 
 ///////////////////////
-//todo: forward / inverse seek
+//todo: remove pmjs dependency
 UI.RegisterCodeEditorPersistentMember("m_latex_sync")
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
@@ -926,6 +927,7 @@ Language.RegisterCompiler(["tex"],{
 			m_latex_sync:doc.m_latex_sync,
 			m_editor_exe:IO.m_my_name,
 			m_line:doc.GetLC(doc.sel1.ccnt)[0]+1,
+			pause_after_run:0,
 		}
 	},
 	m_regex:new RegExp('^(.*?):([0-9]+): (.+)\r?\n'),
@@ -1287,7 +1289,7 @@ UI.RegisterEditorPlugin(function(){
 			var bk_children=menu_edit_children.slice(menu_edit.p_paste,menu_edit_children.length);
 			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste);
 			menu_edit_children=undefined;
-			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",enable_hotkey:1,key:"SHIFT+CTRL+V",action:function(){
+			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",context_menu_group:"edit",enable_hotkey:1,key:"SHIFT+CTRL+V",action:function(){
 				var sel=this.GetSelection();
 				var ed=this.ed;
 				/*
@@ -2350,7 +2352,7 @@ UI.RegisterEditorPlugin(function(){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddSeparator()
-			menu_edit.AddNormalItem({text:"Fo&ld",icon:"叠",enable_hotkey:1,key:"ALT+LEFT",action:function(){
+			menu_edit.AddNormalItem({text:"Fo&ld",icon:"叠",context_menu_group:"fold",enable_hotkey:1,key:"ALT+LEFT",action:function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
@@ -2394,7 +2396,7 @@ UI.RegisterEditorPlugin(function(){
 					UI.Refresh()
 				}
 			}.bind(this)})
-			menu_edit.AddNormalItem({text:"U&nfold",icon:"展",enable_hotkey:1,key:"ALT+RIGHT",action:function(){
+			menu_edit.AddNormalItem({text:"U&nfold",icon:"展",context_menu_group:"fold",enable_hotkey:1,key:"ALT+RIGHT",action:function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);

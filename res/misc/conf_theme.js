@@ -207,8 +207,8 @@ UI.CustomTheme=function(){
 				editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",28),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,50),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,250),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,0),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
 					font_tilde:UI.Font(UI.icon_font_name,28,100),
 					color:0xff000000,
 					color2:0xff000000,
@@ -310,9 +310,9 @@ UI.CustomTheme=function(){
 				find_bar_button_size:28,
 				find_bar_editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",20),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",20,50),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",20,0),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,250),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
 					//font_tilde:UI.Font(UI.icon_font_name,28,100),
 					font_tilde:UI.Font(UI.icon_font_name,26,100),
 					color:0xff000000,
@@ -931,8 +931,8 @@ UI.CustomTheme=function(){
 				editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",28),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",28,200),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,50),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,250),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",28,0),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",28,200),
 					font_tilde:UI.Font(UI.icon_font_name,28,100),
 					//////////////////
 					color:0xffbfdfdf,
@@ -1034,9 +1034,9 @@ UI.CustomTheme=function(){
 				find_bar_button_size:28,
 				find_bar_editor_style:{
 					font:UI.Font("res/fonts/inconsolata.ttf",20),
-					tex_font:UI.Font("res/fonts/cmunrm.ttf",20,50),
+					tex_font:UI.Font("res/fonts/cmunrm.ttf",20,0),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
-					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,250),
+					tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
 					//font_tilde:UI.Font(UI.icon_font_name,28,100),
 					font_tilde:UI.Font(UI.icon_font_name,26,100),
 					color:0xffbfdfdf,

@@ -51,11 +51,6 @@ UI.GetFileNameExtension=function(fname){
 	}
 }
 
-UI.m_ext_loaders={};
-UI.RegisterLoaderForExtension=function(ext,f){
-	UI.m_ext_loaders[ext]=f;
-}
-
 ////////////////////////////////////
 UI.m_ui_metadata={};
 (function(){
