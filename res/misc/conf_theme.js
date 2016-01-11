@@ -344,7 +344,6 @@ UI.CustomTheme=function(){
 				find_message_font:UI.Font(UI.font_name,32,-50),
 				find_message_color:0xff444444,
 				///////
-				show_auto_completion:1,
 				accands_font:UI.Font(UI.font_name,22,-50),
 				accands_id_font:UI.Font(UI.font_name,12,200),
 				accands_padding:24,
@@ -1068,7 +1067,6 @@ UI.CustomTheme=function(){
 				find_message_font:UI.Font(UI.font_name,32,-50),
 				find_message_color:0xff7f7f7f,
 				///////
-				show_auto_completion:1,
 				accands_font:UI.Font(UI.font_name,22,-50),
 				accands_id_font:UI.Font(UI.font_name,12,200),
 				accands_padding:24,

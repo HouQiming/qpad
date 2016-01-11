@@ -456,7 +456,7 @@ class CLayouter_programmer
 		m_color_overlay=int(obj["color_overlay"].or(u32(m_color_overlay)))
 		m_color_embolden=int(obj["color"].or(u32(m_color_embolden)))
 		m_cached_color_virtual_hyphen=int(obj["color_hyphen"].or(u32(m_cached_color_virtual_hyphen)))
-		if m_spell_checker:
+		if m_spell_checker&&!m_temporarily_disable_spell_check:
 			m_current_frame_spell_errors=new long2[]
 		m_current_frame_tildes=new TTildeItem[]
 		m_current_frame_strikeouts=new float3[]
@@ -772,7 +772,7 @@ class CLayouter_programmer
 							s_word[0]|=i8(0x20)
 							if Hunspell.spell(m_spell_checker,s_word):
 								is_bad=0
-						if is_bad:
+						if is_bad&&!m_temporarily_disable_spell_check:
 							//not a word
 							m_current_frame_spell_errors.push(long2(ccnt_before_word,word_ccnt0))
 		///////
@@ -941,11 +941,12 @@ class CLayouter_programmer
 					scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 	}
 	EndRender=function(JSObject obj,CEditableText ed, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
-		if m_current_frame_spell_errors:
-			C_spell_error=obj["color_tilde_spell_error"].as(int)
-			m_current_frame_spell_errors.Sort()
-			foreach se in m_current_frame_spell_errors
-				m_current_frame_tildes.push(TTildeItem(){ccnt0:se.x,ccnt1:se.y,color:C_spell_error})
+		if !m_temporarily_disable_spell_check:
+			if m_current_frame_spell_errors:
+				C_spell_error=obj["color_tilde_spell_error"].as(int)
+				m_current_frame_spell_errors.Sort()
+				foreach se in m_current_frame_spell_errors
+					m_current_frame_tildes.push(TTildeItem(){ccnt0:se.x,ccnt1:se.y,color:C_spell_error})
 		if m_current_frame_tildes.n:
 			//tilde for spell checks / build errors
 			spell_error_ccnts=new i64[m_current_frame_tildes.n*2]
@@ -1089,7 +1090,7 @@ class CLayouter_programmer
 	string[] m_cached_suggestion
 	string m_cached_suggestion_word
 	JS_Suggest=function(JSContext JS){
-		if !m_spell_checker:return 0
+		if !m_spell_checker||!m_current_frame_spell_errors:return 0
 		ed=JS.Param(0).as(CEditableText)
 		ccnt=JS.Param(1).as(i64)
 		p=m_current_frame_spell_errors.Bisect(function(long2 a){return a.y<=ccnt})

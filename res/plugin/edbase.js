@@ -880,7 +880,7 @@ UI.RegisterEditorPlugin(function(){
 UI.ClearCompilerErrors=function(){
 	//keep the locators for seeking but remove the highlights
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		var obj=UI.g_all_document_windows[i].doc
+		var obj=UI.g_all_document_windows[i].main_widget;
 		if(obj&&obj.doc&&obj.doc.m_error_overlays){
 			for(var j=0;j<obj.doc.m_error_overlays.length;j++){
 				var err_j=obj.doc.m_error_overlays[j]
@@ -2268,7 +2268,7 @@ UI.RegisterEditorPlugin(function(){
 					//ed.trigger_data.bracket_completed=C//tex \ref or \cite... don't need this
 					ctx.detecting_bad_curly=0
 					this.CallOnSelectionChange()
-					this.m_user_just_typed_char=1
+					this.UserTypedChar()
 					return 0
 				}
 			}
@@ -2279,7 +2279,7 @@ UI.RegisterEditorPlugin(function(){
 			if(ccnt1+Duktape.__byte_length(C)==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
 				this.HookedEdit([ccnt1,Duktape.__byte_length(C),C])
 				this.SetCaretTo(ccnt1+Duktape.__byte_length(C))
-				this.m_user_just_typed_char=1
+				this.UserTypedChar()
 				ctx.PopBacStack()
 				this.CallOnChange()
 				this.CallOnSelectionChange()

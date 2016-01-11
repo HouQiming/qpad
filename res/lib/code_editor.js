@@ -51,6 +51,50 @@ var g_encoding_names={
 	'5':"the Big-5",
 	'7':"the UTF-16",
 }
+W.ACContext_prototype={
+	GetDisplayItem:function(id){
+		var ret=this.m_display_items[id]
+		if(!ret){
+			UI.assert(id==this.m_display_items.length,"panic: not doing acctx sequentially")
+			var cc=this.m_accands.at(id);
+			//ignore weight for now: cc.weight
+			ret={
+				x:this.m_x_current,
+				w:UI.MeasureText(UI.default_styles.code_editor.accands_font,cc.name).w,
+				name:cc.name
+			}
+			this.m_x_current+=ret.w+UI.default_styles.code_editor.accands_padding
+			this.m_display_items[id]=ret
+		}
+		return ret
+	},
+	IDFromX:function(x){
+		while(this.m_x_current<x&&this.m_display_items.length<this.m_n_cands){
+			this.GetDisplayItem(this.m_display_items.length)
+		}
+		var dis=this.m_display_items
+		var l=0;
+		var r=dis.length-1
+		while(l<=r){
+			var m=(l+r)>>1
+			if(dis[m].x<=x){
+				l=m+1
+			}else{
+				r=m-1
+			}
+		}
+		return Math.max(r,0)
+	},
+};
+var NewACContext=function(ret){
+	Object.setPrototypeOf(ret,W.ACContext_prototype);
+	ret.m_scroll_i=0;
+	ret.m_display_items=[];
+	ret.m_n_cands=(ret.m_accands?ret.m_accands.length:0);
+	ret.m_x_current=UI.default_styles.code_editor.accands_padding*0.5;
+	ret.m_selection=0;
+	return ret;
+};
 W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	tab_is_char:1,
 	plugin_class:'code_editor',
@@ -357,6 +401,163 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			x+this.m_ellipsis_delta_x*scale,
 			y+this.m_ellipsis_delta_y*scale,color,
 			0x2026)
+	},
+	//////////////////////////
+	TestFunctionHint:function(){
+		var fhctx=this.m_fhint_ctx;
+		var ccnt_fcall_bracket=this.FindOuterBracket(this.sel1.ccnt,-1)
+		if(!(fhctx&&fhctx.m_ccnt_fcall_bracket==ccnt_fcall_bracket)){
+			//context changed, detect new fcall
+			fhctx=undefined
+			if(ccnt_fcall_bracket>=0&&this.ed.GetUtf8CharNeighborhood(ccnt_fcall_bracket)[1]=='('.charCodeAt(0)){
+				var ccnt_fcall_word1=this.ed.MoveToBoundary(ccnt_fcall_bracket+1,-1,"word_boundary_right")
+				if(ccnt_fcall_word1>=0){
+					var ccnt_fcall_word0=this.ed.MoveToBoundary(ccnt_fcall_word1,-1,"word_boundary_left")
+					if(ccnt_fcall_word0>=0){
+						var function_id=this.ed.GetText(ccnt_fcall_word0,ccnt_fcall_word1-ccnt_fcall_word0);
+						var prototypes=UI.ED_QueryPrototypeByID(this,function_id)
+						if(prototypes){
+							fhctx={
+								m_prototypes:prototypes,
+								m_ccnt_fcall_bracket:ccnt_fcall_bracket
+							}
+						}
+					}
+				}
+			}
+			this.m_fhint_ctx=fhctx
+		}
+		var s_fhint=undefined;
+		if(fhctx&&this.sel1.ccnt-ccnt_fcall_bracket<MAX_PARSABLE_FCALL){
+			var ccnt_rbracket=this.ed.MoveToBoundary(this.sel1.ccnt,1,"space_newline")
+			if(this.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]==')'.charCodeAt(0)){
+				//do the parsing in native code, GetStateAt then ComputeCharColorID, then do the deed
+				var n_commas=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,this.sel1.ccnt)
+				if(n_commas!=undefined){
+					var prototypes=fhctx.m_prototypes
+					for(var i=0;i<prototypes.length;i++){
+						var proto_i=prototypes[i]
+						if(n_commas>=proto_i.length){continue;}
+						var ccnt_lcomma=this.ed.MoveToBoundary(this.sel1.ccnt,-1,"space_newline")
+						var ch_prev=String.fromCharCode(this.ed.GetUtf8CharNeighborhood(ccnt_lcomma)[0]);
+						var was_comma=(ch_prev==','||ch_prev=='(');
+						var array_fhint=[]
+						for(var j=n_commas;j<proto_i.length;j++){
+							if(array_fhint.length>0||was_comma){
+								array_fhint.push(proto_i[j])
+							}
+							array_fhint.push(',')
+						}
+						if(array_fhint.length>0){
+							array_fhint.pop();
+						}
+						//array_fhint.push(')');
+						s_fhint=array_fhint.join('');
+						break
+					}
+				}
+			}
+		}
+		if(fhctx){
+			fhctx.s_fhint=s_fhint;
+		}
+	},
+	//////////////////////////
+	CancelAutoCompletion:function(){
+		this.m_ac_context=undefined;
+	},
+	TestAutoCompletion:function(is_explicit){
+		//todo: AC / FH canceling when typed char becomes 0 - change, selectionChange
+		//todo: additional handlers: at(), .length, .m_common_prefix
+		//todo: is_explicit
+		if(this.sel0.ccnt!=this.sel1.ccnt){
+			this.m_ac_activated=0;
+			return 0;
+		}
+		if(this.plugin_language_desc.parser=="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)){
+			this.m_ac_activated=0;
+			return 0;
+		}
+		var accands=UI.ED_QueryAutoCompletion(this,this.sel1.ccnt);
+		if(!accands){
+			this.m_ac_activated=0;
+			return 0;
+		}
+		this.m_ac_context=NewACContext({
+			m_is_spell_mode:0,
+			m_ccnt:this.sel1.ccnt,
+			m_accands:accands,
+			m_owner:this,
+		})
+		return 1
+	},
+	TestCorrection:function(){
+		if(this.sel0.ccnt!=this.sel1.ccnt){return 0;}
+		if(!this.plugin_language_desc.default_hyphenator_name){return 0;}
+		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		var spell_ctx=renderer.HunspellSuggest(this.ed,this.sel1.ccnt)
+		if(!spell_ctx){return 0;}
+		var suggestions=spell_ctx.suggestions
+		suggestions.push("Add '@1' to dictionary".replace("@1",spell_ctx.s_prefix))
+		var accands={
+			length:suggestions.length,
+			at:function(id){return this.suggestions[id]},
+			suggestions:suggestions.map(function(a){return {name:a,weight:1}}),
+			s_prefix:spell_ctx.s_prefix,
+			ccnt0:spell_ctx.ccnt0,
+		}
+		this.m_ac_context=NewACContext({
+			m_is_spell_mode:1,
+			m_ccnt:this.sel1.ccnt,
+			m_accands:accands,
+			m_owner:this,
+		})
+		return 1;
+	},
+	ActivateAC:function(){
+		if(!this.m_ac_context){return;}
+		this.m_ac_activated=1;
+		UI.Refresh()
+	},
+	ConfirmAC:function(id){
+		var acctx=this.m_ac_context;
+		var s_prefix=acctx.m_accands.s_prefix
+		if(acctx.m_is_spell_mode&&id==acctx.m_n_cands-1){
+			//coulddo: remove, or just give a "user-dic-editing" option
+			var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+			renderer.HunspellAddWord(s_prefix);
+			this.CancelAutoCompletion()
+			this.m_ac_activated=0;
+			UI.Refresh();
+			return;
+		}
+		var lg=Duktape.__byte_length(s_prefix);
+		if(id==undefined){lg=0;}
+		var ccnt0=this.sel1.ccnt-lg
+		if(acctx.m_is_spell_mode){
+			ccnt0=acctx.m_accands.ccnt0
+		}
+		var sname=(id==undefined?acctx.m_accands.m_common_prefix:acctx.m_accands.at(id).name)
+		if(acctx.m_is_spell_mode){
+			sname=UI.ED_CopyCase(sname,sname.toLowerCase(),sname.toUpperCase(),s_prefix)
+		}
+		var lg2=Duktape.__byte_length(sname);
+		this.HookedEdit([ccnt0,lg,sname])
+		if(!acctx.m_accands.m_common_prefix){
+			this.m_ac_activated=0;
+		}
+		this.sel0.ccnt=ccnt0+lg2
+		this.sel1.ccnt=ccnt0+lg2
+		this.CallOnChange()
+		if(acctx.m_accands.m_common_prefix){
+			this.m_ac_activated=1;
+		}
+		if(acctx.m_accands.length<2){
+			this.m_ac_activated=0;
+		}
+		this.CancelAutoCompletion()
+		this.UserTypedChar()
+		UI.Refresh()
 	},
 	//////////////////////////
 	HookedEdit:function(ops){
@@ -737,11 +938,6 @@ W.CodeEditorWidget_prototype={
 				obj.m_current_find_context.Cancel()
 				obj.m_current_find_context=undefined
 			}
-			if(obj.m_ac_context){
-				//this should self-destruct when it's a disabling change
-				//it should work properly if the user continues typing
-				obj.m_ac_context.m_ccnt=-1;
-			}
 			//obj.m_is_special_document=0
 			var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 			renderer.m_hidden_ranges_prepared=0
@@ -749,7 +945,8 @@ W.CodeEditorWidget_prototype={
 		doc.AddEventHandler('ESC',function(){
 			var obj=this.owner
 			obj.m_notifications=[]
-			obj.m_ac_context=undefined
+			obj.doc.CancelAutoCompletion()
+			obj.doc.m_ac_activated=0
 			this.m_user_just_typed_char=0
 			obj.DestroyReplacingContext();
 			obj.hide_sxs_visualizer=!obj.hide_sxs_visualizer;
@@ -784,6 +981,7 @@ W.CodeEditorWidget_prototype={
 			//var sz=(this.doc.ed?this.doc.ed.GetTextSize():0)
 			this.doc.m_is_destroyed=1;
 			//break the connections for rc
+			this.doc.m_ac_context=undefined;
 			this.doc.ed=undefined;
 			this.doc=undefined;
 			//if(sz>CALL_GC_DOC_SIZE_THRESHOLD){
@@ -1660,7 +1858,7 @@ W.CodeEditorWidget_prototype={
 		UI.BumpHistory(this.file_name)
 		var doc=this.doc
 		var sz=doc.ed.GetTextSize()
-		if(sz>MAX_PARSABLE||!this.show_auto_completion){
+		if(sz>MAX_PARSABLE||!UI.TestOption("enable_parser")){
 			return;
 		}
 		//doc.m_file_index=UI.ED_ParseAs(this.file_name,doc.plugin_language_desc)
@@ -2436,7 +2634,7 @@ var fnewpage_findbar_plugin=function(){
 				this.sel0.ccnt=ccnt+Duktape.__byte_length(s_insertion)
 				this.sel1.ccnt=ccnt+Duktape.__byte_length(s_insertion)
 				this.CallOnChange()
-				this.m_user_just_typed_char=1
+				this.UserTypedChar()
 			}
 		}
 	})
@@ -3233,6 +3431,116 @@ W.CodeEditor=function(id,attrs){
 				doc.visible_scroll_x=anim.scroll_x
 				doc.visible_scroll_y=anim.scroll_y
 			}else{
+				//fhint and AC - compute the hint first
+				if(doc){
+					//function prototype hint
+					var got_overlay_before=!!doc.ed.m_other_overlay;
+					var fhctx=doc.m_fhint_ctx
+					//fhint
+					var s_fhint=fhctx&&fhctx.s_fhint;
+					//auto-completion
+					doc.ed.m_other_overlay=undefined
+					if(!obj.show_find_bar&&doc.m_ac_context){
+						var acctx=doc.m_ac_context;
+						if(acctx.m_n_cands>1){
+							f_draw_accands=function(){
+								var ac_w_needed=0
+								while(acctx.m_display_items.length<acctx.m_scroll_i){
+									acctx.GetDisplayItem(acctx.m_display_items.length)
+								}
+								for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
+									ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
+								}
+								var ed_caret=doc.GetIMECaretXY();
+								var x_caret=(ed_caret.x-doc.visible_scroll_x);
+								var y_caret=(ed_caret.y-doc.visible_scroll_y);
+								x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
+								var hc=UI.GetCharacterHeight(doc.font)
+								var x_accands=Math.max(Math.min(x_caret,obj.x+w_obj_area-ac_w_needed-doc.x),0)
+								var y_accands=y_caret+hc
+								if(doc.y+y_accands+obj.accands_h>obj.y+h_obj_area){
+									y_accands=y_caret-obj.h_accands
+								}
+								x_accands+=doc.x
+								y_accands+=doc.y
+								var ac_anim_node=W.AnimationNode("accands_scrolling",{
+									scroll_x:acctx.GetDisplayItem(acctx.m_scroll_i).x,
+									current_w:ac_w_needed,
+								})
+								var ac_scroll_x=ac_anim_node.scroll_x
+								var w_accands=ac_anim_node.current_w
+								UI.RoundRect({
+									x:x_accands-obj.accands_shadow_size, y:y_accands, 
+									w:w_accands+obj.accands_shadow_size*2, h:obj.h_accands+obj.accands_shadow_size,
+									round:obj.accands_shadow_size,
+									border_width:-obj.accands_shadow_size,
+									color:obj.accands_shadow_color})
+								UI.RoundRect({
+									x:x_accands, y:y_accands,
+									w:w_accands, h:obj.h_accands,
+									border_width:obj.accands_border_width,
+									border_color:obj.accands_border_color,
+									round:obj.accands_round,
+									color:obj.accands_bgcolor})
+								//draw the candidates
+								UI.PushCliprect(x_accands, y_accands, w_accands, obj.h_accands)
+								var hc_accands=UI.GetCharacterHeight(obj.accands_font)
+								var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
+								var ac_id0=acctx.IDFromX(ac_scroll_x)
+								var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
+								for(var i=ac_id0;i<=ac_id1;i++){
+									var dii=acctx.GetDisplayItem(i)
+									var selected=(doc.m_ac_context&&doc.m_ac_activated&&i==acctx.m_selection)
+									var num_id=(i-acctx.m_scroll_i+11)%10
+									var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
+									var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
+									//x, w, name
+									if(selected){
+										UI.RoundRect({
+											x:x_item-w_hint_char-obj.accands_sel_padding,
+											y:y_accands_text-obj.accands_sel_padding,
+											w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
+											color:obj.accands_sel_bgcolor,
+										})
+									}
+									W.Text("",{x:x_item,y:y_accands_text,
+										font:obj.accands_font,text:dii.name,
+										color:selected?obj.accands_text_sel_color:obj.accands_text_color})
+									//coulddo: a shaking arrow with a big "TAB"
+									UI.DrawChar(obj.accands_id_font,
+										x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
+										selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
+									if(doc.m_ac_context){
+										doc.AddTransientHotkey(String.fromCharCode(48+num_id),doc.ConfirmAC.bind(doc,i))
+									}
+								}
+								UI.PopCliprect()
+							}
+						}
+						if(acctx.m_accands&&acctx.m_accands.m_common_prefix){
+							doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
+						}
+						//else if(acctx.m_n_cands==1){
+						//	//doc.ed.m_other_overlay always shows the 1st candidate?
+						//	//need PPM weight calibration, and float weights
+						//	//can't auto-calibrate - PPM always wins
+						//	//tab should be strictly for common prefix? if we could guess the 1st candidate right...
+						//	var s_name=acctx.m_accands.at(0).name
+						//	doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
+						//}
+					}
+					if(s_fhint){
+						if(doc.ed.m_other_overlay){
+							doc.ed.m_other_overlay.text=doc.ed.m_other_overlay.text+s_fhint
+						}else{
+							doc.ed.m_other_overlay={'type':'AC','text':s_fhint}
+						}
+					}
+					//if(got_overlay_before&&!doc.ed.m_other_overlay){
+					//	UI.InvalidateCurrentFrame()
+					//	UI.Refresh()
+					//}
+				}
 				if(!doc){
 					//early meta-data load for wrap_width
 					var loaded_metadata=(UI.m_ui_metadata[obj.file_name]||{})
@@ -3470,323 +3778,6 @@ W.CodeEditor=function(id,attrs){
 			}else{
 				//line numbers
 				DrawLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.w,doc.y,doc.h,1);
-				//function prototype hint
-				var got_overlay_before=!!doc.ed.m_other_overlay;
-				var fhctx=obj.m_fhint_ctx
-				var s_fhint=undefined
-				if(doc.sel0.ccnt==doc.sel1.ccnt&&obj.show_auto_completion&&doc.m_user_just_typed_char){
-					var ccnt_fcall_bracket=doc.FindOuterBracket(doc.sel1.ccnt,-1)
-					if(!(fhctx&&fhctx.m_ccnt_fcall_bracket==ccnt_fcall_bracket)){
-						//context changed, detect new fcall
-						fhctx=undefined
-						if(ccnt_fcall_bracket>=0&&doc.ed.GetUtf8CharNeighborhood(ccnt_fcall_bracket)[1]=='('.charCodeAt(0)){
-							var ccnt_fcall_word1=doc.ed.MoveToBoundary(ccnt_fcall_bracket+1,-1,"word_boundary_right")
-							if(ccnt_fcall_word1>=0){
-								var ccnt_fcall_word0=doc.ed.MoveToBoundary(ccnt_fcall_word1,-1,"word_boundary_left")
-								if(ccnt_fcall_word0>=0){
-									var function_id=doc.ed.GetText(ccnt_fcall_word0,ccnt_fcall_word1-ccnt_fcall_word0);
-									var prototypes=UI.ED_QueryPrototypeByID(doc,function_id)
-									if(prototypes){
-										fhctx={
-											m_prototypes:prototypes,
-											m_ccnt_fcall_bracket:ccnt_fcall_bracket
-										}
-									}
-								}
-							}
-						}
-						obj.m_fhint_ctx=fhctx
-					}
-					if(fhctx&&doc.sel1.ccnt-ccnt_fcall_bracket<MAX_PARSABLE_FCALL){
-						var ccnt_rbracket=doc.ed.MoveToBoundary(doc.sel1.ccnt,1,"space_newline")
-						if(doc.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]==')'.charCodeAt(0)){
-							//do the parsing in native code, GetStateAt then ComputeCharColorID, then do the deed
-							var n_commas=UI.ED_CountCommas(doc.ed,ccnt_fcall_bracket,doc.sel1.ccnt)
-							if(n_commas!=undefined){
-								var prototypes=fhctx.m_prototypes
-								for(var i=0;i<prototypes.length;i++){
-									var proto_i=prototypes[i]
-									if(n_commas>=proto_i.length){continue;}
-									var ccnt_lcomma=doc.ed.MoveToBoundary(doc.sel1.ccnt,-1,"space_newline")
-									var ch_prev=String.fromCharCode(doc.ed.GetUtf8CharNeighborhood(ccnt_lcomma)[0]);
-									var was_comma=(ch_prev==','||ch_prev=='(');
-									var array_fhint=[]
-									for(var j=n_commas;j<proto_i.length;j++){
-										if(array_fhint.length>0||was_comma){
-											array_fhint.push(proto_i[j])
-										}
-										array_fhint.push(',')
-									}
-									if(array_fhint.length>0){
-										array_fhint.pop();
-									}
-									//array_fhint.push(')');
-									s_fhint=array_fhint.join('');
-									break
-								}
-							}
-						}
-					}
-				}else{
-					if(fhctx){
-						obj.m_fhint_ctx=undefined
-					}
-				}
-				//auto-completion
-				doc.ed.m_other_overlay=undefined
-				if(doc.sel0.ccnt==doc.sel1.ccnt&&obj.show_auto_completion&&(doc.m_user_just_typed_char||doc.plugin_language_desc.default_hyphenator_name)){
-					var acctx=obj.m_ac_context
-					var ac_was_actiavted=0
-					var had_some_ac_to_display=0
-					if(acctx&&acctx.m_ccnt!=doc.sel1.ccnt){
-						//if(acctx.m_n_cands>0){
-						//	UI.InvalidateCurrentFrame()
-						//	UI.Refresh()
-						//}
-						had_some_ac_to_display=(acctx.m_n_cands>0)
-						ac_was_actiavted=acctx.m_activated
-						acctx=undefined;
-					}
-					if(!acctx){
-						var accands=undefined;
-						var is_spell_mode=0
-						if(doc.m_user_just_typed_char){
-							if(!(doc.plugin_language_desc.parser=="C"&&!doc.IsBracketEnabledAt(doc.sel1.ccnt))){
-								accands=UI.ED_QueryAutoCompletion(doc,doc.sel1.ccnt);
-							}
-						}else{
-							//tex mode - it's actually a spelling suggestion
-							//var ccnt_word=doc.sel1.ccnt
-							//var ccnt_word0=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_word,-1),-1,"word_boundary_left"),-1)
-							//var ccnt_word1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_word,1),1,"word_boundary_right"),1)
-							accands={length:0,at:function(id){return this.suggestions[id]},suggestions:[],s_prefix:""}
-							is_spell_mode=1
-							//if(ccnt_word0+1<ccnt_word1){
-							var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
-							//accands.s_prefix=doc.ed.GetText(ccnt_word0,ccnt_word1-ccnt_word0)
-							var spell_ctx=renderer.HunspellSuggest(doc.ed,doc.sel1.ccnt)
-							if(spell_ctx){
-								var suggestions=spell_ctx.suggestions
-								accands.s_prefix=spell_ctx.s_prefix
-								suggestions.push("Add '@1' to dictionary".replace("@1",accands.s_prefix))
-								accands.suggestions=suggestions.map(function(a){return {name:a,weight:1}})
-								accands.length=suggestions.length
-								accands.ccnt0=spell_ctx.ccnt0
-							}
-							//}
-						}
-						acctx={
-							m_is_spell_mode:is_spell_mode,
-							m_ccnt:doc.sel1.ccnt,
-							m_accands:accands,
-							m_scroll_i:0,
-							m_display_items:[],
-							m_n_cands:accands?accands.length:0,
-							m_x_current:obj.accands_padding*0.5,
-							m_selection:0,
-							GetDisplayItem:function(id){
-								var ret=this.m_display_items[id]
-								if(!ret){
-									UI.assert(id==this.m_display_items.length,"panic: not doing acctx sequentially")
-									var cc=this.m_accands.at(id);
-									//ignore weight for now: cc.weight
-									ret={
-										x:this.m_x_current,
-										w:UI.MeasureText(obj.accands_font,cc.name).w,
-										name:cc.name
-									}
-									this.m_x_current+=ret.w+obj.accands_padding
-									this.m_display_items[id]=ret
-								}
-								return ret
-							},
-							Activate:function(){
-								if(!this.m_n_cands){return;}
-								this.m_activated=1;
-								UI.Refresh()
-							},
-							Confirm:function(id){
-								var s_prefix=this.m_accands.s_prefix
-								if(is_spell_mode&&id==this.m_n_cands-1){
-									//coulddo: remove, or just give a "user-dic-editing" option
-									var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
-									renderer.HunspellAddWord(s_prefix);
-									obj.m_ac_context=undefined
-									UI.Refresh();
-									return;
-								}
-								var lg=Duktape.__byte_length(s_prefix);
-								if(id==undefined){lg=0;}
-								var ccnt0=doc.sel1.ccnt-lg
-								if(is_spell_mode){
-									ccnt0=this.m_accands.ccnt0
-								}
-								var sname=(id==undefined?this.m_accands.m_common_prefix:this.m_accands.at(id).name)
-								if(doc.plugin_language_desc.default_hyphenator_name){
-									sname=UI.ED_CopyCase(sname,sname.toLowerCase(),sname.toUpperCase(),s_prefix)
-								}
-								var lg2=Duktape.__byte_length(sname);
-								doc.HookedEdit([ccnt0,lg,sname])
-								if(!this.m_accands.m_common_prefix){
-									obj.m_ac_context=undefined
-									doc.m_user_just_typed_char=0
-								}else{
-									obj.m_ac_context.m_ccnt=-1;
-									doc.m_user_just_typed_char=1
-								}
-								doc.sel0.ccnt=ccnt0+lg2
-								doc.sel1.ccnt=ccnt0+lg2
-								doc.CallOnChange()
-								if(this.m_accands.m_common_prefix){
-									this.m_activated=1
-								}
-								//if(this.m_accands.m_auto_activate_after_tab){
-								//	this.m_activated=1
-								//}
-								doc.m_user_just_typed_char=1
-								//obj.m_ac_context=undefined
-								UI.Refresh()
-							},
-							IDFromX:function(x){
-								while(this.m_x_current<x&&this.m_display_items.length<this.m_n_cands){
-									this.GetDisplayItem(this.m_display_items.length)
-								}
-								var dis=this.m_display_items
-								var l=0;
-								var r=dis.length-1
-								while(l<=r){
-									var m=(l+r)>>1
-									if(dis[m].x<=x){
-										l=m+1
-									}else{
-										r=m-1
-									}
-								}
-								return Math.max(r,0)
-							},
-						}
-						var got_some_ac_to_display=(acctx.m_n_cands>0)
-						obj.m_ac_context=acctx
-						if(got_some_ac_to_display||had_some_ac_to_display){
-							UI.InvalidateCurrentFrame()
-						}
-						UI.Refresh()
-					}
-					if(!obj.show_find_bar){
-						if(acctx.m_n_cands>1){
-							if(ac_was_actiavted){
-								acctx.Activate()
-							}
-							f_draw_accands=function(){
-								var ac_w_needed=0
-								while(acctx.m_display_items.length<acctx.m_scroll_i){
-									acctx.GetDisplayItem(acctx.m_display_items.length)
-								}
-								for(var i=acctx.m_scroll_i;i<acctx.m_n_cands&&i<acctx.m_scroll_i+obj.accands_n_shown;i++){
-									ac_w_needed+=acctx.GetDisplayItem(i).w+obj.accands_padding
-								}
-								var ed_caret=doc.GetIMECaretXY();
-								var x_caret=(ed_caret.x-doc.visible_scroll_x);
-								var y_caret=(ed_caret.y-doc.visible_scroll_y);
-								x_caret-=UI.MeasureText(doc.font,acctx.m_accands.s_prefix).w
-								var hc=UI.GetCharacterHeight(doc.font)
-								var x_accands=Math.max(Math.min(x_caret,obj.x+w_obj_area-ac_w_needed-doc.x),0)
-								var y_accands=y_caret+hc
-								if(doc.y+y_accands+obj.accands_h>obj.y+h_obj_area){
-									y_accands=y_caret-obj.h_accands
-								}
-								x_accands+=doc.x
-								y_accands+=doc.y
-								var ac_anim_node=W.AnimationNode("accands_scrolling",{
-									scroll_x:acctx.GetDisplayItem(acctx.m_scroll_i).x,
-									current_w:ac_w_needed,
-								})
-								var ac_scroll_x=ac_anim_node.scroll_x
-								var w_accands=ac_anim_node.current_w
-								UI.RoundRect({
-									x:x_accands-obj.accands_shadow_size, y:y_accands, 
-									w:w_accands+obj.accands_shadow_size*2, h:obj.h_accands+obj.accands_shadow_size,
-									round:obj.accands_shadow_size,
-									border_width:-obj.accands_shadow_size,
-									color:obj.accands_shadow_color})
-								UI.RoundRect({
-									x:x_accands, y:y_accands,
-									w:w_accands, h:obj.h_accands,
-									border_width:obj.accands_border_width,
-									border_color:obj.accands_border_color,
-									round:obj.accands_round,
-									color:obj.accands_bgcolor})
-								//draw the candidates
-								UI.PushCliprect(x_accands, y_accands, w_accands, obj.h_accands)
-								var hc_accands=UI.GetCharacterHeight(obj.accands_font)
-								var y_accands_text=y_accands+(obj.h_accands-hc_accands)*0.5
-								var ac_id0=acctx.IDFromX(ac_scroll_x)
-								var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
-								for(var i=ac_id0;i<=ac_id1;i++){
-									var dii=acctx.GetDisplayItem(i)
-									var selected=(acctx.m_activated&&i==acctx.m_selection)
-									var num_id=(i-acctx.m_scroll_i+11)%10
-									var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
-									var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
-									//x, w, name
-									if(selected){
-										UI.RoundRect({
-											x:x_item-w_hint_char-obj.accands_sel_padding,
-											y:y_accands_text-obj.accands_sel_padding,
-											w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
-											color:obj.accands_sel_bgcolor,
-										})
-									}
-									W.Text("",{x:x_item,y:y_accands_text,
-										font:obj.accands_font,text:dii.name,
-										color:selected?obj.accands_text_sel_color:obj.accands_text_color})
-									//coulddo: a shaking arrow with a big "TAB"
-									UI.DrawChar(obj.accands_id_font,
-										x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
-										selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
-									if(acctx.m_activated){
-										//W.Hotkey("",{key:String.fromCharCode(48+num_id),action:(function(i){return function(){
-										//	acctx.Confirm(i)
-										//}})(i)})
-										doc.AddTransientHotkey(String.fromCharCode(48+num_id),(function(i){return function(){
-											acctx.Confirm(i)
-										}})(i))
-									}
-								}
-								UI.PopCliprect()
-							}
-						}
-						if(acctx.m_accands&&acctx.m_accands.m_common_prefix){
-							doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
-						}
-						//else if(acctx.m_n_cands==1){
-						//	//doc.ed.m_other_overlay always shows the 1st candidate?
-						//	//need PPM weight calibration, and float weights
-						//	//can't auto-calibrate - PPM always wins
-						//	//tab should be strictly for common prefix? if we could guess the 1st candidate right...
-						//	var s_name=acctx.m_accands.at(0).name
-						//	doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
-						//}
-					}
-				}else{
-					var acctx=obj.m_ac_context
-					if(acctx){
-						obj.m_ac_context=undefined
-						UI.InvalidateCurrentFrame()
-						UI.Refresh()
-					}
-				}
-				if(s_fhint){
-					if(doc.ed.m_other_overlay){
-						doc.ed.m_other_overlay.text=doc.ed.m_other_overlay.text+s_fhint
-					}else{
-						doc.ed.m_other_overlay={'type':'AC','text':s_fhint}
-					}
-				}
-				if(got_overlay_before&&!doc.ed.m_other_overlay){
-					UI.InvalidateCurrentFrame()
-					UI.Refresh()
-				}
 				////////////////
 				//the top hint, do it after since its Render screws the spell checks
 				if(top_hint_bbs.length){
@@ -3801,10 +3792,13 @@ W.CodeEditor=function(id,attrs){
 						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
 						if(hh>=0){
 							//print('draw',y0,(obj.y+y_top_hint)*UI.pixels_per_unit,doc.ed.SeekXY(0,y0))
+							var renderer=doc.ed.GetHandlerByID(doc.ed.m_handler_registration["renderer"]);
+							renderer.m_temporarily_disable_spell_check=1
 							doc.ed.Render({x:0,y:y0,w:w_obj_area-w_line_numbers-w_scrolling_area,h:hh,
 								scr_x:(obj.x+w_line_numbers+obj.padding)*UI.pixels_per_unit,
 								scr_y:(obj.y+y_top_hint)*UI.pixels_per_unit, 
 								scale:UI.pixels_per_unit, obj:doc});
+							renderer.m_temporarily_disable_spell_check=0
 							//also draw the line numbers
 							DrawLineNumbers(0,y0,1,obj.y+y_top_hint,y1-y0);
 						}
@@ -4012,19 +4006,19 @@ W.CodeEditor=function(id,attrs){
 				}
 				menu_edit.p_paste=menu_edit.$.length
 				///////////////////////
-				var acctx=obj.m_ac_context
-				if(acctx&&acctx.m_n_cands){
+				var acctx=doc.m_ac_context
+				if(acctx){
 					menu_edit.AddSeparator()
-					if(acctx.m_n_cands==1||acctx.m_accands&&acctx.m_accands.m_common_prefix){
+					if(acctx.m_n_cands==1||acctx.m_accands.m_common_prefix){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
-							acctx.Confirm(acctx.m_n_cands==1?0:undefined)
+							doc.ConfirmAC(acctx.m_n_cands==1?0:undefined)
 						}})
-					}else if(!acctx.m_activated){
+					}else if(!doc.m_ac_activated){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
-							acctx.Activate()
+							doc.ActivateAC()
 						}})
 					}else{
-						//the keys: left/right ,. -= 1234567890, enter / space / tab
+						//the keys: left/right -= 1234567890, enter / space / tab
 						var fprevpage=function(){
 							acctx.m_scroll_i=Math.max(acctx.m_scroll_i-(obj.accands_n_shown),0)
 							acctx.m_selection=acctx.m_scroll_i
@@ -4054,14 +4048,14 @@ W.CodeEditor=function(id,attrs){
 							}
 						}
 						var fconfirm=function(){
-							acctx.Confirm(acctx.m_selection)
+							doc.ConfirmAC(acctx.m_selection)
 						}
 						menu_edit.AddButtonRow({text:"Auto-complete"},[
 							{text:"<",tooltip:'- or ,',action:fprevpage},
 							{key:"RETURN RETURN2",text:"confirm",tooltip:'ENTER or SPACE',action:fconfirm},
 							{text:">",tooltip:'= or .',action:fnextpage}])
-						W.Hotkey("",{text:",",action:fprevpage})
-						W.Hotkey("",{text:".",action:fnextpage})
+						//W.Hotkey("",{text:",",action:fprevpage})
+						//W.Hotkey("",{text:".",action:fnextpage})
 						W.Hotkey("",{text:"-",action:fprevpage})
 						W.Hotkey("",{text:"=",action:fnextpage})
 						W.Hotkey("",{key:"LEFT",action:fprevcand})
@@ -4717,7 +4711,42 @@ UI.RegisterEditorPlugin(function(){
 			}
 		}).bind(this))
 	})
-})
+});
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('userTypeChar',function(){
+		this.TestAutoCompletion()
+	})
+	this.AddEventHandler('change',function(){
+		this.CancelAutoCompletion()
+	})
+	this.AddEventHandler('TAB',function(){
+		var neib=this.ed.GetUtf8CharNeighborhood(this.sel1.ccnt);
+		if(UI.ED_isWordChar(neib[0])&&!UI.ED_isWordChar(neib[1])&&this.TestAutoCompletion("explicit")){
+			this.ActivateAC()
+			return 0;
+		}
+		return 1
+	})
+}).prototype.desc={category:"Editing",name:"Auto-completion",stable_name:"auto_completion"};
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	//doesn't make sense to disable this right now
+	this.AddEventHandler('selectionChange',function(){
+		this.CancelAutoCompletion()
+		this.m_ac_activated=0
+		this.TestCorrection();
+	})
+})//.prototype.desc={category:"Editing",name:"Auto-completion",stable_name:"auto_completion"};
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('userTypeChar',function(){
+		this.TestFunctionHint()
+	})
+}).prototype.desc={category:"Display",name:"Show parameter hint",stable_name:"show_func_hint"};
 
 UI.CustomizeConfigScript=function(fn){
 	var fn_full=IO.GetStoragePath()+"/"+fn;
@@ -4885,14 +4914,14 @@ W.SXS_OptionsPage=function(id,attrs){
 			plugin_items["Open Source Licenses"]=[
 				{license_line:"stb: Public domain, authored from 2009-2013 by Sean Barrett"},
 				{license_line:"duktape: Copyright (c) 2013-2015 by Duktape authors"},
-				{license_line:"Hunspell: Copyright (c) N\u00e9meth L\u00e1szl\u00f3 nemeth"},
+				{license_line:"Hunspell: Copyright (c) N\u00e9meth L\u00e1szl\u00f3"},
 			];
 			plugin_items["Font Licenses"]=[
+				{license_line:"OpenSans: Digitized data copyright © 2010-2011, Google Corporation"},
 				{license_line:"Inconsolata: Copyright (c) 2006-2012, Raph Levien (firstname.lastname@gmail.com)"},
 				{license_line:"    Copyright (c) 2011-2012, Cyreal (cyreal.org)",h_special:-12},
-				{license_line:"OpenSans: Digitized data copyright © 2010-2011, Google Corporation"},
 				{license_line:"Computer Modern: Copyright (c) Authors of original metafont fonts"},
-				{license_line:"    Copyright (C) 2003-2009, Andrey V. Panov (panov@canopus.iacp.dvo.ru)",h_special:-12},
+				{license_line:"    Copyright (c) 2003-2009, Andrey V. Panov (panov@canopus.iacp.dvo.ru)",h_special:-12},
 			];
 			/////////////////
 			var view_items=[];

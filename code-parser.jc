@@ -1683,7 +1683,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if ret_temp.n==1:
 			acret.m_common_prefix=getIdString(ret_temp[0].x)[s_prefix.n:]
 		//acret.m_auto_activate_after_tab=auto_activate_after_tab
-		return JS.Return(acret)
+		if ret_temp.n:
+			return JS.Return(acret)
+		else
+			return 0
 	}
 	JS_UI["ED_QueryDecl"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)
