@@ -3049,6 +3049,20 @@ W.CodeEditor=function(id,attrs){
 			h_sxs_area=obj.h-h_obj_area
 			sxs_area_dim='y'
 		}
+	}else{
+		if(w_obj_area>=h_obj_area){
+			x_sxs_area=obj.x+w_obj_area
+			y_sxs_area=obj.y
+			w_sxs_area=obj.w-w_obj_area
+			h_sxs_area=obj.h
+			sxs_area_dim='x'
+		}else{
+			x_sxs_area=obj.x
+			y_sxs_area=obj.y+h_obj_area
+			w_sxs_area=obj.w
+			h_sxs_area=obj.h-h_obj_area
+			sxs_area_dim='y'
+		}
 	}
 	//prevent m_current_file_list leaks
 	UI.m_current_file_list=undefined
@@ -4355,8 +4369,7 @@ W.CodeEditor=function(id,attrs){
 				},items:obj.m_notifications})
 		}
 		///////////////////////////////////////
-		if(sxs_visualizer&&!obj.hide_sxs_visualizer){
-			//it could just get parent as owner
+		if(sxs_visualizer){
 			//separation shadow
 			var w_shadow=obj.sxs_shadow_size
 			if(sxs_area_dim=='x'){
@@ -4370,7 +4383,10 @@ W.CodeEditor=function(id,attrs){
 					color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
 				})
 			}
-			sxs_visualizer('sxs_visualizer',{x:x_sxs_area,y:y_sxs_area,w:w_sxs_area,h:h_sxs_area,owner:obj})
+			if(!obj.hide_sxs_visualizer){
+				//it could just get parent as owner
+				sxs_visualizer('sxs_visualizer',{x:x_sxs_area,y:y_sxs_area,w:w_sxs_area,h:h_sxs_area,owner:obj})
+			}
 		}
 	UI.End()
 	if(UI.enable_timing){
@@ -4642,7 +4658,7 @@ UI.ED_IndexGC=function(){
 	UI.ED_IndexGCEnd()
 }
 
-UI.FillLanguageMenu=function(language_id,f_set_language_id){
+UI.FillLanguageMenu=function(s_ext,language_id,f_set_language_id){
 	var menu_lang=UI.BigMenu("&Language")
 	var langs=Language.m_all_languages
 	var got_separator=0
@@ -4651,6 +4667,7 @@ UI.FillLanguageMenu=function(language_id,f_set_language_id){
 		b=(b.name_sort_hack||b.name);
 		return a>b?1:(a<b?-1:0);
 	})
+	var default_language_id=Language.GetNameByExt(s_ext)
 	for(var i=0;i<langs.length;i++){
 		if(!got_separator&&!langs[i].name_sort_hack){
 			menu_lang.AddSeparator()
@@ -4658,11 +4675,16 @@ UI.FillLanguageMenu=function(language_id,f_set_language_id){
 		}
 		menu_lang.AddNormalItem({
 			text:langs[i].name,
+			enable_hotkey:0,
+			key:default_language_id==langs[i].name?"\u2605":undefined,
 			icon:(language_id==langs[i].name)?"对":undefined,
-			action:function(name){
+			action:function(name,s_ext,is_selected,is_default){
+				if(is_selected&&!is_default){
+					UI.m_ui_metadata["language_assoc"][s_ext]=name;
+				}
 				f_set_language_id(name)
 				UI.Refresh();
-			}.bind(undefined,langs[i].name)})
+			}.bind(undefined,langs[i].name,s_ext,language_id==langs[i].name,default_language_id==langs[i].name)})
 	}
 }
 
@@ -4677,7 +4699,7 @@ Language.Register({
 Language.Register({
 	name_sort_hack:' Binary blob',name:'Binary',parser:'none',
 	is_binary:1,
-	extensions:['bin','bz2'],
+	extensions:['bin','bz2','zip','exe','dll','lib','o','png','jpg'],
 	////////////////////////
 	rules:function(lang){
 		lang.DefineDefaultColor("color")
@@ -4689,7 +4711,7 @@ Language.Register({
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
-		UI.FillLanguageMenu(this.owner.m_language_id,(function(name){
+		UI.FillLanguageMenu(UI.GetFileNameExtension(this.owner.file_name),this.owner.m_language_id,(function(name){
 			if(name==this.owner.m_language_id){return;}
 			this.owner.m_language_id=name;
 			//try to reload

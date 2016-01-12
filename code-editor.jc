@@ -1862,6 +1862,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		dfa=new u16[n_char_types]
 		dfa_ops=new u16[]
 		reached=new i8[native_bigchars.n]
+		//todo: should blindly generate all bigchars, context support
 		for(i=0L;i<Q.n;i++)
 			cur_states=Q[i]
 			cur_depth=depths[i]
@@ -2043,6 +2044,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		for ch=0:255
 			if !(ch<128&&isWordChar(ch)):
 				word_char_map[ch]=1
+		//s_non_default_word_chars=obj["m_non_default_word_chars"].as(string)
+		//if s_non_default_word_chars:
+		//	foreach ch in Utf8Chars(s_non_default_word_chars)
+		//		if ch<256:
+		//			word_char_map[ch]=!word_char_map[ch]
 		n_word_char_types=2
 		word_color_id_map=new int[string]
 		/////////////
@@ -2530,7 +2536,11 @@ auto CreateFuzzyDFA(string s,int oword,int maxdist, int budget)
 				ids.clear()
 			//Writeln('>>>')
 			foreach st,I in fcur
-				advanced_by[chtab[int(u8(s[st.pos]))+1]].push(int(I))
+				ch8=int(u8(s[st.pos]))
+				advanced_by[chtab[ch8+1]].push(int(I))
+				//" ' rule
+				if ch8=='"'||ch8=='\'':
+					advanced_by[chtab[(ch8^('"'^'\''))+1]].push(int(I))
 			//	Write(st.pos,' ')
 			//Writeln()
 			foreach ids,ch in advanced_by

@@ -983,7 +983,7 @@ W.BinaryEditor=function(id,attrs){
 			}})
 			menu_edit=undefined;
 		}
-		UI.FillLanguageMenu('Binary',function(name){
+		UI.FillLanguageMenu(UI.GetFileNameExtension(obj.file_name),'Binary',function(name){
 			if(name=='Binary'){return;}
 			var new_metadata=(UI.m_ui_metadata[obj.file_name]||{});
 			new_metadata.m_language_id=name;

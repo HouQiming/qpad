@@ -8,11 +8,21 @@ if(UI.Platform.ARCH=="mac"){
 }
 
 UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
+//UI.Theme_Minimalistic(0xffb4771f);
 UI.CustomTheme=function(){
-	if(UI.TestOption("use_light_theme")){//light
+	var is_light=UI.TestOption("use_light_theme");
+	if(is_light){//light
 		var C=UI.current_theme_color;
 		var C_dark=UI.lerp_rgba(C,0xff000000,0.15)
 		var C_sel=UI.lerp_rgba(C,0xffffffff,0.66)
+		var C_raw=C;
+	}else{
+		var C=UI.lerp_rgba(UI.current_theme_color,0xff000000,0.25);
+		var C_dark=UI.lerp_rgba(C,0xff000000,0.15)
+		var C_sel=UI.lerp_rgba(C,0xff444444,0.66)
+		var C_raw=UI.current_theme_color
+	}
+	if(is_light){//light
 		return {//light
 			tooltip:{
 				font:UI.Font(UI.font_name,24,-50),
@@ -706,10 +716,6 @@ UI.CustomTheme=function(){
 			},
 		};
 	}else{//dark
-		var C=UI.lerp_rgba(UI.current_theme_color,0xff000000,0.25);
-		var C_dark=UI.lerp_rgba(C,0xff000000,0.15)
-		var C_sel=UI.lerp_rgba(C,0xff444444,0.66)
-		var C_raw=UI.current_theme_color
 		return {//dark
 			edit:{
 				//animating edit would ruin a lot of object properties
@@ -782,23 +788,23 @@ UI.CustomTheme=function(){
 				text_color:0xffffffff,
 				$:{
 					out:{
-						border_color:C&0x00ffffff,color:0x00ffffff,
+						border_color:0x00e8e8e8,color:C&0x00ffffff,
 					},
 					over:{
-						border_color:C,color:0x00ffffff,
+						border_color:0xffe8e8e8,color:C&0x00ffffff,
 					},
 					down:{
-						border_color:C_dark,color:0x00ffffff,
+						border_color:0xffcccccc,color:C&0x00ffffff,
 					},
 					////////////////////
 					checked_out:{
-						border_color:C&0x00ffffff,color:C_sel,
+						border_color:0x00e8e8e8,color:C_raw,
 					},
 					checked_over:{
-						border_color:C,color:C_sel,
+						border_color:0xffe8e8e8,color:C_raw,
 					},
 					checked_down:{
-						border_color:C_dark,color:C_sel,
+						border_color:0xffcccccc,color:C_raw,
 					},
 				}
 			},
@@ -1022,7 +1028,7 @@ UI.CustomTheme=function(){
 				disclaimer_transition_dt:0.1,
 				disclaimer_color:0xff5555ff,
 				h_find_bar:32,
-				find_bar_bgcolor:0xff666666,
+				find_bar_bgcolor:0xff555555,//0xff666666,
 				find_bar_color:0xff333333,
 				find_bar_round:8,
 				find_bar_padding:4,
@@ -1074,7 +1080,7 @@ UI.CustomTheme=function(){
 				accands_sel_padding:2,
 				accands_shadow_color:0xaa000000,
 				accands_shadow_size:8,
-				accands_bgcolor:0xff666666,
+				accands_bgcolor:0xff555555,
 				accands_round:4,
 				accands_border_width:0,
 				accands_border_color:0xff000000,
@@ -1183,7 +1189,7 @@ UI.CustomTheme=function(){
 				round:0,
 				//////////////////////
 				h_find_bar:32,
-				find_bar_bgcolor:0xff666666,
+				find_bar_bgcolor:0xff555555,
 				find_bar_color:0xff333333,
 				find_bar_round:8,
 				find_bar_padding:4,

@@ -653,7 +653,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_c
 			ch_first=Utf8CodeAt(s,word_i.y)
 		else
 			ch_first=0
-		flags=g_char_to_flags[ch_first]
+		flags=g_char_to_flags[min(ch_first,g_char_to_flags.n-1)]
 		if !flags:
 			//default handling
 			if isCJK(ch_first):

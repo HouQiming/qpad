@@ -420,6 +420,7 @@ var f_tex_like=function(lang){
 	var bid_comment=lang.ColoredDelimiter("key","%","\n","color_comment");
 	var bid_math=lang.ColoredDelimiter("key","$","$","color_string");
 	var bid_bracket=lang.DefineDelimiter("nested",['\\begin','{'],['}','\\end']);
+	//assert(bid_math==2)
 	lang.DefineToken('\\{')
 	lang.DefineToken("\\}")
 	lang.DefineToken("\\\\")
@@ -439,6 +440,7 @@ var f_tex_like=function(lang){
 	kwset.DefineWordColor("color")
 	kwset.DefineWordType("color_number","0-9")
 	lang.SetSpellCheckedColor("color")
+	//lang.m_non_default_word_chars="_";
 	return (function(lang){
 		lang.SetExclusive([bid_comment,bid_math])
 		if(lang.isInside(bid_comment)){
@@ -614,6 +616,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 			if(!UI.top.app.document_area.SaveAll()){return;}
 			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
+			doc.owner.hide_sxs_visualizer=0;
 			UI.ClearCompilerErrors()
 			compiler.make(doc,0)
 		}})
@@ -627,6 +630,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 			if(!UI.top.app.document_area.SaveAll()){return;}
 			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
+			doc.owner.hide_sxs_visualizer=0;
 			UI.ClearCompilerErrors()
 			compiler.make(doc,1)
 		}})
@@ -2153,53 +2157,60 @@ UI.RegisterEditorPlugin(function(){
 		var ed=this.ed;
 		var ctx=this.m_bracket_ctx;
 		if(C=="{"||C=="["||C=="("||((C=="'"&&!lang.is_tex_like||C=='$'&&lang.is_tex_like||C=="\"")&&C!=ctx.current_bracket_ac)){
-			var chbraac=MatchingBracket(C)
+			var chbac=MatchingBracket(C)
 			var ccnt_pos=this.sel1.ccnt
 			var ch_neibs=ed.GetUtf8CharNeighborhood(ccnt_pos)
 			var chprev=ch_neibs[0]
 			var chnext=ch_neibs[1]
-			if(chbraac){
-				if(this.IsLeftBracket(C.charCodeAt(0))&&chbraac!="'"&&chbraac!="\""&&chbraac!="$"){
+			if(chbac){
+				if(this.IsLeftBracket(C.charCodeAt(0))&&chbac!="'"&&chbac!="\""&&chbac!="$"){
 					//the syntax has to actually consider it as a bracket, or it has to be a quote
-					chbraac=0;
+					chbac=0;
 				}else if(!this.IsBracketEnabledAt(ccnt_pos)){
 					//the state has to allow brackets
-					chbraac=0
-				}else if(chbraac=='}'&&!lang.curly_bracket_is_not_special){
+					chbac=0
+				}else if(chbac=='}'&&!lang.curly_bracket_is_not_special){
 					//{ before indented line
 					var indent_cur_line=this.GetIndentLevel(ccnt_pos);
 					var lineno=this.GetLC(ccnt_pos)[0]
 					var ccnt_lh_next=this.SeekLC(lineno+1,0)
 					var indent_next_line=this.GetIndentLevel(ed.MoveToBoundary(ccnt_lh_next,1,"space"));
 					if(indent_cur_line<indent_next_line){
-						chbraac=0;
+						chbac=0;
 					}
-				}else if(C==chbraac&&chprev==C.charCodeAt(0)){
+				}else if(C==chbac&&chprev==C.charCodeAt(0)){
 					//type two quotes in the middle of a string, do not AC
-					chbraac=0;
+					chbac=0;
 				}
 			}
-			if(chbraac==C){
+			if(chbac==C){
 				//for self-matching things, we need to take space/non-space neighbors as a hint
 				//do not auto-match when the next char is a word-char
 				//also deny ' in tex when the *previous* char is a word-char
 				if(UI.IsWordChar(chnext)||UI.IsWordChar(chprev)){
-					chbraac=0;
+					chbac=0;
 				}
 			}
-			if(chbraac){
+			if(C=='$'&&lang.is_tex_like){
+				//no $$ if already in LaTeX math
+				var state_id=this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],ccnt_pos,"ill")[0];
+				if(state_id==2){
+					chbac=0;
+				}
+			}
+			if(chbac){
 				//other-half-mismatch test
 				var is_lineend=this.IsLineEndAt(ccnt_pos)
 				var is_manual_match=0
 				if(ctx.bac_stack.length){
 					//only the topmost level should check for the match
 					is_manual_match=0
-				}else if(chbraac=='}'&&!lang.indent_as_parenthesis){
+				}else if(chbac=='}'&&!lang.indent_as_parenthesis){
 					is_manual_match=0;
 				}else{
 					var blevel=this.GetBracketLevel(ccnt_pos)
 					var ccnt_rbra=this.FindBracket(blevel-1,ccnt_pos,1)
-					is_manual_match=(ccnt_rbra>=0&&ed.GetUtf8CharNeighborhood(ccnt_rbra)[1]==chbraac)
+					is_manual_match=(ccnt_rbra>=0&&ed.GetUtf8CharNeighborhood(ccnt_rbra)[1]==chbac)
 				}
 				//smarter auto (): clearly fcall-ish case
 				var ccnt_next_nonspace=ed.MoveToBoundary(ccnt_pos,1,"space")
@@ -2225,7 +2236,7 @@ UI.RegisterEditorPlugin(function(){
 					}
 				}
 				if((is_lineend||
-				chbraac==C&&!UI.IsWordChar(chnext)&&!UI.IsWordChar(chprev))&&'?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&!is_manual_match||
+				chbac==C&&!UI.IsWordChar(chnext)&&!UI.IsWordChar(chprev))&&'?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&!is_manual_match||
 				ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1==ctx.current_bracket_ac_ccnt_range[1].ccnt||
 				is_fcall_like){
 					if(ctx.current_bracket_ac){
@@ -2234,22 +2245,22 @@ UI.RegisterEditorPlugin(function(){
 						ctx.bac_stack.push(ctx.current_bracket_ac)
 					}
 					//.just_typed_bra=0//for func hint purposes
-					var str=C+chbraac;
+					var str=C+chbac;
 					var sel=this.GetSelection()
-					ctx.current_bracket_ac=chbraac
+					ctx.current_bracket_ac=chbac
 					ccnt_pos=sel[0]
 					if(lang.is_tex_like){
 						//\left completion
 						if(C=="{"){
 							if(ccnt_pos>=1&&ed.GetText(ccnt_pos-1,1)=="\\"){
-								str=C+"\\"+chbraac;
+								str=C+"\\"+chbac;
 							}
 							if(ccnt_pos>=6&&ed.GetText(ccnt_pos-6,6)=="\\left\\"){
-								str=C+"\\right\\"+chbraac
+								str=C+"\\right\\"+chbac
 							}
 						}else{
 							if(ccnt_pos>=5&&ed.GetText(ccnt_pos-5,5)=="\\left"){
-								str=C+"\\right"+chbraac
+								str=C+"\\right"+chbac
 							}
 						}
 					}

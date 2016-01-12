@@ -249,7 +249,13 @@ var g_desc_by_name={}
 exports.m_all_languages=[];
 
 exports.GetNameByExt=function(s_ext){
-	return (g_name_by_ext[s_ext.toLowerCase()]||"Plain text")
+	var assoc=UI.m_ui_metadata["language_assoc"];
+	if(!assoc||typeof(assoc)!='object'){
+		assoc={};
+		UI.m_ui_metadata["language_assoc"]=assoc;
+	}
+	var s_ext_lower=s_ext.toLowerCase();
+	return (assoc[s_ext_lower]||g_name_by_ext[s_ext_lower]||"Plain text")
 }
 
 exports.GetDefinitionByName=function(s_name){

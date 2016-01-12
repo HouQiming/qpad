@@ -383,7 +383,7 @@ UI.Application=function(id,attrs){
 			menu_file.AddSeparator();
 			var fopen_brand_new=function(force_mode){
 				var active_document=UI.top.app.document_area.active_tab
-				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
+				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document&&active_document.main_widget.m_sxs_visualizer==W.SXS_NewPage){
 					//repeated alt+q
 					if(!force_mode||force_mode!=UI.m_ui_metadata.new_page_mode){
 						if(force_mode){
