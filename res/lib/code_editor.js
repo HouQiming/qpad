@@ -3524,7 +3524,7 @@ W.CodeEditor=function(id,attrs){
 									UI.DrawChar(obj.accands_id_font,
 										x_item-obj.accands_sel_padding*0.5-w_hint_char,y_accands_text,
 										selected?obj.accands_text_sel_color:obj.accands_text_color,48+num_id)
-									if(doc.m_ac_context){
+									if(doc.m_ac_context&&doc.m_ac_activated){
 										doc.AddTransientHotkey(String.fromCharCode(48+num_id),doc.ConfirmAC.bind(doc,i))
 									}
 								}
