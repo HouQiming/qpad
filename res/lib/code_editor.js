@@ -4758,6 +4758,7 @@ UI.RegisterEditorPlugin(function(){
 	//doesn't make sense to disable this right now
 	this.AddEventHandler('selectionChange',function(){
 		this.CancelAutoCompletion()
+		this.m_fhint_ctx=undefined;
 		this.m_ac_activated=0
 		this.TestCorrection();
 	})

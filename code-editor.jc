@@ -129,9 +129,11 @@ struct TKeyword
 class CLanguageDescription
 	//int[] m_enabled_from_inside
 	int[] m_all_key_states
+	int[] m_token_enabling_masks
 	int[] m_id_from_key_state
 	u8[] m_char_map
 	u16[] m_bigchar_dfa
+	i16[] m_bigchar_dfa_ops
 	int m_total_state_size
 	int m_context_size
 	int m_n_char_types
@@ -662,6 +664,7 @@ class CLayouter_programmer
 		else
 			color_table=int[int].NULL
 		s_temp_getid=new char[MAX_SPECIAL_COLOR_ID_SIZE]
+		n_tokens=m_lang.m_n_tokens
 		for(;;)
 			//Writeln(word_ccnt0)
 			ch_first=0
@@ -1603,61 +1606,80 @@ class CColorer_programmer
 		m_lang=obj["language"].as(CLanguageDescription)
 	}
 	//state format: ~and_mask|xor_mask, global bracket delta, min brackets
-	inline EnumTokens(string s_context,string s)
-		//do the dfa and get all tokens
-		return {'forEach':inline(fbody_outer){
-			auto ld=m_lang
-			auto sz_context=int(s_context.n)
-			auto n_char_types=ld.m_n_char_types
-			auto char_map=ld.m_char_map
-			auto dfa=ld.m_bigchar_dfa
-			auto token_lengths=ld.m_token_lengths
-			//container={'forEach':inline(fbody){
-			//	for i=0:sz_context-1
-			//		fbody(s_context[s_context.n-sz_context+i],~i)
-			//	foreach ch,I in s
-			//		fbody(ch,int(I))
-			//}}
-			st=0
-			//foreach ch,I in container
-			for(I=-sz_context;I<s.n;I++)
-				if st<0:
-					//rollback is O(1) so actually rolling back should be OK
-					tok_id=~st
-					rollback=(tok_id&255);tok_id>>=8
-					if I-rollback>=0:
-						//this counts the trailing token of sth into the *next* block
-						//Writeln('token: ',tok_id,' ',I,' ',rollback)
-						fbody_outer(tok_id,I-rollback,token_lengths[tok_id])
-						I-=rollback
-					st=0
-				if I>=0:
-					ch=int(u8(s[I]))
-				else
-					ch=int(u8(s_context[s_context.n+I]))
-				chi=int(char_map[ch])
-				st=int(i16(dfa[st*n_char_types+chi]))
-		}}
+	auto GetTokenList(string s_context,string s,iptr ofs)
+		auto ld=m_lang
+		auto sz_context=int(s_context.n)
+		auto n_char_types=ld.m_n_char_types
+		auto char_map=ld.m_char_map
+		auto dfa=ld.m_bigchar_dfa
+		auto dfa_ops=ld.m_bigchar_dfa_ops
+		auto token_lengths=ld.m_token_lengths
+		//container={'forEach':inline(fbody){
+		//	for i=0:sz_context-1
+		//		fbody(s_context[s_context.n-sz_context+i],~i)
+		//	foreach ch,I in s
+		//		fbody(ch,int(I))
+		//}}
+		ret=new int[]
+		st=0
+		for(I=-sz_context;I<=ofs;I++)
+			if st<0:
+				p_ops=~st
+				for(;;)
+					st=int(dfa_ops[p_ops])
+					if st<0:
+						tok_id=~st
+						ptok=I-int(token_lengths[tok_id])
+						if ptok>=0:
+							//flip the token id to sort high priority tokens first
+							ret.push((ptok<<16)+(0xffff^tok_id))
+						p_ops++
+					else
+						break
+			if I>=ofs:break
+			if I>=0:
+				ch=int(u8(s[I]))
+			else
+				ch=int(u8(s_context[s_context.n+I]))
+			chi=int(char_map[ch])
+			st=int(i16(dfa[st*n_char_types+chi]))
+		//shell sort since ret should have been mostly sorted
+		//use optimistic gaps, worst case won't happen: we can't have inverted stuff longer than token length
+		for(gap=(ret.n+1)>>1;gap>0;gap=(gap+1)>>1)
+			for i=gap:ret.n-1
+				tmp=ret[i]
+				for(j=i;j>=gap&&ret[i-gap]>tmp;j-=gap)
+					ret[j]=ret[j-gap]
+				ret[j]=tmp
+			if gap==1:break
+		//flip back the token id
+		foreach d,I in ret
+			ret[I]=d^0xffff
+		return ret
 	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
 		//here it's just the states
 		ld=m_lang
 		key_mask=(1<<ld.m_n_key_states)-1
 		//do the dfa and get all tokens
-		tokens=new u8[]
-		foreach tok,I in EnumTokens(s_context,s)
-			//I is the finishing position
-			if I>ofs:break
-			tokens.push(u8(tok))
+		tokens=GetTokenList(s_context,s,ofs)
 		bdfa=ld.m_bracket_dfa
+		token_masks=ld.m_token_enabling_masks
+		token_lengths=ld.m_token_lengths
+		n_tokens=ld.m_n_tokens
 		for sti=0:ld.m_n_key_states-1
 			pa=3*sti
 			and_mask=~int(a[pa+0]>>32)
 			xor_mask=int(a[pa+0])
 			inc_value=0
 			min_value=0
-			st=ld.m_id_from_key_state[((ld.m_all_key_states[sti]&and_mask)^xor_mask)&key_mask]*ld.m_n_tokens
-			foreach tok,I in tokens
-				tran=bdfa[st+int(tok)]
+			st=ld.m_id_from_key_state[((ld.m_all_key_states[sti]&and_mask)^xor_mask)&key_mask]//*ld.m_n_tokens
+			I_next=0
+			foreach tok_I in tokens
+				I=tok_I>>16
+				tok=(tok_I&0xffff)
+				if I<I_next||!(token_masks[st]&(1<<tok)):continue
+				I_next=I+int(token_lengths[tok])
+				tran=bdfa[st*n_tokens+int(tok)]
 				and_mask&=tran.m_and
 				xor_mask&=tran.m_and
 				xor_mask^=tran.m_xor
@@ -1696,11 +1718,13 @@ class CColorer_programmer
 		ld=m_lang
 		crules=ld.m_coloring_rules
 		bdfa=ld.m_bracket_dfa
+		token_masks=ld.m_token_enabling_masks
+		token_lengths=ld.m_token_lengths
 		//////////////
 		key_mask=(1<<ld.m_n_key_states)-1
 		and_maska=~int(a[0]>>32)
 		xor_maska=int(a[0])
-		bst=ld.m_id_from_key_state[xor_maska&key_mask]*ld.m_n_tokens
+		bst=ld.m_id_from_key_state[xor_maska&key_mask]//*ld.m_n_tokens
 		mask=xor_maska
 		mask0=0
 		struct TColoringEvent
@@ -1727,14 +1751,22 @@ class CColorer_programmer
 				mask0=mask
 		//the first TOKEN may start before the block...
 		testEvent(-s_context.n-1,0)
-		foreach tok,I,lg_token in EnumTokens(s_context,s)
+		n_tokens=ld.m_n_tokens
+		tokens=GetTokenList(s_context,s,s.n)
+		I_next=0
+		foreach tok_I in tokens
+			I=tok_I>>16
+			tok=(tok_I&0xffff)
+			if I<I_next||!(token_masks[bst]&(1<<tok)):continue
+			lg_token=int(token_lengths[tok])
+			I_next=I+lg_token
 			//ignore nest-only brackets
-			tran=bdfa[bst+tok]
+			tran=bdfa[bst*n_tokens+tok]
 			//Writeln(I,' ',bst/ld.m_n_tokens,' ',tok,' ',tran,' ',mask)
 			bst=int(tran.m_next_state)
 			mask&=tran.m_and
 			mask^=tran.m_xor
-			testEvent(I,lg_token)
+			testEvent(I_next,lg_token)
 		coloring_events.Sortby(inline(evt){return evt.ofs*2+(evt.direction)})
 		//Writeln(coloring_events)
 		crule_activation=new i8[crules.n]
@@ -1779,22 +1811,34 @@ class CColorer_programmer
 			ld=m_lang
 			key_mask=(1<<ld.m_n_key_states)-1
 			bdfa=ld.m_bracket_dfa
+			token_masks=ld.m_token_enabling_masks
+			token_lengths=ld.m_token_lengths
 			cur_delta=(a[1]-b[1])
 			and_mask=~int(a[0]>>32)
 			xor_mask=int(a[0])
-			st=ld.m_id_from_key_state[((ld.m_all_key_states[0]&and_mask)^xor_mask)&key_mask]*ld.m_n_tokens
+			st=ld.m_id_from_key_state[((ld.m_all_key_states[0]&and_mask)^xor_mask)&key_mask]//*ld.m_n_tokens
 			ret=new i8[s.n+1]
 			ofs_last=0L
 			is_valid=i8(cur_delta<=0LL)
-			foreach tok,I in EnumTokens(s_context,s)
-				for i=ofs_last:I-1
+			n_tokens=ld.m_n_tokens
+			tokens=GetTokenList(s_context,s,s.n)
+			I_next=0
+			//foreach tok,I in EnumTokens(s_context,s)
+			foreach tok_I in tokens
+				I=tok_I>>16
+				tok=(tok_I&0xffff)
+				if I<I_next||!(token_masks[st]&(1<<tok)):continue
+				lg_token=int(token_lengths[tok])
+				I_next=I+lg_token
+				for i=ofs_last:I_next-1
 					ret[i]=is_valid
-				ofs_last=I
-				tran=bdfa[st+int(tok)]
+				ofs_last=I_next
+				tran=bdfa[st*n_tokens+int(tok)]
 				and_mask&=tran.m_and
 				xor_mask&=tran.m_and
 				xor_mask^=tran.m_xor
 				st=int(tran.m_next_state)
+				//Writeln(tok,' ',tran.m_delta,' ',I_next,' ',cur_delta,' ',int(is_valid))
 				cur_delta+=i64(tran.m_delta)
 				is_valid=i8(cur_delta<=0LL)
 			for i=ofs_last:ret.n-1
@@ -1817,6 +1861,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//bigchar part
 		m_big_chars=obj["m_big_chars"].as(JSObject)
 		if !m_big_chars:return JS.ReturnError("undefined token list")
+		m_big_char_lengths=obj["m_big_char_lengths"].as(JSObject)
 		native_bigchars=new string[]
 		token_lengths=new u8[]
 		char_map=new u8[256]
@@ -1825,7 +1870,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			s_bigchar_i=m_big_chars[i].or("")
 			if !s_bigchar_i.n:return JS.ReturnError("tokens cannot be empty")
 			native_bigchars.push(s_bigchar_i)
-			token_lengths.push(int(s_bigchar_i.n))
+			lg_token=int(s_bigchar_i.n)
+			if m_big_char_lengths:
+				lg_token=m_big_char_lengths[s_bigchar_i].or(lg_token)
+			token_lengths.push(lg_token)
 			foreach ch in s_bigchar_i
 				char_map[int(u8(ch))]=1
 			context_size=max(context_size,s_bigchar_i.n)
@@ -1849,7 +1897,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		foreach spattern,I in native_bigchars
 			ch0=int(u8(spattern[0]))
 			if spattern.n==1:
-				state=~int(I<<8)
+				//state=~int(I<<8)
+				state=0x40000000+int(I)
 			else
 				state=int(I)|(1<<16)
 			fc_lists[int(char_map[ch0])].push(state)
@@ -1860,9 +1909,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		Q=[new int[]]
 		depths=[0]
 		dfa=new u16[n_char_types]
-		dfa_ops=new u16[]
+		dfa_ops=new i16[]
 		reached=new i8[native_bigchars.n]
-		//todo: should blindly generate all bigchars, context support
 		for(i=0L;i<Q.n;i++)
 			cur_states=Q[i]
 			cur_depth=depths[i]
@@ -1877,11 +1925,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					tran[j]=new(fc_lists[j])
 			//fc_lists
 			foreach stpacked in cur_states
-				if stpacked<0:
-					//deferred token, increase rollback but keep it
-					for j=0:tran.n-1
-						tran[j].push(stpacked-1)
-					continue
+				//if stpacked<0:
+				//	//deferred token, increase rollback but keep it
+				//	for j=0:tran.n-1
+				//		tran[j].push(stpacked-1)
+				//	continue
 				pid=(stpacked&0xffff)
 				pos=(stpacked>>16)
 				s_pid=native_bigchars[pid]
@@ -1889,7 +1937,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				pos++
 				if pos>=s_pid.n:
 					//add action
-					tran[ch_std].push(~(pid<<8))
+					tran[ch_std].push(0x40000000+pid)
 				else
 					tran[ch_std].push(pid+(pos<<16))
 			//Write(cur_states,' ')
@@ -1898,29 +1946,34 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				new_states.Sort()
 				new_states.Unique()
 				actions=u16[].NULL
-				if new_states.n&&new_states[0]<0&&new_states.back()>=0:
-					//remove the tokens for which the generatable token is not a prefix of
-					new_states=[a foreach a in new_states if a<0||(a>>16)==cur_depth+1]
-				if new_states.n&&new_states[0]<0&&new_states.back()<0:
-					//actions - higher pid should take higher priority and get sorted first
-					//coulddo: substring case... defer the action and add a rollback
-					new_stid=new_states[0]
-					reached[~new_states[0]>>8]=1
-					//Writeln('bigchar=',native_bigchars[~new_states[0]>>8],' rollback=',~new_states[0]&255)
+				p_ops=-1L
+				if new_states.n&&new_states.back()>=0x40000000:
+					p_ops=dfa_ops.n
+					while new_states.n&&new_states.back()>=0x40000000:
+						tok_id_j=(new_states.back()&0xffff)
+						reached[tok_id_j]=i8(1)
+						dfa_ops.push(i16(~tok_id_j))
+						new_states.n--
+				new_stid=state_map[new_states]
+				if !new_stid:
+					if new_states.n:
+						new_stid=int(Q.n)
+						Q.push(new_states)
+						depths.push(cur_depth+1)
+						dfa.resize(dfa.n+n_char_types)
+						assert(dfa.n==n_char_types*Q.n)
+						state_map[new_states]=new_stid
+				if p_ops>=0L:
+					assert(p_ops<32768)
+					assert(new_stid<32768)
+					dfa_ops.push(i16(new_stid))
+					dfa[my_addr+j]=u16(u32(~p_ops))
 				else
-					new_stid=state_map[new_states]
-					if !new_stid:
-						if new_states.n:
-							new_stid=int(Q.n)
-							Q.push(new_states)
-							depths.push(cur_depth+1)
-							dfa.resize(dfa.n+n_char_types)
-							assert(dfa.n==n_char_types*Q.n)
-							state_map[new_states]=new_stid
-				dfa[my_addr+j]=u16(new_stid)
+					dfa[my_addr+j]=u16(new_stid)
 		ret.m_char_map=char_map
 		ret.m_n_char_types=n_char_types
 		ret.m_bigchar_dfa=dfa
+		ret.m_bigchar_dfa_ops=dfa_ops
 		for i=0:reached.n-1
 			if !reached[i]:
 				Writeln("warning: big char '@1' can never get triggered".Replace(["@1",native_bigchars[i]]))
@@ -1954,6 +2007,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		m_enabled_from_inside=new int[1<<n_key_brackets]
 		m_id_from_key_state=new int[1<<n_key_brackets]
 		m_all_key_states=new int[]
+		m_token_enabling_masks=new int[]
 		m_entry_states=obj["m_entry_states"].as(JSObject)
 		if !m_entry_states:return JS.ReturnError("undefined entry states")
 		for i=0:m_entry_states.length()-1
@@ -1961,11 +2015,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if !obj_i:return JS.ReturnError("undefined entry state")
 			inside_mask=obj_i["inside"].or(0)
 			m_enabled_from_inside[inside_mask]=obj_i["enabled"].or(0)
+			m_token_enabling_mask_i=obj_i["token_enabled"].or(-1)
 			m_id_from_key_state[inside_mask]=i+1
 			m_all_key_states.push(inside_mask)
+			m_token_enabling_masks.push(m_token_enabling_mask_i)
+			//Writeln(inside_mask,' ',m_token_enabling_mask_i)
 		for i=0:m_id_from_key_state.n-1
 			m_id_from_key_state[i]--
 		ret.m_all_key_states=m_all_key_states
+		ret.m_token_enabling_masks=m_token_enabling_masks
 		/////////////
 		//the bracket DFA
 		m_contradiction_fixes=obj["m_contradiction_fixes"].as(JSObject)
@@ -2011,7 +2069,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					//self-contradicting transition, correct it by anding the enabling mask
 					key_state_i=m_contradiction_fixes[key_state_i].as(int)
 				assert(m_id_from_key_state[key_state_i]>=0)
-				bdfa[st+i].m_next_state=u16((m_id_from_key_state[key_state_i])*n_tokens)
+				//bdfa[st+i].m_next_state=u16((m_id_from_key_state[key_state_i])*n_tokens)
+				bdfa[st+i].m_next_state=u16(m_id_from_key_state[key_state_i])
 		for i=0:m_id_from_key_state.n-1
 			if m_id_from_key_state[i]<0:
 				m_id_from_key_state[i]=m_id_from_key_state[m_contradiction_fixes[i].as(int)]

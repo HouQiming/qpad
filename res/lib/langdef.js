@@ -94,20 +94,31 @@ LanguageDefinition.prototype={
 	},
 	Disable:function(bid){
 		this.m_enabling_mask&=~(1<<bid);
+		this.DisableToken(this.m_bracket_types[bid].tok0);
+		this.DisableToken(this.m_bracket_types[bid].tok1);
+	},
+	EnableToken:function(tok){
+		this.m_token_enabling_mask|=(1<<tok);
+	},
+	DisableToken:function(tok){
+		this.m_token_enabling_mask&=~(1<<tok);
 	},
 	/////////////////
 	SetExclusive:function(bids){
 		for(var i=0;i<bids.length;i++){
-			this.Enable(bids[i]);
-		}
-		for(var i=0;i<bids.length;i++){
 			if(this.isInside(bids[i])){
 				for(var j=0;j<bids.length;j++){
-					this.Disable(bids[j]);
+					if(j!=i){
+						this.Disable(bids[j]);
+					}else{
+						this.Enable(bids[i]);
+					}
 				}
-				this.Enable(bids[i]);
-				break;
+				return;
 			}
+		}
+		for(var i=0;i<bids.length;i++){
+			this.Enable(bids[i]);
 		}
 	},
 	/////////////////
@@ -144,36 +155,53 @@ LanguageDefinition.prototype={
 	},
 	/////////////////
 	Finalize:function(fenabler){
-		var bras=this.m_bracket_types;
-		for(var i=1;i<bras.length;i++){
-			if(bras[i].is_key>bras[i-1].is_key||bras[i].is_key==bras[i-1].is_key&&bras[i].type<bras[i-1].type){
+		var brackets=this.m_bracket_types;
+		for(var i=1;i<brackets.length;i++){
+			if(brackets[i].is_key>brackets[i-1].is_key||brackets[i].is_key==brackets[i-1].is_key&&brackets[i].type<brackets[i-1].type){
 				throw new Error("key brackets must appear before nested ones, pairs must appear before self-paired ones: failed at @1".replace("@1","#"+i))
 			}
 		}
-		//bras.sort(function(a,b){
+		//brackets.sort(function(a,b){
 		//	return (b.is_key-a.is_key||a.type-b.type);
 		//})
-		var n_keys=bras.length;
-		for(var i=0;i<bras.length;i++){
-			if(!bras[i].is_key){n_keys=i;break;}
+		var n_keys=brackets.length;
+		for(var i=0;i<brackets.length;i++){
+			if(!brackets[i].is_key){n_keys=i;break;}
 		}
 		if(n_keys>12){
 			throw new Error("too many key brackets (only 12 supported), do you really have that much inter-bracket dependency?")
 		}
-		if(bras.length>=32){
+		if(brackets.length>=32){
 			throw new Error("too many bracket types, 31 types is surely enough?")
+		}
+		if(this.m_big_chars.length>=32){
+			throw new Error("too many tokens, 31 tokens is surely enough?")
 		}
 		var n_combos=(1<<n_keys);
 		var bidmap={};
-		for(var j=0;j<bras.length;j++){
-			bidmap[bras[j].bid]=j;
+		for(var j=0;j<brackets.length;j++){
+			bidmap[brackets[j].bid]=j;
 		}
 		for(var mask_i=0;mask_i<n_combos;mask_i++){
 			this.m_enabling_mask=0;
+			this.m_token_enabling_mask=(1<<this.m_big_chars.length)-1;
 			this.m_inside_mask=0;
 			for(var j=0;j<n_keys;j++){
+				var bracket_j=brackets[j];
+				if(bracket_j.type==REAL_TYPE_MOV){
+					if(mask_i&(1<<j)){
+						//if inside, default-disable tok0
+						for(var k=0;k<bracket_j.tok0.length;k++){
+							this.m_token_enabling_mask&=~(1<<bracket_j.tok0[k]);
+						}
+					}else{
+						for(var k=0;k<bracket_j.tok1.length;k++){
+							this.m_token_enabling_mask&=~(1<<bracket_j.tok1[k]);
+						}
+					}
+				}
 				if(mask_i&(1<<j)){
-					this.m_inside_mask|=(1<<bras[j].bid);
+					this.m_inside_mask|=(1<<bracket_j.bid);
 				}
 			}
 			this.m_enabling_mask|=this.m_inside_mask;
@@ -184,12 +212,12 @@ LanguageDefinition.prototype={
 				continue
 			}
 			var raw_enabling_mask=0;
-			for(var j=0;j<bras.length;j++){
-				if(this.m_enabling_mask&(1<<bras[j].bid)){
+			for(var j=0;j<brackets.length;j++){
+				if(this.m_enabling_mask&(1<<brackets[j].bid)){
 					raw_enabling_mask|=(1<<j);
 				}
 			}
-			this.m_entry_states.push({inside:mask_i,enabled:raw_enabling_mask})
+			this.m_entry_states.push({inside:mask_i,enabled:raw_enabling_mask,token_enabled:this.m_token_enabling_mask})
 		}
 		if(this.m_entry_states.length>64){
 			throw new Error("there are @1 entry states, but the system only supports 64".replace("@1",this.m_entry_states.length))
@@ -201,8 +229,8 @@ LanguageDefinition.prototype={
 		}
 		this.m_owner.m_entry_states=this.m_entry_states
 		this.m_owner.m_inside_mask_to_enabled_mask=inside_mask_to_enabled_mask
-		if(bras.length&&bras[bras.length-1].type==REAL_TYPE_ADD){
-			this.m_owner.m_bracket_enabling_mask=1<<(bras.length-1)
+		if(brackets.length&&brackets[brackets.length-1].type==REAL_TYPE_ADD){
+			this.m_owner.m_bracket_enabling_mask=1<<(brackets.length-1)
 		}else{
 			this.m_owner.m_bracket_enabling_mask=0;
 		}
