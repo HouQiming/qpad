@@ -1025,12 +1025,20 @@ class CLayouter_programmer
 		s_embolden=ed.GetText(ccnt0,ccnt1-ccnt0)
 		wrap_width=m_wrap_width_in_fp
 		x=GetFlatX(ed.GetStateAt(hid,ccnt0))
+		if ed.IsAtLineWrap(ccnt0):
+			x=(x+wrap_width-1)/wrap_width*wrap_width
+		if this.IsRangeHidden(ed,ccnt0,ccnt1):
+			//it's inside a hidden range
+			//coulddo: m_w_ellipsis
+			return
 		foreach ch in Utf8Chars(s_embolden)
 			iy=x/wrap_width
 			ix=x-iy*wrap_width
 			ix_with_overlay=AddOverlayOffset(ix,iy)
 			dx_overlay=ix_with_overlay-ix
+			//Writeln('>>> ',ix,' ',iy)
 			(ix,iy)=SubHiddenRanges(ed,x)
+			//Writeln(ix,' ',iy)
 			ix+=dx_overlay
 			prj_x=float2(fixed2float(ix-scroll_x)*scale+screen_x,fixed2float(iy*hc-scroll_y)*scale+screen_y)
 			g_renderer.DrawChar(fnt_bold_scaled, prj_x.x,prj_x.y,C, ch)
@@ -1122,6 +1130,7 @@ class CLayouter_programmer
 			m_spell_checker_name=sname
 		else
 			m_spell_checker_name=string.NULL
+		m_current_frame_spell_errors=long2[].NULL
 		return JS.Return(!!m_spell_checker)
 	}
 	//////////////////////////////
@@ -1459,8 +1468,9 @@ class CLayouter_programmer
 				dxitem=m_hidden_dx_sub[p]
 				wrap_width=m_wrap_width_in_fp
 				dx=0LL
-				if dxitem.y/wrap_width==y:
+				if dxitem.y/wrap_width==y||fx<dxitem.y:
 					dx=dxitem.z
+				//Writeln('SubHiddenRanges ',p,' ',fx,' ',dxitem,' ',dx)
 				fx=max(fx,dxitem.y)-dxitem.w
 				y=fx/m_wrap_width_in_fp
 				x=fx-y*m_wrap_width_in_fp
@@ -1648,7 +1658,7 @@ class CColorer_programmer
 		for(gap=(ret.n+1)>>1;gap>0;gap=(gap+1)>>1)
 			for i=gap:ret.n-1
 				tmp=ret[i]
-				for(j=i;j>=gap&&ret[i-gap]>tmp;j-=gap)
+				for(j=i;j>=gap&&ret[j-gap]>tmp;j-=gap)
 					ret[j]=ret[j-gap]
 				ret[j]=tmp
 			if gap==1:break
@@ -2550,6 +2560,9 @@ auto CreateFuzzyDFA(string s,int oword,int maxdist, int budget)
 		//but we could incorporate swap? swap is 2. it doesn't get along with others
 		//(s.n+1)*(maxdist+1)
 		chset=(new(s)).ConvertToAsBinary(u8)
+		//always include " and ' as special chars
+		chset.push(u8('"'))
+		chset.push(u8('\''))
 		chset.Sort()
 		chset.Unique()
 		chtab=[0 for i=0:256]

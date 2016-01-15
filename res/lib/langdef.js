@@ -3,6 +3,7 @@ var W=require("gui2d/widgets");
 var LanguageDefinition=function(owner){
 	this.m_existing_tokens={};
 	this.m_big_chars=[];
+	this.m_big_char_lengths={};
 	this.m_bracket_types=[];
 	this.m_entry_states=[];
 	this.m_contradiction_fixes=[];
@@ -19,12 +20,16 @@ var REAL_TYPE_MOV=0;
 var REAL_TYPE_XOR=1;
 var REAL_TYPE_ADD=2;
 LanguageDefinition.prototype={
-	DefineToken:function(stoken){
+	DefineToken:function(stoken,lg){
 		if(typeof stoken!="string"){
-			//it's a set
+			if(typeof stoken[0]!="string"){
+				//it's a token
+				return stoken;
+			}
+			//it's a string set
 			var ret=[];
 			for(var i=0;i<stoken.length;i++){
-				ret[i]=this.DefineToken(stoken[i])[0];
+				ret.push(this.DefineToken(stoken[i])[0]);
 			}
 			return ret;
 		}
@@ -38,6 +43,9 @@ LanguageDefinition.prototype={
 		if(n>=128){throw new Error("too many bigchars, 127 should have been enough")}
 		if(Duktape.__byte_length(stoken)>64){throw new Error("bigchar too long, 64 should have been enough")}
 		this.m_existing_tokens[stoken]=n
+		if(lg!=undefined){
+			this.m_big_char_lengths[stoken]=lg;
+		}
 		return [n];
 	},
 	DefineDelimiter:function(type,stok0,stok1){
@@ -59,6 +67,7 @@ LanguageDefinition.prototype={
 			}
 		}
 		var bid=this.m_bracket_types.length;
+		//print(real_type,tok0,tok1,"|",stok0,stok1)
 		this.m_bracket_types.push({type:real_type,is_key:(type=="key")|0,bid:bid,tok0:tok0,tok1:tok1});
 		return bid;
 	},
@@ -101,7 +110,7 @@ LanguageDefinition.prototype={
 		this.m_token_enabling_mask|=(1<<tok);
 	},
 	DisableToken:function(tok){
-		this.m_token_enabling_mask&=~(1<<tok);
+		this.m_token_enabling_mask&=~(1<<tok[0]);
 	},
 	/////////////////
 	SetExclusive:function(bids){

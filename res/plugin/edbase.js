@@ -231,10 +231,55 @@ Language.Register({
 	file_icon_color:0xffb4771f,
 	file_icon:'プ',
 	rules:function(lang){
-		return f_C_like(lang,{
+		lang.DefineDefaultColor("color_symbol")
+		//match (/, but only count the '/' part as the token
+		var tok_regexp_thing=lang.DefineToken("(/",1);
+		var tok_regexp_end=lang.DefineToken("/");
+		var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
+		var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
+		var bid_regexp=lang.ColoredDelimiter("key",tok_regexp_thing,tok_regexp_end,"color_string");
+		var bid_regexp_charset=lang.ColoredDelimiter("key","[","]","color_string");
+		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
+		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
+		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
+		lang.DefineToken("\\\\")
+		lang.DefineToken("\\'")
+		lang.DefineToken('\\"')
+		lang.DefineToken('\\\n')
+		var tok_regexp_escape=lang.DefineToken("\\/");
+		var tok_regexp_escape1=lang.DefineToken("\\[");
+		var tok_regexp_escape2=lang.DefineToken("\\]");
+		var kwset=lang.DefineKeywordSet("color_symbol");
+		var keywords={
 			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined'],
 			'type':['typeof','var','void','boolean','byte','int','short','char','double','long','float'],
-		},1)
+		};
+		for(var k in keywords){
+			kwset.DefineKeywords("color_"+k,keywords[k])
+		}
+		kwset.DefineWordColor("color")
+		kwset.DefineWordType("color_number","0-9")
+		lang.SetKeyDeclsBaseColor("color")
+		return (function(lang){
+			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2,bid_regexp]);
+			if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)||lang.isInside(bid_regexp)){
+				lang.Disable(bid_bracket);
+			}else{
+				lang.Enable(bid_bracket);
+			}
+			if(lang.isInside(bid_regexp)){
+				lang.Enable(bid_regexp_charset);
+			}else{
+				lang.Disable(bid_regexp_charset);
+				lang.DisableToken(tok_regexp_escape);
+				lang.DisableToken(tok_regexp_escape1);
+				lang.DisableToken(tok_regexp_escape2);
+				lang.DisableToken(tok_regexp_end);
+			}
+			if(lang.isInside(bid_regexp_charset)){
+				lang.DisableToken(tok_regexp_end);
+			}
+		});
 	}
 });
 
