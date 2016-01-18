@@ -2782,7 +2782,7 @@ UI.RegisterEditorPlugin(function(){
 					if(line_id>0){
 						renderer.m_tentative_editops=ApplyAutoEdit(this,cur_autoedit_ops,line_id-2);
 						renderer.ResetTentativeOps()
-						if(!renderer.m_tentative_editops.length){
+						if(!renderer.m_tentative_editops||!renderer.m_tentative_editops.length){
 							InvalidateAutoEdit.call(this)
 						}
 					}

@@ -504,7 +504,7 @@ W.TabbedDocument=function(id,attrs){
 					tabid:i,owner:obj})
 			}
 			x_acc+=label_i.w;
-			if(i==tabid){x_acc_abs_tabid=x_acc_abs+x_delta*0.5;}
+			if(i==tabid){x_acc_abs_tabid=x_acc_abs+x_delta;}
 			tab_label_x_abs[i]=x_acc_abs
 			x_acc_abs+=label_i.w
 		}
@@ -522,9 +522,13 @@ W.TabbedDocument=function(id,attrs){
 		}
 		tab_label_x_abs[n]=x_acc_abs
 		if(n>0&&obj[tabid]){
-			obj.scroll_x=Math.max(Math.min(
-				x_acc_abs-w_label_area+8,
-				x_acc_abs_tabid+(obj[tabid].w-w_label_area)*0.5),0)
+			//obj.scroll_x=Math.max(Math.min(
+			//	x_acc_abs-w_label_area+8,
+			//	x_acc_abs_tabid+(obj[tabid].w-w_label_area)*0.5),0)
+			var scroll_x0=obj.scroll_x;
+			obj.scroll_x=Math.min(Math.max(obj.scroll_x||0,x_acc_abs_tabid+obj[tabid].w-w_label_area+8),x_acc_abs_tabid)
+			obj.scroll_x=Math.max(Math.min(obj.scroll_x,x_acc_abs-w_label_area+8),0)
+			//if(obj.scroll_x!=obj.scroll_x0){UI.Refresh();}
 			obj.w_current_tab_label_width=obj[tabid].w
 		}else{
 			obj.w_current_tab_label_width=0;

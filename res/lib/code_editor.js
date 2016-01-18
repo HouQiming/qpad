@@ -1474,6 +1474,9 @@ W.CodeEditorWidget_prototype={
 				if(ctx.m_init_point_hack!=undefined){
 					ctx.m_current_point=ctx.m_init_point_hack
 					ctx.m_home_end=undefined
+				}else if(ctx.m_backward_matches.length>0&&(ctx.m_flags&UI.SEARCH_FLAG_GOTO_MODE)){
+					ctx.m_current_point=-1
+					ctx.m_home_end=undefined
 				}
 			}
 			UI.Refresh()
@@ -1527,7 +1530,7 @@ W.CodeEditorWidget_prototype={
 				}
 			}
 			if(ctx.m_home_end=='init'){
-				if(ctx.m_forward_matches.length>0){
+				if(ctx.m_forward_matches.length>0&&!(ctx.m_flags&UI.SEARCH_FLAG_GOTO_MODE)){
 					ctx.m_current_point=1
 					ctx.m_home_end=undefined
 				}else if(UI.IsSearchFrontierCompleted(ctx.m_forward_frontier)){

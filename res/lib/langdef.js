@@ -255,7 +255,7 @@ LanguageDefinition.prototype={
 		this.m_owner.m_all_keywords=all_ids
 		for(var i=0;i<this.m_keyword_sets.length;i++){
 			var ksi=this.m_keyword_sets[i].m_keywords
-			for(var j=0;j<ksi.length;j++){
+			for(var j=0;j<ksi.length;j+=2){
 				all_ids.push(ksi[j])
 			}
 		}
