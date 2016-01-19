@@ -524,8 +524,9 @@ Language.Register({
 	file_icon:'文',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
-		var bid_title=lang.ColoredDelimiter("key","#","\n","color_type");
-		var bid_code2=lang.ColoredDelimiter("key","\t","\n","color_string");
+		var tok_newline=lang.DefineToken("\n");
+		var bid_title=lang.ColoredDelimiter("key",lang.DefineToken("\n#",1),"\n","color_type");
+		var bid_code2=lang.ColoredDelimiter("key",lang.DefineToken("\n\t",1),"\n","color_string");
 		var bid_code=lang.ColoredDelimiter("key","`","`","color_string");
 		var kwset=lang.DefineKeywordSet("color_symbol");
 		kwset.DefineWordColor("color")
@@ -533,6 +534,7 @@ Language.Register({
 		lang.SetSpellCheckedColor("color")
 		return (function(lang){
 			lang.SetExclusive([bid_title,bid_code,bid_code2])
+			lang.EnableToken(tok_newline)
 		});
 	}
 });
