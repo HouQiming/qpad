@@ -246,6 +246,8 @@ Language.Register({
 		lang.DefineToken("\\'")
 		lang.DefineToken('\\"')
 		lang.DefineToken('\\\n')
+		var tok_sqaure_bracket0=lang.DefineToken("[");
+		var tok_sqaure_bracket1=lang.DefineToken("]");
 		var tok_regexp_escape=lang.DefineToken("\\/");
 		var tok_regexp_escape1=lang.DefineToken("\\[");
 		var tok_regexp_escape2=lang.DefineToken("\\]");
@@ -279,6 +281,8 @@ Language.Register({
 			if(lang.isInside(bid_regexp_charset)){
 				lang.DisableToken(tok_regexp_end);
 			}
+			lang.EnableToken(tok_sqaure_bracket0);
+			lang.EnableToken(tok_sqaure_bracket1);
 		});
 	}
 });
@@ -1416,14 +1420,14 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit.AddSeparator()
 			menu_edit.AddNormalItem({
 					text:"Auto &wrap",
-					icon:this.owner.m_enable_wrapping?"■":"□",
+					icon:this.m_enable_wrapping?"■":"□",
 					enable_hotkey:1,key:"SHIFT+CTRL+W",
 					action:function(){
-				this.owner.m_enable_wrapping=(this.owner.m_enable_wrapping?0:1)
+				this.m_enable_wrapping=(this.m_enable_wrapping?0:1)
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				var ed_caret_original=this.GetCaretXY();
 				var scroll_y_original=this.scroll_y;
-				renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0,this)
+				renderer.ResetWrapping(this.m_enable_wrapping?this.m_current_wrap_width:0,this)
 				this.caret_is_wrapped=0
 				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
 				var ed_caret_new=this.GetCaretXY();
@@ -1435,12 +1439,6 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit=undefined;
 		}
 	})
-	//this.AddEventHandler('load',function(){
-	//	var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-	//	//print(this.owner.file_name,this.owner.m_enable_wrapping)
-	//	renderer.ResetWrapping(this.owner.m_enable_wrapping?this.owner.m_current_wrap_width:0)
-	//	this.ed.InvalidateStates([0,this.ed.GetTextSize()])
-	//})
 });//.prototype.desc={category:"Display",name:"Enable auto wrap"};
 
 //cut line / delete word
@@ -2955,7 +2953,7 @@ UI.RegisterEditorPlugin(function(){
 		var navitem=q0.pop()
 		var prev_ccnt0=this.sel0.ccnt
 		var prev_ccnt1=this.sel1.ccnt
-		q1.push({file_name:this.owner.file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:"navigation"})
+		q1.push({file_name:this.m_file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:"navigation"})
 		UI.g_cursor_history_test_same_reason=0
 		UI.OpenEditorWindow(navitem.file_name,function(){
 			//print('nav',navitem.ccnt0,navitem.ccnt1,prev_ccnt0,prev_ccnt1)
@@ -3099,6 +3097,7 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('change',function(){
+		//todo
 		if(!this.m_diff_from_save||!this.owner||!(this.owner.h_obj_area>0)){return;}
 		this.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(this.ed,this.m_diff_from_save,this.owner.h_obj_area*UI.pixels_per_unit);
 		this.m_diff_minimap_h_obj_area=this.owner.h_obj_area

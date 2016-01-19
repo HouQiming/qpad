@@ -259,16 +259,27 @@ W.TabbedDocument_prototype={
 		this.m_is_close_pending=1
 		return ret
 	},
-	OnMenu:function(){
-		this.m_is_in_menu=!this.m_is_in_menu;
+	SetMenuState:function(value){
+		if(this.m_is_in_menu==value){return;}
+		this.m_is_in_menu=value;
 		if(this.m_is_in_menu){
 			//g_menu_action_invoked=0;
 			UI.m_frozen_global_menu=UI.m_global_menu
+			UI.m_frozen_global_menu.bk_tabbar_scroll_x=this.scroll_x
+		}else{
+			if(UI.m_frozen_global_menu){
+				this.scroll_x=UI.m_frozen_global_menu.bk_tabbar_scroll_x;
+			}
+			UI.m_frozen_global_menu=undefined;
 		}
 		UI.Refresh()
 	},
+	OnMenu:function(){
+		this.SetMenuState(!this.m_is_in_menu);
+		UI.Refresh()
+	},
 	OnWindowBlur:function(){
-		this.m_is_in_menu=0;
+		this.SetMenuState(0);
 		UI.Refresh()
 	},
 	////////////
@@ -383,7 +394,7 @@ W.TabbedDocument=function(id,attrs){
 		//new tab activating
 		//this doesn't count as a meaningful switch
 		//obj.current_tab_id=(items.length-1);
-		obj.m_is_in_menu=0
+		obj.SetMenuState(0);
 		obj.CancelTabDragging();
 		UI.SaveWorkspace();
 		//if(UI.Platform.BUILD=="debug"){
@@ -448,10 +459,8 @@ W.TabbedDocument=function(id,attrs){
 						if(p_and>=0){
 							W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:
 								(function(obj,i){
-									obj.m_is_in_menu=1;
 									obj.m_menu_preselect=i;
-									//g_menu_action_invoked=0;
-									UI.m_frozen_global_menu=UI.m_global_menu;
+									obj.SetMenuState(1);
 									UI.InvalidateCurrentFrame()
 									UI.Refresh()
 								}).bind(null,obj,i)})
@@ -467,11 +476,7 @@ W.TabbedDocument=function(id,attrs){
 			font:UI.icon_font,text:"单",
 			value:obj.m_is_in_menu,
 			OnChange:function(value){
-				obj.m_is_in_menu=value
-				if(obj.m_is_in_menu){
-					//g_menu_action_invoked=0;
-					UI.m_frozen_global_menu=UI.m_global_menu
-				}
+				obj.SetMenuState(value);
 			}})
 		var x_label_area=obj.x+obj.w-w_label_area
 		//tabs should not need ids
@@ -526,8 +531,11 @@ W.TabbedDocument=function(id,attrs){
 			//	x_acc_abs-w_label_area+8,
 			//	x_acc_abs_tabid+(obj[tabid].w-w_label_area)*0.5),0)
 			var scroll_x0=obj.scroll_x;
-			obj.scroll_x=Math.min(Math.max(obj.scroll_x||0,x_acc_abs_tabid+obj[tabid].w-w_label_area+8),x_acc_abs_tabid)
-			obj.scroll_x=Math.max(Math.min(obj.scroll_x,x_acc_abs-w_label_area+8),0)
+			//disable autoscroll on "the way back"
+			if(w_menu==anim.w_menu||obj.m_is_in_menu){
+				obj.scroll_x=Math.min(Math.max(obj.scroll_x||0,x_acc_abs_tabid+obj[tabid].w-w_label_area+8),x_acc_abs_tabid)
+				obj.scroll_x=Math.max(Math.min(obj.scroll_x,x_acc_abs-w_label_area+8),0)
+			}
 			//if(obj.scroll_x!=obj.scroll_x0){UI.Refresh();}
 			obj.w_current_tab_label_width=obj[tabid].w
 		}else{
@@ -840,7 +848,7 @@ W.TopMenuItem=function(id,attrs){
 				var obj_submenu=W.FancyMenu("sub_menu_"+id,{
 					x:id=='$0'?0:obj.x-4,y:owner.y+owner.h,
 					desc:obj.menu,
-					HideMenu:function(){owner.owner.m_is_in_menu=0;},
+					HideMenu:function(){owner.owner.SetMenuState(0);},
 					parent_menu_list_view:owner.list_view,
 				})
 				UI.SetFocus(obj_submenu)
@@ -876,7 +884,7 @@ W.TopMenuBar=function(id,attrs){
 		if(!obj.m_show_sub_menus){
 			W.Hotkey("",{key:"DOWN",action:fshow_sub_menus})
 			W.Hotkey("",{key:"RETURN RETURN2",action:fshow_sub_menus})
-			W.Hotkey("",{key:"ESC",action:(function(obj){obj.owner.m_is_in_menu=0;UI.Refresh();}).bind(null,obj)})
+			W.Hotkey("",{key:"ESC",action:(function(obj){obj.owner.SetMenuState(0);UI.Refresh();}).bind(null,obj)})
 			if(is_first&&!obj.m_show_sub_menus){
 				UI.SetFocus(obj.list_view);
 			}
