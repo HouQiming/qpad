@@ -584,6 +584,15 @@ if(UI.Platform.ARCH=="mac"){
 	};
 }
 
+if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+	IO.IsFirstInstance=function(){
+		return 1;
+	};
+	IO.SetForegroundProcess=function(pid){
+		return 0;
+	};
+}
+
 UI.OpenFile=UI.OpenEditorWindow;
 
 (function(){

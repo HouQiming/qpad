@@ -4,6 +4,7 @@ var Language=require("res/lib/langdef");
 
 var f_C_like=function(lang,keywords,has_preprocessor){
 	lang.DefineDefaultColor("color_symbol")
+	var tok_newline=lang.DefineToken("\n");
 	var bid_preprocessor
 	if(has_preprocessor){
 		bid_preprocessor=lang.ColoredDelimiter("key","#","\n","color_meta");
@@ -41,6 +42,7 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 		}else{
 			lang.Enable(bid_bracket);
 		}
+		lang.EnableToken(tok_newline);
 	});
 };
 

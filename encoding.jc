@@ -189,7 +189,7 @@ auto OSConvertString(int win_codepage,string iconv_name,string s)
 		if handle==-1L:
 			//failed
 			return s
-		s_out=new string[s.n*2+1024]
+		s_out=new char[s.n*2+1024]
 		param_buffer=[s.d,s.n,s_out.d,s_out.n]
 		iconv(handle,
 			__pointer(param_buffer.d+sizeof(iptr)*0),
