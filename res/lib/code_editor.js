@@ -3236,7 +3236,7 @@ W.CodeEditor=function(id,attrs){
 				}
 			}
 		}
-		//hopefully 8 is the widest char
+		//hopefully '8' is the widest digit char
 		var show_line_numbers=UI.TestOption("show_line_numbers")
 		if(show_line_numbers){
 			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
