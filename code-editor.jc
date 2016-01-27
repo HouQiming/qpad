@@ -829,7 +829,7 @@ class CLayouter_programmer
 		//it's OK to have a negative dx_extra
 		//maintain x normally
 		I_query_valid_point=-1LL
-		if enable_hidden>=0:
+		if enable_hidden>0:
 			//query at the first non-hidden char
 			if !m_hidden_ranges_prepared:
 				PrepareHiddenRanges(ed)
@@ -1460,7 +1460,7 @@ class CLayouter_programmer
 	SubHiddenRanges=function(CEditableText ed,i64 fx){
 		y=fx/m_wrap_width_in_fp
 		x=fx-y*m_wrap_width_in_fp
-		if m_enable_hidden>=0:
+		if m_enable_hidden>0:
 			if !m_hidden_ranges_prepared:
 				PrepareHiddenRanges(ed)
 			p=m_hidden_dx_sub.Bisect(function(long4 a){return a.x<fx})-1L

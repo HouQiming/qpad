@@ -442,7 +442,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	SnapToValidLocation:function(ccnt,side){
 		var ccnt_ret=W.Edit_prototype.SnapToValidLocation.call(this,ccnt,side)
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-		return renderer.SnapToShown(this.ed,ccnt_ret,side)
+		return renderer.m_enable_hidden>0?renderer.SnapToShown(this.ed,ccnt_ret,side):ccnt_ret;
 	},
 	DrawEllipsis:function(x,y,scale,color){
 		x/=UI.pixels_per_unit;
@@ -1487,6 +1487,13 @@ var find_context_prototype={
 		this.m_current_point=fitem.id;
 		//print(id,fitem.id,visual_y);
 	},
+	ConfirmFind:function(){
+		var id=this.m_current_point;
+		var doc=this.GetMatchDoc(id);
+		var renderer=doc.GetRenderer();
+		var sel=doc.GetSelection();
+		renderer.ShowRange(doc.ed,sel[0],sel[1]);
+	},
 };
 
 var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
@@ -1772,7 +1779,9 @@ W.CodeEditorWidget_prototype={
 		}
 		if(flags&UI.SEARCH_FLAG_GOTO_MODE){
 			//ignore the flags
+			var renderer=doc.GetRenderer()
 			var matches=[]
+			renderer.m_enable_hidden=0;
 			//try to go to line number first
 			var line_id=parseInt(sneedle)
 			ctx.m_goto_line_error=undefined;
@@ -1825,6 +1834,7 @@ W.CodeEditorWidget_prototype={
 				}
 			}
 			SetFindContextFinalResult(ctx,ccnt,matches)
+			renderer.m_enable_hidden=1;
 			UI.Refresh()
 		}
 	},
@@ -2100,6 +2110,10 @@ var ffindbar_plugin=function(){
 	})
 	this.AddEventHandler('RETURN',function(){
 		var obj=this.find_bar_owner
+		var ctx=obj.m_current_find_context
+		if(ctx){
+			ctx.ConfirmFind();
+		}
 		obj.show_find_bar=0;
 		obj.doc.AutoScroll('center')
 		obj.doc.scrolling_animation=undefined
