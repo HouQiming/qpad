@@ -1108,9 +1108,10 @@ var find_context_prototype={
 		var fitem_current=this.GetFindItem(r)
 		this.m_current_merged_item=r
 		var renderer=doc.GetRenderer();
+		var bk=renderer.m_enable_hidden;
 		renderer.m_enable_hidden=0
 		this.m_current_visual_y=doc.ed.XYFromCcnt(this.GetMatchCcnt(id,0)).y-fitem_current.scroll_y+fitem_current.visual_y
-		renderer.m_enable_hidden=1
+		renderer.m_enable_hidden=bk;
 		////////////////////
 		var hc=this.m_hfont;
 		var edstyle=UI.default_styles.code_editor
@@ -1134,7 +1135,6 @@ var find_context_prototype={
 		var id=this.m_current_point;
 		var doc=this.GetMatchDoc(id);
 		var renderer=doc.GetRenderer();
-		renderer.m_enable_hidden=0
 		if(this.m_flags&UI.SEARCH_FLAG_FUZZY){
 			if(!this.m_fuzzy_virtual_diffs||this.m_fuzzy_diff_match_id!=id){
 				//fuzzy match rendering - GetMatchCcnt, something else like m_tentative_editops but rendered the other direction
@@ -1382,7 +1382,6 @@ var find_context_prototype={
 				font:edstyle.find_message_font,color:edstyle.find_message_color,
 				text:s_eof_message})
 		}
-		renderer.m_enable_hidden=1;
 	},
 	GetFindItem:function(id){
 		var arr,ofs;
@@ -1443,7 +1442,7 @@ var find_context_prototype={
 		}
 		return undefined
 	},
-	BisectMatches:function(ccnt){
+	BisectMatches:function(doc,ccnt){
 		var l0=-(this.m_backward_matches.length/3)
 		var l=l0
 		var r=(this.m_forward_matches.length/3)
@@ -1479,10 +1478,11 @@ var find_context_prototype={
 		//scroll_y -> ccnt
 		var fitem=this.GetFindItem(r)
 		var scroll_y=visual_y-fitem.visual_y+fitem.scroll_y
-		//var ccnt=doc.ed.SeekXY(scroll_x,scroll_y)
+		var doc=this.GetMatchDoc(fitem.id)
+		var ccnt=doc.ed.SeekXY(scroll_x,scroll_y)
 		//ccnt -> bsearch -> match id
-		//this.m_current_point=this.BisectMatches(ccnt)
-		this.m_current_point=fitem.id;
+		this.m_current_point=this.BisectMatches(doc,ccnt)
+		//this.m_current_point=fitem.id;
 		//print(id,fitem.id,visual_y);
 	},
 	ConfirmFind:function(){
@@ -1555,7 +1555,7 @@ W.CodeEditorWidget_prototype={
 			if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
 				var ccnt=this.sel1.ccnt
 				var ctx=obj.m_current_find_context;
-				var match_id=ctx.BisectMatches(ccnt)
+				var match_id=ctx.BisectMatches(this,ccnt)
 				if(match_id){
 					var match_ccnt0=ctx.GetMatchCcnt(match_id,0)
 					var match_ccnt1=ctx.GetMatchCcnt(match_id,1)
@@ -1577,7 +1577,7 @@ W.CodeEditorWidget_prototype={
 			var obj=this.owner
 			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
 				var ctx=obj.m_current_find_context;
-				var match_id=ctx.BisectMatches(ops[0])
+				var match_id=ctx.BisectMatches(this,ops[0])
 				if(match_id){
 					var match_ccnt0=ctx.GetMatchCcnt(match_id,0)
 					var match_ccnt1=ctx.GetMatchCcnt(match_id,1)
@@ -1767,6 +1767,9 @@ W.CodeEditorWidget_prototype={
 		if(!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
 			UI.m_ui_metadata.find_state.m_current_needle=sneedle
 		}
+		var renderer=doc.GetRenderer()
+		var bk_m_enable_hidden=renderer.m_enable_hidden;
+		renderer.m_enable_hidden=0;
 		ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt==undefined?doc.sel0.ccnt:ccnt,force_ccnt==undefined?doc.sel1.ccnt:ccnt)
 		ctx.SetRenderingHeight(this.h-this.h_find_bar);
 		this.m_current_find_context=ctx
@@ -1777,9 +1780,7 @@ W.CodeEditorWidget_prototype={
 		}
 		if(flags&UI.SEARCH_FLAG_GOTO_MODE){
 			//ignore the flags
-			var renderer=doc.GetRenderer()
 			var matches=[]
-			renderer.m_enable_hidden=0;
 			//try to go to line number first
 			var line_id=parseInt(sneedle)
 			ctx.m_goto_line_error=undefined;
@@ -1836,9 +1837,9 @@ W.CodeEditorWidget_prototype={
 				}
 			}
 			SetFindContextFinalResult(ctx,ccnt,matches)
-			renderer.m_enable_hidden=1;
 			UI.Refresh()
 		}
+		renderer.m_enable_hidden=bk_m_enable_hidden
 	},
 	BeforeQuickFind:function(direction){
 		if(!this.doc){return;}
