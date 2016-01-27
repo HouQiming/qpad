@@ -714,17 +714,16 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				range=[ccnt_outer0+this.BracketSizeAt(ccnt_outer0,0),ccnt_outer1-this.BracketSizeAt(ccnt_outer1,1)]
 			}
 		}else{
-			var id_indent=ed.m_handler_registration["seeker_indentation"]
+			var id_indent=this.ed.m_handler_registration["seeker_indentation"]
 			var my_level=this.GetIndentLevel(this.ed.MoveToBoundary(ccnt,1,"space"));
-			var ccnt_l1=this.SeekLC(line+1,0)
-			var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
+			var ccnt_new=this.ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
 			if(ccnt_new>ccnt_l1){
 				ccnt_new=this.SeekLC(this.GetLC(ccnt_new)[0],0)-1
 				if(ccnt_new>ccnt_l1){
 					if(this.IsRightBracketAt(ccnt_new+1)){
 						ccnt_new++
 					}
-					range=[ccnt_l1,ccnt_new]
+					range=[this.SnapToValidLocation(Math.max(ccnt_l1-1,0),-1),ccnt_new]
 				}
 			}
 		}
@@ -787,8 +786,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			line_indents=[];
 			for(var i=0;i<line_ccnts.length;i++){
 				var ind=undefined;
-				if(line_ccnts[i]>=0){
-					ind=this.ed.MoveToBoundary(line_ccnts[i],1,"space")-line_ccnts[i];
+				var ccnt=line_ccnts[i];
+				if(ccnt<-1){ccnt=-1-ccnt;}
+				if(ccnt>=0){
+					ind=this.ed.MoveToBoundary(ccnt,1,"space")-ccnt;
 				}
 				line_indents[i]=ind;
 			}
