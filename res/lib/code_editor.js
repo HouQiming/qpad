@@ -204,7 +204,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(fn.length&&fn[0]=='*'){
 			//built-in file
 			ed.Edit([0,0,IO.UIReadAll(fn.substr(1))],1);
-			this.ResetSaveDiff()
+			//this.ResetSaveDiff()
 			this.OnLoad()
 			UI.Refresh();
 			return;
@@ -226,7 +226,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				return
 			}
 			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?131072:4194304))
-			this.ResetSaveDiff()
+			//this.ResetSaveDiff()
 			if(is_preview){
 				var rendering_ccnt1=this.SeekXY(0,this.h)
 				if(rendering_ccnt1<ed.GetTextSize()){
@@ -242,7 +242,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
 			}else{
-				this.ResetSaveDiff()
+				//this.ResetSaveDiff()
 				this.OnLoad()
 			}
 			UI.Refresh()
@@ -250,7 +250,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(ed.hfile_loading){
 			floadNext()
 		}else{
-			this.ResetSaveDiff()
+			//this.ResetSaveDiff()
 			this.OnLoad()
 			if(!IO.FileExists(fn)&&!this.m_is_preview&&fn.indexOf('<')<0){
 				this.saved_point=-1;
@@ -442,7 +442,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	SnapToValidLocation:function(ccnt,side){
 		var ccnt_ret=W.Edit_prototype.SnapToValidLocation.call(this,ccnt,side)
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-		return renderer.m_enable_hidden>0?renderer.SnapToShown(this.ed,ccnt_ret,side):ccnt_ret;
+		return renderer.SnapToShown(this.ed,ccnt_ret,side);
 	},
 	DrawEllipsis:function(x,y,scale,color){
 		x/=UI.pixels_per_unit;
@@ -531,9 +531,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_ac_context=undefined;
 	},
 	TestAutoCompletion:function(is_explicit){
-		//todo: AC / FH canceling when typed char becomes 0 - change, selectionChange
-		//todo: additional handlers: at(), .length, .m_common_prefix
-		//todo: is_explicit
+		//todo: is_explicit - additional handlers
 		if(this.sel0.ccnt!=this.sel1.ccnt){
 			this.m_ac_activated=0;
 			return 0;
@@ -1774,7 +1772,7 @@ W.CodeEditorWidget_prototype={
 		this.m_current_find_context=ctx
 		if(force_ccnt==undefined){
 			ctx.AutoScrollFindItems();
-			UI.InvalidateCurrentFrame();
+			//UI.InvalidateCurrentFrame();
 			UI.Refresh()
 		}
 		if(flags&UI.SEARCH_FLAG_GOTO_MODE){
@@ -1812,22 +1810,26 @@ W.CodeEditorWidget_prototype={
 				//todo: make it progressive - search callback, faster is-unmodified test
 				var sneedle_lower=sneedle.toLowerCase()
 				var lg_needle=Duktape.__byte_length(sneedle_lower)
-				var all_key_decls=UI.ED_GetAllKeyDecls(doc)
+				var all_key_decls=UI.ED_GetAllKeyDeclsLower(doc)
 				if(all_key_decls){
 					for(var i=0;i<all_key_decls.length;i+=3){
-						var s_id=all_key_decls[i+0]
-						var s_id_lower=s_id.toLowerCase()
+						var s_id_lower=all_key_decls[i+0]
+						//var s_id_lower=s_id.toLowerCase()
 						if(s_id_lower.length>=sneedle_lower.length){
-							if(s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
+							if(!sneedle_lower||s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
 								//we don't need the type here
 								//var type=all_key_decls[i+1]
 								var ccnt_match=all_key_decls[i+2]
-								if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
+								//if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
+								if(sneedle_lower){
 									matches.push(ccnt_match,ccnt_match+lg_needle)
 								}else{
-									var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
-									matches.push(ccnt_match,ccnt_match1)
+									matches.push(ccnt_match,ccnt_match+Duktape.__byte_length(s_id_lower))
 								}
+								//}else{
+								//	var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
+								//	matches.push(ccnt_match,ccnt_match1)
+								//}
 							}
 						}
 					}
@@ -3686,7 +3688,7 @@ W.CodeEditor=function(id,attrs){
 				//doc.precise_ctrl_lr_stop=UI.TestOption("precise_ctrl_lr_stop");
 				//doc.same_line_only_left_right=!UI.TestOption("left_right_line_wrap");
 				//wrap width widget
-				if(obj.doc.m_enable_wrapping){
+				if(obj.doc.m_enable_wrapping&&!obj.m_is_preview){
 					var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+8;
 					if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
 						UI.RoundRect({
@@ -5062,6 +5064,9 @@ UI.OpenCodeEditorDocument=function(fn,is_preview){
 	//need an initialization-time wrap width
 	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
 	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||1024):0);
+	if(is_preview){
+		wrap_width=1024;
+	}
 	var doc={
 		///////////////
 		language:Language.GetDefinitionByName(language_id),

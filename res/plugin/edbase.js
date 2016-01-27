@@ -3099,7 +3099,6 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('change',function(){
-		//todo
 		if(!this.m_diff_from_save||!this.owner||!(this.owner.h_obj_area>0)){return;}
 		this.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(this.ed,this.m_diff_from_save,this.owner.h_obj_area*UI.pixels_per_unit);
 		this.m_diff_minimap_h_obj_area=this.owner.h_obj_area

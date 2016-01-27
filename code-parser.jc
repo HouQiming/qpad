@@ -1719,7 +1719,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				return JS.Return(all_decls[p].epos0)
 			return 0
 	}
-	JS_UI["ED_GetAllKeyDecls"]=function(JSContext JS){
+	JS_UI["ED_GetAllKeyDeclsLower"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)
 		fidx=doc["m_file_index"].as(CFileIndex)
 		ed=doc["ed"].as(CEditableText)
@@ -1733,13 +1733,19 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		tmp=new(all_key_decls)
 		tmp.Sortby(byMember("epos0"))
 		ret=JS.NewArray()
+		p=0
 		foreach kd,I in tmp
-			ret[I*3+0]=getIdString(kd.id_type&~KEY_DECL_MASK)
-			ret[I*3+1]=(kd.id_type&KEY_DECL_MASK)
 			ccnt=i64(kd.epos0)
+			s=getIdString(kd.id_type&~KEY_DECL_MASK)
 			if diff_from_save:
 				ccnt=diff_from_save.BaseToCurrent(ccnt)
-			ret[I*3+2]=ccnt
+				if !diff_from_save.isUnmodifiedBase(ccnt,ccnt+s.n):
+					//only allow the unmodified guys
+					continue
+			ret[p*3+0]=s.ToLower()
+			ret[p*3+1]=(kd.id_type&KEY_DECL_MASK)
+			ret[p*3+2]=ccnt
+			p++
 		return JS.Return(ret)
 	}
 	JS_UI["ED_QueryKeyDeclByID"]=function(JSContext JS){

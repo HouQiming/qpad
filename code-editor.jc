@@ -899,7 +899,7 @@ class CLayouter_programmer
 						//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 						color=m_cached_colors[int(cidi)&127]
 						if enable_hidden<=0&&(int(cidi)&128):
-							color&=0xaaffffff
+							color&=0x7fffffff
 						g_renderer.FastDrawChar(prj_x.x,prj_x.y,color, ch)
 				else
 					dx_extra-=dx_i
@@ -1517,11 +1517,12 @@ class CLayouter_programmer
 		if !ed:return JS.ReturnError("invalid editor")
 		ccnt0=JS.Param(1).as(i64)
 		ccnt1=JS.Param(2).as(i64)
-		loc0=ed.CreateLocator(ccnt0,1)
-		loc1=ed.CreateLocator(ccnt1,-1)
-		m_hidden_ranges.push(loc0)
-		m_hidden_ranges.push(loc1)
-		m_hidden_ranges_prepared=0
+		if ccnt0<ccnt1:
+			loc0=ed.CreateLocator(ccnt0,1)
+			loc1=ed.CreateLocator(ccnt1,-1)
+			m_hidden_ranges.push(loc0)
+			m_hidden_ranges.push(loc1)
+			m_hidden_ranges_prepared=0
 		return 0
 	}
 	JS_ShowRange=function(JSContext JS){
@@ -1551,16 +1552,17 @@ class CLayouter_programmer
 		if !ed:return JS.ReturnError("invalid editor")
 		ccnt=JS.Param(1).as(i64)
 		direction=JS.Param(2).or(1)
-		if !m_hidden_ranges_prepared:
-			PrepareHiddenRanges(ed)
-		p0=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt})
-		if p0<0||!(p0&1):
-			//do nothing
-		else
-			if direction<0:
-				ccnt=m_hidden_ccnts[p0-1]
+		if m_enable_hidden>0:
+			if !m_hidden_ranges_prepared:
+				PrepareHiddenRanges(ed)
+			p0=m_hidden_ccnts.Bisect(function(i64 a){return a<=ccnt})
+			if p0<0||!(p0&1):
+				//do nothing
 			else
-				ccnt=m_hidden_ccnts[p0]
+				if direction<0:
+					ccnt=m_hidden_ccnts[p0-1]
+				else
+					ccnt=m_hidden_ccnts[p0]
 		return JS.Return(ccnt)
 	}
 	JS_GetHiddenRanges=function(JSContext JS){
@@ -3212,13 +3214,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				fwarning.Call(int,encoding)
 			(s_utf8,s_lingering)=ConvertToUTF8(encoding,s)
 			if s_utf8.n:
-				ed.RawEdit([TEditop(){s:s_utf8}])
+				ed.LoaderEdit([TEditop(){s:s_utf8}])
 		else
 			s_utf8=string.NULL
 			s_lingering=string.NULL
 		if s.n<szread:
 			if s_lingering&&s_lingering.n:
-				ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:s_lingering}])
+				ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:s_lingering}])
 			hf.Close()
 			return JS.Return(0)
 		ret=new CLoadingContext
@@ -3236,7 +3238,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		szread=JS.Param(2).or(NEXT_READ_SIZE)
 		hf=ret.hf
 		//if ret.s_lingering:
-		//	ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
+		//	ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
 		//	ret.s_lingering=string.NULL
 		//after encoding
 		s=hf.Read(szread)
@@ -3247,10 +3249,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		(s_utf8,s_lingering)=ConvertToUTF8(ret.encoding,s)
 		ret.s_lingering=s_lingering
 		if s_utf8.n:
-			ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:s_utf8}])
+			ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:s_utf8}])
 		if n_read<szread:
 			if ret.s_lingering:
-				ed.RawEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
+				ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
 				ret.s_lingering=string.NULL
 			hf.Close()
 			return JS.Return(0)
