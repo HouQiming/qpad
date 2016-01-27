@@ -1565,6 +1565,16 @@ class CLayouter_programmer
 					ccnt=m_hidden_ccnts[p0]
 		return JS.Return(ccnt)
 	}
+	JS_IsRangeHidden=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		ret=0
+		if ccnt0<ccnt1:
+			ret=IsRangeHidden(ed,ccnt0,ccnt1)
+		return JS.Return(ret)
+	}
 	JS_GetHiddenRanges=function(JSContext JS){
 		ret=JS.NewArray()
 		foreach loc,I in m_hidden_ranges
@@ -1599,6 +1609,7 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"HideRange",JS_HideRange)
 		proto.ExportMethod(this,"ShowRange",JS_ShowRange)
 		proto.ExportMethod(this,"SnapToShown",JS_SnapToShown)
+		proto.ExportMethod(this,"IsRangeHidden",JS_IsRangeHidden)
 		proto.ExportMethod(this,"GetHiddenRanges",JS_GetHiddenRanges)
 		proto.ExportMethod(this,"ResetWrapping",JS_ResetWrapping)
 		////////////////////

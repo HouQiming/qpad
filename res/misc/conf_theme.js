@@ -347,7 +347,8 @@ UI.CustomTheme=function(){
 				rectex_styles:[{color:L?0x7f00ffff:0x7faaaa55,w:32,h:32,round:8,border_width:-8}],
 			},
 			bgcolor:L?0xffe8e8e8:0xff3f3f3f,
-			padding:6,
+			//padding:6,
+			padding:8,
 			separator_color:L?0xff999999:0xff000000,
 			///////
 			//show_top_hint:1,
@@ -373,6 +374,47 @@ UI.CustomTheme=function(){
 			//bookmark_shadow:0xff000000,
 			bookmark_border_color:L?C:0xffbfdfdf,
 			bookmark_scroll_bar_marker_size:2,
+			///////
+			fold_button_size:12,
+			fold_button_style:{
+				transition_dt:0.1,
+				round:0,border_width:2,padding:0,
+				font:UI.Font("res/fonts/inconsolata.ttf,!",20,-50),
+				icon_text_valign:'center',
+				$:(L?{//light
+					out:{
+						border_color:0x55000000,color:0,
+						icon_color:0x55000000,
+						text_color:0x55000000,
+					},
+					over:{
+						border_color:C,color:C,
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					down:{
+						border_color:C_dark,color:C_dark,
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+				}:{//dark
+					out:{
+						border_color:0x55e8e8e8,color:0,
+						icon_color:0x55e8e8e8,
+						text_color:0x55e8e8e8,
+					},
+					over:{
+						border_color:C,color:C,
+						icon_color:0xffe8e8e8,
+						text_color:0xffe8e8e8,
+					},
+					down:{
+						border_color:C_dark,color:C_dark,
+						icon_color:0xffe8e8e8,
+						text_color:0xffe8e8e8,
+					},
+				}),
+			},
 			///////
 			//color_diff_tag:[{x:0,y:0,color:0xff2ca033&0xffffff},{x:1,y:0,color:0xff2ca033}],
 			color_diff_tag:[{x:0,y:0,color:0x002ca033},{x:1,y:0,color:0xff2ca033}],

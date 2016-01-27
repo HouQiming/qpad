@@ -439,6 +439,42 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	GetRenderer:function(){
 		return this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 	},
+	SeekAllLinesBetween:function(line0,line1_exclusive,is_valid_only){
+		var ed=this.ed;
+		var ret=[this.SeekLC(line0,0)]
+		var ccnt=ret[0];
+		var handler_id=ed.m_handler_registration["line_column"];
+		for(var i=line0+1;i<line1_exclusive;i++){
+			ccnt=ed.Bisect(handler_id,[i,0, i-1,ccnt],"llll")
+			if(is_valid_only){
+				var ccnt2=this.SnapToValidLocation(ccnt,1)
+				if(ccnt2>ccnt&&this.SnapToValidLocation(ccnt,-1)<ccnt){
+					var ln_real=this.GetLC(ccnt2)[0]
+					if(ln_real>i){
+						//some lines are hidden
+						if(ln_real>line1_exclusive){
+							ln_real=line1_exclusive
+						}
+						ccnt2=ed.Bisect(handler_id,[ln_real,0, i,ccnt],"llll")
+						var i0=i;
+						while(i<ln_real){
+							ret.push(-1)
+							i++;
+						}
+						ret.push(-1)
+						if(ret.length>i0-line0){
+							//we still need the first invalid line for indentation check
+							ret[i0-line0]=-1-ccnt;
+						}
+						ccnt=ccnt2
+						continue;
+					}
+				}
+			}
+			ret.push(ccnt)
+		}
+		return ret;
+	},
 	SnapToValidLocation:function(ccnt,side){
 		var ccnt_ret=W.Edit_prototype.SnapToValidLocation.call(this,ccnt,side)
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
@@ -631,7 +667,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			var lmax=(this.ed?this.GetLC(this.ed.GetTextSize())[0]:0)+1
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(edstyle.line_number_font,56);
 		}
-		var w_bookmark=UI.GetCharacterAdvance(edstyle.bookmark_font,56)+4
+		var w_bookmark=UI.GetCharacterAdvance(edstyle.bookmark_font,56)+4;
 		w_line_numbers+=edstyle.padding+w_bookmark;
 		this.m_rendering_w_line_numbers=w_line_numbers;
 		//prepare bookmarks - they appear under line numbers
@@ -665,6 +701,35 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var line_current=this.ed?this.GetLC(this.sel1.ccnt)[0]:0;
 		this.m_rendering_line_current=line_current;
 	},
+	GetSmartFoldRange:function(ccnt){
+		var line=this.GetLC(ccnt)[0]
+		var ccnt_l0=this.SeekLC(line,0)
+		var ccnt_l1=this.SeekLC(line+1,0)
+		var ccnt_outer0=this.FindOuterBracket_SizeFriendly(ccnt_l1,-1)
+		var range=undefined
+		if(ccnt_outer0>=ccnt_l0){
+			//found bracket on the line
+			var ccnt_outer1=this.FindOuterBracket_SizeFriendly(ccnt_l1,1)
+			if(ccnt_outer1>ccnt_outer0){
+				range=[ccnt_outer0+this.BracketSizeAt(ccnt_outer0,0),ccnt_outer1-this.BracketSizeAt(ccnt_outer1,1)]
+			}
+		}else{
+			var id_indent=ed.m_handler_registration["seeker_indentation"]
+			var my_level=this.GetIndentLevel(this.ed.MoveToBoundary(ccnt,1,"space"));
+			var ccnt_l1=this.SeekLC(line+1,0)
+			var ccnt_new=ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
+			if(ccnt_new>ccnt_l1){
+				ccnt_new=this.SeekLC(this.GetLC(ccnt_new)[0],0)-1
+				if(ccnt_new>ccnt_l1){
+					if(this.IsRightBracketAt(ccnt_new+1)){
+						ccnt_new++
+					}
+					range=[ccnt_l1,ccnt_new]
+				}
+			}
+		}
+		return range
+	},
 	RenderWithLineNumbers:function(scroll_x,scroll_y, area_x,area_y,area_w,area_h,enable_interaction){
 		if(this.m_rendered_frame_id!=UI.m_frame_tick){
 			this.m_rendered_frame_id=UI.m_frame_tick;
@@ -684,6 +749,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				area_x+w_line_numbers+edstyle.padding,area_y,
 				area_w-w_line_numbers-edstyle.padding,
 				area_h);
+			scroll_x=this.visible_scroll_x;
+			scroll_y=this.visible_scroll_y;
 		}else{
 			this.ed.Render({x:scroll_x,y:scroll_y,w:area_w-w_line_numbers-edstyle.padding,h:area_h,
 				scr_x:(area_x+w_line_numbers+edstyle.padding)*UI.pixels_per_unit,scr_y:area_y*UI.pixels_per_unit,
@@ -707,61 +774,117 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			}
 			UI.PopCliprect()
 		}
-		var show_line_numbers=UI.TestOption("show_line_numbers")
-		if(show_line_numbers){
-			var rendering_ccnt0=this.SeekXY(scroll_x,scroll_y)
-			var rendering_ccnt1=this.SeekXY(scroll_x+area_w,scroll_y+area_h)
-			var dy_line_number=(UI.GetCharacterHeight(this.font)-UI.GetCharacterHeight(edstyle.line_number_font))*0.5;
-			var line0=this.GetLC(rendering_ccnt0)[0];
-			var line1=this.GetLC(rendering_ccnt1)[0];
-			var line_ccnts=this.SeekAllLinesBetween(line0,line1+1,"valid_only");
-			var line_xys=this.ed.GetXYEnMasse(line_ccnts)
-			var diff=this.m_diff_from_save
-			UI.PushCliprect(area_x,area_y,area_w,area_h)
+		var rendering_ccnt0=this.SeekXY(scroll_x,scroll_y)
+		var rendering_ccnt1=this.SeekXY(scroll_x+area_w,scroll_y+area_h)
+		var dy_line_number=(UI.GetCharacterHeight(this.font)-UI.GetCharacterHeight(edstyle.line_number_font))*0.5;
+		var line0=this.GetLC(rendering_ccnt0)[0];
+		var line1=this.GetLC(rendering_ccnt1)[0];
+		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1,"valid_only");
+		var line_xys=this.ed.GetXYEnMasse(line_ccnts)
+		var diff=this.m_diff_from_save
+		var line_indents=undefined;
+		if(!this.hyphenator&&enable_interaction){
+			line_indents=[];
 			for(var i=0;i<line_ccnts.length;i++){
-				if(line_ccnts[i]<0){continue;}
-				if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
-				var s_line_number=(line0+i+1).toString();
-				var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
-				var text_dim=UI.MeasureText(edstyle.line_number_font,s_line_number)
-				var x=w_line_numbers-text_dim.w-edstyle.padding
-				if(diff){
-					var ccnt_line_next=-1;
-					for(var j=i+1;j<line_ccnts.length;j++){
-						if(line_ccnts[j]>=0){
-							ccnt_line_next=line_ccnts[j]
-							break
+				var ind=undefined;
+				if(line_ccnts[i]>=0){
+					ind=this.ed.MoveToBoundary(line_ccnts[i],1,"space")-line_ccnts[i];
+				}
+				line_indents[i]=ind;
+			}
+		}
+		var fold_btn_ccnts=(line_indents?[]:undefined);
+		var fold_btn_next_line_ccnts=(line_indents?[]:undefined);
+		var show_line_numbers=UI.TestOption("show_line_numbers")
+		UI.PushCliprect(area_x,area_y,area_w,area_h)
+		for(var i=0;i<line_ccnts.length;i++){
+			if(line_ccnts[i]<0){continue;}
+			if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
+			var s_line_number=(line0+i+1).toString();
+			var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
+			var text_dim=(show_line_numbers?UI.MeasureText(edstyle.line_number_font,s_line_number):{w:0,h:0})
+			var x=w_line_numbers-text_dim.w-edstyle.padding
+			if(diff){
+				var ccnt_line_next=-1;
+				for(var j=i+1;j<line_ccnts.length;j++){
+					if(line_ccnts[j]>=0){
+						ccnt_line_next=line_ccnts[j]
+						break
+					}
+				}
+				if(ccnt_line_next<0){
+					ccnt_line_next=this.SeekLC(line1+1,0)
+				}
+				if(diff.RangeQuery(line_ccnts[i],ccnt_line_next)){
+					//line modified
+					//s_line_number=s_line_number+"*";
+					UI.RoundRect({
+						x:area_x+w_line_numbers-6,y:line_xys[i*2+1]-scroll_y+area_y,
+						w:6,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
+						color:edstyle.color_diff_tag})
+				}
+			}
+			if(enable_interaction){
+				W.Region("$bookmark_l"+(line0+i),{
+					x:area_x,y:y,
+					w:w_line_numbers,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
+					mouse_cursor:"arrow",
+					OnClick:function(line_id){
+						if(this.ToggleBookmarkOnLine){
+							this.ToggleBookmarkOnLine(line_id)
 						}
-					}
-					if(ccnt_line_next<0){
-						ccnt_line_next=this.SeekLC(line1+1,0)
-					}
-					if(diff.RangeQuery(line_ccnts[i],ccnt_line_next)){
-						//line modified
-						//s_line_number=s_line_number+"*";
-						UI.RoundRect({
-							x:area_x+w_line_numbers-6,y:line_xys[i*2+1]-scroll_y+area_y,
-							w:6,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
-							color:edstyle.color_diff_tag})
-					}
-				}
-				if(enable_interaction){
-					W.Region("$bookmark_l"+(line0+i),{
-						x:area_x+x,y:y,
-						w:w_line_numbers,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
-						line_id:line0+i,
-						mouse_cursor:"arrow",
-						OnClick:function(){
-							if(this.ToggleBookmarkOnLine){
-								this.ToggleBookmarkOnLine(this.line_id)
-							}
-						}.bind(this)
-					})
-				}
+					}.bind(this,line0+i)
+				})
+			}
+			if(show_line_numbers){
 				W.Text("",{x:area_x+x,y:y, font:edstyle.line_number_font,text:s_line_number,color:line0+i==line_current?edstyle.line_number_color_focus:edstyle.line_number_color})
 			}
-			UI.PopCliprect()
+			//folding button
+			if(line_indents&&(line_ccnts[i+1]>0||line_ccnts[i+1]<-1)){
+				//indentat... just count spaces
+				var ccnt_line_next=line_ccnts[i+1];
+				if(ccnt_line_next<0){ccnt_line_next=-1-ccnt_line_next;}
+				if(line_indents[i+1]>line_indents[i]){
+					fold_btn_ccnts.push(line_ccnts[i]+line_indents[i])
+					fold_btn_next_line_ccnts.push(ccnt_line_next);
+				}
+			}
 		}
+		if(fold_btn_ccnts){
+			var fold_btn_xys=this.ed.GetXYEnMasse(fold_btn_ccnts);
+			var renderer=this.GetRenderer()
+			for(var i=0;i<fold_btn_ccnts.length;i++){
+				//really draw the folding buttons
+				var x=fold_btn_xys[i*2+0]-scroll_x;
+				var y=fold_btn_xys[i*2+1]-scroll_y;
+				var is_hidden=renderer.IsRangeHidden(this.ed,fold_btn_next_line_ccnts[i]-1,fold_btn_next_line_ccnts[i]);
+				W.Button("fold_"+fold_btn_ccnts[i],{
+					x:area_x+w_line_numbers+edstyle.padding+Math.max(x,0)-edstyle.fold_button_size-2,
+					y:area_y+y+(hc-edstyle.fold_button_size)*0.5,
+					w:edstyle.fold_button_size,
+					h:edstyle.fold_button_size,
+					style:edstyle.fold_button_style,
+					text:is_hidden?'+':'-',
+					OnClick:function(ccnt,is_hidden){
+						var sel=this.GetSmartFoldRange(ccnt);
+						if(sel){
+							var renderer=this.GetRenderer()
+							if(is_hidden){
+								renderer.ShowRange(this.ed,sel[0],sel[1]);
+							}else{
+								renderer.HideRange(this.ed,sel[0],sel[1]);
+								this.SetSelection(
+									renderer.SnapToShown(this.ed,this.sel0.ccnt,this.sel0.ccnt>=sel[1]?1:-1),
+									renderer.SnapToShown(this.ed,this.sel1.ccnt,this.sel1.ccnt>=sel[1]?1:-1))
+							}
+							this.CallOnSelectionChange();
+							UI.Refresh()
+						}
+					}.bind(this,fold_btn_ccnts[i],is_hidden)
+				})
+			}
+		}
+		UI.PopCliprect()
 		//line number bar shadow when x scrolled
 		var x_shadow_size_max=edstyle.x_scroll_shadow_size
 		var x_shadow_size=Math.min(scroll_x/8,x_shadow_size_max)
@@ -3310,11 +3433,12 @@ W.CodeEditor=function(id,attrs){
 		var doc=obj.doc
 		var prev_h_top_hint=(obj.h_top_hint||0),h_top_hint=0,w_line_numbers=0,w_scrolling_area=0,y_top_hint_scroll=0;
 		var h_scrolling_area=h_obj_area
-		var h_top_find=0,h_bottom_find=0
+		var h_top_find=0
 		var editor_style=obj.editor_style
 		var top_hint_bbs=[]
 		var current_find_context=obj.m_current_find_context
-		var ytot
+		var ytot=undefined;
+		var y_bottom_shadow=undefined;
 		var show_minimap=UI.TestOption("show_minimap");
 		if(doc){
 			//scrolling and stuff
@@ -3499,13 +3623,15 @@ W.CodeEditor=function(id,attrs){
 		}
 		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4
 		w_line_numbers+=obj.padding+w_bookmark;
-		if(obj.show_find_bar&&current_find_context){
-			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
-			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_obj_area-w_scrolling_area,y:obj.y,w:w_scrolling_area,h:h_obj_area})
-		}else{
-			UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:h_obj_area})
-			UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_obj_area-w_line_numbers,h:h_obj_area})
-		}
+		UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
+		UI.RoundRect({color:obj.bgcolor,x:obj.x+w_obj_area-w_scrolling_area,y:obj.y,w:w_scrolling_area,h:h_obj_area})
+		//if(obj.show_find_bar&&current_find_context){
+		//	UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
+		//	UI.RoundRect({color:obj.bgcolor,x:obj.x+w_obj_area-w_scrolling_area,y:obj.y,w:w_scrolling_area,h:h_obj_area})
+		//}else{
+		//	//UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:h_obj_area})
+		//	//UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_obj_area-w_line_numbers,h:h_obj_area})
+		//}
 		if(doc&&doc.ed.hfile_loading){
 			//loading progress
 			obj.CreateNotification({
@@ -3682,10 +3808,17 @@ W.CodeEditor=function(id,attrs){
 				}
 				UI.Keep("doc",{});
 				doc.owner=obj;
+				var h_editor=h_obj_area-h_top_find;
 				doc.RenderWithLineNumbers(doc.scroll_x,doc.scroll_y,
 					obj.x,obj.y+h_top_find,
 					w_obj_area-w_scrolling_area,
-					h_obj_area-h_top_find-h_bottom_find,1);
+					h_editor-h_top_find,1);
+				var ccnt_tot=doc.ed.GetTextSize()
+				var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot)
+				if(h_editor>ytot){
+					h_editor=Math.min(h_editor,ytot+UI.GetCharacterHeight(doc.font));
+					y_bottom_shadow=ytot;
+				}
 				//doc.precise_ctrl_lr_stop=UI.TestOption("precise_ctrl_lr_stop");
 				//doc.same_line_only_left_right=!UI.TestOption("left_right_line_wrap");
 				//wrap width widget
@@ -3694,16 +3827,16 @@ W.CodeEditor=function(id,attrs){
 					if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
 						UI.RoundRect({
 							x:obj.x+x_wrap_bar,
-							y:obj.y,
+							y:doc.y,
 							w:obj.wrap_bar_size,
-							h:h_obj_area,
+							h:doc.h,
 							color:obj.wrap_bar_color})
 						//the mouse interaction
 						W.Region('wrapbar_widget',{
 							x:obj.x+x_wrap_bar+(obj.wrap_bar_size-obj.wrap_bar_region_size)*0.5,
-							y:obj.y,
+							y:doc.y,
 							w:obj.wrap_bar_region_size,
-							h:h_obj_area,
+							h:doc.h,
 							owner:obj,
 							dimension:'x',
 							mouse_cursor:'sizewe',
@@ -4035,6 +4168,16 @@ W.CodeEditor=function(id,attrs){
 				}
 			}else{
 				//obj.find_bar_edit=undefined;
+				if(y_bottom_shadow!=undefined){
+					UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_obj_area,h:h_obj_area-y_bottom_shadow})
+					UI.PushCliprect(obj.x,obj.y+y_bottom_shadow,w_obj_area,h_obj_area-y_bottom_shadow)
+						UI.RoundRect({x:0-obj.find_item_shadow_size,y:obj.y+y_bottom_shadow-obj.find_item_shadow_size,
+							w:w_obj_area+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
+							color:obj.find_item_shadow_color,
+							round:obj.find_item_shadow_size,
+							border_width:-obj.find_item_shadow_size})
+					UI.PopCliprect()
+				}
 			}
 			//UI.RoundRect({
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:h_obj_area,
