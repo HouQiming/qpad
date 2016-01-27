@@ -1375,6 +1375,10 @@ UI.RegisterEditorPlugin(function(){
 				var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
 				var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
 				var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
+				if(sinsert==undefined){
+					this.Paste()
+					return;
+				}
 				var ccnt_new=ccnt_lh;
 				if(ccnt_corrected<=sel[0]){
 					this.HookedEdit([ccnt_corrected,0,sinsert,sel[0],sel[1]-sel[0],undefined])
