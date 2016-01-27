@@ -899,7 +899,7 @@ class CLayouter_programmer
 						//g_renderer.DrawChar(fnt_scaled, prj_x.x,prj_x.y,m_cached_colors[color_ids[I]], ch)
 						color=m_cached_colors[int(cidi)&127]
 						if enable_hidden<=0&&(int(cidi)&128):
-							color&=0x55ffffff
+							color&=0xaaffffff
 						g_renderer.FastDrawChar(prj_x.x,prj_x.y,color, ch)
 				else
 					dx_extra-=dx_i
@@ -914,7 +914,7 @@ class CLayouter_programmer
 					ix-=wrap_width
 					iy++
 					if (iy+dy_extra)*hc-scroll_y>=clip_h:break
-			if (int(cidi)&128)&&enable_hidden>=0:
+			if (int(cidi)&128)&&enable_hidden>0:
 				if cidi!=u8(255):
 					cidi&=u8(127)
 					//dx_i=charWidth(U_ELLIPSIS)
@@ -1442,7 +1442,7 @@ class CLayouter_programmer
 		//it's not necessarily an 'add'
 		//test: are we on the last line? same line as last hidden should be enough
 		//then again, we can't easily get flat X for the bsearch - precompute needs to be in xy pairs
-		if m_enable_hidden<0:return XYToX(x,y)
+		if m_enable_hidden<=0:return XYToX(x,y)
 		if !m_hidden_ranges_prepared:
 			PrepareHiddenRanges(ed)
 		hc=charHeight()
@@ -1493,7 +1493,7 @@ class CLayouter_programmer
 		if p>=m_hidden_ccnts.n:
 			return
 		ccnt_next=m_hidden_ccnts[p]-ccnt0
-		enable_hidden=(m_enable_hidden>=0)
+		enable_hidden=(m_enable_hidden>0)
 		i_prev=0L
 		for i=0L:color_ids.n-1
 			if i==ccnt_next:
@@ -3327,7 +3327,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if flags&SEARCH_FLAG_REGEXP:
 				assert(!(flags&SEARCH_FLAG_FUZZY))
 				ReportMatch=function(i64 ccnt0,i64 ccnt1){
-					return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
+					return js_callback.Call(int,ccnt0,ccnt1)
 				}
 			else
 				ReportMatch=function(i64 ccnt0,i64 ccnt1){
@@ -3336,7 +3336,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						if isWordChar(ch0)==isWordChar(ch1):return 0
 						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
 						if isWordChar(ch0)==isWordChar(ch1):return 0
-					return js_callback.CallAsMethod(int,js_this,ccnt0,ccnt1)
+					return js_callback.Call(int,ccnt0,ccnt1)
 				}
 		if flags&SEARCH_FLAG_REGEXP:
 			assert(!(flags&SEARCH_FLAG_FUZZY))
@@ -3366,7 +3366,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if !ed||!rjob:return JS.ReturnError("invalid parameters")
 		//for now, just do it the dumb way
 		n=rjob.m_ops.n
-		ed.Edit(rjob.m_ops)
+		if n:
+			ed.Edit(rjob.m_ops)
 		return JS.Return(n)
 	}
 	//

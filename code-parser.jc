@@ -1730,8 +1730,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//if !s:s=new string
 		all_key_decls=fidx.m_all_key_decls
 		if !all_key_decls:return 0
+		tmp=new(all_key_decls)
+		tmp.Sortby(byMember("epos0"))
 		ret=JS.NewArray()
-		foreach kd,I in all_key_decls
+		foreach kd,I in tmp
 			ret[I*3+0]=getIdString(kd.id_type&~KEY_DECL_MASK)
 			ret[I*3+1]=(kd.id_type&KEY_DECL_MASK)
 			ccnt=i64(kd.epos0)
