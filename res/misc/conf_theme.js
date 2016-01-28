@@ -383,7 +383,7 @@ UI.CustomTheme=function(){
 				icon_text_valign:'center',
 				$:(L?{//light
 					out:{
-						border_color:0x55000000,color:0,
+						border_color:0x55000000,color:0xaae8e8e8,
 						icon_color:0x55000000,
 						text_color:0x55000000,
 					},
@@ -399,7 +399,7 @@ UI.CustomTheme=function(){
 					},
 				}:{//dark
 					out:{
-						border_color:0x55e8e8e8,color:0,
+						border_color:0x55e8e8e8,color:0xaa3f3f3f,
 						icon_color:0x55e8e8e8,
 						text_color:0x55e8e8e8,
 					},

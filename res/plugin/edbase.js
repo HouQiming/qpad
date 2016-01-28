@@ -2966,22 +2966,25 @@ UI.RegisterEditorPlugin(function(){
 	})
 })//.prototype.desc={category:"Controls",name:"Cursor history navigation",stable_name:"cursor_hist"};
 
-/*
 var g_regexp_bash_escaping=new RegExp('[#;&"\'\\\\,`:!*?$(){}\\[\\]<|> \t]','g');
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	this.AddEventHandler('TAB',function(){
-		//shell script
+	if(!UI.TestOption("auto_completion")){return;}
+	//this.AddEventHandler('autoComplete',function(){
+	this.AddEventHandler('explicitAutoComplete',function(){
 		var lang=this.plugin_language_desc
-		if(!lang||!lang.shell_script_type){return 1;}
-		//no selection
-		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
-		//cursor at end of line
-		var ccnt_end=this.ed.MoveToBoundary(this.sel1.ccnt,1,"space");
-		if(this.ed.GetUtf8CharNeighborhood(ccnt_end)[1]!=10){return 1;}
+		if(!lang){return;}
+		//shell script only
+		//||this.plugin_language_desc.parser=="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)
+		if(!lang.shell_script_type){return;}
+		var ccnt=this.sel1.ccnt;
+		//followed by non-word
+		var ch=this.ed.GetUtf8CharNeighborhood(ccnt)[1]
+		if(UI.IsWordChar(ch)){return;}
+		//shell script
 		//line short enough
-		var ccnt_lh=this.SeekLC(this.GetLC(this.sel1.ccnt)[0],0)
-		if(!(this.sel1.ccnt-ccnt_lh<4096)){return 1;}
+		var ccnt_lh=this.SeekLC(this.GetLC(ccnt)[0],0)
+		if(!(ccnt-ccnt_lh<4096)){return;}
 		//parse the line into a list of words, then work on the last word
 		var s=this.ed.GetText(ccnt_lh,this.sel1.ccnt-ccnt_lh)
 		var pword=-1,cur_str=[],instr=undefined;
@@ -3020,11 +3023,18 @@ UI.RegisterEditorPlugin(function(){
 			}
 		}
 		endWord(s.length);
-		if(args.length<3){return 1;}
+		if(args.length<3){return;}
 		//work on args
+		//todo: current path, executable-completion case
 		var s_path=args[args.length-3];
-		var find_context=IO.CreateEnumFileContext(s_path.replace(g_regexp_backslash,"/")+"*",3)
-		var s_common=undefined
+		var s_path_std=s_path.replace(g_regexp_backslash,"/");
+		var s_path_prefix="";
+		if(!(s_path_std.indexOf('/')>=0)&&this.m_file_name){
+			s_path_prefix=UI.GetPathFromFilename(this.m_file_name)+"/";
+		}
+		var find_context=IO.CreateEnumFileContext(s_path_prefix+s_path_std+"*",3)
+		var cands=[];
+		var need_quote=0;
 		for(;;){
 			var fnext=find_context()
 			if(!fnext){
@@ -3032,48 +3042,38 @@ UI.RegisterEditorPlugin(function(){
 				break
 			}
 			var sname=fnext.name
-			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-				sname=sname.toLowerCase()
+			if(s_path_prefix){
+				sname=sname.substr(s_path_prefix.length);
 			}
+			//lang.shell_script_type=="windows"
+			//if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			//	sname=sname.toLowerCase()
+			//}
 			if(fnext.is_dir){
 				sname=sname+"/"
 			}
-			if(!s_common){
-				s_common=sname
-			}else{
-				for(var i=0;i<s_common.length;i++){
-					if(i>=sname.length||sname[i]!=s_common[i]){
-						s_common=s_common.substr(0,i)
-						break;
-					}
-				}
+			if(sname.indexOf(' ')>=0||sname.indexOf('\t')>=0){
+				need_quote=1;
 			}
-			if(s_common.length<=s_path.length){break;}
-		}
-		if(!s_common||s_common.length<=s_path.length){return 1;}
-		//actually replace the stuff
-		if(lang.shell_script_type=="windows"){
-			s_common=s_common.replace(g_regexp_slash,"\\")
-			if(s_common.indexOf(' ')>=0||s_common.indexOf('\t')>=0){
-				//quote it
-				s_common='"'+s_common+'"';
+			if(lang.shell_script_type=="windows"){
+				sname=sname.replace(g_regexp_slash,"\\")
 			}
-		}else{
-			//unix, escape the stuff
-			var fescapestuff=UI.HackCallback(function(smatch){
-				return "\\"+smatch;
-			});
-			s_common=s_common.replace(g_regexp_bash_escaping,fescapestuff);
+			cands.push(sname);
 		}
-		var ccnt0=ccnt_lh+Duktape.__byte_length(s.slice(0,args[args.length-2]))
-		var ccnt1=ccnt_lh+Duktape.__byte_length(s.slice(0,args[args.length-1]))
-		this.HookedEdit([ccnt0,ccnt1-ccnt0,s_common])
-		this.CallOnChange()
-		this.SetCaretTo(ccnt0+Duktape.__byte_length(s_common))
-		return 0
+		if(!cands.length){return;}
+		var ret={cands:cands,s_prefix:s_path};
+		var ccnt0=ccnt_lh+Duktape.__byte_length(s.slice(0,args[args.length-2]));
+		if(need_quote||this.sel1.ccnt-ccnt0!=Duktape.__byte_length(s_path)){
+			for(var i=0;i<cands.length;i++){
+				cands[i]='"'+cands[i]+'"';
+			}
+			ret.ccnt0=ccnt0;
+		}
+		//todo: call bash completion on *nix
+		//http://stackoverflow.com/questions/3520936/accessing-bash-completions-for-specific-commands-programmatically
+		return UI.ED_PrepareACCands(ret);
 	})
-}).prototype.name="File name completion";
-*/
+})//.prototype.name="File name completion";
 
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}

@@ -1384,6 +1384,16 @@ class CLayouter_programmer
 	*/
 	m_enable_hidden=1 
 	PrepareHiddenRanges=function(CEditableText ed){
+		//remove the stale ranges
+		n2=0
+		for I=0:2:m_hidden_ranges.n-2
+			loc0=m_hidden_ranges[I]
+			loc1=m_hidden_ranges[I+1]
+			if (loc1.ccnt>loc0.ccnt):
+				m_hidden_ranges[n2+0]=loc0
+				m_hidden_ranges[n2+1]=loc1
+				n2+=2
+		m_hidden_ranges.n=n2;
 		//they must be x-addressible
 		m_hidden_ranges_prepared=1
 		raw_ccnts=[loc.ccnt*2LL+i64(I&1) foreach loc,I in m_hidden_ranges]

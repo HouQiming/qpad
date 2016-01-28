@@ -11,13 +11,6 @@ var KEY_DECL_FUNCTION=TOK_TYPE*0
 var CALL_GC_DOC_SIZE_THRESHOLD=4194304;
 var GRACEFUL_WORD_SIZE=256;
 
-if(!UI.m_ui_metadata.find_state){
-	UI.m_ui_metadata.find_state={
-		m_current_needle:"",
-		m_find_flags:0,
-	}
-}
-
 UI.m_code_editor_persistent_members_doc=[
 	"m_language_id",
 	"m_current_wrap_width",
@@ -29,6 +22,7 @@ UI.m_code_editor_persistent_members_doc=[
 UI.RegisterCodeEditorPersistentMember=function(name){
 	UI.m_code_editor_persistent_members_doc.push(name)
 }
+UI.m_editor_plugins=[];
 UI.RegisterEditorPlugin=function(fplugin){
 	UI.m_editor_plugins.push(fplugin)
 	return fplugin
@@ -118,6 +112,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks['parse']=[]
 		this.m_event_hooks['menu']=[]
 		this.m_event_hooks['beforeEdit']=[]
+		this.m_event_hooks['autoComplete']=[]
+		this.m_event_hooks['explicitAutoComplete']=[]
 		//before creating the editor, try to call a language callback
 		var loaded_metadata=this.LoadMetaData()
 		var hyp_name=(loaded_metadata.m_hyphenator_name||this.plugin_language_desc&&this.plugin_language_desc.default_hyphenator_name)
@@ -487,7 +483,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(!this.m_ellipsis_font){
 			this.m_ellipsis_font=UI.Font(UI.icon_font_name,this.h_ellipsis)
 			this.m_ellipsis_delta_x=(this.w_ellipsis-UI.GetCharacterAdvance(this.m_ellipsis_font,0x2026))*0.5
-			this.m_ellipsis_delta_y=(UI.GetCharacterHeight(this.font)-this.h_ellipsis)*0.5
+			this.m_ellipsis_delta_y=(UI.GetCharacterHeight(this.font)-this.h_ellipsis)*0.5;
 			this.m_ellipsis_draw_w=this.w_ellipsis-this.padding_ellipsis*2
 		}
 		UI.RoundRect({
@@ -566,17 +562,57 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	CancelAutoCompletion:function(){
 		this.m_ac_context=undefined;
 	},
+	/*
+	needed for accands
+		length:,
+		at:function(id){},
+		s_prefix:,
+		ccnt0:,
+	*/
 	TestAutoCompletion:function(is_explicit){
-		//todo: is_explicit - additional handlers
 		if(this.sel0.ccnt!=this.sel1.ccnt){
 			this.m_ac_activated=0;
 			return 0;
 		}
-		if(this.plugin_language_desc.parser=="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)){
-			this.m_ac_activated=0;
-			return 0;
+		//call plugin-defined AC hooks
+		var is_user_defined=0;
+		var accands=undefined;
+		if(is_explicit&&!accands){
+			var hk=this.m_event_hooks["explicitAutoComplete"];
+			if(hk){
+				for(var i=hk.length-1;i>=0;i--){
+					accands=hk[i].call(this);
+					if(accands){
+						is_user_defined=1;
+						break;
+					}
+				}
+			}
 		}
-		var accands=UI.ED_QueryAutoCompletion(this,this.sel1.ccnt);
+		if(!accands){
+			var hk=this.m_event_hooks["autoComplete"];
+			if(hk){
+				for(var i=hk.length-1;i>=0;i--){
+					accands=hk[i].call(this);
+					if(accands){
+						is_user_defined=1;
+						break;
+					}
+				}
+			}
+		}
+		if(!accands){
+			if(this.plugin_language_desc.parser=="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)){
+				this.m_ac_activated=0;
+				return 0;
+			}
+			var neib=this.ed.GetUtf8CharNeighborhood(this.sel1.ccnt);
+			if(!(UI.ED_isWordChar(neib[0])&&!UI.ED_isWordChar(neib[1]))){
+				this.m_ac_activated=0;
+				return 0;
+			}
+			accands=UI.ED_QueryAutoCompletion(this,this.sel1.ccnt);
+		}
 		if(!accands){
 			this.m_ac_activated=0;
 			return 0;
@@ -584,6 +620,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_ac_context=NewACContext({
 			m_is_spell_mode:0,
 			m_ccnt:this.sel1.ccnt,
+			m_is_user_defined:is_user_defined,
 			m_accands:accands,
 			m_owner:this,
 		})
@@ -632,8 +669,11 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var lg=Duktape.__byte_length(s_prefix);
 		if(id==undefined){lg=0;}
 		var ccnt0=this.sel1.ccnt-lg
-		if(acctx.m_is_spell_mode){
+		if(acctx.m_is_spell_mode||acctx.m_accands.ccnt0!=undefined){
 			ccnt0=acctx.m_accands.ccnt0
+			if(!acctx.m_is_spell_mode){
+				lg=this.sel1.ccnt-ccnt0;
+			}
 		}
 		var sname=(id==undefined?acctx.m_accands.m_common_prefix:acctx.m_accands.at(id).name)
 		if(acctx.m_is_spell_mode){
@@ -1088,8 +1128,16 @@ UI.SEARCH_FLAG_CASE_SENSITIVE=1;
 UI.SEARCH_FLAG_WHOLE_WORD=2;
 UI.SEARCH_FLAG_REGEXP=4;
 UI.SEARCH_FLAG_FUZZY=8;
+UI.SEARCH_FLAG_HIDDEN=16;
 UI.SEARCH_FLAG_GOTO_MODE=1024;
 UI.SEARCH_FLAG_GLOBAL=2048;
+if(!UI.m_ui_metadata.find_state){
+	UI.m_ui_metadata.find_state={
+		m_current_needle:"",
+		m_find_flags:UI.SEARCH_FLAG_HIDDEN,
+	}
+}
+
 var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 	//should be sorted now
 	//matches.sort(function(a,b){return a[0]-b[0];});
@@ -1190,11 +1238,21 @@ var find_context_prototype={
 		UI.Refresh()
 	},
 	ReportMatchForward:function(doc,ccnt0,ccnt1){
+		if(!(this.m_flags&UI.SEARCH_FLAG_HIDDEN)){
+			if(doc.GetRenderer().IsRangeHidden(doc.ed,ccnt0,ccnt1)){
+				return 1024;
+			}
+		}
 		this.m_forward_matches.push(ccnt0,ccnt1,doc)
 		this.CreateHighlight(doc,ccnt0,ccnt1)
 		return 1024
 	},
 	ReportMatchBackward:function(doc,ccnt0,ccnt1){
+		if(!(this.m_flags&UI.SEARCH_FLAG_HIDDEN)){
+			if(doc.GetRenderer().IsRangeHidden(doc.ed,ccnt0,ccnt1)){
+				return 1024;
+			}
+		}
 		this.m_backward_matches.push(ccnt0,ccnt1,doc)
 		this.CreateHighlight(doc,ccnt0,ccnt1)
 		return 1024
@@ -1233,7 +1291,7 @@ var find_context_prototype={
 		this.m_current_merged_item=r
 		var renderer=doc.GetRenderer();
 		var bk=renderer.m_enable_hidden;
-		renderer.m_enable_hidden=0
+		renderer.m_enable_hidden=((this.m_flags&UI.SEARCH_FLAG_HIDDEN)?0:1);
 		this.m_current_visual_y=doc.ed.XYFromCcnt(this.GetMatchCcnt(id,0)).y-fitem_current.scroll_y+fitem_current.visual_y
 		renderer.m_enable_hidden=bk;
 		////////////////////
@@ -1893,7 +1951,7 @@ W.CodeEditorWidget_prototype={
 		}
 		var renderer=doc.GetRenderer()
 		var bk_m_enable_hidden=renderer.m_enable_hidden;
-		renderer.m_enable_hidden=0;
+		renderer.m_enable_hidden=((flags&UI.SEARCH_FLAG_HIDDEN)?0:1);
 		ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt==undefined?doc.sel0.ccnt:ccnt,force_ccnt==undefined?doc.sel1.ccnt:ccnt)
 		ctx.SetRenderingHeight(this.h-this.h_find_bar);
 		this.m_current_find_context=ctx
@@ -2235,7 +2293,7 @@ var ffindbar_plugin=function(){
 	this.AddEventHandler('ESC',function(){
 		this.CancelFind();
 	})
-	this.AddEventHandler('RETURN',function(){
+	this.AddEventHandler('RETURN RETURN2',function(){
 		var obj=this.find_bar_owner
 		var ctx=obj.m_current_find_context
 		if(ctx){
@@ -3967,7 +4025,7 @@ W.CodeEditor=function(id,attrs){
 				var render_secs=0,ln_secs=0;
 				//DrawItem
 				var renderer=doc.GetRenderer();
-				renderer.m_enable_hidden=0
+				renderer.m_enable_hidden=((current_find_context.m_flags&UI.SEARCH_FLAG_HIDDEN)?0:1)
 				current_find_context.RenderVisibleFindItems(w_line_numbers+obj.padding,w_find_items,h_obj_area-obj.h_find_bar)
 				renderer.m_enable_hidden=1
 				if(!current_find_context.m_forward_matches.length&&!current_find_context.m_backward_matches.length&&
@@ -4047,7 +4105,7 @@ W.CodeEditor=function(id,attrs){
 				//fuzzy match disclaimer... fade, red search bar with "fuzzy match" written on
 				var rect_bar=UI.RoundRect({
 					x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
-					w:w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?4:1),h:obj.h_find_bar-obj.find_bar_padding*2,
+					w:w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?5:1),h:obj.h_find_bar-obj.find_bar_padding*2,
 					color:UI.lerp_rgba(obj.find_bar_color,obj.disclaimer_color,(disclaimer_alpha||0)*0.125),
 					round:obj.find_bar_round})
 				var chr_icon='s'.charCodeAt(0);
@@ -4081,6 +4139,8 @@ W.CodeEditor=function(id,attrs){
 						OnChange:function(value){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
 							obj.DestroyReplacingContext();
+							obj.doc.sel0.ccnt=obj.m_sel0_before_find
+							obj.doc.sel1.ccnt=obj.m_sel1_before_find
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+C",action:function(){btn_case.OnClick()}})
@@ -4092,6 +4152,8 @@ W.CodeEditor=function(id,attrs){
 						OnChange:function(value){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
 							obj.DestroyReplacingContext();
+							obj.doc.sel0.ccnt=obj.m_sel0_before_find
+							obj.doc.sel1.ccnt=obj.m_sel1_before_find
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+H",action:function(){btn_word.OnClick()}})
@@ -4103,9 +4165,24 @@ W.CodeEditor=function(id,attrs){
 						OnChange:function(value){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
 							obj.DestroyReplacingContext();
+							obj.doc.sel0.ccnt=obj.m_sel0_before_find
+							obj.doc.sel1.ccnt=obj.m_sel1_before_find
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick()}})
+					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+					var btn_hidden=W.Button("find_button_hidden",{style:UI.default_styles.check_button,
+						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
+						font:UI.icon_font,text:"藏",tooltip:"Search hidden text - ALT+T",
+						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_HIDDEN?1:0),
+						OnChange:function(value){
+							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_HIDDEN)|(value?UI.SEARCH_FLAG_HIDDEN:0)
+							obj.DestroyReplacingContext();
+							obj.doc.sel0.ccnt=obj.m_sel0_before_find
+							obj.doc.sel1.ccnt=obj.m_sel1_before_find
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+						}})
+					W.Hotkey("",{key:"ALT+T",action:function(){btn_hidden.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				}
 				W.Button("find_button_close",{style:UI.default_styles.check_button,
@@ -4264,12 +4341,12 @@ W.CodeEditor=function(id,attrs){
 							{text:">",tooltip:'= or .',action:fnextpage}])
 						//W.Hotkey("",{text:",",action:fprevpage})
 						//W.Hotkey("",{text:".",action:fnextpage})
-						W.Hotkey("",{text:"-",action:fprevpage})
-						W.Hotkey("",{text:"=",action:fnextpage})
-						W.Hotkey("",{key:"LEFT",action:fprevcand})
-						W.Hotkey("",{key:"RIGHT",action:fnextcand})
-						W.Hotkey("",{text:" ",action:fconfirm})
-						W.Hotkey("",{key:"TAB",action:fconfirm})
+						doc.AddTransientHotkey("-",fprevpage)
+						doc.AddTransientHotkey("=",fnextpage)
+						doc.AddTransientHotkey("LEFT",fprevcand)
+						doc.AddTransientHotkey("RIGHT",fnextcand)
+						doc.AddTransientHotkey(" ",fconfirm)
+						doc.AddTransientHotkey("TAB",fconfirm)
 					}
 				}
 				///////////////////////
@@ -4924,14 +5001,28 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('userTypeChar',function(){
-		this.TestAutoCompletion()
+		if(this.m_ac_activated){
+			if(this.TestAutoCompletion("explicit")){
+				//var acctx=this.m_ac_context;
+				//if(acctx&&acctx.m_accands.m_common_prefix){
+				//	this.ConfirmAC(undefined);
+				//}
+				return;
+			}
+		}else{
+			this.TestAutoCompletion()
+		}
 	})
 	this.AddEventHandler('change',function(){
 		this.CancelAutoCompletion()
 	})
 	this.AddEventHandler('TAB',function(){
-		var neib=this.ed.GetUtf8CharNeighborhood(this.sel1.ccnt);
-		if(UI.ED_isWordChar(neib[0])&&!UI.ED_isWordChar(neib[1])&&this.TestAutoCompletion("explicit")){
+		if(this.TestAutoCompletion("explicit")){
+			var acctx=this.m_ac_context;
+			if(acctx&&acctx.m_accands.m_common_prefix){
+				this.ConfirmAC(undefined);
+				return 0;
+			}
 			this.ActivateAC()
 			return 0;
 		}

@@ -875,7 +875,7 @@ auto appendKeywords(int[] ids,JSObject options)
 		for i=0:n-1
 			ids.push(getid(js_kws[i].as(string)))
 
-if Platform.IS_WINDOWS
+if Platform.IS_WINDOWS:
 	memicmp=__c_function(int,"_memicmp","string.h")
 else
 	memicmp=function(__pointer a,__pointer b,iptr n){
@@ -1299,6 +1299,7 @@ class CACContext
 	int2[] m_candidates
 	string s_prefix
 	string m_common_prefix
+	m_ccnt0=-1LL
 	//int m_auto_activate_after_tab
 	JS_At=function(JSContext JS){
 		id=JS.Param(0).as(int)
@@ -1312,12 +1313,16 @@ class CACContext
 	JS_GetLength=function(JSContext JS){
 		return JS.Return(m_candidates.n)
 	}
+	JS_GetCcnt0=function(JSContext JS){
+		return m_ccnt0<0LL?0:JS.Return(m_ccnt0)
+	}
 	auto __JS_prototype(JSObject proto)
 		proto.ExportMethod(this,"at",JS_At)
 		proto.ExportProperty(this,"s_prefix")
 		proto.ExportProperty(this,"m_common_prefix")
 		//proto.ExportProperty(this,"m_auto_activate_after_tab")
 		proto.ExportGetterSetter(this,'length',JS_GetLength,(function(JSContext):int).NULL)
+		proto.ExportGetterSetter(this,'ccnt0',JS_GetCcnt0,(function(JSContext):int).NULL)
 
 inline chrequi(auto ch0,auto chw0)
 	ch=int(ch0)
@@ -1483,8 +1488,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				ids=new int[]
 				appendKeywords(ids,options)
 				ret=new CFileIndex(){m_ids:ComputeIDOrderingMaps(ids)}
-				ret.m_ids.Sort()
-				ret.m_ids.Unique()
+				//ret.m_ids.Sort()
+				//ret.m_ids.Unique()
 			else
 				if fn.n&&fn[0]=='*':
 					sdata=sbox.UIReadAll(fn[1:])
@@ -1509,6 +1514,35 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return JS.Return(jsret)
 		g_c_like_parse_queue.discard()
 		return 0
+	}
+	jsPrepareAccands=function(JSContext JS,int2[] cands,string s_prefix,string s_common_prefix,i64 ccnt0){
+		cands.Sortby(byMember("x"))
+		ret_temp=new int2[]
+		foreach id,same_cands in cands.Groupby(byMember("x"))
+			weight=__float_as_int([__int_as_float(cc.y) for cc in same_cands].Sum())
+			ret_temp.push(int2(id,weight))
+		ret_temp.Sort(inline(ia,ib){
+			auto ret=ib.y-ia.y
+			if !ret:
+				id0=ia.x
+				id1=ib.x
+				sym0=g_symbols[id0]
+				sym1=g_symbols[id1]
+				n_min=min(sym0.n,sym1.n)
+				ret=memicmp(__pointer(g_strings.d+sym0.p_name),__pointer(g_strings.d+sym1.p_name),n_min)
+				if !ret:
+					ret=sym0.n-sym1.n
+			return ret<0
+		})
+		acret=new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix,m_common_prefix:s_common_prefix,m_ccnt0:ccnt0}
+		if ret_temp.n==1:
+			s_only_cand=getIdString(ret_temp[0].x)
+			if ccnt0<0LL:
+				acret.m_common_prefix=s_only_cand[s_prefix.n:]
+			else
+				acret.m_common_prefix=s_only_cand
+		//acret.m_auto_activate_after_tab=auto_activate_after_tab
+		return ret_temp.n?JS.Return(acret):0
 	}
 	JS_UI["ED_QueryAutoCompletion"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)
@@ -1554,6 +1588,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//if weight_scale>1.f:
 				//	Writeln(getIdString(arr_i.x),' ',arr_i.y,' ',weight_scale)
 				cands.push(int2(arr_i.x,__float_as_int(float(arr_i.y)*weight_scale)))
+				assert(g_symbols[arr_i.x].n>=s_prefix.n)
 		//weight normalization? no: evidence size is also significant
 		auto SearchPPMRange(int2 rg,float weight_scale)
 			if rg.x<rg.y:
@@ -1583,6 +1618,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 							return ch0<ch1
 					}
 				})
+				//Writeln(s_prefix)
+				//foreach cand_i in cands
+				//	Writeln(getIdString(cand_i.x),' ',cand_i.y)
 				s_common_prefix=CommonPrefix(getIdString(cands[0].x)[s_prefix.n:],getIdString(cands.back().x)[s_prefix.n:])
 				//Writeln('s_common_prefix=',s_common_prefix)
 				if s_common_prefix.n:
@@ -1663,32 +1701,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						//Writeln(ed.GetText(ccnt_before_fname,ccnt_bracket-ccnt_before_fname),'()')
 						SearchPPMRange(fidx.m_function_bracket_index[int2(id_fname,arg_id)],65536.f)
 		//////////////////////////
-		cands.Sortby(byMember("x"))
-		ret_temp=new int2[]
-		foreach id,same_cands in cands.Groupby(byMember("x"))
-			weight=__float_as_int([__int_as_float(cc.y) for cc in same_cands].Sum())
-			ret_temp.push(int2(id,weight))
-		ret_temp.Sort(inline(ia,ib){
-			auto ret=ib.y-ia.y
-			if !ret:
-				id0=ia.x
-				id1=ib.x
-				sym0=g_symbols[id0]
-				sym1=g_symbols[id1]
-				n_min=min(sym0.n,sym1.n)
-				ret=memicmp(__pointer(g_strings.d+sym0.p_name),__pointer(g_strings.d+sym1.p_name),n_min)
-				if !ret:
-					ret=sym0.n-sym1.n
-			return ret<0
-		})
-		acret=new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix,m_common_prefix:s_common_prefix}
-		if ret_temp.n==1:
-			acret.m_common_prefix=getIdString(ret_temp[0].x)[s_prefix.n:]
-		//acret.m_auto_activate_after_tab=auto_activate_after_tab
-		if ret_temp.n:
-			return JS.Return(acret)
-		else
-			return 0
+		return jsPrepareAccands(JS,cands,s_prefix,s_common_prefix,-1LL)
 	}
 	JS_UI["ED_QueryDecl"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)
@@ -1890,5 +1903,46 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				g_key_decl_files[id]=CKeyDeclFile.NULL
 				//Writeln('index gc collected: ',getIdString(id))
 		return 0
+	}
+	struct TUserACCand
+		iptr id
+		string s
+	JS_UI["ED_PrepareACCands"]=function(JSContext JS){
+		args=JS.Param(0).as(JSObject)
+		s_prefix=args["s_prefix"].or("")
+		ss=args["cands"].as(JSObject)
+		has_ccnt0=args.has("ccnt0")
+		ccnt0=-1LL
+		if has_ccnt0:
+			ccnt0=args["ccnt0"].as(i64)
+			if ccnt0<0LL:
+				has_ccnt0=0
+		n=ss["length"].as(iptr)
+		ss_real=[TUserACCand(){id:i,s:ss[i].as(string)} for i=0:n-1]
+		if !has_ccnt0:
+			ss_real.Sort(inline(cand0,cand1){
+				auto sym0=cand0.s
+				auto sym1=cand1.s
+				auto n_min=min(sym0.n,sym1.n)
+				auto ret=memicmp(__pointer(sym0.d),__pointer(sym1.d),n_min)
+				if !ret:
+					ret=sym0.n-sym1.n
+				return ret<0
+			})
+			s_common_prefix=CommonPrefix(ss_real[0].s,ss_real[ss_real.n-1].s)
+			if s_common_prefix.n>s_prefix.n:
+				s_common_prefix=s_common_prefix[s_prefix.n:]
+			else
+				s_common_prefix=string.NULL
+		else
+			s_common_prefix=string.NULL
+		///////////////////
+		freqs=JS["freqs"].as(JSObject)
+		if freqs:
+			//ss_real.Sortby(inline(cand){return -freqs[cand.id].as(double)})
+			cands=[int2(getid(cand.s),freqs[cand.id].as(int)) foreach cand in ss_real]
+		else
+			cands=[int2(getid(cand.s),1) foreach cand in ss_real]
+		return jsPrepareAccands(JS,cands,s_prefix,s_common_prefix,ccnt0)
 	}
 })
