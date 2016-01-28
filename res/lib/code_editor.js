@@ -2850,12 +2850,12 @@ W.FileItem=function(id,attrs){
 		if(obj.y<parent_list_view.y+parent_list_view.h&&obj.y+obj.h>parent_list_view.y){
 			if(obj.git_repo_to_list){
 				//display a searching... text
-				W.Text("",{x:obj.x+4,y:obj.y+4,
+				W.Text("",{x:obj.x+4,y:obj.y+2,
 					font:obj.name_font,text:UI._("Parsing git repo @1...").replace("@1",obj.git_repo_to_list),
 					color:obj.misc_color})
 			}else if(obj.name_to_find){
 				//display a searching... text
-				W.Text("",{x:obj.x+4,y:obj.y+4,
+				W.Text("",{x:obj.x+4,y:obj.y+2,
 					font:obj.name_font,text:UI._("Searching @1...").replace("@1",obj.name_to_find),
 					color:obj.misc_color})
 			}else{//normal file
@@ -2954,6 +2954,23 @@ W.FileItem=function(id,attrs){
 						obj.selected?obj.sel_name_color:(git_icon_color||name_color),s_git_icon.charCodeAt(0))
 				}
 				var dims_misc=UI.MeasureText(obj.misc_font,s_misc_text);
+				/////////////////////////
+				//forget button
+				//obj.selected&&
+				if(UI.m_ui_metadata[obj.name]){
+					W.Button("forget_button",{style:obj.button_style,
+						x:16,y:0,
+						value:obj.selected,
+						text:"✕",
+						tooltip:"Forget about this file",
+						anchor:'parent',anchor_align:'right',anchor_valign:'center',
+						OnClick:function(){
+							UI.ForgetFile(obj)
+						}
+					})
+					dims_misc.w+=obj.forget_button.w;
+				}
+				/////////////////////////
 				var name_font=obj.name_font;
 				var name_font_bold=obj.name_font_bold;
 				var w_name=Math.max(obj.w-20-w_icon-dims_misc.w-4,64);
@@ -2964,7 +2981,7 @@ W.FileItem=function(id,attrs){
 						name_font=UI.Font(UI.font_name,size,-50);
 						name_font_bold=UI.Font(UI.font_name,size,100);
 					}
-					W.Text("",{x:obj.x+w_icon+2,y:obj.y+4,
+					W.Text("",{x:obj.x+w_icon+2,y:obj.y+2,
 						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:name_color})
 				}else{
@@ -2978,11 +2995,11 @@ W.FileItem=function(id,attrs){
 					}
 					var lg_basepath=obj.name.length-sname.length
 					if(lg_basepath>0){
-						W.Text("",{x:obj.x+w_icon+2,y:obj.y+4,
+						W.Text("",{x:obj.x+w_icon+2,y:obj.y+2,
 							font:name_font,text:obj.name.substr(0,lg_basepath),
 							color:obj.name_to_create?(obj.selected?obj.sel_misc_color:obj.misc_color):(obj.selected?obj.sel_basepath_color:obj.basepath_color)})
 					}
-					W.Text("",{x:obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+4,
+					W.Text("",{x:obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+2,
 						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:obj.name_color})
 					if(obj.history_hl_ranges&&!obj.name_to_create){
@@ -2993,7 +3010,7 @@ W.FileItem=function(id,attrs){
 							var p1=obj.history_hl_ranges[i+1];//Math.max(obj.history_hl_ranges[i+1]-base_offset,0);
 							if(p0<p1){
 								var x=obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,p0)).w
-								W.Text("",{x:x,y:obj.y+4,
+								W.Text("",{x:x,y:obj.y+2,
 									font:name_font_bold,text:obj.name.substr(p0,p1-p0),
 									color:obj.selected?obj.sel_name_color:obj.name_color})
 							}
@@ -3003,20 +3020,6 @@ W.FileItem=function(id,attrs){
 				W.Text("",{x:obj.x+obj.w-dims_misc.w-20,y:obj.y+(obj.h-dims_misc.h)*0.5,
 					font:obj.misc_font,text:s_misc_text,
 					color:obj.selected?obj.sel_misc_color:obj.misc_color})
-				/////////////////////////
-				//forget button
-				//obj.selected&&
-				if(UI.m_ui_metadata[obj.name]){
-					W.Button("forget_button",{style:obj.button_style,
-						x:dims_misc.w+24,y:0,
-						value:obj.selected,
-						text:"Forget",
-						anchor:'parent',anchor_align:'right',anchor_valign:'center',
-						OnClick:function(){
-							UI.ForgetFile(obj)
-						}
-					})
-				}
 			}
 		}
 	UI.End()
@@ -3373,6 +3376,10 @@ W.SXS_NewPage=function(id,attrs){
 		dimension:'y',layout_spacing:0,layout_align:'fill',
 		OnDemandSort:UI.m_ui_metadata.new_page_mode=='fs_view'?W.FileItemOnDemandSort:undefined,
 		OnDemand:W.FileItemOnDemand,
+		OnFocus:function(){
+			UI.SetFocus(obj.find_bar_edit);
+			UI.Refresh();
+		},
 		OnChange:function(value){
 			//if(this.value==value){return;}
 			W.ListView_prototype.OnChange.call(this,value)

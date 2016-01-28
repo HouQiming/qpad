@@ -692,8 +692,8 @@ UI.CustomTheme=function(){
 			color_git_modified:L?UI.lerp_rgba(0xff000000,0xff1c1ae3,0.5):UI.lerp_rgba(0xffe8e8e8,0xff5555ff,0.5),
 			button_style:{
 				transition_dt:0.1,
-				round:0.1,border_width:1,padding:4,
-				font:UI.Font(UI.font_name,16,-50),
+				round:0.1,border_width:1,padding:2,
+				font:UI.Font(UI.icon_font_name,14),
 				$:{
 					out:{
 						//border_color:0xff444444,color:0xffffffff,
