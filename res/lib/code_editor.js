@@ -2516,9 +2516,10 @@ W.FileItemOnDemand=function(){
 			var fn_i_search=fname_i.toLowerCase()
 			var is_invalid=0;
 			var hl_ranges=[]
+			var min_allowed_match=fn_i_search.lastIndexOf('/')+1;
 			for(var j=0;j<hist_keywords.length;j++){
 				var pj=fn_i_search.lastIndexOf(hist_keywords[j]);
-				if(pj<0){
+				if(pj<0||pj+hist_keywords[j].length<=min_allowed_match){
 					is_invalid=1
 					break;
 				}
@@ -2543,7 +2544,8 @@ W.FileItemOnDemand=function(){
 		this.m_find_context=IO.CreateEnumFileContext(this.name_to_find,3)
 	}
 	var ret=[];
-	var h_item=(UI.m_ui_metadata.new_page_mode=='fs_view'?UI.default_styles.file_item.h_dense:UI.default_styles.file_item.h);
+	//var h_item=(UI.m_ui_metadata.new_page_mode=='fs_view'?UI.default_styles.file_item.h_dense:UI.default_styles.file_item.h);
+	var h_item=UI.default_styles.file_item.h_dense;
 	while(UI.g_file_listing_budget>0){
 		var fnext=this.m_find_context()
 		if(!fnext){
@@ -2784,12 +2786,14 @@ W.FileItem=function(id,attrs){
 				//var sel_bgcolor=(ext_color|0xff000000)
 				var sel_bgcolor=obj.sel_bgcolor;
 				//////////////
-				var icon_font=obj.icon_font;
-				var h_icon=obj.h_icon;
-				if(UI.m_ui_metadata.new_page_mode=='fs_view'){
-					icon_font=obj.icon_font_dense;
-					h_icon=obj.h_icon_dense;
-				}
+				//var icon_font=obj.icon_font;
+				//var h_icon=obj.h_icon;
+				//if(UI.m_ui_metadata.new_page_mode=='fs_view'){
+				//	icon_font=obj.icon_font_dense;
+				//	h_icon=obj.h_icon_dense;
+				//}
+				var icon_font=obj.icon_font_dense;
+				var h_icon=obj.h_icon_dense;
 				var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
 				if(obj.selected){
 					ext_color=obj.sel_file_icon_color
@@ -2802,73 +2806,81 @@ W.FileItem=function(id,attrs){
 					obj.name_to_create?
 						UI._("Create new file"):
 						(obj.is_dir?s_time:FormatFileSize(obj.size)+", "+s_time));
-				if(UI.m_ui_metadata.new_page_mode=='fs_view'){
-					var name_color=obj.name_color;
-					var sname=UI.RemovePath(obj.name);
-					if(obj.is_dir){sname=sname+"/";}
-					if(obj.owner.m_file_list_repo){
-						var repos=g_repo_from_file[obj.name]
-						if(repos){
-							var s_git_status=repos[obj.owner.m_file_list_repo];
-							var s_git_icon=undefined;
-							var git_icon_color=undefined;
-							if(s_git_status){
-								//detect new / modified / conflicted / ignored / untracked
-								if(s_git_status=='!!'){
-									//ignored
-									ext_color&=0x7fffffff;
-									name_color&=0x7fffffff;
-								}else if(s_git_status=='??'){
-									//untracked
-									name_color=obj.color_git_untracked;
-									s_git_icon="问";
-								}else if(s_git_status[0]=='U'||s_git_status[1]=='U'||s_git_status=='AA'){
-									//conflicted
-									name_color=obj.color_git_conflicted;
-									s_git_icon="叹";
-								}else if(s_git_status[0]=='A'||s_git_status[1]=='A'){
-									//new
-									name_color=obj.color_git_new;
-									s_git_icon="加";
-								}else if(s_git_status!='  '){
-									//modified
-									name_color=obj.color_git_modified;
-									git_icon_color=obj.color_git_conflicted;
-									s_git_icon="改";
-								}
+				var name_color=obj.name_color;
+				var sname=UI.RemovePath(obj.name);
+				if(obj.is_dir){sname=sname+"/";}
+				if(obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!='fs_view'){
+					var repos=g_repo_from_file[obj.name]
+					if(repos){
+						var s_git_status=repos[obj.owner.m_file_list_repo];
+						if(s_git_status==undefined&&UI.m_ui_metadata.new_page_mode!='fs_view'){
+							for(var skey in repos){
+								s_git_status=repos[skey];
+								break;
+							}
+						}
+						var s_git_icon=undefined;
+						var git_icon_color=undefined;
+						if(s_git_status){
+							//detect new / modified / conflicted / ignored / untracked
+							if(s_git_status=='!!'){
+								//ignored
+								ext_color&=0x7fffffff;
+								name_color&=0x7fffffff;
+							}else if(s_git_status=='??'){
+								//untracked
+								name_color=obj.color_git_untracked;
+								s_git_icon="问";
+							}else if(s_git_status[0]=='U'||s_git_status[1]=='U'||s_git_status=='AA'){
+								//conflicted
+								name_color=obj.color_git_conflicted;
+								s_git_icon="叹";
+							}else if(s_git_status[0]=='A'||s_git_status[1]=='A'){
+								//new
+								name_color=obj.color_git_new;
+								s_git_icon="加";
+							}else if(s_git_status!='  '){
+								//modified
+								name_color=obj.color_git_modified;
+								git_icon_color=obj.color_git_conflicted;
+								s_git_icon="改";
 							}
 						}
 					}
-					if(sname&&sname[0]=='.'){
-						ext_color&=0x7fffffff;
-						name_color&=0x7fffffff;
-					}
-					//if(s_git_icon){
-					//	ext_color&=0x7fffffff;
-					//}
-					UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-h_icon)*0.5,ext_color,icon_code)
-					if(s_git_icon){
-						UI.DrawChar(obj.icon_font_git,
-							obj.x+(h_icon-obj.h_icon_git),obj.y+(obj.h-obj.h_icon_git-2),
-							obj.selected?sel_bgcolor:UI.default_styles.sxs_new_page.color,0x5768)//坨
-						UI.DrawChar(obj.icon_font_git,
-							obj.x+(h_icon-obj.h_icon_git),obj.y+(obj.h-obj.h_icon_git-2),
-							obj.selected?obj.sel_name_color:(git_icon_color||name_color),s_git_icon.charCodeAt(0))
+				}
+				if(sname&&sname[0]=='.'){
+					ext_color&=0x7fffffff;
+					name_color&=0x7fffffff;
+				}
+				//if(s_git_icon){
+				//	ext_color&=0x7fffffff;
+				//}
+				UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-h_icon)*0.5,ext_color,icon_code)
+				if(s_git_icon){
+					UI.DrawChar(obj.icon_font_git,
+						obj.x+(h_icon-obj.h_icon_git),obj.y+(obj.h-obj.h_icon_git-2),
+						obj.selected?sel_bgcolor:UI.default_styles.sxs_new_page.color,0x5768)//坨
+					UI.DrawChar(obj.icon_font_git,
+						obj.x+(h_icon-obj.h_icon_git),obj.y+(obj.h-obj.h_icon_git-2),
+						obj.selected?obj.sel_name_color:(git_icon_color||name_color),s_git_icon.charCodeAt(0))
+				}
+				var dims_misc=UI.MeasureText(obj.misc_font,s_misc_text);
+				var name_font=obj.name_font;
+				var name_font_bold=obj.name_font_bold;
+				var w_name=Math.max(obj.w-20-w_icon-dims_misc.w-4,64);
+				if(UI.m_ui_metadata.new_page_mode=='fs_view'){
+					var dims=UI.MeasureText(name_font,sname);
+					if(dims.w>w_name){
+						var size=obj.name_font_size*(w_name/dims.w);
+						name_font=UI.Font(UI.font_name,size,-50);
+						name_font_bold=UI.Font(UI.font_name,size,100);
 					}
 					W.Text("",{x:obj.x+w_icon+2,y:obj.y+4,
-						font:obj.name_font,text:sname,
+						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:name_color})
-					var dims=UI.MeasureText(obj.misc_font,s_misc_text);
-					W.Text("",{x:obj.x+obj.w-dims.w-20,y:obj.y+(obj.h-dims.h)*0.5,
-						font:obj.misc_font,text:s_misc_text,
-						color:obj.selected?obj.sel_misc_color:obj.misc_color})
 				}else{
-					UI.DrawChar(icon_font,obj.x,obj.y+(obj.h-h_icon)*0.5,ext_color,icon_code)
-					var name_font=obj.name_font;
-					var name_font_bold=obj.name_font_bold;
 					var sname=GetSmartFileName(obj)
 					if(obj.name_to_create){sname="";}
-					var w_name=Math.max(obj.w-20-w_icon,64);
 					var dims=UI.MeasureText(name_font,obj.name);
 					if(dims.w>w_name){
 						var size=obj.name_font_size*(w_name/dims.w);
@@ -2877,11 +2889,11 @@ W.FileItem=function(id,attrs){
 					}
 					var lg_basepath=obj.name.length-sname.length
 					if(lg_basepath>0){
-						W.Text("",{x:obj.x+w_icon,y:obj.y+4,
+						W.Text("",{x:obj.x+w_icon+2,y:obj.y+4,
 							font:name_font,text:obj.name.substr(0,lg_basepath),
 							color:obj.name_to_create?(obj.selected?obj.sel_misc_color:obj.misc_color):(obj.selected?obj.sel_basepath_color:obj.basepath_color)})
 					}
-					W.Text("",{x:obj.x+w_icon+UI.MeasureText(name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+4,
+					W.Text("",{x:obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+4,
 						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:obj.name_color})
 					if(obj.history_hl_ranges&&!obj.name_to_create){
@@ -2891,77 +2903,29 @@ W.FileItem=function(id,attrs){
 							var p0=obj.history_hl_ranges[i+0];//Math.max(obj.history_hl_ranges[i+0]-base_offset,0);
 							var p1=obj.history_hl_ranges[i+1];//Math.max(obj.history_hl_ranges[i+1]-base_offset,0);
 							if(p0<p1){
-								var x=obj.x+w_icon+UI.MeasureText(name_font,obj.name.substr(0,p0)).w
+								var x=obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,p0)).w
 								W.Text("",{x:x,y:obj.y+4,
 									font:name_font_bold,text:obj.name.substr(p0,p1-p0),
 									color:obj.selected?obj.sel_name_color:obj.name_color})
 							}
 						}
 					}
-					W.Text("",{x:obj.x+w_icon,y:obj.y+30,
-						font:obj.misc_font,text:s_misc_text,
-						color:obj.selected?obj.sel_misc_color:obj.misc_color})
-					if(!desc.file_icon&&!obj.is_dir&&!obj.name_to_create){
-						var fnt_size_base=24;
-						s_ext=s_ext.toUpperCase()
-						if(s_ext==""){s_ext="?";fnt_size_base=32}
-						var ext_dims=UI.MeasureText(UI.Font(UI.eng_font_name,fnt_size_base),s_ext)
-						var ext_font=UI.Font(UI.eng_font_name,Math.min(24*28/ext_dims.w,fnt_size_base))
-						ext_dims=UI.MeasureText(ext_font,s_ext)
-						W.Text("",{x:obj.x+(w_icon-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
-							font:ext_font,text:s_ext,
-							color:ext_color})
-					}else if(desc.file_icon=="プ"||obj.name_to_create){
-						s_ext=s_ext.toUpperCase()
-						var ext_dims=UI.MeasureText(UI.Font(UI.eng_font_name,24),s_ext)
-						var ext_font=UI.Font(UI.eng_font_name,Math.min(24*24/ext_dims.w,24))
-						ext_dims=UI.MeasureText(ext_font,s_ext)
-						W.Text("",{x:obj.x+(w_icon*(s_ext.length==1?0.98:1)-ext_dims.w)*0.5,y:obj.y+(obj.h-ext_dims.h)*0.5,
-							font:ext_font,text:s_ext,
-							color:ext_color})
-					}
-					/////////////////////////
-					var x_tag=obj.x+w_icon+UI.MeasureText(obj.misc_font,s_misc_text).w+obj.tag_padding*2
-					var DrawTag=function(sname){
-						var tag_dims=UI.MeasureText(obj.misc_font,sname)
-						UI.RoundRect({
-							color:(obj.selected?obj.sel_misc_color:obj.misc_color)&0x7fffffff,border_width:0,
-							x:x_tag,y:obj.y+30,w:tag_dims.w+obj.tag_round*2,h:tag_dims.h,
-							round:obj.tag_round,
-							//color:0,
-						})
-						W.Text("",{x:x_tag+obj.tag_round,y:obj.y+30,
-							font:obj.misc_font,text:sname,
-							color:obj.selected?sel_bgcolor:0xffffffff})
-						x_tag+=tag_dims.w+obj.tag_padding+obj.tag_round*2
-					}
-					var repos=g_repo_from_file[obj.name]
-					if(repos){
-						//git tags
-						for(var spath in repos){
-							if(repos[spath]!="!!"&&repos[spath]!="??"){
-								var sname=GetSmartFileName(g_repo_list[spath])
-								if(repos[spath]&&repos[spath]!="  "){
-									DrawTag(sname+'*')
-								}else{
-									DrawTag(sname)
-								}
-							}
-						}
-					}
-					/////////////////////////
-					//forget button
-					if(obj.selected&&UI.m_ui_metadata[obj.name]){
-						W.Button("forget_button",{style:obj.button_style,
-							x:16,y:0,
-							text:"Forget",
-							anchor:'parent',anchor_align:'right',anchor_valign:'center',
-							OnClick:function(){
-								UI.ForgetFile(obj)
-							}
-						})
-					}
 				}
+				W.Text("",{x:obj.x+obj.w-dims_misc.w-20,y:obj.y+(obj.h-dims_misc.h)*0.5,
+					font:obj.misc_font,text:s_misc_text,
+					color:obj.selected?obj.sel_misc_color:obj.misc_color})
+				///////////////////////////
+				////forget button
+				//if(obj.selected&&UI.m_ui_metadata[obj.name]){
+				//	W.Button("forget_button",{style:obj.button_style,
+				//		x:16,y:0,
+				//		text:"Forget",
+				//		anchor:'parent',anchor_align:'right',anchor_valign:'center',
+				//		OnClick:function(){
+				//			UI.ForgetFile(obj)
+				//		}
+				//	})
+				//}
 			}
 		}
 	UI.End()
@@ -3180,9 +3144,10 @@ W.SXS_NewPage=function(id,attrs){
 					var fn_i=hist[i],fn_i_search=fn_i.toLowerCase()
 					var is_invalid=0;
 					var hl_ranges=[]
+					var min_allowed_match=fn_i_search.lastIndexOf('/')+1;
 					for(var j=0;j<hist_keywords.length;j++){
 						var pj=fn_i_search.lastIndexOf(hist_keywords[j]);
-						if(pj<0){
+						if(pj<0||pj+hist_keywords[j].length<=min_allowed_match){
 							is_invalid=1
 							break;
 						}
