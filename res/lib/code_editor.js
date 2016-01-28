@@ -3321,6 +3321,11 @@ W.SXS_NewPage=function(id,attrs){
 }
 
 UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
+	if(obj.m_prev_next_button_drawn!=UI.m_frame_tick){
+		obj.m_prev_next_button_drawn=UI.m_frame_tick;
+	}else{
+		return;
+	}
 	menu.AddButtonRow({text:stext},[
 		{key:"SHIFT+CTRL+D",text:"edit_up",icon:"上",tooltip:'Prev - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),action:fprev},
 		{key:"ALT+A",text:"edit_all",icon:"换",tooltip:'All - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),action:fall},
@@ -4451,7 +4456,7 @@ W.CodeEditor=function(id,attrs){
 								if(!(ccnt>0)){break;}
 							}
 							var gkds=UI.ED_QueryKeyDeclByID(id)
-							//not found, check key decls by id only
+							//not found, check key decls by id
 							var fn=doc.owner.file_name
 							var p_target=0
 							ccnt=ccnt0
@@ -4478,7 +4483,7 @@ W.CodeEditor=function(id,attrs){
 									UI.Refresh()
 								})
 							}else{
-								this.CreateNotification({id:'find_result',icon:'警',text:"Cannot find a definition"})
+								this.CreateNotification({id:'find_result',icon:'警',text:UI._("Cannot find a definition of '@1'").replace("@1",id)})
 							}
 						}
 					}.bind(obj)})
