@@ -1764,9 +1764,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_QueryKeyDeclByID"]=function(JSContext JS){
 		s=JS.Param(0).as(string)
 		id=getid(s)
+		tmp=new iptr[]
+		for(p=g_symbols[id].gkd_x;p>=0L;p=g_key_decls[p].x)
+			tmp.push(p)
 		ret=JS.NewArray()
 		n=0
-		for(p=g_symbols[id].gkd_x;p>=0L;p=g_key_decls[p].x)
+		foreach p in tmp.ReverseOrder()
 			ret[n*2+0]=getIdString(g_key_decls[p].idfn)
 			ret[n*2+1]=g_key_decls[p].epos0
 			n++

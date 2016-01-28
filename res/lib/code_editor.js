@@ -1755,6 +1755,7 @@ W.CodeEditorWidget_prototype={
 			}else{
 				obj.DismissNotification('replace_hint')
 			}
+			UI.g_goto_definition_context=undefined;
 			this.m_hide_prev_next_buttons=1;
 		})
 		doc.AddEventHandler('beforeEdit',function(ops){
@@ -1820,6 +1821,7 @@ W.CodeEditorWidget_prototype={
 				obj.m_current_find_context=undefined
 			}
 			obj.m_hide_find_highlight=1
+			UI.g_goto_definition_context=undefined;
 			UI.Refresh()
 			return 1
 		})
@@ -4267,6 +4269,7 @@ W.CodeEditor=function(id,attrs){
 			//UI.RoundRect({
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:h_obj_area,
 			//	color:obj.separator_color})
+			var got_gotodef_notification=0;
 			if(UI.HasFocus(doc)){
 				var menu_edit=UI.BigMenu("&Edit")
 				menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:0,key:"CTRL+Z",action:function(){
@@ -4416,7 +4419,76 @@ W.CodeEditor=function(id,attrs){
 					UI.Refresh()
 				}})
 				var neib=doc.ed.GetUtf8CharNeighborhood(doc.sel1.ccnt);
-				if(doc.m_file_index&&doc.m_file_index.hasDecls()&&(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1]))){
+				if(UI.g_goto_definition_context&&obj.m_prev_next_button_drawn!=UI.m_frame_tick){
+					//render the current gotodef context, and put up #/# text as notification
+					obj.m_prev_next_button_drawn=UI.m_frame_tick;
+					var ed_caret=doc.GetIMECaretXY();
+					var y_caret=(ed_caret.y-doc.visible_scroll_y);
+					var hc=UI.GetCharacterHeight(doc.font)
+					var sz_button=obj.autoedit_button_size;
+					var padding=obj.autoedit_button_padding;
+					var x_button_box=obj.x+w_line_numbers+(ed_caret.x-doc.visible_scroll_x)-sz_button-padding*2;
+					var y_button_box=obj.y+y_caret+hc*0.5-sz_button*1-padding;
+					var w_button_box=sz_button+padding*2;
+					var h_button_box=sz_button*2+padding*2;
+					UI.RoundRect({
+						x:x_button_box-obj.accands_shadow_size, y:y_button_box, 
+						w:w_button_box+obj.accands_shadow_size*2, h:h_button_box+obj.accands_shadow_size,
+						round:obj.accands_shadow_size,
+						border_width:-obj.accands_shadow_size,
+						color:obj.accands_shadow_color})
+					UI.RoundRect({
+						x:x_button_box, y:y_button_box,
+						w:w_button_box, h:h_button_box,
+						border_width:obj.accands_border_width,
+						border_color:obj.accands_border_color,
+						round:obj.accands_round,
+						color:obj.accands_bgcolor})
+					var fgoto_action=UI.HackCallback(function(delta){
+						var gotoctx=UI.g_goto_definition_context;
+						if(!gotoctx){return;}
+						gotoctx.p_target+=delta*2;
+						if(gotoctx.p_target>=gotoctx.gkds.length){
+							gotoctx.p_target=0;
+						}
+						if(gotoctx.p_target<0){
+							gotoctx.p_target=gotoctx.gkds.length-2
+						}
+						var gkds=gotoctx.gkds;
+						var ccnt_go=gkds[gotoctx.p_target+1]
+						UI.RecordCursorHistroy(doc,"go_to_definition")
+						UI.OpenEditorWindow(gkds[gotoctx.p_target+0],function(){
+							var doc=this
+							var ccnt=ccnt_go
+							if(doc.m_diff_from_save){
+								ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
+							}
+							doc.SetSelection(ccnt,ccnt)
+							UI.g_goto_definition_context=gotoctx;
+							UI.g_cursor_history_test_same_reason=1
+							UI.Refresh()
+						})
+						UI.Refresh()
+					})
+					var gotoctx=UI.g_goto_definition_context;
+					got_gotodef_notification=1;
+					obj.CreateNotification({id:'definition_id',text:
+						UI.Format(UI._("Definition @1 of @2"),(gotoctx.p_target/2+1).toString(),(gotoctx.gkds.length/2).toString())},1)
+					W.Button("button_def_up",{style:UI.default_styles.check_button,
+						x:x_button_box+padding,y:y_button_box+sz_button*0+padding,
+						w:sz_button,h:sz_button,
+						font:UI.icon_font_20,text:"上",tooltip:UI._('Previous definition')+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+F12')),
+						tooltip_placement:'right',
+						OnClick:fgoto_action.bind(obj,-1)})
+					W.Button("button_def_down",{style:UI.default_styles.check_button,
+						x:x_button_box+padding,y:y_button_box+sz_button*1+padding,
+						w:sz_button,h:sz_button,
+						font:UI.icon_font_20,text:"下",tooltip:UI._('Next definition')+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('F12')),
+						tooltip_placement:'right',
+						OnClick:fgoto_action.bind(obj,1)})
+					W.Hotkey("",{key:"SHIFT+F12",action:fgoto_action.bind(obj,-1)})
+					W.Hotkey("",{key:"F12",action:fgoto_action.bind(obj,1)})
+				}else if(doc.m_file_index&&doc.m_file_index.hasDecls()&&(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1]))){
 					menu_search.AddNormalItem({text:"Go to &definition",context_menu_group:"definition",enable_hotkey:1,key:"F12",action:function(){
 						var obj=this
 						var doc=obj.doc
@@ -4466,6 +4538,9 @@ W.CodeEditor=function(id,attrs){
 							for(var i=0;i<gkds.length;i+=2){
 								if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
 									p_target=i+2
+									if(p_target>=gkds.length){
+										p_target=0;
+									}
 									break
 								}
 							}
@@ -4479,9 +4554,15 @@ W.CodeEditor=function(id,attrs){
 										ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
 									}
 									doc.SetSelection(ccnt,ccnt)
+									if(gkds.length>2){
+										UI.g_goto_definition_context={gkds:gkds,p_target:p_target};
+									}
 									UI.g_cursor_history_test_same_reason=1
 									UI.Refresh()
 								})
+								if(gkds.length>2){
+									this.DestroyReplacingContext(1)
+								}
 							}else{
 								this.CreateNotification({id:'find_result',icon:'警',text:UI._("Cannot find a definition of '@1'").replace("@1",id)})
 							}
@@ -4491,6 +4572,9 @@ W.CodeEditor=function(id,attrs){
 				doc.CallHooks('menu')
 				menu_edit=undefined;
 				menu_search=undefined;
+			}
+			if(!got_gotodef_notification){
+				obj.DismissNotification("definition_id")
 			}
 			if(doc.m_menu_context){
 				UI.TopMostWidget(function(){
