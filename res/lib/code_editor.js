@@ -4508,9 +4508,23 @@ W.CodeEditor=function(id,attrs){
 							var ccnt0=doc.sel1.ccnt
 							var ccnt=ccnt0
 							for(;;){
-								ccnt=doc.FindOuterLevel(ccnt);
+								//parser-friendly outer scope search
+								var ccnt_bracket=doc.FindOuterBracket_SizeFriendly(ccnt,-1);
+								var ccnt_indent=doc.FindOuterIndentation(ccnt);
+								if(ccnt_bracket>=0&&ccnt_indent>=0&&!doc.plugin_language_desc.indent_as_parenthesis){
+									if(doc.GetIndentLevel(ccnt_indent)<=doc.GetIndentLevel(ccnt_bracket)){
+										//#endif and stuff in C, ignore it
+										ccnt_indent=-1;
+									}
+								}
+								var ccnt_query=Math.max(ccnt_bracket,ccnt_indent);
+								if(ccnt_indent>ccnt_bracket){
+									//the parser should be placing things here
+									ccnt_query=doc.ed.MoveToBoundary(doc.SeekLC(doc.GetLC(ccnt_indent)[0]+1,0),1,"space")
+								}
+								ccnt=Math.max(ccnt_bracket,ccnt_indent)
+								//ccnt=doc.FindOuterLevel(ccnt);
 								if(!(ccnt>=0)){ccnt=0;}
-								var ccnt_query=ccnt;
 								if(doc.m_diff_from_save){
 									ccnt_query=doc.m_diff_from_save.CurrentToBase(ccnt_query)
 								}
