@@ -662,6 +662,7 @@ UI.CustomTheme=function(){
 		},
 		file_item:{
 			h:56,h_dense:32,
+			treeview_indent:16,
 			h_icon:48,
 			icon_font:UI.Font(UI.icon_font_name,48),
 			h_icon_dense:28,

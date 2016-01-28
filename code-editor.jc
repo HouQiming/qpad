@@ -3649,6 +3649,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto ch=JS.Param(0).as(int)
 		return JS.Return(isWordChar(ch));
 	}
+	JS_UI["ED_8bitStringSort"]=function(JSContext JS){
+		auto ss=JS.Param(0).as(JSObject)
+		n=ss["length"].as(iptr)
+		ret=[ss[i].as(string) for i=0:n-1]
+		ret.Sort()
+		for i=0:n-1
+			ss[i]=ret[i]
+		return 0
+	}
 	g_model_cn=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_cn.bin").ConvertToAsBinary(u32))
 	g_model_jp=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_jp.bin").ConvertToAsBinary(u32))
 	g_model_b5=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_b5.bin").ConvertToAsBinary(u32))

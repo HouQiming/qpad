@@ -421,7 +421,7 @@ UI.Application=function(id,attrs){
 				tab.title=UI._("New Tab");
 				UI.Refresh()
 			};
-			menu_file.AddNormalItem({icon:"时",text:"Recen&t...",
+			menu_file.AddNormalItem({icon:"时",text:"Recent or gi&t...",
 				key:UI.m_ui_metadata.new_page_mode!='fs_view'?"ALT+Q":"ALT+Q,Q",
 				enable_hotkey:0,action:fopen_brand_new.bind(undefined,'hist_view')})
 			menu_file.AddNormalItem({text:"&Browse...",

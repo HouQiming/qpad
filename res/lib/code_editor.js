@@ -1341,6 +1341,7 @@ var find_context_prototype={
 		var find_scroll_x=Math.max(xy_middle.x-(w_find_items-w_line_numbers),0)
 		var find_scroll_y=this.m_find_scroll_visual_y
 		var obj_parent=UI.context_parent;
+		var was_just_reset=this.m_is_just_reset;
 		if(this.m_is_just_reset){
 			//don't animate the first round
 			this.m_is_just_reset=0;
@@ -1366,7 +1367,9 @@ var find_context_prototype={
 				for(var i=matches.length-2;i>=0;i-=2){
 					this.ReportMatchBackward(doc,matches[i+0],matches[i+1])
 				}
+				this.m_is_just_reset=1;
 				this.m_backward_frontier=-1
+				UI.InvalidateCurrentFrame();
 			}else{
 				this.m_backward_frontier=UI.ED_Search(doc.ed,this.m_backward_frontier,-1,this.m_needle,this.m_flags,262144,this.ReportMatchBackward.bind(this,doc),this)
 			}
@@ -1429,7 +1432,7 @@ var find_context_prototype={
 			UI.Refresh()
 		}
 		if(find_scroll_y+find_shared_h>this.m_y_extent_forward-h_safety_internal&&!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
-			//todo: searching beyond files
+			//todo: searching beyond the current file
 			var p0=this.m_forward_matches.length
 			if(this.m_forward_search_hack){
 				var matches=this.m_forward_search_hack
@@ -1437,7 +1440,9 @@ var find_context_prototype={
 				for(var i=0;i<matches.length;i+=2){
 					this.ReportMatchForward(doc,matches[i+0],matches[i+1])
 				}
+				this.m_is_just_reset=1;
 				this.m_forward_frontier=-1
+				UI.InvalidateCurrentFrame();
 			}else{
 				this.m_forward_frontier=UI.ED_Search(doc.ed,this.m_forward_frontier,1,this.m_needle,this.m_flags,262144,this.ReportMatchForward.bind(this,doc),this);
 			}
@@ -1518,6 +1523,7 @@ var find_context_prototype={
 				h_expand=hc*edstyle.find_item_expand_current;
 			}
 			var nodekey="find_item_"+i.toString();
+			if(was_just_reset){obj_parent[nodekey]=undefined;}
 			h_expand=W.AnimationNode(nodekey,{
 				h_expand:h_expand,
 			}).h_expand;
@@ -2413,9 +2419,10 @@ var ffindbar_plugin=function(){
 var g_repo_from_file={}
 var g_repo_list={}
 var ParseGit=function(spath){
+	if(g_repo_list[spath]){return;}
 	var my_repo={name:spath,is_parsing:1,files:[]}
 	g_repo_list[spath]=my_repo
-	IO.RunTool(["git","ls-files"],spath, ".*",function(match){
+	IO.RunTool(["git","ls-files"],spath, ".*",function(g_repo_from_file,match){
 		if(match[0].indexOf(':')>=0){
 			return;
 		}
@@ -2431,14 +2438,14 @@ var ParseGit=function(spath){
 		//repo -> status map
 		repos[spath]="  ";
 		my_repo.files.push(fname)
-	},function(){
+	}.bind(undefined,g_repo_from_file),function(){
 		//some dangling dependencies may have been resolved
 		if(UI.ED_ReparseDanglingDeps()){
 			CallParseMore()
 		}
 		//"git status --short --ignored"
 		//IO.RunTool(["git","ls-files","--modified"],spath, ".*",function(match){
-		IO.RunTool(["git","status","--porcelain","--ignored"],spath, "(..) (([^>]+) -> )?([^>]+)",function(match){
+		IO.RunTool(["git","status","--porcelain","--ignored"],spath, "(..) (([^>]+) -> )?([^>]+)",function(g_repo_from_file,match){
 			//if(match[0].indexOf(':')>=0){
 			//	return;
 			//}
@@ -2457,7 +2464,8 @@ var ParseGit=function(spath){
 			}
 			//repo -> status map
 			repos[spath]=match[1]
-		},function(){
+		}.bind(undefined,g_repo_from_file),function(){
+			UI.ED_8bitStringSort(my_repo.files)
 			my_repo.is_parsing=0
 			UI.Refresh()
 		}, 30)
@@ -2508,8 +2516,11 @@ W.FileItemOnDemand=function(){
 		if(repo.is_parsing){
 			return "keep";
 		}
-		var hist_keywords=this.search_text.split(" ").filter(function(a){return a.toLowerCase()});
+		if(this.is_tree_view){
+			return GenerateGitRepoTreeView(repo);
+		}
 		var ret=[]
+		var hist_keywords=this.search_text.split(" ").filter(function(a){return a.toLowerCase()});
 		for(var i=0;i<repo.files.length;i++){
 			var fname_i=repo.files[i]
 			if(UI.m_current_file_list.m_appeared_full_names[fname_i]){continue;}
@@ -2537,6 +2548,12 @@ W.FileItemOnDemand=function(){
 		return ret
 	}
 	if(!this.name_to_find){
+		if(this.is_tree_view){
+			var nd_parent=this.parent;
+			var parent_expanded=(!nd_parent||!nd_parent.is_hidden&&UI.m_current_file_list.m_treeview_metadata[nd_parent.name]);
+			this.is_hidden=!parent_expanded;
+			this.h=(this.is_hidden?0:UI.default_styles.file_item.h_dense);
+		}
 		return "keep"
 	}
 	if(!this.m_find_context){
@@ -2578,6 +2595,68 @@ W.FileItemOnDemand=function(){
 	ret.push(this)
 	return ret;
 }
+
+var AddGitPath=function(dir_items,dir_seq,p){
+	var s=dir_seq[p];
+	if(p>=dir_seq.length-1){
+		if(s=="*"){
+			//repo-locating, return the repo-level thing
+			return dir_items;
+		}
+		dir_items["*files"].push(dir_seq.join("/"))
+		return;
+	}
+	var dir_p=dir_items[s];
+	if(!dir_p){
+		dir_p={"*subdirs":[],"*files":[]};
+		dir_items["*subdirs"].push(dir_seq.slice(0,p+1).join("/"),dir_p)
+		dir_items[s]=dir_p;
+	}
+	return AddGitPath(dir_p,dir_seq,p+1);
+}
+
+var FlushGitPaths=function(dir_items,ret,parent,depth){
+	var subdirs=dir_items["*subdirs"];
+	for(var i=0;i<subdirs.length;i+=2){
+		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
+		var ret2=W.FileItemOnDemand.call({name_to_find:subdirs[i+0]})
+		for(var j=0;j<ret2.length;j++){
+			ret2[j].parent=parent;
+			ret2[j].is_tree_view=depth;
+			ret.push(ret2[j])
+		}
+		FlushGitPaths(subdirs[i+1],ret,ret2[0],depth+1);
+	}
+	var files=dir_items["*files"];
+	for(var i=0;i<files.length;i++){
+		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
+		var ret2=W.FileItemOnDemand.call({name_to_find:files[i]})
+		for(var j=0;j<ret2.length;j++){
+			ret2[j].parent=parent;
+			ret2[j].is_tree_view=depth;
+			ret.push(ret2[j])
+		}
+	}
+}
+
+var GenerateGitRepoTreeView=function(repo){
+	//treeview rendering mode, generate hide-able stuff and infer the directory structure
+	//the item objects *could* refer to each other
+	//.is_hidden check in generated stuff
+	var dir_items={"*subdirs":[],"*files":[]};
+	var dir_repo=AddGitPath(dir_items,(repo.name+"/*").split("/"),0);
+	for(var i=0;i<repo.files.length;i++){
+		var fn_i=repo.files[i];
+		AddGitPath(dir_items,fn_i.split("/"),0);
+	}
+	var ret=[];
+	FlushGitPaths(dir_repo,ret,undefined,1);
+	//initialize the hidden-ness status
+	for(var i=0;i<ret.length;i++){
+		W.FileItemOnDemand.call(ret[i]);
+	}
+	return ret;
+};
 
 W.FileItemOnDemandSort=function(obj){
 	obj.items.sort(function(a,b){return !!a.name_to_find-!!b.name_to_find||b.is_dir-a.is_dir||(a.name<b.name?-1:(a.name==b.name?0:1));})
@@ -2738,6 +2817,11 @@ var FileItem_prototype={
 	OnDblClick:function(event){
 		if(this.name_to_find){return;}
 		if(this.is_dir){
+			if(this.is_tree_view){
+				UI.m_current_file_list.m_treeview_metadata[this.name]=!UI.m_current_file_list.m_treeview_metadata[this.name];
+				UI.Refresh();
+				return;
+			}
 			var obj=this.owner
 			var fbar=obj.find_bar_edit
 			var ed=fbar.ed
@@ -2755,6 +2839,11 @@ var FileItem_prototype={
 W.FileItem=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"file_item",FileItem_prototype);
 	var parent_list_view=UI.context_parent;
+	if(obj.is_tree_view){
+		var dx_indent=(obj.is_tree_view-1)*obj.treeview_indent;
+		obj.x+=dx_indent;
+		obj.w-=dx_indent;
+	}
 	UI.Begin(obj)
 		//icon, name, meta-info
 		//hopefully go without a separator line
@@ -2868,7 +2957,7 @@ W.FileItem=function(id,attrs){
 				var name_font=obj.name_font;
 				var name_font_bold=obj.name_font_bold;
 				var w_name=Math.max(obj.w-20-w_icon-dims_misc.w-4,64);
-				if(UI.m_ui_metadata.new_page_mode=='fs_view'){
+				if(UI.m_ui_metadata.new_page_mode=='fs_view'||obj.is_tree_view){
 					var dims=UI.MeasureText(name_font,sname);
 					if(dims.w>w_name){
 						var size=obj.name_font_size*(w_name/dims.w);
@@ -2966,6 +3055,30 @@ var fnewpage_findbar_plugin=function(){
 		var obj=this.owner
 		obj.file_list.OnKeyDown(event)
 	}
+	this.AddEventHandler('LEFT',function(){
+		if(UI.m_current_file_list.m_treeview_metadata){
+			var obj=this.owner
+			var cur_item=obj.file_list.items[obj.file_list.value];
+			if(cur_item.is_tree_view&&cur_item.is_dir){
+				UI.m_current_file_list.m_treeview_metadata[cur_item.name]=0;
+				UI.Refresh();
+				return;
+			}
+		}
+		return 1;
+	})
+	this.AddEventHandler('RIGHT',function(){
+		if(UI.m_current_file_list.m_treeview_metadata){
+			var obj=this.owner
+			var cur_item=obj.file_list.items[obj.file_list.value];
+			if(cur_item.is_tree_view&&cur_item.is_dir){
+				UI.m_current_file_list.m_treeview_metadata[cur_item.name]=1;
+				UI.Refresh();
+				return;
+			}
+		}
+		return 1;
+	})
 	this.AddEventHandler('change',function(){
 		var obj=this.owner
 		obj.m_file_list=undefined
@@ -3077,62 +3190,83 @@ var g_root_items;
 W.SXS_NewPage=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
 	UI.Begin(obj)
-		UI.RoundRect(obj)
-		////////////////////////////////////////////
-		//the find bar
-		UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h_find_bar,
-			color:obj.find_bar_bgcolor})
-		var rect_bar=UI.RoundRect({
-			x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
-			w:obj.w-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
-			color:obj.find_bar_color,
-			round:obj.find_bar_round})
-		UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
-			obj.find_bar_hint_color,'s'.charCodeAt(0))
-		var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
-		var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
-		var is_find_bar_new=!obj.find_bar_edit;
-		W.Edit("find_bar_edit",{
-			style:obj.find_bar_editor_style,
-			x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
-			owner:obj,
-			precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
-			same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
-			plugins:[fnewpage_findbar_plugin],
-			default_focus:2,
-			tab_width:UI.GetOption("tab_width",4),
-		});
-		if(is_find_bar_new&&UI.m_ui_metadata.new_page_mode=='fs_view'){
-			//set initial path - UI.m_new_document_search_path
-			obj.find_bar_edit.HookedEdit([0,0,(UI.m_new_document_search_path+"/")||"./"])
-			var ccnt=obj.find_bar_edit.ed.GetTextSize();
-			obj.find_bar_edit.SetSelection(ccnt,ccnt)
+	UI.RoundRect(obj)
+	////////////////////////////////////////////
+	//the find bar
+	UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h_find_bar,
+		color:obj.find_bar_bgcolor})
+	var rect_bar=UI.RoundRect({
+		x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
+		w:obj.w-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
+		color:obj.find_bar_color,
+		round:obj.find_bar_round})
+	UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
+		obj.find_bar_hint_color,'s'.charCodeAt(0))
+	var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
+	var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
+	var is_find_bar_new=!obj.find_bar_edit;
+	W.Edit("find_bar_edit",{
+		style:obj.find_bar_editor_style,
+		x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+		owner:obj,
+		precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+		same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
+		plugins:[fnewpage_findbar_plugin],
+		default_focus:2,
+		tab_width:UI.GetOption("tab_width",4),
+	});
+	if(is_find_bar_new&&UI.m_ui_metadata.new_page_mode=='fs_view'){
+		//set initial path - UI.m_new_document_search_path
+		obj.find_bar_edit.HookedEdit([0,0,(UI.m_new_document_search_path+"/")||"./"])
+		var ccnt=obj.find_bar_edit.ed.GetTextSize();
+		obj.find_bar_edit.SetSelection(ccnt,ccnt)
+	}
+	if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
+		W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+			font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
+			text:UI.m_ui_metadata.new_page_mode=='fs_view'?UI._("Path"):UI._("Search")})
+	}
+	////////////////////////////////////////////
+	UI.m_current_file_list=obj.m_current_file_list
+	if(UI.m_ui_metadata.new_page_mode=='fs_view'){
+		UI.g_file_listing_budget=FILE_LISTING_BUDGET_FS_VIEW;
+	}else{
+		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
+	}
+	var files=obj.m_file_list;
+	var first_time=0
+	if(!files){
+		obj.m_current_file_list={
+			m_now:IO.WallClockTime(),
+			m_appeared_names:{},
+			m_appeared_full_names:{},
+			m_listed_git_repos:{},
 		}
-		if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
-			W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
-				font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-				text:UI.m_ui_metadata.new_page_mode=='fs_view'?UI._("Path"):UI._("Search")})
-		}
-		////////////////////////////////////////////
 		UI.m_current_file_list=obj.m_current_file_list
-		if(UI.m_ui_metadata.new_page_mode=='fs_view'){
-			UI.g_file_listing_budget=FILE_LISTING_BUDGET_FS_VIEW;
-		}else{
-			UI.g_file_listing_budget=FILE_LISTING_BUDGET;
+		files=[]
+		///////////////////////
+		var s_git_view_path=undefined;
+		var s_search_text=obj.find_bar_edit.ed.GetText()
+		if(UI.m_ui_metadata.new_page_mode!='fs_view'&&!s_search_text&&UI.m_previous_document){
+			//project view
+			s_git_view_path=DetectRepository(UI.m_previous_document);
 		}
-		var files=obj.m_file_list;
-		var first_time=0
-		if(!files){
-			obj.m_current_file_list={
-				m_now:IO.WallClockTime(),
-				m_appeared_names:{},
-				m_appeared_full_names:{},
-				m_listed_git_repos:{},
+		if(s_git_view_path){
+			//empty search string, git treeview
+			var git_treeview_metadata=UI.m_ui_metadata["<git-treeview>"];
+			if(!git_treeview_metadata){
+				git_treeview_metadata={};
+				UI.m_ui_metadata["<git-treeview>"]=git_treeview_metadata;
 			}
-			UI.m_current_file_list=obj.m_current_file_list
-			files=[]
-			///////////////////////
-			var s_search_text=obj.find_bar_edit.ed.GetText()
+			var treeview_metadata_i=git_treeview_metadata[s_git_view_path]
+			if(!treeview_metadata_i){
+				treeview_metadata_i={};
+				git_treeview_metadata[s_git_view_path]=treeview_metadata_i;
+			}
+			UI.m_current_file_list.m_treeview_metadata=treeview_metadata_i;
+			obj.m_file_list_repo=s_git_view_path;
+			files.push({git_repo_to_list:s_git_view_path, is_tree_view:1, search_text:""})
+		}else{
 			//it's more of a smart interpretation of the user-typed string, not a full-blown explorer
 			//history mode
 			//only do space split for hist mode
@@ -3225,64 +3359,65 @@ W.SXS_NewPage=function(id,attrs){
 					create_if_not_found:s_path,
 				})
 			}
-			//////////////
-			obj.m_file_list=files
-			obj.file_list=undefined
-			first_time=1
 		}
-		UI.m_current_file_list.m_ui_obj=W.ListView('file_list',{
-			x:obj.x+4,y:obj.y+obj.h_find_bar+4,w:obj.w-8,h:obj.h-obj.h_find_bar-4,
-			mouse_wheel_speed:80,
-			dimension:'y',layout_spacing:0,layout_align:'fill',
-			OnDemandSort:UI.m_ui_metadata.new_page_mode=='fs_view'?W.FileItemOnDemandSort:undefined,
-			OnDemand:W.FileItemOnDemand,
-			OnChange:function(value){
-				//if(this.value==value){return;}
-				W.ListView_prototype.OnChange.call(this,value)
-				this.OpenPreview(value,"explicit")
-			},
-			OpenPreview:function(value,is_explicit){
-				var editor_widget=obj.owner
-				if(!editor_widget.m_is_special_document||!UI.HasFocus(obj.find_bar_edit)&&!is_explicit){return;}
-				if(!this.items.length){return;}
-				if(!this.items[value].name||this.items[value].is_dir){return;}
-				var fn=IO.NormalizeFileName(this.items[value].name)
-				if(editor_widget.file_name==fn){return;}
-				if(!IO.FileExists(fn)){return;}
-				if(editor_widget.m_file_name_before_preview){
-					//clear preview first
-					editor_widget.file_name=editor_widget.m_file_name_before_preview
-					editor_widget.doc=undefined
-					editor_widget.m_is_preview=0
-					editor_widget.m_file_name_before_preview=undefined
-					editor_widget.bin_preview=undefined;
-				}
-				if(!editor_widget.m_file_name_before_preview){
-					editor_widget.m_file_name_before_preview=editor_widget.file_name
-				}
-				editor_widget.file_name=fn
+		//////////////
+		obj.m_file_list=files
+		obj.file_list=undefined
+		first_time=1
+	}
+	UI.m_current_file_list.m_ui_obj=W.ListView('file_list',{
+		x:obj.x+4,y:obj.y+obj.h_find_bar+4,w:obj.w-8,h:obj.h-obj.h_find_bar-4,
+		mouse_wheel_speed:80,
+		dimension:'y',layout_spacing:0,layout_align:'fill',
+		OnDemandSort:UI.m_ui_metadata.new_page_mode=='fs_view'?W.FileItemOnDemandSort:undefined,
+		OnDemand:W.FileItemOnDemand,
+		OnChange:function(value){
+			//if(this.value==value){return;}
+			W.ListView_prototype.OnChange.call(this,value)
+			this.OpenPreview(value,"explicit")
+		},
+		OpenPreview:function(value,is_explicit){
+			var editor_widget=obj.owner
+			if(!editor_widget.m_is_special_document||!UI.HasFocus(obj.find_bar_edit)&&!is_explicit){return;}
+			if(!this.items.length){return;}
+			if(!this.items[value].name||this.items[value].is_dir){return;}
+			var fn=IO.NormalizeFileName(this.items[value].name)
+			if(editor_widget.file_name==fn){return;}
+			if(!IO.FileExists(fn)){return;}
+			if(editor_widget.m_file_name_before_preview){
+				//clear preview first
+				editor_widget.file_name=editor_widget.m_file_name_before_preview
 				editor_widget.doc=undefined
-				editor_widget.m_is_special_document=1
-				editor_widget.m_is_preview=1
+				editor_widget.m_is_preview=0
+				editor_widget.m_file_name_before_preview=undefined
 				editor_widget.bin_preview=undefined;
-				//UI.InvalidateCurrentFrame()
-				UI.Refresh()
-			},
-			item_template:{
-				object_type:W.FileItem,
-				owner:obj,
-			},items:files})
-		if(first_time){
-			obj.file_list.OpenPreview(0,"explicit")
-		}
-		//find bar shadow
-		UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
-		UI.RoundRect({
-			x:obj.x-obj.find_bar_shadow_size, y:obj.y+obj.h_find_bar-obj.find_bar_shadow_size, w:obj.w+2*obj.find_bar_shadow_size, h:obj.find_bar_shadow_size*2,
-			round:obj.find_bar_shadow_size,
-			border_width:-obj.find_bar_shadow_size,
-			color:obj.find_bar_shadow_color})
-		UI.PopCliprect()
+			}
+			if(!editor_widget.m_file_name_before_preview){
+				editor_widget.m_file_name_before_preview=editor_widget.file_name
+			}
+			editor_widget.file_name=fn
+			editor_widget.doc=undefined
+			editor_widget.m_is_special_document=1
+			editor_widget.m_is_preview=1
+			editor_widget.bin_preview=undefined;
+			//UI.InvalidateCurrentFrame()
+			UI.Refresh()
+		},
+		item_template:{
+			object_type:W.FileItem,
+			owner:obj,
+		},items:files})
+	if(first_time){
+		obj.file_list.OpenPreview(0,"explicit")
+	}
+	//find bar shadow
+	UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
+	UI.RoundRect({
+		x:obj.x-obj.find_bar_shadow_size, y:obj.y+obj.h_find_bar-obj.find_bar_shadow_size, w:obj.w+2*obj.find_bar_shadow_size, h:obj.find_bar_shadow_size*2,
+		round:obj.find_bar_shadow_size,
+		border_width:-obj.find_bar_shadow_size,
+		color:obj.find_bar_shadow_color})
+	UI.PopCliprect()
 	UI.End()
 	return obj
 }
@@ -4730,7 +4865,7 @@ W.CodeEditor=function(id,attrs){
 	return obj
 }
 
-UI.DetectRepository=DetectRepository;
+//UI.DetectRepository=DetectRepository;
 var g_new_id=0
 UI.NewCodeEditorTab=function(fname0){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
