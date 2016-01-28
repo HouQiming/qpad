@@ -1302,7 +1302,9 @@ var find_context_prototype={
 		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation*2;
 		var ccnt_match0=this.GetMatchCcnt(id,0)
 		var ccnt_match1=((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?ccnt_match0:this.GetMatchCcnt(id,1))
-		UI.SetSelectionEx(doc,ccnt_match0,ccnt_match1,(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?"goto":"find")
+		if(doc.sel0.ccnt!=ccnt_match0||doc.sel1.ccnt!=ccnt_match1){
+			UI.SetSelectionEx(doc,ccnt_match0,ccnt_match1,(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?"goto":"find")
+		}
 		doc.AutoScroll("show")
 		this.m_find_scroll_visual_y=Math.min(Math.max(this.m_find_scroll_visual_y,
 			this.m_current_visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),

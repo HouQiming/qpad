@@ -486,8 +486,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//	p0=iptr(addr_events[i])
 		//	copy(s_write[p0:],bufs[i>>1])
 		for i=0:2:addr_events.n-2
-			p0=iptr(addr_events[i])
-			p1=iptr(addr_events[i+1])
+			p0=iptr(addr_events[i])>>1
+			p1=iptr(addr_events[i+1])>>1
 			copy(s_write[p0:],data[p0:p1-1])
 		s_write.discard()
 		return JS.Return(1)
