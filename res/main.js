@@ -127,20 +127,26 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			if(sname&&sname.length){
 				var atypes=sname.split(":");
 				if(atypes.length>1){
-					stype=atypes[1];
-					sname=atypes[0];
+					stype=atypes.pop();
+					sname=atypes.join(":");
 				}
 				sregfile.push('"')
-				sregfile.push(sname)
+				sregfile.push(sname.replace(/\\/g,"\\\\"))
 				sregfile.push('"')
 			}else{
 				sregfile.push('@');
 			}
 			if(stype){
 				sregfile.push('=')
-				sregfile.push(stype)
-				sregfile.push(':')
-				sregfile.push(sval.toString())
+				if(stype=="string"){
+					sregfile.push('"')
+					sregfile.push(sval.toString())
+					sregfile.push('"')
+				}else{
+					sregfile.push(stype)
+					sregfile.push(':')
+					sregfile.push(sval.toString())
+				}
 			}else{
 				sregfile.push("=hex(2):")
 				for(var j=0;j<sval.length;j++){
@@ -201,6 +207,8 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			file_formats)
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\Applications\\@1\\shell\\open\\command".replace("@1",sshortname),
 			["","\""+sexe+"\" \"%1\""])
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CURRENT_USER\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers",
+			[sexe+":string",'~ HIGHDPIAWARE'])
 		var sversion=UI.g_version;
 		var version_parts=sversion.split(/[. ]/)
 		var vermajor=parseInt(version_parts[0]||"3");

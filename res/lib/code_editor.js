@@ -5260,6 +5260,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				owner:obj,
 				editor_widget:obj.owner,
 			},items:obj.plugin_view_items})
+		W.Hotkey("",{key:"ESC",action:function(){UI.top.app.document_area.CloseTab();}})
 	UI.End()
 	return obj
 }
