@@ -1112,7 +1112,7 @@ W.FancyMenu=function(id,attrs){
 	return obj
 }
 
-//todo: menu search support
+//coulddo: menu search support
 
 ///////////////////////
 UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");

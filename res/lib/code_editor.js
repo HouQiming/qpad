@@ -2962,7 +2962,7 @@ W.FileItem=function(id,attrs){
 						x:16,y:0,
 						value:obj.selected,
 						text:"✕",
-						tooltip:"Forget about this file",
+						tooltip:"Forget this file",
 						anchor:'parent',anchor_align:'right',anchor_valign:'center',
 						OnClick:function(){
 							UI.ForgetFile(obj)
@@ -4776,8 +4776,9 @@ W.CodeEditor=function(id,attrs){
 			}
 			//at-scrollbar bookmark marker
 			var hc_bookmark=UI.GetCharacterHeight(obj.bookmark_font)
-			var bm_ccnts=this.m_rendering_bm_ccnts;
+			var bm_ccnts=doc.m_rendering_bm_ccnts;
 			if(bm_ccnts&&bm_ccnts.length){
+				var bm_xys=doc.m_rendering_bm_xys;
 				for(var i=0;i<bm_ccnts.length;i++){
 					var y=Math.max(Math.min(bm_xys[i*2+1]/ytot,1),0)*sbar.h+sbar.y
 					var id=bm_ccnts[i][0]
