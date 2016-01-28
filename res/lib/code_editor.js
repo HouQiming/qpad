@@ -3003,18 +3003,20 @@ W.FileItem=function(id,attrs){
 				W.Text("",{x:obj.x+obj.w-dims_misc.w-20,y:obj.y+(obj.h-dims_misc.h)*0.5,
 					font:obj.misc_font,text:s_misc_text,
 					color:obj.selected?obj.sel_misc_color:obj.misc_color})
-				///////////////////////////
-				////forget button
-				//if(obj.selected&&UI.m_ui_metadata[obj.name]){
-				//	W.Button("forget_button",{style:obj.button_style,
-				//		x:16,y:0,
-				//		text:"Forget",
-				//		anchor:'parent',anchor_align:'right',anchor_valign:'center',
-				//		OnClick:function(){
-				//			UI.ForgetFile(obj)
-				//		}
-				//	})
-				//}
+				/////////////////////////
+				//forget button
+				//obj.selected&&
+				if(UI.m_ui_metadata[obj.name]){
+					W.Button("forget_button",{style:obj.button_style,
+						x:dims_misc.w+24,y:0,
+						value:obj.selected,
+						text:"Forget",
+						anchor:'parent',anchor_align:'right',anchor_valign:'center',
+						OnClick:function(){
+							UI.ForgetFile(obj)
+						}
+					})
+				}
 			}
 		}
 	UI.End()

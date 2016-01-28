@@ -693,14 +693,13 @@ UI.CustomTheme=function(){
 			button_style:{
 				transition_dt:0.1,
 				round:0.1,border_width:1,padding:4,
-				font:UI.Font(UI.font_name,24,-50),
-				icon_font:UI.Font(UI.icon_font_name,18),
+				font:UI.Font(UI.font_name,16,-50),
 				$:{
 					out:{
 						//border_color:0xff444444,color:0xffffffff,
-						border_color:0,color:[{x:0,y:0,color:C},{x:0,y:1,color:C}],
-						icon_color:0xffffffff,
-						text_color:0xffffffff,
+						border_color:0,color:0,
+						icon_color:L?0xff7f7f7f:0xff7f7f7f,
+						text_color:L?0xff7f7f7f:0xff7f7f7f,
 					},
 					over:{
 						border_color:0xff444444,color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
@@ -708,6 +707,22 @@ UI.CustomTheme=function(){
 						text_color:0xff000000,
 					},
 					down:{
+						border_color:0xff7f7f7f,color:[{x:0,y:0,color:0xff7f7f7f},{x:0,y:1,color:0xff7f7f7f}],
+						icon_color:0xff000000,
+						text_color:0xff000000,
+					},
+					checked_out:{
+						//border_color:0xff444444,color:0xffffffff,
+						border_color:0,color:0,
+						icon_color:0xffffffff,
+						text_color:0xffffffff,
+					},
+					checked_over:{
+						border_color:0xff444444,color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
+						icon_color:0xff000000,
+						text_color:0xff000000,
+					},
+					checked_down:{
 						border_color:0xff7f7f7f,color:[{x:0,y:0,color:0xff7f7f7f},{x:0,y:1,color:0xff7f7f7f}],
 						icon_color:0xff000000,
 						text_color:0xff000000,
