@@ -11,6 +11,7 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	}else{
 		bid_preprocessor=bid_comment;
 	}
+	var tok_comment0=lang.DefineToken("/*");
 	var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 	var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
 	var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
@@ -33,6 +34,7 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 			if(lang.isInside(bid_preprocessor)){
 				lang.Enable(bid_comment);
 				//lang.Enable(bid_comment2);
+				lang.EnableToken(tok_comment0);
 			}
 		}else{
 			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2]);

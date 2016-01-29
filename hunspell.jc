@@ -72,7 +72,8 @@ auto getSpeller(string lang)
 	//if !isAvailable():return NULL
 	ret=g_spellers[lang]
 	if !ret:
-		exepath=System.Env.GetExecutablePath()+("dict/")
+		//exepath=System.Env.GetExecutablePath()+("dict/")
+		exepath=System.Env.GetStoragePath()+("/dict/")
 		sa=exepath+lang+(".aff\0")
 		sb=exepath+lang+(".dic\0")
 		if System.IO.FileExists(sa[:sa.n-2]):
@@ -99,7 +100,8 @@ auto spell(HSPELLER hun,string s)
 	return Hunspell_spell(hun,s)
 
 auto addWord(HSPELLER hun,string lang,string s0)
-	exepath=System.Env.GetExecutablePath()+("dict/")
+	//exepath=System.Env.GetExecutablePath()+("dict/")
+	exepath=System.Env.GetStoragePath()+("/dict/")
 	sc=exepath+lang+(".user_dic")
 	f=System.IO.OpenFile(sc,System.IO.OPEN_READ+System.IO.OPEN_WRITE)
 	if !f:f=System.IO.CreateFile(sc)

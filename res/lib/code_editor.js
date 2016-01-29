@@ -1224,6 +1224,34 @@ var fsave_code_editor=UI.HackCallback(function(){
 	}
 });
 
+var find_item_region_prototype={
+	OnMouseDown:function(event){
+		var doc=this.doc;
+		var ctx=this.owner;
+		var ccnt=doc.SeekXY(event.x-this.x+this.scroll_x,event.y-this.y+this.scroll_y)
+		var p_match=ctx.BisectMatches(doc,ccnt);
+		if(p_match<ctx.m_forward_matches.length/3){
+			var ccnt_l=ctx.GetMatchCcnt(p_match+0,1)
+			var ccnt_r=ctx.GetMatchCcnt(p_match+1,0)
+			if(Math.abs(ccnt_r-ccnt)<Math.abs(ccnt_l-ccnt)){
+				p_match++;
+			}
+		}
+		ctx.m_current_point=p_match;
+		ctx.AutoScrollFindItems()
+		if(event.clicks>1){
+			var obj=ctx.m_owner;
+			if(ctx){
+				ctx.ConfirmFind();
+			}
+			obj.show_find_bar=0;
+			obj.doc.AutoScroll('center')
+			obj.doc.scrolling_animation=undefined
+		}
+		UI.Refresh()
+	},
+};
+
 var find_context_prototype={
 	CreateHighlight:function(doc,ccnt0,ccnt1){
 		var locator_0=doc.ed.CreateLocator(ccnt0,-1);locator_0.undo_tracked=0;
@@ -1331,7 +1359,6 @@ var find_context_prototype={
 		if(this.m_fuzzy_virtual_diffs){
 			renderer.m_virtual_diffs=this.m_fuzzy_virtual_diffs;
 		}
-		//do it here and now
 		var edstyle=UI.default_styles.code_editor;
 		var hc=this.m_hfont;
 		var h_bof_eof_message=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation;
@@ -1516,6 +1543,7 @@ var find_context_prototype={
 				font:edstyle.find_message_font,color:edstyle.find_message_color,
 				text:s_bof_message})
 		}
+		//actual rendering
 		for(var i=p0;i<=p1;i++){
 			var find_item_i=this.GetFindItem(i)
 			var h_expand=0
@@ -1544,6 +1572,14 @@ var find_context_prototype={
 				find_scroll_x,doc_scroll_y,
 				0,find_item_i.visual_y-find_scroll_y-h_expand*0.5,
 				w_find_items,doc_h,0)
+			W.Region("R_find_item_"+i.toString(),{
+				x:0,y:find_item_i.visual_y-find_scroll_y-h_expand*0.5,
+				w:w_find_items,h:doc_h,
+				owner:this,
+				doc:doc,
+				scroll_x:find_scroll_x,
+				scroll_y:doc_scroll_y,
+			},find_item_region_prototype)
 			var h_expand_max=hc*edstyle.find_item_expand_current
 			var highlight_alpha=h_expand/h_expand_max;
 			var alpha=Math.max(Math.min(((1-highlight_alpha)*96)|0,255),0)
@@ -2414,6 +2450,36 @@ var ffindbar_plugin=function(){
 		this.CallOnChange();
 		UI.Refresh()
 	})
+	this.OnMouseWheel=function(event){
+		var obj=this.find_bar_owner;
+		var hc=UI.GetCharacterHeight(obj.editor_style.font)
+		var dy=-hc*event.y*this.mouse_wheel_speed;
+		if(!dy){return;}
+		if(obj.m_current_find_context){
+			var ctx=obj.m_current_find_context
+			var point0=ctx.m_current_point;
+			ctx.m_find_scroll_visual_y+=dy;
+			ctx.SeekFindItemByVisualY(ctx.m_current_visual_y+dy,0)
+			if(dy<0){
+				if(point0==ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
+					ctx.m_current_point--;
+				}
+				if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
+					ctx.m_current_point--;
+				}
+			}else{
+				if(point0==ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
+					ctx.m_current_point++;
+				}
+				if(!ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
+					ctx.m_current_point++;
+				}
+			}
+			ctx.m_home_end=undefined;
+			ctx.AutoScrollFindItems()
+			UI.Refresh()
+		}
+	}
 }
 
 var g_repo_from_file={}
@@ -2440,6 +2506,8 @@ var ParseGit=function(spath){
 		my_repo.files.push(fname)
 	}.bind(undefined,g_repo_from_file),function(){
 		//some dangling dependencies may have been resolved
+		UI.ED_8bitStringSort(my_repo.files)
+		my_repo.is_parsing=0
 		if(UI.ED_ReparseDanglingDeps()){
 			CallParseMore()
 		}
@@ -2465,8 +2533,6 @@ var ParseGit=function(spath){
 			//repo -> status map
 			repos[spath]=match[1]
 		}.bind(undefined,g_repo_from_file),function(){
-			UI.ED_8bitStringSort(my_repo.files)
-			my_repo.is_parsing=0
 			UI.Refresh()
 		}, 30)
 	}, 30)
@@ -3838,9 +3904,12 @@ W.CodeEditor=function(id,attrs){
 			doc.y=obj.y
 			doc.w=w_obj_area-w_line_numbers-obj.padding-w_scrolling_area
 			doc.h=h_obj_area
-			doc.RenderWithLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,doc.x,doc.y,doc.w,doc.h,0)
+			doc.RenderWithLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,obj.x,obj.y,w_obj_area-w_scrolling_area,h_obj_area,0)
 		}else if(obj.m_is_preview&&!doc&&(obj.bin_preview||UI.ED_GetFileLanguage(obj.file_name).is_binary)){
-			W.BinaryEditor("bin_preview",{x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,is_preview:1,file_name:obj.file_name})
+			W.BinaryEditor("bin_preview",{
+				x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,
+				is_preview:1,file_name:obj.file_name,
+			})
 		}else{
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar

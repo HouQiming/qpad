@@ -158,7 +158,8 @@ var freadOnTimer=function(){
 	}
 	g_utility_procs=new_procs;
 	if(g_utility_procs.length>0){
-		UI.setTimeout(freadOnTimer,100)
+		//UI.setTimeout(freadOnTimer,50)
+		UI.NextTick(freadOnTimer)
 	}
 };
 IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){
@@ -167,9 +168,6 @@ IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){
 	if(!proc){
 		return 0;
 	}
-	if(!g_utility_procs.length){
-		UI.setTimeout(freadOnTimer,100)
-	}
 	proc.sregex=new RegExp(sregex,"");
 	proc.fparse=fparse;
 	proc.ffinalize=ffinalize;
@@ -177,6 +175,10 @@ IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){
 	proc.tick0=Duktape.__ui_get_tick();
 	proc.buf="";
 	g_utility_procs.push(proc)
+	if(g_utility_procs.length==1){
+		//UI.setTimeout(freadOnTimer,50)
+		UI.NextTick(freadOnTimer)
+	}
 	return 1;
 };
 

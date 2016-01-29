@@ -27,6 +27,9 @@ if Platform.IS_WINDOWS:
 	__generate_json("lib_files","kernel32.lib")
 	__generate_json("lib_files","user32.lib")
 	__generate_json("lib_files","gdi32.lib")
+if Platform.ARCH=="win32":
+	//use VC2008 for XP support
+	__generate_json("vc_versions","9")
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -48,6 +51,16 @@ auto genString(string s0)
 				s.push(hex[ch&15])
 	return s
 
+if Platform.IS_WINDOWS:
+	ExitProcess=__c_function(int,"ExitProcess","windows.h")
+	registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+		JS_UI["SDL_GLInitErrorCallback"]=function(JSContext JS){
+			MessageBoxA=__c_function(int,"MessageBoxA","windows.h")
+			MessageBoxA(NULL,"Your machine doesn't support OpenGL 2.0.\n\nPlease download and extract the LLVMPipe package","Error",0x10)
+			ExitProcess(1)
+			return 0;
+		}
+	})
 if Platform.BUILD=="debug":
 	registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		JS_UI["dumpMemoryUsage"]=function(JSContext JS){
@@ -447,6 +460,26 @@ if Platform.BUILD=="debug":
 		return 0
 	}
 	/////////////
-	Gui2D.g_log_file=System.Env.GetStoragePath()+"/log.txt"
+	s_storage_path=System.Env.GetStoragePath()
+	{
+		if !System.IO.DirExists(s_storage_path+"/dict"):
+			System.IO.CreateDirectory(s_storage_path+"/dict")
+		if !System.IO.FileExists(s_storage_path+"/dict/en_us.aff")
+			auto f=System.IO.CreateFile(s_storage_path+"/dict/en_us.aff")
+			if f:
+				auto s=sbox.UIReadAll("res/misc/dict/en_us.aff")
+				f.Write(s)
+				f.Close()
+		if !System.IO.FileExists(s_storage_path+"/dict/en_us.dic")
+			auto f=System.IO.CreateFile(s_storage_path+"/dict/en_us.dic")
+			if f:
+				auto s=sbox.UIReadAll("res/misc/dict/en_us.dic")
+				f.Write(s)
+				f.Close()
+	}
+	Gui2D.g_log_file=s_storage_path+"/log.txt"
 	sbox.UIRunJS(JS,"res/main.js")
+	//if Platform.IS_WINDOWS&&System.IO.FileExists(System.Env.GetExecutablePath()+"/opengl32.dll"):
+	//	//LLVMPipe tends to crash
+	//	ExitProcess(1)
 })()

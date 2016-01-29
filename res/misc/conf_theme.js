@@ -888,7 +888,7 @@ UI.CustomTheme=function(){
 			caption_icon_color:L?0xff7f7f7f:0xff444444,
 		},
 	};
-	if(L){//light
+	if(!L){//dark
 		styles.edit={
 			//animating edit would ruin a lot of object properties
 			transition_dt:0,
