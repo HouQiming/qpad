@@ -661,7 +661,7 @@ UI.CustomTheme=function(){
 			error_color:L?0xff444444:0xffe8e8e8,
 		},
 		file_item:{
-			h:56,h_dense:32,
+			h:32,h_dense:32,
 			treeview_indent:16,
 			h_icon:48,
 			icon_font:UI.Font(UI.icon_font_name,48),
@@ -671,6 +671,7 @@ UI.CustomTheme=function(){
 			icon_font_git:UI.Font(UI.icon_font_name,16),
 			dir_icon_color:L?0xffb4771f:0xffaceaea,
 			file_icon_color:L?0xff444444:0xffe8e8e8,
+			//caption_font:UI.Font(UI.font_name,20,-50),
 			name_font_size:UI.Platform.ARCH=="mac"?20:24,
 			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
 			name_font_bold:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,100):UI.Font(UI.font_name,24,100),

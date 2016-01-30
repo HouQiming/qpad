@@ -160,7 +160,11 @@ if Platform.BUILD=="debug":
 	}
 	jsio["NormalizeFileName"]=function(JSContext JS){
 		fn0=JS.Param(0).as(string)
+		is_win_cased=JS.Param(1).or(0)
 		if !fn0:return 0
+		if Platform.IS_WINDOWS&&is_win_cased:
+			foreach fn in System.IO.EnumFiles(fn0,System.IO.ENUM_FILE)
+				return JS.Return(fn)
 		return JS.Return(System.Env.NormalizeFileName(fn0))
 	}
 	jsio["CreateEnumFileContext"]=function(JSContext JS){

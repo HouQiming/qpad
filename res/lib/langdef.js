@@ -362,3 +362,11 @@ exports.GetHyphenator=function(lang){
 	}
 	return ret;
 }
+
+///////////////////////////////////
+exports.g_icon_overrides={};
+exports.RegisterFileIcon=function(s_icon,exts){
+	for(var i=0;i<exts.length;i++){
+		exports.g_icon_overrides[exts[i]]=s_icon;
+	}
+}

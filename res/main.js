@@ -245,6 +245,38 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 
 var g_app_inited=0;
 UI.m_cmdline_opens=[];
+UI.OpenFileListWindow=function(force_mode){
+	var active_document=UI.top.app.document_area.active_tab
+	if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document&&active_document.main_widget.m_sxs_visualizer==W.SXS_NewPage){
+		//repeated alt+q
+		if(!force_mode||force_mode!=UI.m_ui_metadata.new_page_mode){
+			if(force_mode){
+				UI.m_ui_metadata.new_page_mode=force_mode;
+			}else{
+				if(UI.m_ui_metadata.new_page_mode=='fs_view'){
+					UI.m_ui_metadata.new_page_mode='hist_view';
+				}else{
+					UI.m_ui_metadata.new_page_mode='fs_view';
+				}
+			}
+			if(active_document.main_widget.sxs_visualizer){
+				var obj_find_bar_edit=active_document.main_widget.sxs_visualizer.find_bar_edit;
+				if(obj_find_bar_edit){
+					if(obj_find_bar_edit.OnDestroy){obj_find_bar_edit.OnDestroy();}
+					active_document.main_widget.sxs_visualizer.find_bar_edit=undefined;
+				}
+				active_document.main_widget.sxs_visualizer.m_file_list=undefined;
+			}
+		}
+		UI.Refresh()
+		return;
+	}
+	UI.UpdateNewDocumentSearchPath()
+	var tab=UI.NewCodeEditorTab();
+	tab.auto_focus_file_search=1
+	tab.title=UI._("New Tab");
+	UI.Refresh()
+};
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -389,48 +421,20 @@ UI.Application=function(id,attrs){
 				}});
 			}
 			menu_file.AddSeparator();
-			var fopen_brand_new=function(force_mode){
-				var active_document=UI.top.app.document_area.active_tab
-				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document&&active_document.main_widget.m_sxs_visualizer==W.SXS_NewPage){
-					//repeated alt+q
-					if(!force_mode||force_mode!=UI.m_ui_metadata.new_page_mode){
-						if(force_mode){
-							UI.m_ui_metadata.new_page_mode=force_mode;
-						}else{
-							if(UI.m_ui_metadata.new_page_mode=='fs_view'){
-								UI.m_ui_metadata.new_page_mode='hist_view';
-							}else{
-								UI.m_ui_metadata.new_page_mode='fs_view';
-							}
-						}
-						if(active_document.main_widget.sxs_visualizer){
-							var obj_find_bar_edit=active_document.main_widget.sxs_visualizer.find_bar_edit;
-							if(obj_find_bar_edit){
-								if(obj_find_bar_edit.OnDestroy){obj_find_bar_edit.OnDestroy();}
-								active_document.main_widget.sxs_visualizer.find_bar_edit=undefined;
-							}
-							active_document.main_widget.sxs_visualizer.m_file_list=undefined;
-						}
-					}
-					UI.Refresh()
-					return;
-				}
-				UI.UpdateNewDocumentSearchPath()
-				var tab=UI.NewCodeEditorTab();
-				tab.auto_focus_file_search=1
-				tab.title=UI._("New Tab");
-				UI.Refresh()
-			};
-			menu_file.AddNormalItem({icon:"时",text:"Recent or gi&t...",
+			menu_file.AddNormalItem({icon:"时",text:"Recent / projec&t...",
 				key:UI.m_ui_metadata.new_page_mode!='fs_view'?"ALT+Q":"ALT+Q,Q",
-				enable_hotkey:0,action:fopen_brand_new.bind(undefined,'hist_view')})
+				enable_hotkey:0,action:UI.OpenFileListWindow.bind(undefined,'hist_view')})
 			menu_file.AddNormalItem({text:"&Browse...",
 				key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
-				enable_hotkey:0,action:fopen_brand_new.bind(undefined,'fs_view')})
+				enable_hotkey:0,action:UI.OpenFileListWindow.bind(undefined,'fs_view')})
 			menu_file.AddNormalItem({text:"Arran&ge tabs",
 				enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
+			menu_file.AddNormalItem({text:"Manage projects...",
+				enable_hotkey:0,action:function(){
+					UI.OpenEditorWindow("*project_list")
+				}})
 			//obj.ArrangeTabs.bind(obj.current_tab_id)
-			W.Hotkey("",{key:"ALT+Q",action:fopen_brand_new})
+			W.Hotkey("",{key:"ALT+Q",action:UI.OpenFileListWindow})
 			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
 				menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
 					if(UI.m_closed_windows.length>0){
@@ -601,7 +605,13 @@ if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 	};
 }
 
-UI.OpenFile=UI.OpenEditorWindow;
+UI.OpenFile=function(fn){
+	if(IO.DirExists(fn)){
+		UI.AddProjectDir(fn);
+	}else if(IO.FileExists(fn)){
+		UI.OpenEditorWindow(fn);
+	}
+};
 
 (function(){
 	var argv=IO.m_argv;

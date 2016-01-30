@@ -2,6 +2,10 @@ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
 
+Language.RegisterFileIcon("M",["png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr"]);
+Language.RegisterFileIcon("V",["mp4","mpg","mpeg","h264","avi","mov","rm","rmvb"]);
+Language.RegisterFileIcon("文",["txt"]);
+
 var f_C_like=function(lang,keywords,has_preprocessor){
 	lang.DefineDefaultColor("color_symbol")
 	var tok_newline=lang.DefineToken("\n");
@@ -88,7 +92,7 @@ var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.P
 
 Language.Register({
 	name:"C/C++",parser:"C",
-	extensions:["c","cxx","cpp","cc","h","hpp"],
+	extensions:["c","cxx","cpp","cc","h","hpp","mm"],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
 	file_icon_color:0xff9a3d6a,
@@ -353,7 +357,7 @@ Language.Register({
 
 Language.Register({
 	name:'XML',parser:"text",
-	extensions:['xml','vcproj','vcxproj','sproj','sln'],
+	extensions:['xml','vcproj','vcxproj','sproj','sln','svg','mobileprovision'],
 	file_icon_color:0xff444444,
 	file_icon:'マ',
 	rules:function(lang){

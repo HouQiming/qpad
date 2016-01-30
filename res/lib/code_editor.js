@@ -27,6 +27,10 @@ UI.RegisterEditorPlugin=function(fplugin){
 	UI.m_editor_plugins.push(fplugin)
 	return fplugin
 }
+UI.m_special_files=[];
+UI.RegisterSpecialFile=function(fn,obj){
+	UI.m_special_files[fn]=obj;
+}
 require("res/plugin/edbase");
 
 ///////////////////////////////////////////////////////
@@ -199,7 +203,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.owner.DismissNotification('saving_progress');
 		if(fn.length&&fn[0]=='*'){
 			//built-in file
-			ed.Edit([0,0,IO.UIReadAll(fn.substr(1))],1);
+			var fn_special=fn.substr(1);
+			var floader=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].Load);
+			var s_content="";
+			if(floader){
+				s_content=(floader()||"");
+			}else{
+				s_content=(IO.UIReadAll(fn_special)||"");
+			}
+			ed.Edit([0,0,s_content],1);
 			//this.ResetSaveDiff()
 			this.OnLoad()
 			UI.Refresh();
@@ -1387,6 +1399,7 @@ var find_context_prototype={
 		var h_safety_internal=h_safety+h_find_items//for page up/down
 		//search-on-render
 		if(find_scroll_y<this.m_y_extent_backward+h_safety_internal&&!UI.IsSearchFrontierCompleted(this.m_backward_frontier)){
+			UI.assert(!(this.m_flags&UI.SEARCH_FLAG_GLOBAL));
 			var p0=this.m_backward_matches.length
 			if(this.m_backward_search_hack){
 				var matches=this.m_backward_search_hack
@@ -1459,7 +1472,6 @@ var find_context_prototype={
 			UI.Refresh()
 		}
 		if(find_scroll_y+find_shared_h>this.m_y_extent_forward-h_safety_internal&&!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
-			//todo: searching beyond the current file
 			var p0=this.m_forward_matches.length
 			if(this.m_forward_search_hack){
 				var matches=this.m_forward_search_hack
@@ -1472,6 +1484,10 @@ var find_context_prototype={
 				UI.InvalidateCurrentFrame();
 			}else{
 				this.m_forward_frontier=UI.ED_Search(doc.ed,this.m_forward_frontier,1,this.m_needle,this.m_flags,262144,this.ReportMatchForward.bind(this,doc),this);
+				if(UI.IsSearchFrontierCompleted(this.m_forward_frontier)&&(this.m_flags&UI.SEARCH_FLAG_GLOBAL)){
+					//searching beyond the current file
+					//!?
+				}
 			}
 			//var ccnt_merged_anyway=this.m_mergable_ccnt_forward
 			var current_y1=this.m_merged_y_windows_forward.pop()
@@ -1940,12 +1956,24 @@ W.CodeEditorWidget_prototype={
 		this.doc.ParseFile()
 	},
 	Save:function(){
+		var fn=this.file_name;
 		var doc=this.doc
 		if(doc.ed.hfile_loading){
 			this.CreateNotification({id:'saving_progress',icon:'错',text:"You cannot save a file before it finishes loading"})
 			return
 		}
-		var ctx=UI.EDSaver_Open(doc.ed,this.file_name)
+		if(fn.length&&fn[0]=='*'){
+			var fn_special=fn.substr(1);
+			var fsaver=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].Save);
+			if(fsaver){
+				fsaver(this.doc.ed.GetText());
+				doc.saved_point=doc.ed.GetUndoQueueLength()
+				doc.ResetSaveDiff()
+			}
+			return;
+		}
+		//use cased file name on Windows...
+		var ctx=UI.EDSaver_Open(doc.ed,IO.NormalizeFileName(this.file_name,1))
 		if(!ctx){
 			this.CreateNotification({id:'saving_progress',icon:'错',text:"Cannot create a temporary file for saving"})
 			return
@@ -2506,8 +2534,6 @@ var ParseGit=function(spath){
 		my_repo.files.push(fname)
 	}.bind(undefined,g_repo_from_file),function(){
 		//some dangling dependencies may have been resolved
-		UI.ED_8bitStringSort(my_repo.files)
-		my_repo.is_parsing=0
 		if(UI.ED_ReparseDanglingDeps()){
 			CallParseMore()
 		}
@@ -2531,8 +2557,14 @@ var ParseGit=function(spath){
 				g_repo_from_file[fname]=repos
 			}
 			//repo -> status map
+			if(UI.m_ui_metadata[fname]&&!repos[spath]){
+				//count in ignored files if editted in qpad
+				my_repo.files.push(fname)
+			}
 			repos[spath]=match[1]
 		}.bind(undefined,g_repo_from_file),function(){
+			UI.ED_8bitStringSort(my_repo.files)
+			my_repo.is_parsing=0
 			UI.Refresh()
 		}, 30)
 	}, 30)
@@ -2554,9 +2586,14 @@ var DetectRepository=function(fname){
 		return g_is_repo_detected[spath];
 	}
 	///////////////////
-	if(spath!='.'&&IO.DirExists(spath+"/.git")){
-		ParseGit(spath)
+	if(spath!='.'&&(IO.DirExists(spath+"/.git")||IO.DirExists(spath+"/.svn"))){
+		//ParseGit(spath)
+		ParseProject(spath)
 		g_is_repo_detected[spath]=spath;
+		if(!UI.g_is_dir_a_project[spath]){
+			UI.g_is_dir_a_project[spath]="transient";
+			UI.g_transient_projects.push(spath)
+		}
 		return spath
 	}
 	///////////////////
@@ -2574,10 +2611,12 @@ UI.ClearFileListingCache=function(){
 
 //var FILE_LISTING_BUDGET=100
 var FILE_LISTING_BUDGET=16
-var FILE_LISTING_BUDGET_FS_VIEW=32
+var FILE_LISTING_BUDGET_FS_VIEW=32;
+var FILE_LISTING_BUDGET_PARSE_PROJECT=256;
 UI.g_file_listing_budget=FILE_LISTING_BUDGET;
 W.FileItemOnDemand=function(){
 	if(this.git_repo_to_list){
+		ParseProject(this.git_repo_to_list);
 		var repo=g_repo_list[this.git_repo_to_list]
 		if(repo.is_parsing){
 			return "keep";
@@ -2646,9 +2685,9 @@ W.FileItemOnDemand=function(){
 		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			fnext.name=fnext.name.toLowerCase()
 		}
-		if(UI.m_current_file_list.m_appeared_full_names[fnext.name]){continue;}
+		if(UI.m_current_file_list.m_appeared_full_names[fnext.name]&&!this.is_tree_view){continue;}
 		UI.m_current_file_list.m_appeared_full_names[fnext.name]=1
-		DetectRepository(fnext.name)
+		if(!this.is_tree_view){DetectRepository(fnext.name);}
 		//avoid duplicate
 		ret.push({
 			name:fnext.name,
@@ -2685,7 +2724,7 @@ var FlushGitPaths=function(dir_items,ret,parent,depth){
 	var subdirs=dir_items["*subdirs"];
 	for(var i=0;i<subdirs.length;i+=2){
 		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
-		var ret2=W.FileItemOnDemand.call({name_to_find:subdirs[i+0]})
+		var ret2=W.FileItemOnDemand.call({name_to_find:subdirs[i+0],is_tree_view:depth})
 		for(var j=0;j<ret2.length;j++){
 			ret2[j].parent=parent;
 			ret2[j].is_tree_view=depth;
@@ -2696,7 +2735,7 @@ var FlushGitPaths=function(dir_items,ret,parent,depth){
 	var files=dir_items["*files"];
 	for(var i=0;i<files.length;i++){
 		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
-		var ret2=W.FileItemOnDemand.call({name_to_find:files[i]})
+		var ret2=W.FileItemOnDemand.call({name_to_find:files[i],is_tree_view:depth})
 		for(var j=0;j<ret2.length;j++){
 			ret2[j].parent=parent;
 			ret2[j].is_tree_view=depth;
@@ -2716,13 +2755,63 @@ var GenerateGitRepoTreeView=function(repo){
 		AddGitPath(dir_items,fn_i.split("/"),0);
 	}
 	var ret=[];
-	FlushGitPaths(dir_repo,ret,undefined,1);
+	UI.g_file_listing_budget=FILE_LISTING_BUDGET;
+	var ret2=W.FileItemOnDemand.call({name_to_find:repo.name,is_tree_view:1})
+	for(var j=0;j<ret2.length;j++){
+		ret2[j].parent=undefined;
+		ret2[j].is_tree_view=1;
+		ret.push(ret2[j])
+	}
+	FlushGitPaths(dir_repo,ret,ret2[0],2);
 	//initialize the hidden-ness status
 	for(var i=0;i<ret.length;i++){
 		W.FileItemOnDemand.call(ret[i]);
 	}
 	return ret;
 };
+
+var ParseProject=function(spath){
+	if(g_repo_list[spath]){return;}
+	if(IO.DirExists(spath+"/.git")){
+		ParseGit(spath)
+	}else{
+		//}else if(IO.DirExists(spath+"/.svn")){
+		//	ParseSVN(spath)
+		//it's faster to parse the filesystem than to parse the SVN
+		//filesystem "project"
+		//don't put up status, just generate a file list
+		var my_repo={name:spath,is_parsing:1,files:[]}
+		g_repo_list[spath]=my_repo
+		//file-only, recursive
+		var find_context=IO.CreateEnumFileContext(spath+"/*",5);
+		var fparse_batch=undefined;
+		fparse_batch=function(){
+			for(var i=0;i<FILE_LISTING_BUDGET_PARSE_PROJECT;i++){
+				var fnext=find_context()
+				if(!fnext){
+					find_context=undefined
+					break
+				}
+				var sname=fnext.name;
+				my_repo.files.push(sname);
+				var repos=g_repo_from_file[fnext.name]
+				if(!repos){
+					repos={};
+					g_repo_from_file[fnext.name]=repos;
+				}
+				repos[spath]="  ";
+			}
+			if(find_context){
+				UI.NextTick(fparse_batch)
+			}else{
+				UI.ED_8bitStringSort(my_repo.files)
+				my_repo.is_parsing=0
+			}
+		};
+		fparse_batch();
+		return my_repo
+	}
+}
 
 W.FileItemOnDemandSort=function(obj){
 	obj.items.sort(function(a,b){return !!a.name_to_find-!!b.name_to_find||b.is_dir-a.is_dir||(a.name<b.name?-1:(a.name==b.name?0:1));})
@@ -2875,7 +2964,7 @@ var OpenInPlace=function(obj,name){
 	obj.m_sxs_visualizer=undefined;
 	UI.top.app.quit_on_zero_tab=0;
 	UI.m_current_file_list=undefined
-	UI.ClearFileListingCache();
+	//UI.ClearFileListingCache();
 	UI.Refresh()
 }
 
@@ -2901,23 +2990,50 @@ var FileItem_prototype={
 		var obj=this.owner.owner;
 		OpenInPlace(obj,this.name)
 	},
-}
+};
 W.FileItem=function(id,attrs){
-	var obj=UI.StdWidget(id,attrs,"file_item",FileItem_prototype);
+	var obj=UI.StdWidget(id,attrs,"none",UI.default_styles.file_item);
 	var parent_list_view=UI.context_parent;
 	if(obj.is_tree_view){
 		var dx_indent=(obj.is_tree_view-1)*obj.treeview_indent;
 		obj.x+=dx_indent;
 		obj.w-=dx_indent;
+		var s_try_to_focus=(obj.owner.m_try_to_focus);
+		if(s_try_to_focus){
+			var is_me_focus=0;
+			if(obj.name==s_try_to_focus){
+				is_me_focus=1;
+			}else if(obj.is_dir&&!UI.m_current_file_list.m_treeview_metadata[obj.name]){
+				if(obj.name.length<s_try_to_focus&&s_try_to_focus.substr(0,obj.name.length)==obj.name){
+					is_me_focus=1;
+				}
+			}
+			if(is_me_focus){
+				var list_items=obj.owner.file_list.items;
+				for(var j=0;j<list_items.length;j++){
+					if(list_items[j].name==obj.name){
+						obj.owner.file_list.OnChange(j);
+						obj.owner.m_try_to_focus=undefined;
+						UI.Refresh()
+						break;
+					}
+				}
+			}
+		}
 	}
 	UI.Begin(obj)
 		//icon, name, meta-info
 		//hopefully go without a separator line
 		if(obj.y<parent_list_view.y+parent_list_view.h&&obj.y+obj.h>parent_list_view.y){
-			if(obj.git_repo_to_list){
+			if(obj.caption){
+				var dims=UI.MeasureText(obj.name_font,obj.caption);
+				W.Text("",{x:obj.x+(obj.w-dims.w)*0.5,y:obj.y+4,
+					font:obj.name_font,text:obj.caption,
+					color:UI.default_styles.code_editor.find_message_color})
+			}else if(obj.git_repo_to_list){
 				//display a searching... text
 				W.Text("",{x:obj.x+4,y:obj.y+2,
-					font:obj.name_font,text:UI._("Parsing git repo @1...").replace("@1",obj.git_repo_to_list),
+					font:obj.name_font,text:UI._("Parsing project @1...").replace("@1",obj.git_repo_to_list),
 					color:obj.misc_color})
 			}else if(obj.name_to_find){
 				//display a searching... text
@@ -2929,10 +3045,14 @@ W.FileItem=function(id,attrs){
 				var language_id=Language.GetNameByExt(s_ext)
 				var desc=Language.GetDescObjectByName(language_id)
 				var ext_color=obj.file_icon_color;//(desc.file_icon_color||obj.file_icon_color)
-				var icon_code=(desc.file_icon||'档').charCodeAt(0)
+				var icon_code=(Language.g_icon_overrides[s_ext]||desc.file_icon||'档').charCodeAt(0)
 				if(obj.is_dir){
 					ext_color=obj.dir_icon_color;
-					icon_code='开'.charCodeAt(0)
+					if(obj.is_tree_view&&UI.m_current_file_list.m_treeview_metadata[obj.name]){
+						icon_code=0x5f00;//'开'.charCodeAt(0)
+					}else{
+						icon_code=0x5939;//'夹'.charCodeAt(0)
+					}
 				}
 				if(obj.name_to_create){
 					ext_color=0x55444444
@@ -2964,15 +3084,21 @@ W.FileItem=function(id,attrs){
 				var name_color=obj.name_color;
 				var sname=UI.RemovePath(obj.name);
 				if(obj.is_dir){sname=sname+"/";}
-				if(obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!='fs_view'){
+				//var stag=undefined;
+				if((obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!='fs_view')&&obj.is_tree_view!=1){
 					var repos=g_repo_from_file[obj.name]
 					if(repos){
-						var s_git_status=repos[obj.owner.m_file_list_repo];
-						if(s_git_status==undefined&&UI.m_ui_metadata.new_page_mode!='fs_view'){
+						var s_git_status=undefined;
+						if(UI.m_ui_metadata.new_page_mode!='fs_view'){
 							for(var skey in repos){
 								s_git_status=repos[skey];
+								//if(obj.is_tree_view!=1){
+								//	stag=skey;
+								//}
 								break;
 							}
+						}else{
+							s_git_status=repos[obj.owner.m_file_list_repo];
 						}
 						var s_git_icon=undefined;
 						var git_icon_color=undefined;
@@ -3022,8 +3148,19 @@ W.FileItem=function(id,attrs){
 				var dims_misc=UI.MeasureText(obj.misc_font,s_misc_text);
 				/////////////////////////
 				//forget button
-				//obj.selected&&
-				if(UI.m_ui_metadata[obj.name]){
+				if(UI.g_is_dir_a_project[obj.name]=='permanent'){
+					W.Button("forget_button",{style:obj.button_style,
+						x:16,y:0,
+						value:obj.selected,
+						text:"✕",
+						tooltip:"Unpin this project",
+						anchor:'parent',anchor_align:'right',anchor_valign:'center',
+						OnClick:function(){
+							UI.RemoveProjectDir(obj.name)
+						}
+					})
+					dims_misc.w+=obj.forget_button.w;
+				}else if(UI.m_ui_metadata[obj.name]){
 					W.Button("forget_button",{style:obj.button_style,
 						x:16,y:0,
 						value:obj.selected,
@@ -3115,7 +3252,7 @@ var fnewpage_findbar_plugin=function(){
 			}
 		}
 		UI.m_current_file_list=undefined;
-		UI.ClearFileListingCache();
+		//UI.ClearFileListingCache();
 		UI.Refresh()
 	})
 	this.OnMouseWheel=function(event){
@@ -3130,10 +3267,20 @@ var fnewpage_findbar_plugin=function(){
 		if(UI.m_current_file_list.m_treeview_metadata){
 			var obj=this.owner
 			var cur_item=obj.file_list.items[obj.file_list.value];
-			if(cur_item.is_tree_view&&cur_item.is_dir){
+			if(cur_item.is_tree_view&&cur_item.is_dir&&UI.m_current_file_list.m_treeview_metadata[cur_item.name]){
 				UI.m_current_file_list.m_treeview_metadata[cur_item.name]=0;
 				UI.Refresh();
 				return;
+			}
+			if(cur_item.is_tree_view&&cur_item.parent){
+				//go to parent *AND* fold
+				for(var i=0;i<obj.file_list.items.length;i++){
+					if(obj.file_list.items[i]==cur_item.parent){
+						obj.file_list.OnChange(i);
+						UI.Refresh();
+						return;
+					}
+				}
 			}
 		}
 		return 1;
@@ -3156,6 +3303,14 @@ var fnewpage_findbar_plugin=function(){
 		obj.m_try_to_focus=undefined;
 		UI.Refresh()
 	})
+	this.AddEventHandler('F5',function(){
+		UI.ClearFileListingCache();
+		var obj=this.owner
+		obj.m_file_list=undefined
+		obj.m_try_to_focus=undefined;
+		UI.Refresh()
+		return 1;
+	})
 	this.AddEventHandler('RETURN RETURN2',fpassthrough)
 	this.AddEventHandler('UP',fpassthrough)
 	this.AddEventHandler('DOWN',fpassthrough)
@@ -3163,19 +3318,19 @@ var fnewpage_findbar_plugin=function(){
 	this.AddEventHandler('PGDN',fpassthrough)
 	this.AddEventHandler('TAB',function(key,event){
 		var s_search_text=this.ed.GetText()
-		var s_path=s_search_text
-		var ccnt=Duktape.__byte_length(s_path)
-		if(s_path.length&&this.sel0.ccnt==ccnt&&this.sel1.ccnt==ccnt){
-			s_path=IO.ProcessUnixFileName(s_path.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
-			if(s_path.search(g_regexp_abspath)>=0){
+		var spath=s_search_text
+		var ccnt=Duktape.__byte_length(spath)
+		if(spath.length&&this.sel0.ccnt==ccnt&&this.sel1.ccnt==ccnt){
+			spath=IO.ProcessUnixFileName(spath.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
+			if(spath.search(g_regexp_abspath)>=0){
 				//do nothing: it's absolute
 			}else{
-				s_path=UI.m_new_document_search_path+"/"+s_path
+				spath=UI.m_new_document_search_path+"/"+spath
 			}
 			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-				s_path=s_path.toLowerCase()
+				spath=spath.toLowerCase()
 			}
-			var find_context=IO.CreateEnumFileContext(s_path+"*",3)
+			var find_context=IO.CreateEnumFileContext(spath+"*",3)
 			var s_common=undefined
 			for(;;){
 				var fnext=find_context()
@@ -3200,11 +3355,11 @@ var fnewpage_findbar_plugin=function(){
 						}
 					}
 				}
-				if(s_common.length<=s_path.length){break;}
+				if(s_common.length<=spath.length){break;}
 			}
-			if(s_common&&s_common.length>s_path.length){
+			if(s_common&&s_common.length>spath.length){
 				//path completion
-				var s_insertion=s_common.slice(s_path.length)
+				var s_insertion=s_common.slice(spath.length)
 				this.HookedEdit([ccnt,0,s_insertion])
 				this.sel0.ccnt=ccnt+Duktape.__byte_length(s_insertion)
 				this.sel1.ccnt=ccnt+Duktape.__byte_length(s_insertion)
@@ -3266,9 +3421,25 @@ W.SXS_NewPage=function(id,attrs){
 	//the find bar
 	UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h_find_bar,
 		color:obj.find_bar_bgcolor})
+	var w_buttons=0;
+	if(UI.m_ui_metadata.new_page_mode!='fs_view'&&!s_search_text){
+		//manage projects button
+		W.Button("manage_button",{
+			x:0,y:0,h:obj.h_find_bar,
+			value:obj.selected,padding:8,
+			text:"Manage...",
+			tooltip:"Manage projects...",
+			anchor:'parent',anchor_align:'right',anchor_valign:'top',
+			OnClick:function(){
+				UI.top.app.document_area.CloseTab()
+				UI.OpenEditorWindow("*project_list")
+			}
+		})
+		w_buttons+=obj.manage_button.w
+	}
 	var rect_bar=UI.RoundRect({
 		x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
-		w:obj.w-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
+		w:obj.w-w_buttons-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
 		color:obj.find_bar_color,
 		round:obj.find_bar_round})
 	UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
@@ -3295,7 +3466,7 @@ W.SXS_NewPage=function(id,attrs){
 	if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 		W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 			font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-			text:UI.m_ui_metadata.new_page_mode=='fs_view'?UI._("Path"):UI._("Search")})
+			text:UI.m_ui_metadata.new_page_mode=='fs_view'?UI._("Path"):UI._("Listing projects, type to search files")})
 	}
 	////////////////////////////////////////////
 	UI.m_current_file_list=obj.m_current_file_list
@@ -3309,34 +3480,46 @@ W.SXS_NewPage=function(id,attrs){
 	if(!files){
 		obj.m_current_file_list={
 			m_now:IO.WallClockTime(),
+			m_owner:obj,
 			m_appeared_names:{},
 			m_appeared_full_names:{},
 			m_listed_git_repos:{},
 		}
 		UI.m_current_file_list=obj.m_current_file_list
-		files=[]
+		files=[];
 		///////////////////////
-		var s_git_view_path=undefined;
 		var s_search_text=obj.find_bar_edit.ed.GetText()
-		if(UI.m_ui_metadata.new_page_mode!='fs_view'&&!s_search_text&&UI.m_previous_document){
-			//project view
-			s_git_view_path=DetectRepository(UI.m_previous_document);
-		}
-		if(s_git_view_path){
-			//empty search string, git treeview
-			var git_treeview_metadata=UI.m_ui_metadata["<git-treeview>"];
+		var projects=(UI.m_ui_metadata["<projects>"]||[]);
+		//sync current projects to a map - UI.g_transient_projects
+		if(UI.m_ui_metadata.new_page_mode!='fs_view'&&!s_search_text){
+			//empty search string, project view
+			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			if(!git_treeview_metadata){
 				git_treeview_metadata={};
-				UI.m_ui_metadata["<git-treeview>"]=git_treeview_metadata;
+				UI.m_ui_metadata["<project-treeview>"]=git_treeview_metadata;
 			}
-			var treeview_metadata_i=git_treeview_metadata[s_git_view_path]
-			if(!treeview_metadata_i){
-				treeview_metadata_i={};
-				git_treeview_metadata[s_git_view_path]=treeview_metadata_i;
+			UI.m_current_file_list.m_treeview_metadata=git_treeview_metadata;
+			if(projects.length>0){
+				files.push({caption:"Projects",no_selection:1,h:32})
+				for(var i=0;i<projects.length;i++){
+					files.push({git_repo_to_list:projects[i], is_tree_view:1, search_text:""})
+				}
 			}
-			UI.m_current_file_list.m_treeview_metadata=treeview_metadata_i;
-			obj.m_file_list_repo=s_git_view_path;
-			files.push({git_repo_to_list:s_git_view_path, is_tree_view:1, search_text:""})
+			if(UI.g_transient_projects.length>0){
+				files.push({caption:"Auto-detected projects",no_selection:1,h:32})
+				UI.g_transient_projects.sort(function(a,b){
+					a=UI.RemovePath(a);
+					b=UI.RemovePath(b);
+					if(a<b){return -1;}else{return a>b?1:0;}
+				});
+				for(var i=0;i<UI.g_transient_projects.length;i++){
+					files.push({git_repo_to_list:UI.g_transient_projects[i], is_tree_view:1, search_text:""})
+				}
+			}
+			//var s_git_view_path=DetectRepository(UI.m_previous_document);
+			//obj.m_file_list_repo=s_git_view_path;
+			//set current - m_try_to_focus
+			obj.m_try_to_focus=UI.m_previous_document
 		}else{
 			//it's more of a smart interpretation of the user-typed string, not a full-blown explorer
 			//history mode
@@ -3407,17 +3590,17 @@ W.SXS_NewPage=function(id,attrs){
 				files.sort(function(a,b){return b.relevance-a.relevance||b.hist_ord-a.hist_ord;});
 			}
 			//file system part, leave them unsorted
-			var s_path=s_search_text
+			var spath=s_search_text
 			obj.m_file_list_repo=undefined;
-			if(s_path.length||!files.length){
-				s_path=IO.ProcessUnixFileName(s_path.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
-				if(s_path.search(g_regexp_abspath)>=0){
+			if(spath.length||!files.length){
+				spath=IO.ProcessUnixFileName(spath.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
+				if(spath.search(g_regexp_abspath)>=0){
 					//do nothing: it's absolute
 				}else{
-					s_path=UI.m_new_document_search_path+"/"+s_path
+					spath=UI.m_new_document_search_path+"/"+spath
 				}
 				//git project part
-				var spath_repo=DetectRepository(s_path+"*")
+				var spath_repo=DetectRepository(spath+"*")
 				obj.m_file_list_repo=spath_repo;
 				if(spath_repo&&UI.m_ui_metadata.new_page_mode!='fs_view'){
 					if(!UI.m_current_file_list.m_listed_git_repos[spath_repo]){
@@ -3426,8 +3609,8 @@ W.SXS_NewPage=function(id,attrs){
 					}
 				}
 				files.push({
-					name_to_find:s_path+"*",
-					create_if_not_found:s_path,
+					name_to_find:spath+"*",
+					create_if_not_found:spath,
 				})
 			}
 		}
@@ -3436,6 +3619,7 @@ W.SXS_NewPage=function(id,attrs){
 		obj.file_list=undefined
 		first_time=1
 	}
+	UI.default_styles.file_item.__proto__=FileItem_prototype;
 	UI.m_current_file_list.m_ui_obj=W.ListView('file_list',{
 		x:obj.x+4,y:obj.y+obj.h_find_bar+4,w:obj.w-8,h:obj.h-obj.h_find_bar-4,
 		mouse_wheel_speed:80,
@@ -3738,6 +3922,8 @@ W.CodeEditor=function(id,attrs){
 						top_hint_inv.push(ccnt);
 					}
 					top_hints=undefined;
+					var renderer=doc.GetRenderer();
+					renderer.m_enable_hidden=0;
 					var line_xys=doc.ed.GetXYEnMasse(top_hint_inv)
 					var hc=UI.GetCharacterHeight(doc.font)
 					var eps=hc/16;
@@ -3764,6 +3950,7 @@ W.CodeEditor=function(id,attrs){
 						h_top_hint=hc*obj.top_hint_max_lines;
 					}
 					top_hint_bbs.push(cur_bb_y0,cur_bb_y1)
+					renderer.m_enable_hidden=1;
 				}
 			}else{
 				h_top_hint=0
@@ -4998,8 +5185,15 @@ UI.NewCodeEditorTab=function(fname0){
 				body.title=undefined;
 				body.tooltip=undefined
 			}else{
-				body.title=UI.RemovePath(body.file_name)
-				body.tooltip=body.file_name
+				var fn_display=IO.NormalizeFileName(body.file_name,1);
+				if(body.file_name.length&&body.file_name[0]=='*'){
+					var special_file_desc=UI.m_special_files[body.file_name.substr(1)];
+					if(special_file_desc&&special_file_desc.display_name){
+						fn_display=special_file_desc.display_name;
+					}
+				}
+				body.title=UI.RemovePath(fn_display);
+				body.tooltip=fn_display;
 				this.need_save=0
 				if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
 					body.title=body.title+'*'
@@ -5053,7 +5247,9 @@ UI.NewCodeEditorTab=function(fname0){
 };
 
 UI.OpenEditorWindow=function(fname,fcallback){
-	fname=IO.NormalizeFileName(fname).replace(/[\\]/g,"/");
+	if(!(fname&&fname[0]=='*')){
+		fname=IO.NormalizeFileName(fname).replace(/[\\]/g,"/");
+	}
 	var obj_tab=undefined;
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		if(UI.g_all_document_windows[i].file_name==fname){
@@ -5618,4 +5814,110 @@ UI.CloseCodeEditorDocument=function(doc){
 	}
 }
 
+////////////////////////////////////////////////
+//project system
+UI.AddProjectDir=function(spath){
+	var projects=UI.m_ui_metadata["<projects>"];
+	if(!projects){
+		projects=[];
+		UI.m_ui_metadata["<projects>"]=projects;
+	}
+	var spath=IO.NormalizeFileName(spath)
+	for(var i=0;i<projects.length;i++){
+		if(projects[i]==spath){
+			return;
+		}
+	}
+	projects.push(spath);
+	UI.g_is_dir_a_project[spath]="permanent";
+	UI.g_transient_projects=UI.g_transient_projects.filter(function(a){return a!=spath;})
+	if(UI.m_current_file_list){
+		var obj=UI.m_current_file_list.m_owner;
+		if(obj){
+			obj.m_file_list=undefined
+			obj.m_try_to_focus=undefined;
+			UI.Refresh()
+		}
+	}else{
+		UI.OpenFileListWindow('hist_view')
+	}
+};
+
+UI.RemoveProjectDir=function(spath){
+	var projects=UI.m_ui_metadata["<projects>"];
+	if(!projects){
+		projects=[];
+	}
+	var spath=IO.NormalizeFileName(spath)
+	UI.m_ui_metadata["<projects>"]=projects.filter(function(a){return a!=spath;})
+	UI.g_is_dir_a_project[spath]="transient";
+	UI.g_transient_projects.push(spath)
+	if(UI.m_current_file_list){
+		var obj=UI.m_current_file_list.m_owner;
+		if(obj){
+			obj.m_file_list=undefined
+			obj.m_try_to_focus=undefined;
+			UI.Refresh()
+		}
+	}
+};
+
+UI.g_is_dir_a_project={};
+UI.g_transient_projects=[];
+(function(){
+	var projects=(UI.m_ui_metadata["<projects>"]||[]);
+	for(var i=0;i<projects.length;i++){
+		UI.g_is_dir_a_project[projects[i]]="permanent";
+	}
+})()
+
+UI.RegisterSpecialFile("project_list",{
+	display_name:"Project List",
+	Load:function(){
+		var ret=[];
+		var projects=(UI.m_ui_metadata["<projects>"]||[]);
+		ret.push('*** Projects ***');
+		for(var i=0;i<projects.length;i++){
+			ret.push(projects[i])
+		}
+		if(UI.g_transient_projects.length>0){
+			ret.push('*** Auto detected projects ***');
+			UI.g_transient_projects.sort(function(a,b){
+				a=UI.RemovePath(a);
+				b=UI.RemovePath(b);
+				if(a<b){return -1;}else{return a>b?1:0;}
+			});
+			for(var i=0;i<UI.g_transient_projects.length;i++){
+				ret.push(UI.g_transient_projects[i])
+			}
+		}
+		ret.push('')
+		return ret.join('\n');
+	},
+	Save:function(stext){
+		var files=stext.split('\n');
+		var n_stars=0;
+		var projects=[];
+		for(var i=0;i<files.length;i++){
+			var fn=files[i];
+			if(!fn){continue;}
+			if(fn[0]=='*'){
+				n_stars++;
+				if(n_stars>1){break;}
+				continue;
+			}
+			if(!IO.DirExists(fn)){continue;}
+			projects.push(fn)
+			UI.m_ui_metadata["<projects>"]=projects;
+			if(UI.m_current_file_list){
+				var obj=UI.m_current_file_list.m_owner;
+				if(obj){
+					obj.m_file_list=undefined
+					obj.m_try_to_focus=undefined;
+					UI.Refresh()
+				}
+			}
+		}
+	},
+});
 //UI.enable_timing=1
