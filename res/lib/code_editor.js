@@ -1673,13 +1673,18 @@ var find_context_prototype={
 				if(this.m_repo_path&&!this.m_repo_files){
 					var repo=g_repo_list[this.m_repo_path]
 					if(!repo.is_parsing){
-						if(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE){
-							this.m_repo_files=repo.files.filter(function(fn){
+						this.m_repo_files=repo.files.filter(function(fn){
+							var repos=g_repo_from_file[fn]
+							if(repos&&repos[this.m_repo_path]=='!!'){
+								//do not search ignored files -- even though we show them in the project listing
+								return 0;
+							}
+							if(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE){
 								return UI.ED_GetFileLanguage(fn).parser=="C";
-							});
-						}else{
-							this.m_repo_files=repo.files.filter(function(fn){return !UI.ED_GetFileLanguage(fn).is_binary});
-						}
+							}else{
+								return !UI.ED_GetFileLanguage(fn).is_binary;
+							}
+						}.bind(this));
 						this.m_p_repo_files=0;
 						if(!this.m_temp_documents){
 							this.m_temp_documents=[];
