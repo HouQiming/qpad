@@ -1295,35 +1295,53 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 	//ctx.m_backward_frontier=-1
 }
 
-var g_is_parse_more_running=0
+var g_is_parse_more_running=0;
+var FPS_PARSING=30;
 var CallParseMore=function(){
 	if(g_is_parse_more_running){return;}
 	var fcallmore=UI.HackCallback(function(){
-		var ret=UI.ED_ParseMore()
-		if(ret){
-			var obj_tab=undefined;
-			for(var i=0;i<UI.g_all_document_windows.length;i++){
-				if(UI.g_all_document_windows[i].file_name==ret.file_name){
-					obj_tab=UI.g_all_document_windows[i]
-					break
+		var tick0=Duktape.__ui_get_tick()
+		for(;;){
+			var ret=UI.ED_ParseMore()
+			if(ret){
+				var doc=UI.g_editor_from_file[ret.file_name];
+				if(doc){
+					doc.m_file_index=ret.file_index;
+					UI.Refresh()
 				}
-			}
-			if(obj_tab&&obj_tab.main_widget&&obj_tab.main_widget.doc){
-				obj_tab.main_widget.doc.m_file_index=ret.file_index
-				UI.Refresh()
-			}else{
-				//not-opened-yet
-				//if(UI.Platform.BUILD=="debug"){
-				//	print("panic: failed to set m_file_index",ret.file_name)
+				//var obj_tab=undefined;
+				//for(var i=0;i<UI.g_all_document_windows.length;i++){
+				//	if(UI.g_all_document_windows[i].file_name==ret.file_name){
+				//		obj_tab=UI.g_all_document_windows[i]
+				//		break
+				//	}
 				//}
+				//if(obj_tab&&obj_tab.main_widget&&obj_tab.main_widget.doc){
+				//	obj_tab.main_widget.doc.m_file_index=ret.file_index
+				//	UI.Refresh()
+				//}else{
+				//	//not-opened-yet
+				//	//if(UI.Platform.BUILD=="debug"){
+				//	//	print("panic: failed to set m_file_index",ret.file_name)
+				//	//}
+				//}
+				UI.NextTick(fcallmore)
+			}else{
+				g_is_parse_more_running=0;
+				UI.Refresh();
+				return;
 			}
-			UI.NextTick(fcallmore)
-		}else{
-			g_is_parse_more_running=0;
+			var tick1=Duktape.__ui_get_tick()
+			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>1.0/FPS_PARSING){break;}
 		}
 	});
 	g_is_parse_more_running=1;
-	UI.NextTick(fcallmore)
+	//in-global-search test
+	//if(UI.g_is_in_global_search){
+	//	fcallmore();
+	//}else{
+	UI.NextTick(fcallmore);
+	//}
 };
 
 var fsave_code_editor=UI.HackCallback(function(){
@@ -1386,6 +1404,39 @@ var find_item_region_prototype={
 	},
 };
 
+var QueryKeyDeclList=function(matches,doc,sneedle){
+	var sneedle_lower=sneedle.toLowerCase()
+	var lg_needle=Duktape.__byte_length(sneedle_lower)
+	var all_key_decls=UI.ED_GetAllKeyDeclsLower(doc)
+	if(all_key_decls){
+		for(var i=0;i<all_key_decls.length;i+=3){
+			var s_id_lower=all_key_decls[i+0]
+			//var s_id_lower=s_id.toLowerCase()
+			if(s_id_lower.length>=sneedle_lower.length){
+				if(!sneedle_lower||s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
+					//we don't need the type here
+					//var type=all_key_decls[i+1]
+					var ccnt_match=all_key_decls[i+2]
+					//if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
+					if(sneedle_lower){
+						matches.push(ccnt_match,ccnt_match+lg_needle)
+					}else{
+						matches.push(ccnt_match,ccnt_match+Duktape.__byte_length(s_id_lower))
+					}
+					//}else{
+					//	var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
+					//	matches.push(ccnt_match,ccnt_match1)
+					//}
+				}
+			}
+		}
+		return all_key_decls.length;
+	}else{
+		return 0;
+	}
+};
+
+//UI.g_is_in_global_search=0;
 var find_context_prototype={
 	CreateHighlight:function(doc,ccnt0,ccnt1){
 		var locator_0=doc.ed.CreateLocator(ccnt0,-1);locator_0.undo_tracked=0;
@@ -1435,6 +1486,9 @@ var find_context_prototype={
 		this.m_highlight_ranges=[];
 		this.m_locators=[];
 		this.m_temp_documents=undefined;
+		//if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+		//	UI.g_is_in_global_search--;
+		//}
 	},
 	///////////////////////
 	SetRenderingHeight:function(h0){
@@ -1619,9 +1673,17 @@ var find_context_prototype={
 				if(this.m_repo_path&&!this.m_repo_files){
 					var repo=g_repo_list[this.m_repo_path]
 					if(!repo.is_parsing){
-						this.m_repo_files=repo.files.filter(function(fn){return !UI.ED_GetFileLanguage(fn).is_binary});
+						if(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE){
+							this.m_repo_files=repo.files.filter(function(fn){
+								return UI.ED_GetFileLanguage(fn).parser=="C";
+							});
+						}else{
+							this.m_repo_files=repo.files.filter(function(fn){return !UI.ED_GetFileLanguage(fn).is_binary});
+						}
 						this.m_p_repo_files=0;
-						this.m_temp_documents=[];
+						if(!this.m_temp_documents){
+							this.m_temp_documents=[];
+						}
 						this.m_doc_ordering={};
 						this.m_sel_backups={};
 						for(var i=0;i<this.m_repo_files.length;i++){
@@ -1657,7 +1719,23 @@ var find_context_prototype={
 				ccnt_tot=doc_forward_search.ed.GetTextSize()
 				ytot=doc_forward_search.ed.XYFromCcnt(ccnt_tot).y+doc_forward_search.ed.GetCharacterHeightAt(ccnt_tot);
 				var p0=this.m_forward_matches.length
-				if(this.m_forward_search_hack){
+				if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)&&(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)){
+					//global goto
+					if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)&&!g_is_parse_more_running){
+						if(doc_forward_search.m_file_index&&doc_forward_search.m_file_index.hasDecls()){
+							var matches=[];
+							var workload=QueryKeyDeclList(matches,doc_forward_search,this.m_needle)
+							for(var i=0;i<matches.length;i+=2){
+								this.ReportMatchForward(doc_forward_search,matches[i+0],matches[i+1])
+							}
+							FORWARD_BUDGET-=workload*128;
+						}
+						this.m_search_doc=undefined;
+						this.m_forward_frontier=-1;
+					}else{
+						break;
+					}
+				}else if(this.m_forward_search_hack){
 					var matches=this.m_forward_search_hack
 					this.m_forward_search_hack=undefined
 					for(var i=0;i<matches.length;i+=2){
@@ -2007,16 +2085,18 @@ var find_context_prototype={
 			UI.OpenEditorWindow(doc.m_file_name);
 		}
 	},
-	CancelFind:function(){
+	RestoreSel:function(){
 		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
-			for(var i=0;i<this.m_temp_documents.length;i++){
-				var doc=this.m_temp_documents[i];
-				var bksel=this.m_sel_backups[doc.m_file_name];
-				if(bksel){
-					doc.sel0.ccnt=bksel[0];
-					doc.sel1.ccnt=bksel[1];
-					doc.AutoScroll('center');
-					doc.scrolling_animation=undefined
+			if(this.m_temp_documents&&this.m_sel_backups){
+				for(var i=0;i<this.m_temp_documents.length;i++){
+					var doc=this.m_temp_documents[i];
+					var bksel=this.m_sel_backups[doc.m_file_name];
+					if(bksel){
+						doc.sel0.ccnt=bksel[0];
+						doc.sel1.ccnt=bksel[1];
+						doc.AutoScroll('center');
+						doc.scrolling_animation=undefined
+					}
 				}
 			}
 		}else{
@@ -2026,6 +2106,9 @@ var find_context_prototype={
 			doc.AutoScroll('center')
 			doc.scrolling_animation=undefined
 		}
+	},
+	CancelFind:function(){
+		this.RestoreSel();
 		var obj=this.m_owner
 		obj.show_find_bar=0;
 		UI.Refresh()
@@ -2084,6 +2167,9 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 	//ctx.m_mergable_ccnt_forward=doc.ed.SeekXY(1e17,y_id)
 	ctx.m_y_extent_backward=-hc*ctx.m_context_size
 	ctx.m_y_extent_forward=hc*(ctx.m_context_size+1)
+	//if(flags&UI.SEARCH_FLAG_GLOBAL){
+	//	UI.g_is_in_global_search++;
+	//}
 	return ctx;
 }
 
@@ -2205,7 +2291,6 @@ W.CodeEditorWidget_prototype={
 			UI.m_ui_metadata.find_state.m_current_needle=""
 			return;
 		}
-		this.DestroyFindingContext()
 		if(!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
 			UI.m_ui_metadata.find_state.m_current_needle=sneedle
 		}
@@ -2218,13 +2303,28 @@ W.CodeEditorWidget_prototype={
 		}
 		ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt==undefined?doc.sel0.ccnt:ccnt,force_ccnt==undefined?doc.sel1.ccnt:ccnt)
 		ctx.SetRenderingHeight(this.h-this.h_find_bar);
+		if((flags&UI.SEARCH_FLAG_GLOBAL)&&this.m_current_find_context&&this.m_current_find_context.m_temp_documents){
+			//carry over docs to avoid re-loading
+			//keep at most one refs for each doc
+			var temp_docs0=this.m_current_find_context.m_temp_documents;
+			ctx.m_temp_documents=[];
+			for(var i=0;i<temp_docs0.length;i++){
+				if(temp_docs0[i].m_ed_refcnt>1){
+					UI.CloseCodeEditorDocument(temp_docs0[i])
+				}else{
+					ctx.m_temp_documents.push(temp_docs0[i]);
+				}
+			}
+			this.m_current_find_context.m_temp_documents=undefined;
+		}
+		this.DestroyFindingContext()
 		this.m_current_find_context=ctx
 		if(force_ccnt==undefined){
 			ctx.AutoScrollFindItems();
 			//UI.InvalidateCurrentFrame();
 			UI.Refresh()
 		}
-		if(flags&UI.SEARCH_FLAG_GOTO_MODE){
+		if((flags&UI.SEARCH_FLAG_GOTO_MODE)&&!(flags&UI.SEARCH_FLAG_GLOBAL)){
 			//ignore the flags
 			var matches=[]
 			//try to go to line number first
@@ -2254,33 +2354,8 @@ W.CodeEditorWidget_prototype={
 				}
 			}else{
 				//search for function / class
-				//todo: make it progressive - search callback, faster is-unmodified test
-				var sneedle_lower=sneedle.toLowerCase()
-				var lg_needle=Duktape.__byte_length(sneedle_lower)
-				var all_key_decls=UI.ED_GetAllKeyDeclsLower(doc)
-				if(all_key_decls){
-					for(var i=0;i<all_key_decls.length;i+=3){
-						var s_id_lower=all_key_decls[i+0]
-						//var s_id_lower=s_id.toLowerCase()
-						if(s_id_lower.length>=sneedle_lower.length){
-							if(!sneedle_lower||s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
-								//we don't need the type here
-								//var type=all_key_decls[i+1]
-								var ccnt_match=all_key_decls[i+2]
-								//if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
-								if(sneedle_lower){
-									matches.push(ccnt_match,ccnt_match+lg_needle)
-								}else{
-									matches.push(ccnt_match,ccnt_match+Duktape.__byte_length(s_id_lower))
-								}
-								//}else{
-								//	var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
-								//	matches.push(ccnt_match,ccnt_match1)
-								//}
-							}
-						}
-					}
-				}
+				//coulddo: make it progressive - search callback, faster is-unmodified test
+				QueryKeyDeclList(matches,doc,sneedle);
 			}
 			SetFindContextFinalResult(ctx,ccnt,matches)
 			UI.Refresh()
@@ -2556,6 +2631,9 @@ var ffindbar_plugin=function(){
 		var ctx=obj.m_current_find_context
 		if(ctx){
 			ctx.CancelFind();
+		}else{
+			obj.show_find_bar=0;
+			UI.Refresh();
 		}
 	})
 	this.AddEventHandler('RETURN RETURN2',function(){
@@ -2575,7 +2653,7 @@ var ffindbar_plugin=function(){
 		//obj.doc.sel1.ccnt=obj.m_sel1_before_find
 		var ctx=obj.m_current_find_context
 		if(ctx){
-			ctx.CancelFind();
+			ctx.RestoreSel();
 		}
 		obj.DestroyReplacingContext();
 		var find_flag_mode=(obj.show_find_bar&~UI.SEARCH_FLAG_SHOW)
@@ -4723,9 +4801,13 @@ W.CodeEditor=function(id,attrs){
 					color:obj.find_bar_bgcolor})
 				var show_flag_buttons=!(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)
 				//fuzzy match disclaimer... fade, red search bar with "fuzzy match" written on
+				var x_rect_bar=obj.x+obj.find_bar_padding;
+				var w_rect_bar=w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?5:1);
+				var x_buttons=x_rect_bar+w_rect_bar;
 				var rect_bar=UI.RoundRect({
-					x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
-					w:w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?5:1),h:obj.h_find_bar-obj.find_bar_padding*2,
+					x:x_rect_bar,y:obj.y+obj.find_bar_padding,
+					w:w_rect_bar,
+					h:obj.h_find_bar-obj.find_bar_padding*2,
 					color:UI.lerp_rgba(obj.find_bar_color,obj.disclaimer_color,(disclaimer_alpha||0)*0.125),
 					round:obj.find_bar_round})
 				var chr_icon='s'.charCodeAt(0);
@@ -4734,10 +4816,28 @@ W.CodeEditor=function(id,attrs){
 				}else if(disclaimer_alpha>0){
 					chr_icon='糊'.charCodeAt(0);
 				}
-				UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
+				UI.DrawChar(UI.icon_font_20,rect_bar.x+obj.find_bar_padding,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
 					UI.lerp_rgba(obj.find_bar_hint_color,obj.disclaimer_color,disclaimer_alpha||0),chr_icon)
-				var x_button_right=rect_bar.x+rect_bar.w+obj.find_bar_padding
-				if(disclaimer_alpha>0){
+				var x_button_right=x_buttons+obj.find_bar_padding
+				if(obj.show_find_bar&UI.SEARCH_FLAG_GLOBAL){
+					//draw project name
+					//UI.DrawChar(UI.icon_font_20,
+					//	x_rect_bar,obj.y+(obj.h_find_bar-20)*0.5,
+					//	UI.default_styles.check_button.text_color,0x5939)//'夹'.charCodeAt(0)
+					//x_rect_bar+=20;
+					var spath_repo=DetectRepository(doc.m_file_name);
+					var s_global_search_hint=UI.Format("in project '@1'",UI.RemovePath(spath_repo))
+					//var dims=UI.MeasureText(obj.find_bar_hint_font,s_global_search_hint);
+					//W.Text("",{x:x_rect_bar+w_rect_bar-dims.w-obj.find_bar_padding,y:obj.y+(obj.h_find_bar-dims.h)*0.5,
+					//	font:obj.find_bar_hint_font,color:UI.default_styles.check_button.text_color,
+					//	text:s_global_search_hint})
+					//w_rect_bar-=dims.w+obj.find_bar_padding*2;
+					W.Text("",{x:8,
+						anchor:rect_bar,anchor_align:'right',anchor_yalign:'up',
+						font:obj.find_bar_hint_font,
+						color:obj.find_bar_hint_color,
+						text:s_global_search_hint})
+				}else if(disclaimer_alpha>0){
 					//"fuzzy search" text
 					W.Text("",{x:8,
 						anchor:rect_bar,anchor_align:'right',anchor_yalign:'up',
@@ -4760,7 +4860,7 @@ W.CodeEditor=function(id,attrs){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
-							if(ctx){ctx.CancelFind();}
+							if(ctx){ctx.RestoreSel();}
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+C",action:function(){btn_case.OnClick()}})
@@ -4773,7 +4873,7 @@ W.CodeEditor=function(id,attrs){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
-							if(ctx){ctx.CancelFind();}
+							if(ctx){ctx.RestoreSel();}
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+H",action:function(){btn_word.OnClick()}})
@@ -4786,7 +4886,7 @@ W.CodeEditor=function(id,attrs){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
-							if(ctx){ctx.CancelFind();}
+							if(ctx){ctx.RestoreSel();}
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick()}})
@@ -4799,7 +4899,7 @@ W.CodeEditor=function(id,attrs){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_HIDDEN)|(value?UI.SEARCH_FLAG_HIDDEN:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
-							if(ctx){ctx.CancelFind();}
+							if(ctx){ctx.RestoreSel();}
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+T",action:function(){btn_hidden.OnClick()}})
@@ -4814,7 +4914,7 @@ W.CodeEditor=function(id,attrs){
 							ctx.CancelFind();
 						}
 					}})
-				var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,chr_icon);
+				var x_find_edit=rect_bar.x+obj.find_bar_padding*2+UI.GetCharacterAdvance(UI.icon_font_20,chr_icon);
 				var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
 				var previous_find_bar_edit=obj.find_bar_edit
 				W.Edit("find_bar_edit",{
@@ -4860,7 +4960,7 @@ W.CodeEditor=function(id,attrs){
 				if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 					W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 						font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-						text:(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)?"Function / class / line number":"Search"})
+						text:(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)?"Go to function / class / line number":"Search"})
 				}
 			}else{
 				//obj.find_bar_edit=undefined;

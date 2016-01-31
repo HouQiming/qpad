@@ -478,7 +478,7 @@ UI.CustomTheme=function(){
 			find_item_shadow_size:4,
 			find_mode_bgcolor:L?0xffc0c0c0:0xff333333,
 			//find_item_replace_highlight_color:0x55007fff,
-			find_message_font:UI.Font(UI.font_name,32,-50),
+			find_message_font:UI.Font(UI.font_name,28,-50),
 			find_message_color:L?0xff444444:0xff7f7f7f,
 			///////
 			accands_font:UI.Font(UI.font_name,22,-50),
