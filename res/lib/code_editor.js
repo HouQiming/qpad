@@ -1,4 +1,3 @@
-//wrap-around in search
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/boxdoc");
@@ -138,9 +137,115 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//these are locators when set
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
 		this.m_unkeyed_bookmarks=[];
-		if(this.m_is_main_editor){this.m_diff_from_save=this.ed.CreateDiffTracker()}
-		if(this.owner){
-			this.owner.OnEditorCreate();
+		if(this.m_is_main_editor){
+			this.m_diff_from_save=this.ed.CreateDiffTracker()
+			this.StartLoading(this.m_file_name)
+			//main editor things
+			this.AddEventHandler('selectionChange',function(){
+				var obj=this.owner
+				if(!obj){return;}
+				var show_replace_hint=0
+				if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
+					var ccnt=this.sel1.ccnt
+					var ctx=obj.m_current_find_context;
+					var match_id=ctx.BisectMatches(this,ccnt)
+					if(match_id){
+						var match_ccnt0=ctx.GetMatchCcnt(match_id,0)
+						var match_ccnt1=ctx.GetMatchCcnt(match_id,1)
+						if(match_ccnt0<=ccnt&&ccnt<=match_ccnt1&&match_ccnt0<=this.sel0.ccnt&&this.sel0.ccnt<=match_ccnt1){
+							show_replace_hint=1
+						}
+					}
+				}
+				if(show_replace_hint){
+					obj.CreateNotification({
+						id:'replace_hint',icon:'换',text:['Edit the match to start replacing'].join("\n")
+					},"quiet")
+				}else{
+					obj.DismissNotification('replace_hint')
+				}
+				UI.g_goto_definition_context=undefined;
+				this.m_hide_prev_next_buttons=1;
+			})
+			this.AddEventHandler('beforeEdit',function(ops){
+				var obj=this.owner
+				if(!obj){return;}
+				if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
+					var ctx=obj.m_current_find_context;
+					var match_id=ctx.BisectMatches(this,ops[0])
+					if(match_id){
+						var match_ccnt0=ctx.GetMatchCcnt(match_id,0)
+						var match_ccnt1=ctx.GetMatchCcnt(match_id,1)
+						var intersected=1;
+						for(var i=0;i<ops.length;i+=3){
+							var ccnt0_i=ops[i]
+							var ccnt1_i=ops[i]+ops[i+1]
+							if(!(ccnt0_i<=match_ccnt1&&ccnt1_i>=match_ccnt0)){
+								intersected=0;
+								break
+							}
+							//m_user_just_typed_char is updated after this, we can test it here for the previous state
+							if(this.m_user_just_typed_char&&ccnt0_i==match_ccnt1){
+								//the user types a new copy of the needle, then continues typing
+								//it SHOULD NOT count as an auto-replace attempt
+								intersected=0;
+								break
+							}
+						}
+						if(intersected){
+							//start replacing - *every* op intersects with the match...
+							obj.SetReplacingContext(match_ccnt0,match_ccnt1)
+						}else{
+							obj.m_current_find_context.m_no_more_replace=1;
+						}
+					}else{
+						if(obj.m_current_find_context){
+							obj.m_current_find_context.m_no_more_replace=1;
+						}
+					}
+				}
+			})
+			this.AddEventHandler('change',function(){
+				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+				renderer.m_hidden_ranges_prepared=0
+				///////////
+				var obj=this.owner
+				if(!obj){return;}
+				obj.DestroyFindingContext()
+			})
+			this.AddEventHandler('ESC',function(){
+				this.CancelAutoCompletion()
+				this.m_ac_activated=0
+				this.m_user_just_typed_char=0
+				//////////
+				var obj=this.owner
+				if(!obj){return;}
+				obj.m_notifications=[]
+				obj.DestroyReplacingContext();
+				obj.hide_sxs_visualizer=!obj.hide_sxs_visualizer;
+				if(!obj.m_sxs_visualizer){
+					obj.hide_sxs_visualizer=0;
+				}
+				obj.DestroyFindingContext()
+				obj.m_hide_find_highlight=1
+				UI.g_goto_definition_context=undefined;
+				UI.Refresh()
+				return 1
+			})
+			//current line highlight
+			var hl_items=this.CreateTransientHighlight({'depth':-100,'color':this.color_cur_line_highlight,'invertible':0});
+			this.cur_line_p0=hl_items[0]
+			this.cur_line_p1=hl_items[1]
+			this.cur_line_hl=hl_items[2]
+			var line_current=this.GetLC(this.sel1.ccnt)[0]
+			var ed_caret=this.GetCaretXY();
+			if(UI.TestOption("show_line_highlight")){
+				this.cur_line_p0.ccnt=this.SeekXY(0,ed_caret.y);
+				this.cur_line_p1.ccnt=this.SeekXY(1e17,ed_caret.y);
+			}else{
+				this.cur_line_p0.ccnt=0;
+				this.cur_line_p1.ccnt=0;
+			}
 		}
 	},
 	OnDestroy:function(){
@@ -200,7 +305,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var ed=this.ed;
 		var is_preview=this.m_is_preview
 		this.m_loaded_time=IO.GetFileTimestamp(fn)
-		this.owner.DismissNotification('saving_progress');
+		if(this.owner){this.owner.DismissNotification('saving_progress');}
 		if(fn.length&&fn[0]=='*'){
 			//built-in file
 			var fn_special=fn.substr(1);
@@ -218,10 +323,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			return;
 		}
 		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216),function(encoding){
-			this.owner.CreateNotification({id:'saving_progress',icon:'警',
-				text:"The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.".replace(
-					"@1",g_encoding_names[encoding]||"an unknown"),
-			})
+			if(this.owner){
+				this.owner.CreateNotification({id:'saving_progress',icon:'警',
+					text:"The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.".replace(
+						"@1",g_encoding_names[encoding]||"an unknown"),
+				})
+			}
 			return 0
 		}.bind(this))
 		//abandonment should work as is...
@@ -262,7 +369,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			this.OnLoad()
 			if(!IO.FileExists(fn)&&!this.m_is_preview&&fn.indexOf('<')<0){
 				this.saved_point=-1;
-				this.owner.CreateNotification({id:'saving_progress',icon:'新',text:"Save to create the file"})
+				if(this.owner){
+					this.owner.CreateNotification({id:'saving_progress',icon:'新',text:"Save to create the file"})
+				}
 			}
 		}
 		UI.Refresh()
@@ -1143,6 +1252,12 @@ UI.SEARCH_FLAG_FUZZY=8;
 UI.SEARCH_FLAG_HIDDEN=16;
 UI.SEARCH_FLAG_GOTO_MODE=1024;
 UI.SEARCH_FLAG_GLOBAL=2048;
+//only used in show_find_bar
+UI.SEARCH_FLAG_SHOW=1048576;
+UI.SHOW_FIND=UI.SEARCH_FLAG_SHOW;
+UI.SHOW_GOTO=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GOTO_MODE;
+UI.SHOW_GLOBAL_FIND=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GLOBAL;
+UI.SHOW_GLOBAL_GOTO=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GLOBAL+UI.SEARCH_FLAG_GOTO_MODE;
 if(!UI.m_ui_metadata.find_state){
 	UI.m_ui_metadata.find_state={
 		m_current_needle:"",
@@ -1278,6 +1393,7 @@ var find_context_prototype={
 		UI.Refresh()
 	},
 	ReportMatchForward:function(doc,ccnt0,ccnt1){
+		//print(doc.m_file_name,ccnt0,ccnt1)
 		if(!(this.m_flags&UI.SEARCH_FLAG_HIDDEN)){
 			if(doc.GetRenderer().IsRangeHidden(doc.ed,ccnt0,ccnt1)){
 				return 1024;
@@ -1304,6 +1420,14 @@ var find_context_prototype={
 		for(var i=0;i<this.m_locators.length;i++){
 			this.m_locators[i].discard()
 		}
+		if(this.m_temp_documents){
+			for(var i=0;i<this.m_temp_documents.length;i++){
+				UI.CloseCodeEditorDocument(this.m_temp_documents[i]);
+			}
+		}
+		this.m_highlight_ranges=[];
+		this.m_locators=[];
+		this.m_temp_documents=undefined;
 	},
 	///////////////////////
 	SetRenderingHeight:function(h0){
@@ -1352,17 +1476,27 @@ var find_context_prototype={
 		this.m_find_scroll_visual_y=Math.max(Math.min(this.m_find_scroll_visual_y,this.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),this.m_y_extent_backward-h_bof_eof_message_with_sep)
 		//print(this.m_find_scroll_visual_y,this.m_current_visual_y,this.m_current_point,r,JSON.stringify(fitem_current));
 	},
+	IsForwardSearchCompleted:function(){
+		if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
+			return 0;
+		}
+		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+			return !this.m_search_doc&&this.m_p_repo_files>=this.m_repo_files.length;
+		}else{
+			return 1;
+		}
+	},
 	RenderVisibleFindItems:function(w_line_numbers,w_find_items,h_rendering){
 		this.SetRenderingHeight(h_rendering);
 		var h_find_items=this.m_current_visual_h;
 		this.AutoScrollFindItems();
 		var id=this.m_current_point;
-		var doc=this.GetMatchDoc(id);
-		var renderer=doc.GetRenderer();
+		var doc_curpoint=this.GetMatchDoc(id);
+		var renderer=doc_curpoint.GetRenderer();
 		if(this.m_flags&UI.SEARCH_FLAG_FUZZY){
 			if(!this.m_fuzzy_virtual_diffs||this.m_fuzzy_diff_match_id!=id){
 				//fuzzy match rendering - GetMatchCcnt, something else like m_tentative_editops but rendered the other direction
-				this.m_fuzzy_virtual_diffs=UI.ED_RawEditDistance(doc.ed,
+				this.m_fuzzy_virtual_diffs=UI.ED_RawEditDistance(doc_curpoint.ed,
 					this.GetMatchCcnt(id,0),this.GetMatchCcnt(id,1),
 					this.m_needle, this.m_flags&UI.SEARCH_FLAG_CASE_SENSITIVE);
 				this.m_fuzzy_diff_match_id=id;
@@ -1376,7 +1510,7 @@ var find_context_prototype={
 		var h_bof_eof_message=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation;
 		var eps=hc/16;
 		var ccnt_middle=this.GetMatchCcnt(this.m_current_point,1)
-		var xy_middle=doc.ed.XYFromCcnt(ccnt_middle)
+		var xy_middle=doc_curpoint.ed.XYFromCcnt(ccnt_middle)
 		var find_scroll_x=Math.max(xy_middle.x-(w_find_items-w_line_numbers),0)
 		var find_scroll_y=this.m_find_scroll_visual_y
 		var obj_parent=UI.context_parent;
@@ -1393,8 +1527,8 @@ var find_context_prototype={
 		find_scroll_x=anim_node.scroll_x;
 		find_scroll_y=anim_node.scroll_y;
 		var find_shared_h=this.m_current_visual_h;
-		var ccnt_tot=doc.ed.GetTextSize()
-		var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
+		var ccnt_tot=doc_curpoint.ed.GetTextSize()
+		var ytot=doc_curpoint.ed.XYFromCcnt(ccnt_tot).y+doc_curpoint.ed.GetCharacterHeightAt(ccnt_tot);
 		var h_safety=hc*edstyle.find_item_expand_current;
 		var h_safety_internal=h_safety+h_find_items//for page up/down
 		//search-on-render
@@ -1405,13 +1539,13 @@ var find_context_prototype={
 				var matches=this.m_backward_search_hack
 				this.m_backward_search_hack=undefined
 				for(var i=matches.length-2;i>=0;i-=2){
-					this.ReportMatchBackward(doc,matches[i+0],matches[i+1])
+					this.ReportMatchBackward(doc_curpoint,matches[i+0],matches[i+1])
 				}
 				this.m_is_just_reset=1;
 				this.m_backward_frontier=-1
 				UI.InvalidateCurrentFrame();
 			}else{
-				this.m_backward_frontier=UI.ED_Search(doc.ed,this.m_backward_frontier,-1,this.m_needle,this.m_flags,262144,this.ReportMatchBackward.bind(this,doc),this)
+				this.m_backward_frontier=UI.ED_Search(doc_curpoint.ed,this.m_backward_frontier,-1,this.m_needle,this.m_flags,262144,this.ReportMatchBackward.bind(this,doc_curpoint),this)
 			}
 			//var ccnt_merged_anyway=this.m_mergable_ccnt_backward
 			var current_y1=this.m_merged_y_windows_backward.pop()
@@ -1427,11 +1561,11 @@ var find_context_prototype={
 			for(var i=match_ccnts0.length-1;i>=0;i--){
 				match_ccnts.push(match_ccnts0[i]);
 			}
-			var match_xys=doc.ed.GetXYEnMasse(match_ccnts)
+			var match_xys=doc_curpoint.ed.GetXYEnMasse(match_ccnts)
 			for(var pmatch=p0;pmatch<this.m_backward_matches.length;pmatch+=3){
 				var ccnt_id=this.m_backward_matches[pmatch]
 				//if(ccnt_id>=ccnt_merged_anyway){current_id=-1-(pmatch/3);continue;}
-				var y_id=match_xys[(match_ccnts.length-1-(pmatch-p0)/3)*2+1];//doc.ed.XYFromCcnt(ccnt_id).y
+				var y_id=match_xys[(match_ccnts.length-1-(pmatch-p0)/3)*2+1];//doc_curpoint.ed.XYFromCcnt(ccnt_id).y
 				var y_id0=Math.max(y_id-hc*this.m_context_size,0),y_id1=Math.min(y_id+hc*(this.m_context_size+1),ytot)
 				if(y_id1>current_y0-eps){
 					//merge
@@ -1445,7 +1579,7 @@ var find_context_prototype={
 					current_y1=y_id1
 					current_visual_y-=y_id1-y_id0+edstyle.find_item_separation
 				}
-				//ccnt_merged_anyway=doc.ed.SeekXY(0,y_id)
+				//ccnt_merged_anyway=doc_curpoint.ed.SeekXY(0,y_id)
 			}
 			this.m_merged_y_windows_backward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
 			//this.m_mergable_ccnt_backward=ccnt_merged_anyway
@@ -1471,86 +1605,159 @@ var find_context_prototype={
 			}
 			UI.Refresh()
 		}
-		if(find_scroll_y+find_shared_h>this.m_y_extent_forward-h_safety_internal&&!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
-			var p0=this.m_forward_matches.length
-			if(this.m_forward_search_hack){
-				var matches=this.m_forward_search_hack
-				this.m_forward_search_hack=undefined
-				for(var i=0;i<matches.length;i+=2){
-					this.ReportMatchForward(doc,matches[i+0],matches[i+1])
+		var FORWARD_BUDGET=262144;
+		for(;;){
+			//repeate forward search for small files in global mode
+			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+				if(this.m_repo_path&&!this.m_repo_files){
+					var repo=g_repo_list[this.m_repo_path]
+					if(!repo.is_parsing){
+						this.m_repo_files=repo.files.filter(function(fn){return !UI.ED_GetFileLanguage(fn).is_binary});
+						this.m_p_repo_files=0;
+						this.m_temp_documents=[];
+						this.m_doc_ordering={};
+						for(var i=0;i<this.m_repo_files.length;i++){
+							this.m_doc_ordering[this.m_repo_files[i]]=i;
+						}
+					}
 				}
-				this.m_is_just_reset=1;
-				this.m_forward_frontier=-1
-				UI.InvalidateCurrentFrame();
-			}else{
-				this.m_forward_frontier=UI.ED_Search(doc.ed,this.m_forward_frontier,1,this.m_needle,this.m_flags,262144,this.ReportMatchForward.bind(this,doc),this);
-				if(UI.IsSearchFrontierCompleted(this.m_forward_frontier)&&(this.m_flags&UI.SEARCH_FLAG_GLOBAL)){
-					//searching beyond the current file
-					//!?
+				if(this.m_repo_files&&UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
+					if(!this.m_search_doc&&this.m_p_repo_files<this.m_repo_files.length){
+						//try to search beyond the current file, keep doc in m_temp_documents
+						var doc_next=UI.OpenCodeEditorDocument(this.m_repo_files[this.m_p_repo_files]);
+						this.m_p_repo_files++;
+						this.m_search_doc=doc_next;
+						if(!doc_next.ed){doc_next.Init();}
+						this.m_temp_documents.push(doc_next)
+					}
+					if(this.m_search_doc&&!this.m_search_doc.ed.hfile_loading){
+						//we could start searching!
+						this.m_forward_frontier=0;
+					}
 				}
 			}
-			//var ccnt_merged_anyway=this.m_mergable_ccnt_forward
-			var current_y1=this.m_merged_y_windows_forward.pop()
-			var current_y0=this.m_merged_y_windows_forward.pop()
-			var current_visual_y=this.m_merged_y_windows_forward.pop()
-			var current_id=this.m_merged_y_windows_forward.pop()
-			current_y1+=current_y0
-			var match_ccnts=[];
-			for(var pmatch=p0;pmatch<this.m_forward_matches.length;pmatch+=3){
-				match_ccnts.push(this.m_forward_matches[pmatch])
-			}
-			var match_xys=doc.ed.GetXYEnMasse(match_ccnts)
-			for(var pmatch=p0;pmatch<this.m_forward_matches.length;pmatch+=3){
-				var ccnt_id=this.m_forward_matches[pmatch]
-				//if(ccnt_id<=ccnt_merged_anyway){continue;}
-				var y_id=match_xys[(pmatch-p0)/3*2+1];//doc.ed.XYFromCcnt(ccnt_id).y
-				var y_id0=Math.max(y_id-hc*this.m_context_size,0),y_id1=Math.min(y_id+hc*(this.m_context_size+1),ytot)
-				if(y_id0<current_y1+eps){
-					//merge
-					current_y1=y_id1
+			if((find_scroll_y+find_shared_h>this.m_y_extent_forward-h_safety_internal||(this.m_flags&UI.SEARCH_FLAG_GLOBAL))&&
+			!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
+				var doc_forward_search=(this.m_flags&UI.SEARCH_FLAG_GLOBAL)?this.m_search_doc:doc_curpoint;
+				ccnt_tot=doc_forward_search.ed.GetTextSize()
+				ytot=doc_forward_search.ed.XYFromCcnt(ccnt_tot).y+doc_forward_search.ed.GetCharacterHeightAt(ccnt_tot);
+				var p0=this.m_forward_matches.length
+				if(this.m_forward_search_hack){
+					var matches=this.m_forward_search_hack
+					this.m_forward_search_hack=undefined
+					for(var i=0;i<matches.length;i+=2){
+						this.ReportMatchForward(doc_forward_search,matches[i+0],matches[i+1])
+					}
+					this.m_is_just_reset=1;
+					this.m_forward_frontier=-1
+					UI.InvalidateCurrentFrame();
 				}else{
-					this.m_merged_y_windows_forward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
-					current_visual_y+=current_y1-current_y0+edstyle.find_item_separation
-					current_id=(pmatch/3)+1
-					current_y0=y_id0
-					current_y1=y_id1
+					this.m_forward_frontier=UI.ED_Search(doc_forward_search.ed,this.m_forward_frontier,1,this.m_needle,this.m_flags,FORWARD_BUDGET,this.ReportMatchForward.bind(this,doc_forward_search),this);
+					if(UI.IsSearchFrontierCompleted(this.m_forward_frontier)&&(this.m_flags&UI.SEARCH_FLAG_GLOBAL)){
+						//clear out m_search_doc to open the next file
+						this.m_search_doc=undefined;
+						this.m_forward_frontier=-1;
+						FORWARD_BUDGET-=doc_forward_search.ed.GetTextSize()*((this.m_flags&UI.SEARCH_FLAG_REGEXP)?16:1);
+						FORWARD_BUDGET-=4096;
+					}else{
+						FORWARD_BUDGET=-1;
+					}
 				}
-				//ccnt_merged_anyway=doc.ed.SeekXY(1e17,y_id)
-			}
-			this.m_merged_y_windows_forward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
-			//this.m_mergable_ccnt_forward=ccnt_merged_anyway
-			this.m_merged_y_windows_backward[0]=this.m_merged_y_windows_forward[0]
-			this.m_merged_y_windows_backward[1]=this.m_merged_y_windows_forward[1]
-			this.m_merged_y_windows_backward[2]=this.m_merged_y_windows_forward[2]
-			this.m_merged_y_windows_backward[3]=this.m_merged_y_windows_forward[3]
-			this.m_y_extent_forward=current_visual_y+current_y1-current_y0
-			if(this.m_home_end=='end'){
-				this.m_current_point=(this.m_forward_matches.length/3)
-				if(UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
-					this.m_home_end=undefined
+				//var ccnt_merged_anyway=this.m_mergable_ccnt_forward
+				var current_y1=this.m_merged_y_windows_forward.pop()
+				var current_y0=this.m_merged_y_windows_forward.pop()
+				var current_visual_y=this.m_merged_y_windows_forward.pop()
+				var current_id=this.m_merged_y_windows_forward.pop()
+				current_y1+=current_y0
+				var match_ccnts=[];
+				for(var pmatch=p0;pmatch<this.m_forward_matches.length;pmatch+=3){
+					match_ccnts.push(this.m_forward_matches[pmatch])
 				}
-			}
-			if(this.m_home_end=='init'){
-				if(this.m_forward_matches.length>0&&!((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&!this.m_needle)){
-					this.m_current_point=1
-					this.m_home_end=undefined
-				}else if(UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
-					this.m_home_end=undefined
+				var match_xys=doc_forward_search.ed.GetXYEnMasse(match_ccnts)
+				for(var pmatch=p0;pmatch<this.m_forward_matches.length;pmatch+=3){
+					var ccnt_id=this.m_forward_matches[pmatch]
+					//if(ccnt_id<=ccnt_merged_anyway){continue;}
+					var y_id=match_xys[(pmatch-p0)/3*2+1];//doc_forward_search.ed.XYFromCcnt(ccnt_id).y
+					var y_id0=Math.max(y_id-hc*this.m_context_size,0),y_id1=Math.min(y_id+hc*(this.m_context_size+1),ytot)
+					if(y_id0<current_y1+eps&&(!(this.m_flags&UI.SEARCH_FLAG_GLOBAL)||this.m_forward_matches[pmatch+2]==this.m_forward_matches[pmatch+(2-3)])){
+						//merge
+						current_y1=y_id1
+					}else{
+						if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)&&current_id==0){
+							//we don't want the zero-th thing in a global search
+						}else{
+							this.m_merged_y_windows_forward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
+							current_visual_y+=current_y1-current_y0+edstyle.find_item_separation
+						}
+						current_id=(pmatch/3)+1
+						current_y0=y_id0
+						current_y1=y_id1
+					}
+					//ccnt_merged_anyway=doc_forward_search.ed.SeekXY(1e17,y_id)
 				}
+				this.m_merged_y_windows_forward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
+				//this.m_mergable_ccnt_forward=ccnt_merged_anyway
+				this.m_merged_y_windows_backward[0]=this.m_merged_y_windows_forward[0]
+				this.m_merged_y_windows_backward[1]=this.m_merged_y_windows_forward[1]
+				this.m_merged_y_windows_backward[2]=this.m_merged_y_windows_forward[2]
+				this.m_merged_y_windows_backward[3]=this.m_merged_y_windows_forward[3]
+				this.m_y_extent_forward=current_visual_y+current_y1-current_y0
+				if(this.m_home_end=='end'){
+					this.m_current_point=(this.m_forward_matches.length/3)
+					if(this.IsForwardSearchCompleted()){
+						this.m_home_end=undefined
+					}
+				}
+				if(this.m_home_end=='init'){
+					if(this.m_forward_matches.length>0&&!((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&!this.m_needle)){
+						this.m_current_point=1
+						this.m_home_end=undefined
+					}else if(this.IsForwardSearchCompleted()){
+						this.m_home_end=undefined
+					}
+				}
+				UI.Refresh()
+			}else{
+				break;
 			}
-			UI.Refresh()
+			if(!(this.m_flags&UI.SEARCH_FLAG_GLOBAL)||!(FORWARD_BUDGET>0)){break;}
 		}
 		var p0=this.BisectFindItems(find_scroll_y-h_safety)
 		var p1=this.BisectFindItems(find_scroll_y+find_shared_h+h_safety)
 		if(p0==-((this.m_merged_y_windows_backward.length>>2)-1)){
 			//BOF
 			var s_bof_message;
-			if(!UI.IsSearchFrontierCompleted(this.m_backward_frontier)){
-				s_bof_message=UI._("Searching @1%").replace("@1",((1-UI.GetSearchFrontierCcnt(this.m_backward_frontier)/ccnt_tot)*100).toFixed(0))
-			}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!=undefined){
-				s_bof_message=UI._("Go to line @1").replace("@1",this.m_goto_line_number.toString())
+			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+				if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
+					ccnt_tot=this.m_search_doc.ed.GetTextSize()
+					s_bof_message=UI.Format("Searching '@1' @2%",
+						this.m_search_doc.m_file_name,
+						((UI.GetSearchFrontierCcnt(this.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
+				}else{
+					if(!this.m_repo_path){
+						s_bof_message=UI._("'@1' is not a part of any known project").replace("@1",this.m_base_file)
+					}else if(!this.m_repo_files){
+						s_bof_message=UI._("Listing project files...")
+					}else if(this.m_search_doc&&this.m_search_doc.ed.hfile_loading){
+						s_bof_message=UI.Format("Loading '@1' @2%",
+							this.m_search_doc.m_file_name,
+							(this.m_search_doc.ed.hfile_loading.progress*100).toFixed(0));
+					}else if(!this.m_search_doc&&this.m_p_repo_files<this.m_repo_files.length){
+						s_bof_message=UI.Format("Loading '@1' @2%",
+							this.m_repo_files[this.m_p_repo_files],
+							"0");
+					}else{
+						s_bof_message=UI._("All files searched")
+					}
+				}
 			}else{
-				s_bof_message=UI._("No more '@1' above".replace("@1",this.m_needle))
+				if(!UI.IsSearchFrontierCompleted(this.m_backward_frontier)){
+					s_bof_message=UI._("Searching @1%").replace("@1",((1-UI.GetSearchFrontierCcnt(this.m_backward_frontier)/ccnt_tot)*100).toFixed(0))
+				}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!=undefined){
+					s_bof_message=UI._("Go to line @1").replace("@1",this.m_goto_line_number.toString())
+				}else{
+					s_bof_message=UI._("No more '@1' above".replace("@1",this.m_needle))
+				}
 			}
 			var text_dim=UI.MeasureText(edstyle.find_message_font,s_bof_message)
 			var y=this.m_y_extent_backward-find_scroll_y-h_bof_eof_message
@@ -1573,6 +1780,11 @@ var find_context_prototype={
 			}).h_expand;
 			find_scroll_y-=h_expand*0.5
 			//draw the shadow
+			var doc_render=this.GetMatchDoc(find_item_i.id);
+			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+				ccnt_tot=doc_render.ed.GetTextSize()
+				ytot=doc_render.ed.XYFromCcnt(ccnt_tot).y+doc_render.ed.GetCharacterHeightAt(ccnt_tot);
+			}
 			var doc_h=find_item_i.shared_h+h_expand
 			var doc_scroll_y=Math.max(Math.min(find_item_i.scroll_y-h_expand*0.5,ytot-doc_h),0)
 			var y=find_item_i.visual_y-find_scroll_y-h_expand*0.5;
@@ -1584,15 +1796,28 @@ var find_context_prototype={
 					border_width:-edstyle.find_item_shadow_size})
 			UI.PopCliprect()
 			//draw the main part
-			doc.RenderWithLineNumbers(
+			doc_render.RenderWithLineNumbers(
 				find_scroll_x,doc_scroll_y,
-				0,find_item_i.visual_y-find_scroll_y-h_expand*0.5,
+				0,y,
 				w_find_items,doc_h,0)
+			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+				var fn_display=IO.NormalizeFileName(doc_render.m_file_name,1);
+				var s_repo_path=this.m_repo_path;
+				if(doc_render.m_file_name.length>s_repo_path.length+1&&doc_render.m_file_name.substr(0,s_repo_path.length)==s_repo_path){
+					fn_display=fn_display.substr(s_repo_path.length+1);
+				}
+				var text_dim=UI.MeasureText(edstyle.find_message_font,fn_display)
+				W.Text("",{
+					x:(w_find_items-4-text_dim.w),y:y,
+					font:edstyle.find_message_font,color:edstyle.editor_style.color_symbol,
+					text:fn_display})
+			}
+			var y_clipped=Math.max(y,0);
 			W.Region("R_find_item_"+i.toString(),{
-				x:0,y:find_item_i.visual_y-find_scroll_y-h_expand*0.5,
-				w:w_find_items,h:doc_h,
+				x:0,y:y_clipped,
+				w:w_find_items,h:Math.min(y+doc_h,h_rendering/edstyle.find_item_scale)-y_clipped,
 				owner:this,
-				doc:doc,
+				doc:doc_render,
 				scroll_x:find_scroll_x,
 				scroll_y:doc_scroll_y,
 			},find_item_region_prototype)
@@ -1611,9 +1836,32 @@ var find_context_prototype={
 			//EOF
 			var s_eof_message;
 			if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
-				s_eof_message=UI._("Searching @1%").replace("@1",((UI.GetSearchFrontierCcnt(this.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
+				if(this.m_search_doc){
+					ccnt_tot=this.m_search_doc.ed.GetTextSize()
+					s_eof_message=UI.Format("Searching '@1' @2%",
+						this.m_search_doc.m_file_name,
+						((UI.GetSearchFrontierCcnt(this.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
+				}else{
+					s_eof_message=UI._("Searching @1%").replace("@1",((UI.GetSearchFrontierCcnt(this.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
+				}
 			}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!=undefined){
 				s_eof_message=UI._("Go to line @1").replace("@1",this.m_goto_line_number.toString())
+			}else if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)){
+				if(!this.m_repo_path){
+					s_eof_message=UI._("'@1' is not a part of any known project").replace("@1",this.m_base_file)
+				}else if(!this.m_repo_files){
+					s_eof_message=UI._("Listing project files...")
+				}else if(this.m_search_doc&&this.m_search_doc.ed.hfile_loading){
+					s_eof_message=UI.Format("Loading '@1' @2%",
+						this.m_search_doc.m_file_name,
+						(this.m_search_doc.ed.hfile_loading.progress*100).toFixed(0));
+				}else if(!this.m_search_doc&&this.m_p_repo_files<this.m_repo_files.length){
+					s_eof_message=UI.Format("Loading '@1' @2%",
+						this.m_repo_files[this.m_p_repo_files],
+						"0");
+				}else{
+					s_eof_message=UI._("All files searched")
+				}
 			}else{
 				s_eof_message=UI._("No more '@1' below").replace("@1",this.m_needle)
 			}
@@ -1685,13 +1933,20 @@ var find_context_prototype={
 		return undefined
 	},
 	BisectMatches:function(doc,ccnt){
+		var docid=(this.m_doc_ordering?this.m_doc_ordering[doc.m_file_name]:0);
 		var l0=-(this.m_backward_matches.length/3)
+		//if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)&&this.m_forward_matches.length>0){
+		//	l0=1;
+		//}
 		var l=l0
 		var r=(this.m_forward_matches.length/3)
 		while(l<=r){
 			var m=(l+r)>>1
 			var ccnt_m=this.GetMatchCcnt(m,0)
-			if(ccnt_m<=ccnt){
+			var doc_m=this.GetMatchDoc(m)
+			var docid_m=(this.m_doc_ordering?this.m_doc_ordering[doc_m.m_file_name]:0);
+			//print(m,docid_m,doc_m.m_file_name,docid_m,doc.m_file_name,docid)
+			if(docid_m<docid||docid_m==docid&&ccnt_m<=ccnt){
 				l=m+1;
 			}else{
 				r=m-1;
@@ -1733,6 +1988,9 @@ var find_context_prototype={
 		var renderer=doc.GetRenderer();
 		var sel=doc.GetSelection();
 		renderer.ShowRange(doc.ed,sel[0],sel[1]);
+		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+			UI.OpenEditorWindow(doc.m_file_name);
+		}
 	},
 };
 
@@ -1745,9 +2003,9 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		m_original_frontier:ccnt1,
 		m_is_just_reset:1,
 		m_forward_matches:[],
-		m_forward_frontier:ccnt1,
+		m_forward_frontier:(flags&UI.SEARCH_FLAG_GLOBAL)?-1:ccnt1,
 		m_backward_matches:[],
-		m_backward_frontier:ccnt1,
+		m_backward_frontier:(flags&UI.SEARCH_FLAG_GLOBAL)?-1:ccnt1,
 		m_highlight_ranges:[],
 		m_locators:[],
 		m_owner:obj,
@@ -1769,6 +2027,11 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		m_y_extent_backward:0,
 		m_y_extent_forward:0,
 	}
+	if(flags&UI.SEARCH_FLAG_GLOBAL){
+		var spath_repo=DetectRepository(doc.m_file_name);
+		ctx.m_repo_path=spath_repo;
+		ctx.m_base_file=doc.m_file_name;
+	}
 	ctx.__proto__=find_context_prototype;
 	var y_id=doc.ed.XYFromCcnt(ccnt1).y
 	var y_id0=Math.max(y_id-hc*ctx.m_context_size,0),y_id1=Math.min(y_id+hc*(ctx.m_context_size+1),ytot)
@@ -1785,119 +2048,6 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 
 W.CodeEditorWidget_prototype={
 	m_tabswitch_count:{},
-	OnEditorCreate:function(){
-		this.m_tabswitch_count=((this.file_name&&UI.m_ui_metadata[this.file_name]||{}).m_tabswitch_count||{});
-		/////////////////
-		var doc=this.doc
-		doc.StartLoading(this.file_name)
-		doc.AddEventHandler('selectionChange',function(){
-			var obj=this.owner
-			if(!obj){return;}
-			var show_replace_hint=0
-			if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
-				var ccnt=this.sel1.ccnt
-				var ctx=obj.m_current_find_context;
-				var match_id=ctx.BisectMatches(this,ccnt)
-				if(match_id){
-					var match_ccnt0=ctx.GetMatchCcnt(match_id,0)
-					var match_ccnt1=ctx.GetMatchCcnt(match_id,1)
-					if(match_ccnt0<=ccnt&&ccnt<=match_ccnt1&&match_ccnt0<=this.sel0.ccnt&&this.sel0.ccnt<=match_ccnt1){
-						show_replace_hint=1
-					}
-				}
-			}
-			if(show_replace_hint){
-				obj.CreateNotification({
-					id:'replace_hint',icon:'换',text:['Edit the match to start replacing'].join("\n")
-				},"quiet")
-			}else{
-				obj.DismissNotification('replace_hint')
-			}
-			UI.g_goto_definition_context=undefined;
-			this.m_hide_prev_next_buttons=1;
-		})
-		doc.AddEventHandler('beforeEdit',function(ops){
-			var obj=this.owner
-			if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
-				var ctx=obj.m_current_find_context;
-				var match_id=ctx.BisectMatches(this,ops[0])
-				if(match_id){
-					var match_ccnt0=ctx.GetMatchCcnt(match_id,0)
-					var match_ccnt1=ctx.GetMatchCcnt(match_id,1)
-					var intersected=1;
-					for(var i=0;i<ops.length;i+=3){
-						var ccnt0_i=ops[i]
-						var ccnt1_i=ops[i]+ops[i+1]
-						if(!(ccnt0_i<=match_ccnt1&&ccnt1_i>=match_ccnt0)){
-							intersected=0;
-							break
-						}
-						//m_user_just_typed_char is updated after this, we can test it here for the previous state
-						if(this.m_user_just_typed_char&&ccnt0_i==match_ccnt1){
-							//the user types a new copy of the needle, then continues typing
-							//it SHOULD NOT count as an auto-replace attempt
-							intersected=0;
-							break
-						}
-					}
-					if(intersected){
-						//start replacing - *every* op intersects with the match...
-						obj.SetReplacingContext(match_ccnt0,match_ccnt1)
-					}else{
-						obj.m_current_find_context.m_no_more_replace=1;
-					}
-				}else{
-					if(obj.m_current_find_context){
-						obj.m_current_find_context.m_no_more_replace=1;
-					}
-				}
-			}
-		})
-		doc.AddEventHandler('change',function(){
-			var obj=this.owner
-			if(obj.m_current_find_context){
-				obj.m_current_find_context.Cancel()
-				obj.m_current_find_context=undefined
-			}
-			//obj.m_is_special_document=0
-			var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-			renderer.m_hidden_ranges_prepared=0
-		})
-		doc.AddEventHandler('ESC',function(){
-			var obj=this.owner
-			obj.m_notifications=[]
-			obj.doc.CancelAutoCompletion()
-			obj.doc.m_ac_activated=0
-			this.m_user_just_typed_char=0
-			obj.DestroyReplacingContext();
-			obj.hide_sxs_visualizer=!obj.hide_sxs_visualizer;
-			if(!obj.m_sxs_visualizer){
-				obj.hide_sxs_visualizer=0;
-			}
-			if(obj.m_current_find_context){
-				obj.m_current_find_context.Cancel()
-				obj.m_current_find_context=undefined
-			}
-			obj.m_hide_find_highlight=1
-			UI.g_goto_definition_context=undefined;
-			UI.Refresh()
-			return 1
-		})
-		//current line highlight
-		var hl_items=doc.CreateTransientHighlight({'depth':-100,'color':this.color_cur_line_highlight,'invertible':0});
-		doc.cur_line_p0=hl_items[0]
-		doc.cur_line_p1=hl_items[1]
-		doc.cur_line_hl=hl_items[2]
-		var line_current=doc.GetLC(doc.sel1.ccnt)[0]
-		var ed_caret=doc.GetCaretXY();
-		if(UI.TestOption("show_line_highlight")){
-			doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
-			doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
-		}else{
-			doc.cur_line_p0.ccnt=0;
-			doc.cur_line_p1.ccnt=0;
-		}
-	},
 	OnDestroy:function(){
 		if(this.doc){
 			UI.CloseCodeEditorDocument(this.doc)
@@ -1907,10 +2057,7 @@ W.CodeEditorWidget_prototype={
 	///////////////////////////
 	Reload:function(){
 		this.SaveMetaData()
-		if(this.m_current_find_context){
-			this.m_current_find_context.Cancel()
-			this.m_current_find_context=undefined
-		}
+		this.DestroyFindingContext()
 		this.m_ac_context=undefined
 		if(this.doc){
 			UI.CloseCodeEditorDocument(this.doc);
@@ -1993,12 +2140,15 @@ W.CodeEditorWidget_prototype={
 	////////////////////////////////////
 	//the virtual document doesn't include middle expansion
 	//middle-expand with fixed additional size to make it possible
+	DestroyFindingContext:function(){
+		if(this.m_current_find_context){
+			this.m_current_find_context.Cancel()
+			this.m_current_find_context=undefined
+		}
+	},
 	ResetFindingContext:function(sneedle,flags, force_ccnt){
 		var doc=this.doc
 		var ccnt=(force_ccnt==undefined?doc.sel1.ccnt:force_ccnt)
-		//if(flags&UI.SEARCH_FLAG_GOTO_MODE){
-		//	ccnt=0
-		//}
 		this.m_hide_find_highlight=0
 		if(this.m_current_find_context){
 			if(force_ccnt!=undefined&&
@@ -2008,24 +2158,23 @@ W.CodeEditorWidget_prototype={
 			!(this.m_current_find_context.m_flags&UI.SEARCH_FLAG_FUZZY)){
 				return;
 			}
-			this.m_current_find_context.Cancel()
-			this.m_current_find_context=undefined
 		}
 		if(!sneedle.length&&!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
-			if(this.m_current_find_context){
-				this.m_current_find_context.Cancel()
-			}
-			this.m_current_find_context=undefined
 			//this.m_current_needle=undefined
 			UI.m_ui_metadata.find_state.m_current_needle=""
 			return;
 		}
+		this.DestroyFindingContext()
 		if(!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
 			UI.m_ui_metadata.find_state.m_current_needle=sneedle
 		}
 		var renderer=doc.GetRenderer()
 		var bk_m_enable_hidden=renderer.m_enable_hidden;
 		renderer.m_enable_hidden=((flags&UI.SEARCH_FLAG_HIDDEN)?0:1);
+		if(flags&UI.SEARCH_FLAG_GLOBAL){
+			ccnt=0;
+			force_ccnt=0;
+		}
 		ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt==undefined?doc.sel0.ccnt:ccnt,force_ccnt==undefined?doc.sel1.ccnt:ccnt)
 		ctx.SetRenderingHeight(this.h-this.h_find_bar);
 		this.m_current_find_context=ctx
@@ -2122,10 +2271,7 @@ W.CodeEditorWidget_prototype={
 			}
 		}
 		if(sel[0]<sel[1]){
-			if(this.m_current_find_context){
-				this.m_current_find_context.Cancel()
-				this.m_current_find_context=undefined
-			}
+			this.DestroyFindingContext()
 			UI.m_ui_metadata.find_state.m_current_needle=this.doc.ed.GetText(sel[0],sel[1]-sel[0])
 			if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
 				UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
@@ -2383,7 +2529,7 @@ var ffindbar_plugin=function(){
 		obj.doc.sel0.ccnt=obj.m_sel0_before_find
 		obj.doc.sel1.ccnt=obj.m_sel1_before_find
 		obj.DestroyReplacingContext();
-		var find_flag_mode=(obj.show_find_bar=="goto"?UI.SEARCH_FLAG_GOTO_MODE:0)
+		var find_flag_mode=(obj.show_find_bar&~UI.SEARCH_FLAG_SHOW)
 		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags|find_flag_mode)
 	})
 	//skip zero
@@ -2392,7 +2538,7 @@ var ffindbar_plugin=function(){
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			ctx.m_home_end=undefined;
-			if(ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
+			if(ctx.m_current_point>-((ctx.m_backward_matches.length/3))&&!(ctx.m_current_point==1&&(ctx.m_flags&UI.SEARCH_FLAG_GLOBAL))){
 				ctx.m_current_point--;
 				if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
 					ctx.m_current_point--;
@@ -2468,13 +2614,25 @@ var ffindbar_plugin=function(){
 	})
 	this.AddEventHandler('CTRL+F',function(){
 		var obj=this.find_bar_owner;
-		obj.show_find_bar="find";
+		obj.show_find_bar=UI.SHOW_FIND;
 		this.CallOnChange();
 		UI.Refresh()
 	})
 	this.AddEventHandler('CTRL+G',function(){
 		var obj=this.find_bar_owner;
-		obj.show_find_bar="goto";
+		obj.show_find_bar=UI.SHOW_GOTO;
+		this.CallOnChange();
+		UI.Refresh()
+	})
+	this.AddEventHandler('CTRL+SHIFT+F',function(){
+		var obj=this.find_bar_owner;
+		obj.show_find_bar=UI.SHOW_GLOBAL_FIND;
+		this.CallOnChange();
+		UI.Refresh()
+	})
+	this.AddEventHandler('CTRL+SHIFT+G',function(){
+		var obj=this.find_bar_owner;
+		obj.show_find_bar=UI.SHOW_GLOBAL_GOTO;
 		this.CallOnChange();
 		UI.Refresh()
 	})
@@ -3795,6 +3953,34 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 }
 
 var MAX_PARSABLE_FCALL=4096
+var finvoke_find=function(mode){
+	var obj=this;
+	var sel=obj.doc.GetSelection()
+	obj.show_find_bar=mode;
+	obj.m_sel0_before_find=obj.doc.sel0.ccnt
+	obj.m_sel1_before_find=obj.doc.sel1.ccnt
+	if(sel[0]<sel[1]){
+		UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+		if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
+			UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
+		}
+	}
+	obj.DismissNotification('find_result')
+	obj.DestroyFindingContext()
+	UI.Refresh()
+};
+var finvoke_goto=function(mode){
+	var obj=this;
+	var sel=obj.doc.GetSelection()
+	obj.show_find_bar=mode
+	obj.m_sel0_before_find=obj.doc.sel0.ccnt
+	obj.m_sel1_before_find=obj.doc.sel1.ccnt
+	//if(sel[0]<sel[1]){
+	//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+	//}
+	//UI.m_ui_metadata.find_state.m_current_needle=""
+	UI.Refresh()
+}
 W.CodeEditor=function(id,attrs){
 	var tick0
 	if(UI.enable_timing){
@@ -4237,15 +4423,25 @@ W.CodeEditor=function(id,attrs){
 				}
 				if(!doc){
 					doc=UI.OpenCodeEditorDocument(obj.file_name,obj.m_is_preview);
+					obj.m_tabswitch_count=((obj.file_name&&UI.m_ui_metadata[obj.file_name]||{}).m_tabswitch_count||{});
 					obj.doc=doc;
 				}
 				UI.Keep("doc",{});
+				var was_bound_elsewhere=0;
+				if(doc.owner!=obj){
+					was_bound_elsewhere=1;
+				}
 				doc.owner=obj;
 				var h_editor=h_obj_area-h_top_find;
 				doc.RenderWithLineNumbers(doc.scroll_x,doc.scroll_y,
 					obj.x,obj.y+h_top_find,
 					w_obj_area-w_scrolling_area,
 					h_editor-h_top_find,1);
+				if(was_bound_elsewhere){
+					doc.scroll_x=(doc.scroll_x||0);
+					doc.scroll_y=(doc.scroll_y||0);
+					doc.AutoScroll("center_if_hidden")
+				}
 				var ccnt_tot=doc.ed.GetTextSize()
 				var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot)
 				if(h_editor>ytot){
@@ -4404,7 +4600,7 @@ W.CodeEditor=function(id,attrs){
 				renderer.m_enable_hidden=1
 				if(!current_find_context.m_forward_matches.length&&!current_find_context.m_backward_matches.length&&
 				current_find_context.m_needle.length&&
-				!(current_find_context.m_flags&(UI.SEARCH_FLAG_REGEXP|UI.SEARCH_FLAG_FUZZY|UI.SEARCH_FLAG_GOTO_MODE))){
+				!(current_find_context.m_flags&(UI.SEARCH_FLAG_REGEXP|UI.SEARCH_FLAG_FUZZY|UI.SEARCH_FLAG_GLOBAL|UI.SEARCH_FLAG_GOTO_MODE))){
 					if(UI.IsSearchFrontierCompleted(current_find_context.m_forward_frontier)&&UI.IsSearchFrontierCompleted(current_find_context.m_backward_frontier)){
 						//print("fuzzy search reset")
 						obj.ResetFindingContext(current_find_context.m_needle,current_find_context.m_find_flags|UI.SEARCH_FLAG_FUZZY)
@@ -4475,7 +4671,7 @@ W.CodeEditor=function(id,attrs){
 				UI.PopCliprect()
 				UI.RoundRect({x:obj.x,y:obj.y,w:w_obj_area-w_scrolling_area,h:obj.h_find_bar,
 					color:obj.find_bar_bgcolor})
-				var show_flag_buttons=(obj.show_find_bar!="goto")
+				var show_flag_buttons=!(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)
 				//fuzzy match disclaimer... fade, red search bar with "fuzzy match" written on
 				var rect_bar=UI.RoundRect({
 					x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
@@ -4483,7 +4679,7 @@ W.CodeEditor=function(id,attrs){
 					color:UI.lerp_rgba(obj.find_bar_color,obj.disclaimer_color,(disclaimer_alpha||0)*0.125),
 					round:obj.find_bar_round})
 				var chr_icon='s'.charCodeAt(0);
-				if(obj.show_find_bar=="goto"){
+				if(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE){
 					chr_icon='去'.charCodeAt(0);
 				}else if(disclaimer_alpha>0){
 					chr_icon='糊'.charCodeAt(0);
@@ -4595,9 +4791,9 @@ W.CodeEditor=function(id,attrs){
 				},W.CodeEditor_prototype);
 				if(!previous_find_bar_edit){
 					//the darn buttons do make sense in ctrl+g mode!
-					var find_flag_mode=(obj.show_find_bar=="goto"?UI.SEARCH_FLAG_GOTO_MODE:0)
-					if(UI.m_ui_metadata.find_state.m_current_needle||obj.show_find_bar=="goto"){
-						if(UI.m_ui_metadata.find_state.m_current_needle&&obj.show_find_bar!="goto"){
+					var find_flag_mode=(obj.show_find_bar&~UI.SEARCH_FLAG_SHOW)
+					if(UI.m_ui_metadata.find_state.m_current_needle||(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)){
+						if(UI.m_ui_metadata.find_state.m_current_needle&&!(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)){
 							obj.find_bar_edit.HookedEdit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
 							obj.find_bar_edit.AutoScroll('center')
 						}
@@ -4616,7 +4812,7 @@ W.CodeEditor=function(id,attrs){
 				if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 					W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 						font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-						text:obj.show_find_bar=="goto"?"Function / class / line number":"Search"})
+						text:(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)?"Function / class / line number":"Search"})
 				}
 			}else{
 				//obj.find_bar_edit=undefined;
@@ -4726,26 +4922,9 @@ W.CodeEditor=function(id,attrs){
 				}
 				///////////////////////
 				var menu_search=UI.BigMenu("&Search")
-				var finvoke_find=function(){
-					var sel=obj.doc.GetSelection()
-					obj.show_find_bar="find"
-					obj.m_sel0_before_find=obj.doc.sel0.ccnt
-					obj.m_sel1_before_find=obj.doc.sel1.ccnt
-					if(sel[0]<sel[1]){
-						UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-						if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
-							UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
-						}
-					}
-					obj.DismissNotification('find_result')
-					if(obj.m_current_find_context){
-						obj.m_current_find_context.Cancel()
-						obj.m_current_find_context=undefined
-					}
-					UI.Refresh()
-				};
-				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find})
-				W.Hotkey("",{key:"CTRL+R",action:finvoke_find})
+				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
+				W.Hotkey("",{key:"CTRL+R",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
+				menu_search.AddNormalItem({text:"Find... in project",enable_hotkey:1,key:"CTRL+SHIFT+F",action:finvoke_find.bind(obj,UI.SHOW_GLOBAL_FIND)})
 				menu_search.AddButtonRow({text:"Find previous / next"},[
 					{key:"SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+F3',action:function(){
 						obj.FindNext(-1)
@@ -4772,17 +4951,8 @@ W.CodeEditor=function(id,attrs){
 						function(){obj.DoReplaceFromUI( 1);})
 				}
 				menu_search.AddSeparator();
-				menu_search.AddNormalItem({text:"&Go to...",icon:'去',enable_hotkey:1,key:"CTRL+G",action:function(){
-					var sel=obj.doc.GetSelection()
-					obj.show_find_bar="goto"
-					obj.m_sel0_before_find=obj.doc.sel0.ccnt
-					obj.m_sel1_before_find=obj.doc.sel1.ccnt
-					//if(sel[0]<sel[1]){
-					//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-					//}
-					//UI.m_ui_metadata.find_state.m_current_needle=""
-					UI.Refresh()
-				}})
+				menu_search.AddNormalItem({text:"&Go to...",icon:'去',enable_hotkey:1,key:"CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GOTO)})
+				menu_search.AddNormalItem({text:"Go to... in project",enable_hotkey:1,key:"CTRL+SHIFT+G",action:finvoke_goto.bind(obj,UI.SHOW_GLOBAL_GOTO)})
 				var neib=doc.ed.GetUtf8CharNeighborhood(doc.sel1.ccnt);
 				if(UI.g_goto_definition_context&&obj.m_prev_next_button_drawn!=UI.m_frame_tick){
 					//render the current gotodef context, and put up #/# text as notification
@@ -5360,7 +5530,7 @@ UI.RecordCursorHistroy=function(doc,sreason){
 	}
 	var prev_ccnt0=doc.sel0.ccnt
 	var prev_ccnt1=doc.sel1.ccnt
-	UI.g_cursor_history_undo.push({file_name:doc.owner.file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:sreason})
+	UI.g_cursor_history_undo.push({file_name:doc.m_file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:sreason})
 	//print(JSON.stringify(UI.g_cursor_history_undo))
 	UI.g_cursor_history_test_same_reason=1
 }
@@ -5442,7 +5612,13 @@ Language.Register({
 Language.Register({
 	name_sort_hack:' Binary blob',name:'Binary',parser:'none',
 	is_binary:1,
-	extensions:['bin','bz2','zip','exe','dll','lib','o','png','jpg'],
+	extensions:[
+		'bin',
+		'bz2','zip',
+		'exe','dll','lib','o',
+		"png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr",
+		"mp4","mpg","mpeg","h264","avi","mov","rm","rmvb",
+		'ttf','otf'],
 	////////////////////////
 	rules:function(lang){
 		lang.DefineDefaultColor("color")

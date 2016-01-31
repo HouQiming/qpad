@@ -658,7 +658,9 @@ UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	UI.RegisterCodeEditorPersistentMember("m_compiler_name")
 	this.AddEventHandler('selectionChange',function(){
-		this.owner.DismissNotification("double_compilation")
+		if(this.owner){
+			this.owner.DismissNotification("double_compilation")
+		}
 	})
 	this.AddEventHandler('menu',function(){
 		var compiler=GetCompiler(this)
@@ -667,29 +669,37 @@ UI.RegisterEditorPlugin(function(){
 		var doc=this
 		menu_run.AddNormalItem({text:"&Compile",enable_hotkey:1,key:"F7",action:function(){
 			if(UI.already_compiling){
-				doc.owner.CreateNotification({
-					id:"double_compilation",icon:'警',
-					text:"Already compiling something else",
-				})
+				if(doc.owner){
+					doc.owner.CreateNotification({
+						id:"double_compilation",icon:'警',
+						text:"Already compiling something else",
+					})
+				}
 				return;
 			}
 			if(!UI.top.app.document_area.SaveAll()){return;}
-			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
-			doc.owner.hide_sxs_visualizer=0;
+			if(doc.owner){
+				doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
+				doc.owner.hide_sxs_visualizer=0;
+			}
 			UI.ClearCompilerErrors()
 			compiler.make(doc,0)
 		}})
 		menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
 			if(UI.already_compiling){
-				doc.owner.CreateNotification({
-					id:"double_compilation",icon:'警',
-					text:"Already compiling something else",
-				})
+				if(doc.owner){
+					doc.owner.CreateNotification({
+						id:"double_compilation",icon:'警',
+						text:"Already compiling something else",
+					})
+				}
 				return;
 			}
 			if(!UI.top.app.document_area.SaveAll()){return;}
-			doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
-			doc.owner.hide_sxs_visualizer=0;
+			if(doc.owner){
+				doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
+				doc.owner.hide_sxs_visualizer=0;
+			}
 			UI.ClearCompilerErrors()
 			compiler.make(doc,1)
 		}})
