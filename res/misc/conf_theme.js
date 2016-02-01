@@ -163,6 +163,9 @@ UI.CustomTheme=function(){
 			menu_bar_border_color:L?0xffaaaaaa:0xff444444,
 			menu_bar_shadow_size:8,
 			menu_bar_shadow_color:0xaa000000,
+			menu_bar_caption:{
+				text_color:L?0xffaaaaaa:0xff7f7f7f,
+			},
 			menu_button_style:{
 				transition_dt:0.25,
 				round:0,padding:0,

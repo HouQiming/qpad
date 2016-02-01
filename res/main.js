@@ -508,15 +508,18 @@ UI.Application=function(id,attrs){
 		UI.End();
 	UI.End();
 	if(!g_app_inited){
-		var workspace=UI.m_ui_metadata["<workspace>"]
+		var workspace=UI.m_ui_metadata["<workspace_v2>"]
 		var fn_current_tab=UI.m_ui_metadata["<current_tab>"]
 		if(workspace){
 			var current_tab_id=undefined
 			for(var i=0;i<workspace.length;i++){
 				//UI.NewCodeEditorTab(workspace[i])
-				UI.OpenEditorWindow(workspace[i])
+				UI.OpenEditorWindow(workspace[i].file_name)
+				var item=UI.top.app.document_area.items[UI.top.app.document_area.items.length-1];
+				item.z_order=workspace[i].z_order;
+				item.area_name=workspace[i].area_name;
 				if(workspace[i]==fn_current_tab){
-					current_tab_id=i;
+					current_tab_id=UI.top.app.document_area.length-1;
 				}
 			}
 			if(current_tab_id!=undefined){
@@ -552,7 +555,7 @@ UI.Application=function(id,attrs){
 		//UI.UpdateNewDocumentSearchPath()
 		UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
 		UI.m_previous_document=undefined
-		fopen_brand_new();
+		UI.OpenFileListWindow();
 		UI.InvalidateCurrentFrame()
 		UI.Refresh()
 		app.quit_on_zero_tab=1;

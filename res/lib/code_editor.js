@@ -5636,6 +5636,7 @@ UI.OnApplicationSwitch=function(){
 		}
 	}
 	////////////////////
+	//todo: unshown editors?
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab=UI.g_all_document_windows[i]
 		if(obj_tab.main_widget&&obj_tab.main_widget.doc){

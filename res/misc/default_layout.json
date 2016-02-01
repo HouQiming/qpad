@@ -1,0 +1,15 @@
+{
+	"type":"hsplit",
+	"split":0.2,
+	"children":[
+		{
+			"type":"vsplit",
+			"split":0.75,
+			"children":[
+				{"type":"util","name":"v_tools"},
+				{"type":"util","name":"h_tools"}
+			]
+		},
+		{"type":"doc","name":"doc_default"}
+	]
+}

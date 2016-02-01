@@ -87,16 +87,36 @@ UI.GetOption=function(stable_name,default_value){
 //}
 
 ////////////////////////////////////
+UI.g_current_z_value=0;
 UI.SaveWorkspace=function(){
-	//workspace
-	var workspace=[]
+	//compact z values
+	var z_values=[];
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var wnd=UI.g_all_document_windows[i]
+		z_values.push(wnd.z_order);
+	}
+	z_values.sort();
+	UI.g_current_z_value=0;
+	var ztran={};
+	for(var i=0;i<z_values.length;i++){
+		if(!i||z_values[i]!=z_values[i-1]){
+			ztran[z_values[i]]=UI.g_current_z_value;
+			UI.g_current_z_value++;
+		}
+	}
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var wnd=UI.g_all_document_windows[i]
+		wnd.z_order=ztran[wnd.z_order];
+	}
+	//save workspace
+	var workspace=[];
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var wnd=UI.g_all_document_windows[i]
 		if(wnd.main_widget&&wnd.main_widget.m_is_special_document){continue;}
 		if((wnd.main_widget&&wnd.main_widget.file_name||wnd.file_name).indexOf('<')>=0){continue;}
-		workspace.push(wnd.file_name)
+		workspace.push({file_name:wnd.file_name,z_order:(wnd.z_order||0),area_name:wnd.area_name})
 	}
-	UI.m_ui_metadata["<workspace>"]=workspace
+	UI.m_ui_metadata["<workspace_v2>"]=workspace
 	var obj_current_tab=UI.g_all_document_windows[UI.top.app.document_area.current_tab_id]
 	if(obj_current_tab){
 		var fn_current_tab=obj_current_tab.file_name
