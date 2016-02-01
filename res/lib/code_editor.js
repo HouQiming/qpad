@@ -1666,7 +1666,8 @@ var find_context_prototype={
 			}
 			UI.Refresh()
 		}
-		var FORWARD_BUDGET=262144;
+		//var FORWARD_BUDGET=262144;
+		var FORWARD_BUDGET=1048576;
 		for(;;){
 			//repeate forward search for small files in global mode
 			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
