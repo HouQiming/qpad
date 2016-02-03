@@ -319,15 +319,17 @@ W.TabbedDocument_prototype={
 		var caption_areas=this.m_dragging_caption_areas;
 		if(caption_areas==undefined){return;}
 		var target_position=undefined;
+		this.m_dragging_mouse_x=event.x;
+		this.m_dragging_mouse_y=event.y;
 		for(var i=0;i<caption_areas.length;i++){
 			var area_i=caption_areas[i];
-			if(segDist(area_i.y,area_i.y+area_i.h,event.y)<obj.caption_drag_tolerance_y){
+			if(segDist(area_i.y,area_i.y+area_i.h,event.y)<this.caption_drag_tolerance_y){
 				for(var j=0;j<area_i.tabs.length;j++){
 					var tabid_j=area_i.tabs[j];
 					var x0_j=area_i.x0_w_tabs[j*2];
 					var x1_j=x0_j+area_i.x0_w_tabs[j*2+1];
 					var dist=segDist(x0_j,x1_j,event.x);
-					//dist<obj.caption_drag_tolerance_x
+					//dist<this.caption_drag_tolerance_x
 					if(target_position==undefined||target_position.score>dist){
 						//source area / other area
 						var side=0;
@@ -338,11 +340,11 @@ W.TabbedDocument_prototype={
 						}
 						if(side==0){
 							target_position={
-								score:dist,tabid:tabid_j,
+								score:dist,area_id:i,tabid:tabid_j,
 							}
 						}else{
 							target_position={
-								score:dist,tabid:this.items.length,
+								score:dist,area_id:i,tabid:this.items.length,
 							}
 						}
 					}
@@ -371,7 +373,7 @@ W.TabbedDocument_prototype={
 						}
 					}
 					target_position={
-						score:dist,name:area_i.name,
+						score:dist,name:area_i.name,area_id:i,
 						split_side:side,
 					}
 				}
@@ -384,15 +386,54 @@ W.TabbedDocument_prototype={
 			this.m_dragging_tab_moved=1;
 		}
 		this.m_dragging_tab_target=target_position;
+		//create caption rendering context
+		//active tab, tar-area after, src-area after potential split shade
+		var tab_label_style=UI.default_styles.tab_label;
+		var rendering_caption_areas=[];
+		var tar_added=0;
+		for(var i=0;i<caption_areas.length;i++){
+			var area_i=caption_areas[i];
+			var x_caption=area_i.x;
+			var out_area_i={};out_area_i.__proto__=area_i;
+			out_area_i.x0_w_tabs=[];
+			for(var j=0;j<area_i.tabs.length;j++){
+				var tabid_j=area_i.tabs[j];
+				if(target_position&&tabid_j==this.m_dragging_tab_src_tabid){
+					out_area_i.x0_w_tabs[j*2]=undefined;
+					out_area_i.x0_w_tabs[j*2+1]=undefined;
+					continue
+				}else if(target_position&&!tar_added&&i==target_position.area_id&&target_position.tabid!=undefined&&tabid_j>=target_position.tabid){
+					//add target
+					var w_src_at_target=UI.MeasureText(tab_label_style.font,this.items[this.m_dragging_tab_src_tabid].title).w+tab_label_style.padding*2;
+					x_caption+=w_src_at_target;
+				}
+				var w_j=UI.MeasureText(tab_label_style.font,this.items[tabid_j].title).w+tab_label_style.padding*2;
+				out_area_i.x0_w_tabs[j*2]=x_caption;
+				out_area_i.x0_w_tabs[j*2+1]=w_j;
+				x_caption+=w_j;
+			}
+			rendering_caption_areas[i]=out_area_i;
+		}
+		this.m_dragging_rendering_caption_areas=rendering_caption_areas;
 		UI.Refresh()
 	},
 	OnTabUp:function(tabid){
 		if(this.m_dragging_caption_areas==undefined){return;}
-		this.m_dragging_caption_areas=undefined
-		if(!this.m_dragging_tab_moved){
+		this.m_dragging_caption_areas=undefined;
+		this.m_dragging_rendering_caption_areas=undefined;
+		if(!this.m_dragging_tab_moved||!this.m_dragging_tab_target){
 			//this.SetTab(tabid)
 		}else{
-			!? this.m_dragging_tab_target
+			//get old names, generate new once
+			var target_position=this.m_dragging_tab_target;
+			if(target_position.split_side){
+				//actually split, shuffle the object
+				!?
+			}else{
+				//put at target_position.tabid
+				!?
+			}
+			return//todo
 			var dstid=this.m_dragging_tab_dst_tabid
 			var srcid=this.m_dragging_tab_src_tabid
 			var item_src=this.items[srcid]
@@ -678,33 +719,85 @@ W.TabbedDocument=function(id,attrs){
 				x_caption+=w_j;
 			}
 		}
-		//render the captions / menu
+		//render the captions
 		//todo: update layout based on dragging status
-		!? //m_dragging_tab_target
-		for(var pass_i=0;pass_i<2;pass_i++){
-			for(var i=0;i<rendered_areas.length;i++){
-				var area_i=rendered_areas[i];
+		if(obj.m_dragging_rendering_caption_areas){
+			var rendering_caption_areas=obj.m_dragging_rendering_caption_areas;
+			//tar-area after, src-area after potential split shade
+			for(var i=0;i<rendering_caption_areas.length;i++){
+				var area_i=rendering_caption_areas[i];
 				if(!(area_i.w>0)){continue;}
 				UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
 				for(var j=0;j<area_i.tabs.length;j++){
-					var tab_j=area_i.tabs[j];
-					if((tab_j==obj.active_tab)==(pass_i==1)){
-						W.TabLabel(tab_j.__global_tab_id,{
-							x_animated:area_i.x0_w_tabs[j*2],y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
-							selected:tab_j==obj.active_tab,
-							title:tab_j.title, tooltip:tab_j.tooltip,
-							hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
-							tabid:tab_j.__global_tab_id,owner:obj})
-					}
+					var tab_j=obj.items[area_i.tabs[j]];
+					if(area_i.tabs[j]==obj.m_dragging_tab_src_tabid){continue;}
+					W.TabLabel(tab_j.__global_tab_id,{
+						x_animated:area_i.x0_w_tabs[j*2],y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
+						selected:tab_j==obj.active_tab,
+						title:tab_j.title, tooltip:tab_j.tooltip,
+						hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
+						tabid:tab_j.__global_tab_id,owner:obj})
 				}
 				UI.PopCliprect();
 			}
+			//active (src) tab
+			var tab_dragging_src=obj.items[obj.m_dragging_tab_src_tabid];
+			var w_src_at_target=UI.MeasureText(tab_label_style.font,tab_dragging_src.title).w+tab_label_style.padding*2;
+			W.TabLabel(tab_dragging_src.__global_tab_id,{
+				x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
+				w:w_src_at_target,h:area_i.h,
+				selected:tab_dragging_src==obj.active_tab,
+				title:tab_dragging_src.title, tooltip:tab_dragging_src.tooltip,
+				hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
+				tabid:tab_dragging_src.__global_tab_id,owner:obj})
+			//splitting shade
+			if(obj.m_dragging_tab_target&&obj.m_dragging_tab_target.split_side){
+				var target_position=obj.m_dragging_tab_target;
+				var box=rendering_caption_areas[target_position.area_id].content_box;
+				var sside=target_position.split_side;
+				var box_shade=undefined
+				if(sside=="left"){
+					box_shade={x:box.x,y:box.y,w:box.w*0.5,h:box.h}
+				}else if(sside=="right"){
+					box_shade={x:box.x+box.w*0.5,y:box.y,w:box.w*0.5,h:box.h}
+				}else if(sside=="up"){
+					box_shade={x:box.x,y:box.y,w:box.w,h:box.h*0.5}
+				}else{
+					UI.assert(sside=="down");
+					box_shade={x:box.x,y:box.y+box.h*0.5,w:box.w,h:box.h*0.5}
+				}
+				if(box_shade){
+					box_shade.color=obj.bgcolor_split_shade;
+					box_shade.border_width=0;
+					UI.RoundRect(box_shade)
+				}
+			}
+		}else{
+			for(var pass_i=0;pass_i<2;pass_i++){
+				for(var i=0;i<rendered_areas.length;i++){
+					var area_i=rendered_areas[i];
+					if(!(area_i.w>0)){continue;}
+					UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
+					for(var j=0;j<area_i.tabs.length;j++){
+						var tab_j=area_i.tabs[j];
+						if((tab_j==obj.active_tab)==(pass_i==1)){
+							W.TabLabel(tab_j.__global_tab_id,{
+								x_animated:area_i.x0_w_tabs[j*2],y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
+								selected:tab_j==obj.active_tab,
+								title:tab_j.title, tooltip:tab_j.tooltip,
+								hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
+								tabid:tab_j.__global_tab_id,owner:obj})
+						}
+					}
+					UI.PopCliprect();
+				}
+			}
+			//save areas for dragging
+			for(var i=0;i<rendered_areas.length;i++){
+				rendered_areas[i].tabs=rendered_areas[i].tabs.map(function(a){return a.__global_tab_id});
+			}
+			obj.m_caption_areas=rendered_areas;
 		}
-		//save areas for dragging
-		for(var i=0;i<rendered_areas.length;i++){
-			rendered_areas[i].tabs=rendered_areas[i].tabs.map(function(a){return a.__global_tab_id});
-		}
-		obj.m_caption_areas=rendered_areas;
 		//show the active-caption as a part of the menu
 		if(obj.m_is_in_menu){
 			//menu *bar* goes *above* the tab labels
@@ -722,7 +815,7 @@ W.TabbedDocument=function(id,attrs){
 					W.Text("",{
 						x:obj.x+w_menu_button+w_menu_bar-dims.w,y:obj.y+(obj.h_caption-dims.h)*0.5,
 						font:tab_label_style.font,text:s_active_title,
-						color:obj.menu_bar_caption.text_color,
+						color:obj.menu_bar_caption_text_color,
 					});
 				UI.PopCliprect();
 				w_menu_bar-=dims.w;
