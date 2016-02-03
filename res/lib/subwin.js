@@ -2,7 +2,7 @@ var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 
 ///////////////////////
-UI.interpolators.tabid=function(a,b,t){return b;}
+UI.interpolators["tabid"]=function(a,b,t){return b;}
 W.TabLabel_prototype={
 	title:"",//initial empty title
 	mouse_state:'out',
@@ -15,7 +15,7 @@ W.TabLabel_prototype={
 		if(this.tabid==undefined){return;}
 		if(event.clicks!=2){
 			UI.CaptureMouse(this);
-			this.owner.OnTabDown(this.tabid,event)
+			this.owner.OnTabDown(this.tabid,event,this.x,this.y)
 		}
 	},
 	OnMouseMove:function(event){
@@ -26,7 +26,7 @@ W.TabLabel_prototype={
 		if(this.tabid==undefined){return;}
 		this.owner.OnTabMove(this.tabid,event)
 		if(event.clicks==2){
-			this.m_dragging_tab_label_x_abs=undefined;
+			this.owner.CancelTabDragging();
 		}else{
 			this.owner.OnTabUp(this.tabid)
 			this.tabid=undefined;
@@ -42,12 +42,14 @@ W.TabLabel_prototype={
 W.TabLabel=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
 	UI.StdStyling(id,obj,attrs, "tab_label",obj.selected?"active":"inactive");
-	if(!attrs.w){
-		obj.text=obj.title;
-		obj.w=UI.MeasureIconText(obj).w;
-	}
+	//if(!attrs.w){
+	//	obj.text=obj.title;
+	//	obj.w=UI.MeasureIconText(obj).w;
+	//}
 	//obj.x+=obj.x_animated
-	obj.x=obj.x_animated;
+	if(attrs.x==undefined){
+		obj.x=obj.x_animated;
+	}
 	UI.StdAnchoring(id,obj);
 	W.PureRegion(id,obj)
 	UI.Begin(obj)
@@ -73,7 +75,7 @@ W.TabLabel=function(id,attrs){
 		W.Text("",{
 			'anchor':'parent','anchor_align':"center",'anchor_valign':"center",
 			'x':0,'y':0,
-			'font':obj.font,'text':obj.text,'color':obj.text_color,
+			'font':obj.font,'text':obj.title,'color':obj.text_color,
 		})
 		if(obj.mouse_state=="over"&&obj.tooltip){
 			W.DrawTooltip(obj)
@@ -107,6 +109,9 @@ var GetTabFileName=function(tab1){
 	if(tab1.main_widget&&tab1.main_widget.file_name){fn=tab1.main_widget.file_name}
 	return fn;
 }
+var segDist=function(x0,x1,x){
+	return x<x0?x0-x:Math.max(x-x1,0);
+};
 W.TabbedDocument_prototype={
 	//closer -> class: OnClose notification and stuff
 	CloseTab:function(tabid,forced){
@@ -284,7 +289,7 @@ W.TabbedDocument_prototype={
 		UI.Refresh()
 	},
 	////////////
-	OnTabDown:function(tabid,event){
+	OnTabDown:function(tabid,event,x_label,y_label){
 		if(event.button==UI.SDL_BUTTON_MIDDLE){
 			this.CloseTab(tabid)
 			return;
@@ -292,42 +297,102 @@ W.TabbedDocument_prototype={
 			this.SetTab(tabid)
 		}
 		//create a current tab label x snapshot
-		this.m_dragging_tab_label_x_abs=this.m_tab_label_x_abs
+		this.m_dragging_caption_areas=this.m_caption_areas;
 		this.m_dragging_tab_moved=0
-		this.m_dragging_tab_x_base=this.scroll_x+event.x;
-		this.m_dragging_tab_x_offset=this.m_dragging_tab_x_base-this.m_dragging_tab_label_x_abs[tabid];
+		this.m_dragging_tab_x_offset=event.x-x_label;
+		this.m_dragging_tab_y_offset=event.y-y_label;
 		this.m_dragging_tab_src_tabid=tabid
-		this.m_dragging_tab_dst_tabid=tabid
-		this.m_dragging_tab_delta=0;
-	},
-	OnTabMove:function(tabid,event){
-		var xs=this.m_dragging_tab_label_x_abs;
-		if(xs==undefined){return;}
-		this.m_dragging_tab_delta=this.scroll_x+event.x-this.m_dragging_tab_x_base
-		var l=0;
-		var r=xs.length-2;
-		var x=this.m_dragging_tab_delta+xs[tabid]+this.m_dragging_tab_x_offset
-		while(l<=r){
-			var m=(l+r)>>1;
-			if(xs[m]<=x){
-				l=m+1;
-			}else{
-				r=m-1;
+		this.m_dragging_tab_target=undefined;
+		/////////////
+		var caption_areas=this.m_dragging_caption_areas;
+		for(var i=0;i<caption_areas.length;i++){
+			var area_i=caption_areas[i];
+			for(var j=0;j<area_i.tabs.length;j++){
+				var tabid_j=area_i.tabs[j];
+				if(tabid_j==tabid){
+					area_i.has_dragging_src=1;
+				}
 			}
 		}
-		if(r<0){r=0;}
-		this.m_dragging_tab_dst_tabid=r
-		if(this.m_dragging_tab_dst_tabid!=tabid){
+	},
+	OnTabMove:function(tabid,event){
+		var caption_areas=this.m_dragging_caption_areas;
+		if(caption_areas==undefined){return;}
+		var target_position=undefined;
+		for(var i=0;i<caption_areas.length;i++){
+			var area_i=caption_areas[i];
+			if(segDist(area_i.y,area_i.y+area_i.h,event.y)<obj.caption_drag_tolerance_y){
+				for(var j=0;j<area_i.tabs.length;j++){
+					var tabid_j=area_i.tabs[j];
+					var x0_j=area_i.x0_w_tabs[j*2];
+					var x1_j=x0_j+area_i.x0_w_tabs[j*2+1];
+					var dist=segDist(x0_j,x1_j,event.x);
+					//dist<obj.caption_drag_tolerance_x
+					if(target_position==undefined||target_position.score>dist){
+						//source area / other area
+						var side=0;
+						if(area_i.has_dragging_src){
+							side=(tabid_j<=this.m_dragging_tab_src_tabid?0:1);
+						}else{
+							side=(event.x<(x0_j+x1_j)*0.5?0:1);
+						}
+						if(side==0){
+							target_position={
+								score:dist,tabid:tabid_j,
+							}
+						}else{
+							target_position={
+								score:dist,tabid:this.items.length,
+							}
+						}
+					}
+				}
+			}
+			//window splitting check - cross-split
+			var box=area_i.content_box;
+			if(box.w>0&&box.h>0){
+				var dist=segDist(box.x,box.x+box.w,event.x)+segDist(box.y,box.y+box.h,event.y);
+				if(target_position==undefined||target_position.score>dist){
+					//source area / other area
+					var fx=(event.x-box.x)/box.w;
+					var fy=(event.y-box.y)/box.h;
+					var side=undefined;
+					if(fx<fy){
+						if(fx<1-fy){
+							side="left";
+						}else{
+							side="down";
+						}
+					}else{
+						if(fx<1-fy){
+							side="up";
+						}else{
+							side="right";
+						}
+					}
+					target_position={
+						score:dist,name:area_i.name,
+						split_side:side,
+					}
+				}
+			}
+		}
+		if(target_position&&target_position.tabid==this.m_dragging_tab_src_tabid){
+			target_position=undefined;
+		}
+		if(target_position){
 			this.m_dragging_tab_moved=1;
 		}
+		this.m_dragging_tab_target=target_position;
 		UI.Refresh()
 	},
 	OnTabUp:function(tabid){
-		if(this.m_dragging_tab_label_x_abs==undefined){return;}
-		this.m_dragging_tab_label_x_abs=undefined
+		if(this.m_dragging_caption_areas==undefined){return;}
+		this.m_dragging_caption_areas=undefined
 		if(!this.m_dragging_tab_moved){
 			//this.SetTab(tabid)
 		}else{
+			!? this.m_dragging_tab_target
 			var dstid=this.m_dragging_tab_dst_tabid
 			var srcid=this.m_dragging_tab_src_tabid
 			var item_src=this.items[srcid]
@@ -355,8 +420,8 @@ W.TabbedDocument_prototype={
 		}
 	},
 	CancelTabDragging:function(){
-		if(this.m_dragging_tab_label_x_abs==undefined){
-			this.m_dragging_tab_label_x_abs=undefined
+		if(this.m_dragging_caption_areas==undefined){
+			this.m_dragging_caption_areas=undefined
 			if(UI.nd_captured){UI.ReleaseMouse(UI.nd_captured)}
 		}
 	},
@@ -420,6 +485,7 @@ var RenderLayout=function(layout,obj){
 	});
 	dfsIsThere(layout)
 	var rendered_areas=[];
+	//todo: animated area sizes?
 	var dfsRender=UI.HackCallback(function(nd,x,y,w,h){
 		if(nd.type=="hsplit"||nd.type=="vsplit"){
 			var ch0=nd.children[0];
@@ -585,13 +651,14 @@ W.TabbedDocument=function(id,attrs){
 		for(var i=0;i<rendered_areas.length;i++){
 			var area_i=rendered_areas[i];
 			rendered_area_by_name[area_i.name]=area_i;
+			area_i.content_box={x:area_i.x,y:area_i.y+obj.h_caption+obj.h_bar,w:area_i.w,h:Math.max(area_i.h-(obj.h_caption+obj.h_bar),0)}
 			if(area_i.x==obj.x&&area_i.y==obj.y){
 				area_i.x+=w_menu_button;
 				area_i.w-=w_menu_button;
 			}
 			area_i.h=Math.min(obj.h_caption,area_i.h)
 			area_i.tabs=[];
-			area_i.x0_tabs=[];
+			area_i.x0_w_tabs=[];
 		}
 		for(var i=0;i<items.length;i++){
 			var area_name=(items[i].area_name||"doc_default");
@@ -605,13 +672,15 @@ W.TabbedDocument=function(id,attrs){
 			var x_caption=area_i.x;
 			for(var j=0;j<area_i.tabs.length;j++){
 				var tab_j=area_i.tabs[j];
-				area_i.x0_tabs[j]=x_caption;
-				x_caption+=UI.MeasureText(tab_label_style.font,tab_j.title).w
-				x_caption+=tab_label_style.padding*2;
+				var w_j=UI.MeasureText(tab_label_style.font,tab_j.title).w+tab_label_style.padding*2;
+				area_i.x0_w_tabs[j*2]=x_caption;
+				area_i.x0_w_tabs[j*2+1]=w_j;
+				x_caption+=w_j;
 			}
 		}
 		//render the captions / menu
 		//todo: update layout based on dragging status
+		!? //m_dragging_tab_target
 		for(var pass_i=0;pass_i<2;pass_i++){
 			for(var i=0;i<rendered_areas.length;i++){
 				var area_i=rendered_areas[i];
@@ -621,7 +690,7 @@ W.TabbedDocument=function(id,attrs){
 					var tab_j=area_i.tabs[j];
 					if((tab_j==obj.active_tab)==(pass_i==1)){
 						W.TabLabel(tab_j.__global_tab_id,{
-							x:area_i.x0_tabs[j],x_animated:area_i.x0_tabs[j],y:area_i.y,h:area_i.h,
+							x_animated:area_i.x0_w_tabs[j*2],y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
 							selected:tab_j==obj.active_tab,
 							title:tab_j.title, tooltip:tab_j.tooltip,
 							hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
@@ -633,7 +702,7 @@ W.TabbedDocument=function(id,attrs){
 		}
 		//save areas for dragging
 		for(var i=0;i<rendered_areas.length;i++){
-			rendered_areas[i].tabs=undefined;
+			rendered_areas[i].tabs=rendered_areas[i].tabs.map(function(a){return a.__global_tab_id});
 		}
 		obj.m_caption_areas=rendered_areas;
 		//show the active-caption as a part of the menu

@@ -158,6 +158,8 @@ UI.CustomTheme=function(){
 			w_menu_button:26,
 			h_menu_button:26,
 			padding:4,
+			caption_drag_tolerance_y:4,
+			caption_drag_tolerance_x:12,
 			menu_bar_color:L?[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}]:[{x:0,y:0,color:0xff666666},{x:0,y:1,color:0xff444444}],
 			menu_bar_border_width:0,
 			menu_bar_border_color:L?0xffaaaaaa:0xff444444,
