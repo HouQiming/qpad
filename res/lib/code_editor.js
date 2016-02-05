@@ -229,12 +229,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				if(!obj){return;}
 				obj.m_notifications=[]
 				obj.DestroyReplacingContext();
-				obj.hide_sxs_visualizer=!obj.hide_sxs_visualizer;
-				if(!obj.m_sxs_visualizer){
-					obj.hide_sxs_visualizer=0;
-				}
+				//obj.hide_sxs_visualizer=!obj.hide_sxs_visualizer;
+				//if(!obj.m_sxs_visualizer){
+				//	obj.hide_sxs_visualizer=0;
+				//}
 				obj.DestroyFindingContext()
 				obj.m_hide_find_highlight=1
+				UI.top.app.document_area.ToggleMaximizeMode();
 				UI.g_goto_definition_context=undefined;
 				UI.Refresh()
 				return 1

@@ -310,6 +310,10 @@ W.TabbedDocument_prototype={
 		}else{
 			this.SetTab(tabid)
 		}
+		var layout=UI.m_ui_metadata["<layout>"];
+		if(layout.m_is_maximized){
+			return;
+		}
 		//create a current tab label x snapshot
 		this.m_dragging_caption_areas=this.m_caption_areas;
 		this.m_dragging_tab_moved=0
@@ -544,6 +548,12 @@ W.TabbedDocument_prototype={
 		this.current_tab_id=0;
 		UI.Refresh()
 	},
+	ToggleMaximizeMode:function(){
+		if(this.m_dragging_caption_areas){return;}
+		var layout=UI.m_ui_metadata["<layout>"];
+		layout.m_is_maximized=!layout.m_is_maximized;
+		UI.Refresh();
+	},
 }
 var g_sizing_rect_prototype={
 	OnMouseDown:function(event){
@@ -757,8 +767,63 @@ var RenderLayout=function(layout,obj){
 		nd.temp_z_order=undefined;
 	};
 	UI.HackCallback(dfsRender)
-	dfsRender(layout,obj.x,obj.y,obj.w,obj.h)
+	if(layout.m_is_maximized&&obj.active_tab){
+		var tab_maximized=obj.active_tab;
+		windows_to_render={};
+		windows_to_render[tab_maximized.area_name||"doc_default"]=tab_maximized;
+		var dfsClearTemps=function(nd){
+			if(nd.children){
+				for(var i=0;i<nd.children.length;i++){
+					dfsClearTemps(nd.children[i])
+				}
+			}
+			nd.temp_is_there=undefined;
+			nd.temp_has_active=undefined;
+			nd.temp_z_order=undefined;
+		};
+		UI.HackCallback(dfsClearTemps)
+		dfsClearTemps(layout);
+		dfsRender({
+			type:"doc",
+			name:tab_maximized.area_name||"doc_default",
+			temp_is_there:2,temp_has_active:1,temp_z_order:UI.g_current_z_value-1,
+		},obj.x,obj.y,obj.w,obj.h)
+	}else{
+		dfsRender(layout,obj.x,obj.y,obj.w,obj.h)
+	}
 	return [rendered_areas,windows_to_render];
+}
+
+var SortTabsByArea=function(layout,obj){
+	var order_by_name={};
+	var order_id=0;
+	var dfsComputeOrder=function(nd){
+		if(nd.children){
+			for(var i=0;i<nd.children.length;i++){
+				dfsComputeOrder(nd.children[i]);
+			}
+		}else{
+			order_by_name[nd.name]=order_id;
+			order_id++;
+		}
+	}
+	UI.HackCallback(dfsComputeOrder);
+	dfsComputeOrder(layout)
+	///////////////
+	var bk_ui_item=[];
+	for(var i=0;i<obj.items.length;i++){
+		var item_i=obj.items[i];
+		item_i.__global_tab_id=i;
+		bk_ui_item[i]=obj[i];
+	}
+	obj.items.sort(function(a,b){
+		return (order_by_name[a.area_name||"doc_default"]-order_by_name[b.area_name||"doc_default"])||(a.__global_tab_id-b.__global_tab_id);
+	})
+	for(var i=0;i<obj.items.length;i++){
+		var item_i=obj.items[i];
+		obj[i]=bk_ui_item[item_i.__global_tab_id];
+		item_i.__global_tab_id=i;
+	}
 }
 
 UI.g_caption_scroll_by_name={};
@@ -790,6 +855,8 @@ W.TabbedDocument=function(id,attrs){
 		obj.Close();
 		return;
 	}
+	//sort items
+	SortTabsByArea(layout,obj);
 	UI.Begin(obj)
 		for(var i=0;i<items.length;i++){
 			items[i].__global_tab_id=i;
@@ -806,6 +873,9 @@ W.TabbedDocument=function(id,attrs){
 		UI.BigMenu("&File");
 		if(obj.m_is_in_menu){
 			w_menu=obj.w;
+			if(layout.m_is_maximized){
+				w_menu-=w_menu_button;
+			}
 		}
 		var anim=W.AnimationNode("menu_animation",{transition_dt:0.15,w_menu:w_menu})
 		//menu shadow goes below tab label
@@ -870,6 +940,9 @@ W.TabbedDocument=function(id,attrs){
 			if(area_i.x==obj.x&&area_i.y==obj.y){
 				area_i.x+=w_menu_button;
 				area_i.w-=w_menu_button;
+				if(layout.m_is_maximized){
+					area_i.w-=w_menu_button;
+				}
 			}
 			area_i.h=Math.min(obj.h_caption,area_i.h)
 			area_i.tabs=[];
@@ -877,9 +950,9 @@ W.TabbedDocument=function(id,attrs){
 		}
 		for(var i=0;i<items.length;i++){
 			var area_name=(items[i].area_name||"doc_default");
-			if(!rendered_area_by_name[area_name]){
-				area_name="doc_default";
-			}
+			//if(!rendered_area_by_name[area_name]){
+			//	area_name="doc_default";
+			//}
 			if(rendered_area_by_name[area_name]){
 				rendered_area_by_name[area_name].tabs.push(items[i]);
 			}
@@ -1041,6 +1114,22 @@ W.TabbedDocument=function(id,attrs){
 					default_value:obj.m_menu_preselect,
 					owner:obj})
 			}
+		}
+		if(layout.m_is_maximized){
+			UI.RoundRect({
+				x:obj.x+obj.w-w_menu_button,y:obj.y,w:w_menu_button,h:obj.h_caption,
+				color:obj.menu_bar_color,
+			})
+			W.Button("restore_button",{
+				x:obj.x+obj.w-obj.padding-obj.w_menu_button,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),
+				w:obj.w_menu_button,h:obj.h_menu_button,
+				style:obj.menu_button_style,
+				tooltip:'Restore tab size - ESC',
+				font:UI.icon_font,text:"还",
+				value:0,
+				OnClick:function(){
+					obj.ToggleMaximizeMode();
+				}})
 		}
 	UI.End()
 	if(!obj.m_is_in_menu){
