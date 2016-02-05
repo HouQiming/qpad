@@ -41,7 +41,7 @@ W.TabLabel_prototype={
 }
 W.TabLabel=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabLabel_prototype);
-	UI.StdStyling(id,obj,attrs, "tab_label",obj.selected?"active":"inactive");
+	UI.StdStyling(id,obj,attrs, "tab_label",obj.selected>0?obj.selected==2?"active":"rendered":"inactive");
 	//if(!attrs.w){
 	//	obj.text=obj.title;
 	//	obj.w=UI.MeasureIconText(obj).w;
@@ -53,7 +53,7 @@ W.TabLabel=function(id,attrs){
 	UI.StdAnchoring(id,obj);
 	W.PureRegion(id,obj)
 	UI.Begin(obj)
-		if(obj.selected){
+		if(obj.selected>0){
 			UI.RoundRect({
 				x:obj.x,y:obj.y-obj.shadow_size*0.5,w:obj.w+obj.shadow_size,h:obj.h+obj.shadow_size*1.5,
 				color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size,
@@ -111,6 +111,17 @@ var GetTabFileName=function(tab1){
 }
 var segDist=function(x0,x1,x){
 	return x<x0?x0-x:Math.max(x-x1,0);
+};
+var dfsFindLayoutByName=function(layout,name){
+	if(layout.children){
+		var ret=undefined;
+		for(var i=0;i<layout.children.length;i++){
+			ret=dfsFindLayoutByName(layout.children[i],name);
+			if(ret){break;}
+		}
+		return ret;
+	}
+	return layout.name==name?layout:undefined;
 };
 W.TabbedDocument_prototype={
 	//closer -> class: OnClose notification and stuff
@@ -185,6 +196,8 @@ W.TabbedDocument_prototype={
 		if(this.current_tab_id!=tabid){
 			//for close hack
 			this.just_created_a_tab=0;
+			//for focus sync
+			UI.SetFocus(undefined)
 		}
 		this.current_tab_id=tabid
 		UI.Refresh()
@@ -224,6 +237,7 @@ W.TabbedDocument_prototype={
 					//this doesn't count as a meaningful switch
 					this.just_created_a_tab=0;
 					this.current_tab_id=i;
+					UI.SetFocus(undefined)
 					tab_i.in_save_dialog=1
 				}
 				ret=1
@@ -323,12 +337,15 @@ W.TabbedDocument_prototype={
 		this.m_dragging_mouse_y=event.y;
 		for(var i=0;i<caption_areas.length;i++){
 			var area_i=caption_areas[i];
+			var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
 			if(segDist(area_i.y,area_i.y+area_i.h,event.y)<this.caption_drag_tolerance_y){
 				for(var j=0;j<area_i.tabs.length;j++){
 					var tabid_j=area_i.tabs[j];
-					var x0_j=area_i.x0_w_tabs[j*2];
+					var x0_j=area_i.x0_w_tabs[j*2]-scroll_x;
 					var x1_j=x0_j+area_i.x0_w_tabs[j*2+1];
-					var dist=segDist(x0_j,x1_j,event.x);
+					x0_j=Math.max(x0_j,area_i.x);
+					x1_j=Math.min(x1_j,area_i.x+area_i.w);
+					var dist=segDist(x0_j,j==area_i.tabs.length-1?area_i.x+area_i.w:x1_j,event.x);
 					//dist<this.caption_drag_tolerance_x
 					if(target_position==undefined||target_position.score>dist){
 						//source area / other area
@@ -340,11 +357,11 @@ W.TabbedDocument_prototype={
 						}
 						if(side==0){
 							target_position={
-								score:dist,area_id:i,tabid:tabid_j,
+								score:dist,name:area_i.name,area_id:i,tabid:tabid_j,
 							}
 						}else{
 							target_position={
-								score:dist,area_id:i,tabid:this.items.length,
+								score:dist,name:area_i.name,area_id:i,tabid:tabid_j+1,
 							}
 						}
 					}
@@ -353,7 +370,7 @@ W.TabbedDocument_prototype={
 			//window splitting check - cross-split
 			var box=area_i.content_box;
 			if(box.w>0&&box.h>0){
-				var dist=segDist(box.x,box.x+box.w,event.x)+segDist(box.y,box.y+box.h,event.y);
+				var dist=segDist(box.x,box.x+box.w,event.x)+segDist(box.y,box.y+box.h,event.y)+this.split_penalty;
 				if(target_position==undefined||target_position.score>dist){
 					//source area / other area
 					var fx=(event.x-box.x)/box.w;
@@ -406,6 +423,7 @@ W.TabbedDocument_prototype={
 					//add target
 					var w_src_at_target=UI.MeasureText(tab_label_style.font,this.items[this.m_dragging_tab_src_tabid].title).w+tab_label_style.padding*2;
 					x_caption+=w_src_at_target;
+					tar_added=1;
 				}
 				var w_j=UI.MeasureText(tab_label_style.font,this.items[tabid_j].title).w+tab_label_style.padding*2;
 				out_area_i.x0_w_tabs[j*2]=x_caption;
@@ -428,35 +446,70 @@ W.TabbedDocument_prototype={
 			var target_position=this.m_dragging_tab_target;
 			if(target_position.split_side){
 				//actually split, shuffle the object
-				!?
-			}else{
-				//put at target_position.tabid
-				!?
-			}
-			return//todo
-			var dstid=this.m_dragging_tab_dst_tabid
-			var srcid=this.m_dragging_tab_src_tabid
-			var item_src=this.items[srcid]
-			var label_src=this[srcid]
-			var tabid_new=this.current_tab_id;
-			if(srcid<dstid){
-				for(j=srcid+1;j<=dstid;j++){
-					this.items[j-1]=this.items[j]
-					this[j-1]=this[j]
-					if(this.current_tab_id==j){tabid_new=j-1;}
+				var layout=UI.m_ui_metadata["<layout>"];
+				var target_layout=dfsFindLayoutByName(layout,target_position.name)
+				if(target_layout){
+					var type0=target_layout.type;
+					var name0=target_layout.name;
+					if(layout.g_new_layout_id==undefined){layout.g_new_layout_id=0;}
+					var name_new=undefined;
+					for(;;){
+						name_new="doc_"+layout.g_new_layout_id.toString();
+						layout.g_new_layout_id++;
+						if(!dfsFindLayoutByName(layout,name_new)){break;}
+					}
+					target_layout.name=undefined;
+					if(target_position.split_side=="up"){
+						target_layout.type="vsplit";
+						target_layout.children=[{type:type0,name:name_new},{type:type0,name:name0}];
+					}else if(target_position.split_side=="down"){
+						target_layout.type="vsplit";
+						target_layout.children=[{type:type0,name:name0},{type:type0,name:name_new}];
+					}else if(target_position.split_side=="left"){
+						target_layout.type="hsplit";
+						target_layout.children=[{type:type0,name:name_new},{type:type0,name:name0}];
+					}else{ UI.assert(target_position.split_side=="right");
+						target_layout.type="hsplit";
+						target_layout.children=[{type:type0,name:name0},{type:type0,name:name_new}];
+					}
+					target_layout.split=0.5;
+					var tab0=this.items[this.m_dragging_tab_src_tabid];
+					tab0.area_name=name_new;
 				}
 			}else{
-				for(j=srcid-1;j>=dstid;j--){
-					this.items[j+1]=this.items[j]
-					this[j+1]=this[j]
-					if(this.current_tab_id==j){tabid_new=j+1;}
+				//put src tab at target_position.tabid
+				var tab0=this.items[this.m_dragging_tab_src_tabid]
+				var bk_widgets=[];
+				var new_items=[];
+				for(var i=0;i<this.items.length;i++){
+					bk_widgets[i]=this[i];
+					this.items[i].__global_tab_id=i;
+					this[i]=undefined;
 				}
+				for(var i=0;i<this.items.length;i++){
+					if(i==target_position.tabid){
+						new_items.push(tab0);
+					}
+					if(i==this.m_dragging_tab_src_tabid){continue;}
+					new_items.push(this.items[i]);
+				}
+				if(this.items.length==target_position.tabid){
+					new_items.push(tab0);
+				}
+				///////////////
+				for(var i=0;i<this.items.length;i++){
+					this.items[i]=new_items[i];
+				}
+				for(var i=0;i<this.items.length;i++){
+					this[i]=bk_widgets[this.items[i].__global_tab_id];
+					this.items[i].__global_tab_id=i;
+					if(this.items[i]==tab0){
+						this.current_tab_id=i;
+					}
+				}
+				tab0.area_name=target_position.name;
 			}
-			if(this.current_tab_id==srcid){tabid_new=dstid;}
 			this.just_created_a_tab=0;
-			this.current_tab_id=tabid_new
-			this.items[dstid]=item_src
-			this[dstid]=label_src
 			UI.Refresh()
 		}
 	},
@@ -492,8 +545,35 @@ W.TabbedDocument_prototype={
 		UI.Refresh()
 	},
 }
+var g_sizing_rect_prototype={
+	OnMouseDown:function(event){
+		UI.CaptureMouse(this);
+		this.m_is_dragging=1;
+		this.m_dragging_x=event.x;
+		this.m_dragging_y=event.y;
+		this.m_dragging_split0=this.nd.split;
+	},
+	OnMouseMove:function(event){
+		if(!this.m_is_dragging){return;}
+		var nd=this.nd;
+		var dsplit=0;
+		if(nd.type=="hsplit"){
+			dsplit=(event.x-this.m_dragging_x)/this.area_size.w;
+		}else{
+			dsplit=(event.y-this.m_dragging_y)/this.area_size.h;
+		}
+		nd.split=Math.min(Math.max(this.m_dragging_split0+dsplit,0.05),0.95);
+		UI.Refresh()
+	},
+	OnMouseUp:function(event){
+		this.m_is_dragging=0;
+		this.OnMouseMove(event)
+		UI.ReleaseMouse(this);
+	},
+};
 var RenderLayout=function(layout,obj){
 	//per-tab z_order, sort and reset on workspace save / restore
+	var has_area_name={};
 	var windows_to_render={};
 	var items=obj.items;
 	if(obj.active_tab){
@@ -502,37 +582,85 @@ var RenderLayout=function(layout,obj){
 			UI.g_current_z_value++;
 		}
 	}
+	//print("---")
 	for(var i=0;i<items.length;i++){
 		var area_name=(items[i].area_name||"doc_default");
 		var z_i=(items[i].z_order||0);
+		//print(items[i].title,z_i)
 		if(!windows_to_render[area_name]||windows_to_render[area_name].z_order<=z_i){
 			windows_to_render[area_name]=items[i];
 		}
 	}
 	//dfs layout - is-there test
-	var dfsIsThere=UI.HackCallback(function(nd){
+	var active_name=(obj.active_tab&&obj.active_tab.area_name||"doc_default");
+	var dfsIsThere=function(nd){
 		var is_there=0;
+		var has_active=0;
+		var z_order=0;
 		if(nd.type=="hsplit"||nd.type=="vsplit"){
 			for(var i=0;i<nd.children.length;i++){
-				is_there|=dfsIsThere(nd.children[i]);
+				is_there=Math.max(is_there,dfsIsThere(nd.children[i]));
+				has_active|=nd.children[i].temp_has_active;
+				z_order=Math.max(z_order,nd.children[i].temp_z_order)
 			}
-		}else if(nd.type=="doc"){
-			is_there=1;
 		}else{
-			is_there=(!!windows_to_render[nd.name]);
+			has_area_name[nd.name]=1;
+			is_there=(windows_to_render[nd.name]?2:0);
+			z_order=(windows_to_render[nd.name]&&windows_to_render[nd.name].z_order||0);
+			if(!is_there&&nd.name=="doc_default"){
+				is_there=1;
+			}
+			if(!is_there&&nd.type!="doc"){
+				//don't auto-delete, don't render either
+				is_there=1;
+			}
+			if(nd.name==active_name){
+				has_active=1;
+			}
 		}
 		nd.temp_is_there=is_there;
+		nd.temp_has_active=has_active;
+		nd.temp_z_order=z_order;
 		return is_there;
-	});
+	};
+	UI.HackCallback(dfsIsThere)
 	dfsIsThere(layout)
+	for(var i=0;i<items.length;i++){
+		var area_name=(items[i].area_name||"doc_default");
+		if(!has_area_name[area_name]){
+			items[i].area_name=undefined;
+			UI.Refresh();
+		}
+	}
+	//auto-delete unused doc layouts
+	if(UI.g_app_inited){
+		var dfsCleanUp=function(nd){
+			if(nd.type=="hsplit"||nd.type=="vsplit"){
+				var ch0=nd.children[0];
+				var ch1=nd.children[1];
+				if(ch0.temp_is_there&&ch1.temp_is_there){
+					nd.children[0]=dfsCleanUp(ch0);
+					nd.children[1]=dfsCleanUp(ch1);
+				}else{
+					return dfsCleanUp(ch0.temp_is_there?ch0:ch1);
+				}
+			}
+			return nd;
+		};
+		UI.HackCallback(dfsCleanUp);
+		layout=dfsCleanUp(layout);
+		UI.m_ui_metadata["<layout>"]=layout;
+	}
 	var rendered_areas=[];
-	//todo: animated area sizes?
-	var dfsRender=UI.HackCallback(function(nd,x,y,w,h){
+	//coulddo: animated area sizes for ESC maximize
+	var id_sizing_rect=0;
+	var dfsRender=function(nd,x,y,w,h){
 		if(nd.type=="hsplit"||nd.type=="vsplit"){
 			var ch0=nd.children[0];
 			var ch1=nd.children[1];
-			if(ch0.temp_is_there&&ch1.temp_is_there){
+			if(ch0.temp_is_there>=2&&ch1.temp_is_there>=2){
 				var split=nd.split;
+				var ch0_active=(ch0.temp_has_active||ch0.temp_z_order>ch1.temp_z_order);
 				if(nd.type=="hsplit"){
 					dfsRender(ch0,x,y,w*split,h);
 					dfsRender(ch1,x+w*split,y,w-w*split,h);
@@ -540,8 +668,40 @@ var RenderLayout=function(layout,obj){
 					dfsRender(ch0,x,y,w,h*split);
 					dfsRender(ch1,x,y+h*split,w,h-h*split);
 				}
+				//draw the separation shadow
+				//nd.temp_has_active
+				if(1){
+					var sizing_rect=undefined;
+					if(nd.type=="hsplit"){
+						var x_split=x+w*split;
+						if(ch0_active){
+							sizing_rect={x:x_split,y:y,w:obj.shadow_size,h:h};
+						}else{
+							sizing_rect={x:x_split-obj.shadow_size,y:y,w:obj.shadow_size,h:h};
+						}
+						UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h)
+						UI.RoundRect({x:x_split-obj.shadow_size,y:y-obj.shadow_size,w:obj.shadow_size*2,h:h+obj.shadow_size*2,
+							color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size})
+					}else{
+						var y_split=y+h*split;
+						if(ch0_active){
+							sizing_rect={x:x,y:y_split,w:w,h:obj.shadow_size}
+						}else{
+							sizing_rect={x:x,y:y_split-obj.shadow_size,w:w,h:obj.shadow_size}
+						}
+						UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h)
+						UI.RoundRect({x:x-obj.shadow_size,y:y_split-obj.shadow_size,w:w+obj.shadow_size*2,h:obj.shadow_size*2,
+							color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size})
+					}
+					UI.PopCliprect();
+					sizing_rect.nd=nd;
+					sizing_rect.area_size={x:x,y:y,w:w,h:h};
+					sizing_rect.mouse_cursor=(nd.type=="hsplit"?"sizewe":"sizens"),
+					W.Region("sizing_"+id_sizing_rect,sizing_rect,g_sizing_rect_prototype)
+					id_sizing_rect++;
+				}
 			}else{
-				dfsRender(ch0.temp_is_there?ch0:ch1,x,y,w,h);
+				dfsRender(ch0.temp_is_there>=2?ch0:ch1,x,y,w,h);
 			}
 		}else{
 			//compute undragged layout
@@ -551,8 +711,7 @@ var RenderLayout=function(layout,obj){
 				if(h_content>0){
 					rendered_areas.push({name:nd.name,x:x,y:y,w:w,h:h})
 					W.RoundRect("",{
-						'anchor':'parent','anchor_align':"fill",'anchor_valign':"up",
-						x:x,y:y+obj.h_caption,h:obj.h_bar,
+						x:x,y:y+obj.h_caption,w:w,h:obj.h_bar,
 						color:obj.border_color})
 					UI.PushSubWindow(x,y+obj.h_caption+obj.h_bar,w,h_content)
 					var n0_topmost=UI.RecordTopMostContext()
@@ -564,7 +723,19 @@ var RenderLayout=function(layout,obj){
 					var obj_tab=UI.Begin(UI.Keep(s_wrapper_name,W.RoundRect("",{
 						x:0,y:0,w:w,h:h_content,tab:tab,
 					})))
+						var bk_focus_is_a_region=UI.context_focus_is_a_region;
+						var bk_tentative_focus=UI.context_tentative_focus;
 						tab.body.call(tab)
+						if(!bk_focus_is_a_region&&UI.context_focus_is_a_region&&obj.current_tab_id!=tab.__global_tab_id&&UI.nd_focus){
+							obj.just_created_a_tab=0;
+							obj.current_tab_id=tab.__global_tab_id;
+							UI.InvalidateCurrentFrame()
+							UI.Refresh()
+						}
+						if(tab!=obj.active_tab){
+							//only auto-focus the active tab
+							UI.context_tentative_focus=bk_tentative_focus;
+						}
 					UI.End()
 					UI.FlushTopMostContext(n0_topmost)
 					UI.PopSubWindow()
@@ -581,12 +752,16 @@ var RenderLayout=function(layout,obj){
 				}
 			}
 		}
-		nd.temp_is_there=undefined
-	});
+		nd.temp_is_there=undefined;
+		nd.temp_has_active=undefined;
+		nd.temp_z_order=undefined;
+	};
+	UI.HackCallback(dfsRender)
 	dfsRender(layout,obj.x,obj.y,obj.w,obj.h)
 	return [rendered_areas,windows_to_render];
 }
 
+UI.g_caption_scroll_by_name={};
 W.TabbedDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabbedDocument_prototype);
 	UI.StdStyling(id,obj,attrs, "tabbed_document");
@@ -616,9 +791,10 @@ W.TabbedDocument=function(id,attrs){
 		return;
 	}
 	UI.Begin(obj)
-		var sel={}
+		for(var i=0;i<items.length;i++){
+			items[i].__global_tab_id=i;
+		}
 		var tabid=(obj.current_tab_id||0);
-		sel[tabid]=1
 		var n=items.length
 		var y_label_area=obj.y
 		var w_label_area=obj.w
@@ -640,6 +816,10 @@ W.TabbedDocument=function(id,attrs){
 			border_width:-obj.menu_bar_shadow_size,
 			color:obj.menu_bar_shadow_color,
 		})
+		UI.RoundRect({
+			x:obj.x,y:obj.y,w:anim.w_menu,h:obj.h_caption,
+			color:obj.menu_bar_color,
+		})
 		if(obj.m_is_in_menu){
 			//var is_1st=!obj.main_menu_bar;
 			//but menu *bar* goes *above* the tab labels
@@ -647,12 +827,6 @@ W.TabbedDocument=function(id,attrs){
 			//	UI.SetFocus(obj.main_menu_bar)
 			//}
 		}else{
-			UI.RoundRect({
-				x:obj.x,y:obj.y,w:w_menu,h:obj.h_caption,
-				color:obj.menu_bar_color,
-				border_width:obj.menu_bar_border_width,
-				border_color:obj.menu_bar_border_color,
-			})
 			UI.m_frozen_global_menu=undefined
 			obj.m_menu_preselect=undefined
 			if(bk_menu){
@@ -703,10 +877,17 @@ W.TabbedDocument=function(id,attrs){
 		}
 		for(var i=0;i<items.length;i++){
 			var area_name=(items[i].area_name||"doc_default");
-			rendered_area_by_name[area_name].tabs.push(items[i]);
-			items[i].__global_tab_id=i;
+			if(!rendered_area_by_name[area_name]){
+				area_name="doc_default";
+			}
+			if(rendered_area_by_name[area_name]){
+				rendered_area_by_name[area_name].tabs.push(items[i]);
+			}
 		}
 		var tab_label_style=UI.default_styles.tab_label;
+		var area_autoscroll_target=undefined;
+		var x_reveal_target=0;
+		var w_active_tab=0;
 		for(var i=0;i<rendered_areas.length;i++){
 			var area_i=rendered_areas[i];
 			if(!(area_i.w>0)){continue;}
@@ -714,26 +895,50 @@ W.TabbedDocument=function(id,attrs){
 			for(var j=0;j<area_i.tabs.length;j++){
 				var tab_j=area_i.tabs[j];
 				var w_j=UI.MeasureText(tab_label_style.font,tab_j.title).w+tab_label_style.padding*2;
+				if(tab_j==obj.active_tab){
+					area_autoscroll_target=area_i;
+					x_reveal_target=x_caption;
+					w_active_tab=w_j;
+				}
 				area_i.x0_w_tabs[j*2]=x_caption;
 				area_i.x0_w_tabs[j*2+1]=w_j;
 				x_caption+=w_j;
 			}
+			area_i.wtot=x_caption-area_i.x;
 		}
 		//render the captions
-		//todo: update layout based on dragging status
+		if(obj.m_dragging_rendering_caption_areas){
+			x_reveal_target=obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset;
+			if(obj.m_dragging_tab_target){
+				area_autoscroll_target=rendered_area_by_name[obj.m_dragging_tab_target.name];
+			}
+		}
+		if(area_autoscroll_target){
+			var scroll_x=(UI.g_caption_scroll_by_name[area_autoscroll_target.name]||0);
+			x_reveal_target-=area_autoscroll_target.x;
+			scroll_x0=scroll_x;
+			scroll_x=Math.min(Math.max(scroll_x,x_reveal_target+w_active_tab-area_autoscroll_target.w),x_reveal_target);
+			scroll_x=Math.max(Math.min(scroll_x,area_autoscroll_target.wtot-area_autoscroll_target.w),0);
+			if(scroll_x!=scroll_x0){
+				UI.g_caption_scroll_by_name[area_autoscroll_target.name]=scroll_x;
+				UI.Refresh()
+			}
+			//print(scroll_x,x_reveal_target,w_active_tab,area_autoscroll_target.w,area_autoscroll_target.wtot-area_autoscroll_target.w)
+		}
 		if(obj.m_dragging_rendering_caption_areas){
 			var rendering_caption_areas=obj.m_dragging_rendering_caption_areas;
 			//tar-area after, src-area after potential split shade
 			for(var i=0;i<rendering_caption_areas.length;i++){
 				var area_i=rendering_caption_areas[i];
 				if(!(area_i.w>0)){continue;}
+				var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
 				UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
 				for(var j=0;j<area_i.tabs.length;j++){
 					var tab_j=obj.items[area_i.tabs[j]];
 					if(area_i.tabs[j]==obj.m_dragging_tab_src_tabid){continue;}
 					W.TabLabel(tab_j.__global_tab_id,{
-						x_animated:area_i.x0_w_tabs[j*2],y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
-						selected:tab_j==obj.active_tab,
+						x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
+						selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
 						title:tab_j.title, tooltip:tab_j.tooltip,
 						hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
 						tabid:tab_j.__global_tab_id,owner:obj})
@@ -746,7 +951,7 @@ W.TabbedDocument=function(id,attrs){
 			W.TabLabel(tab_dragging_src.__global_tab_id,{
 				x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
 				w:w_src_at_target,h:area_i.h,
-				selected:tab_dragging_src==obj.active_tab,
+				selected:2,
 				title:tab_dragging_src.title, tooltip:tab_dragging_src.tooltip,
 				hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
 				tabid:tab_dragging_src.__global_tab_id,owner:obj})
@@ -771,19 +976,28 @@ W.TabbedDocument=function(id,attrs){
 					box_shade.border_width=0;
 					UI.RoundRect(box_shade)
 				}
+			}else if(obj.m_dragging_tab_target&&obj.m_dragging_tab_target.name!=(tab_dragging_src.area_name||"doc_default")){
+				var target_position=obj.m_dragging_tab_target;
+				var box=rendering_caption_areas[target_position.area_id].content_box;
+				var sside=target_position.split_side;
+				var box_shade={x:box.x,y:box.y,w:box.w,h:box.h};
+				box_shade.color=obj.bgcolor_split_shade;
+				box_shade.border_width=0;
+				UI.RoundRect(box_shade);
 			}
 		}else{
 			for(var pass_i=0;pass_i<2;pass_i++){
 				for(var i=0;i<rendered_areas.length;i++){
 					var area_i=rendered_areas[i];
 					if(!(area_i.w>0)){continue;}
+					var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
 					UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
 					for(var j=0;j<area_i.tabs.length;j++){
 						var tab_j=area_i.tabs[j];
 						if((tab_j==obj.active_tab)==(pass_i==1)){
 							W.TabLabel(tab_j.__global_tab_id,{
-								x_animated:area_i.x0_w_tabs[j*2],y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
-								selected:tab_j==obj.active_tab,
+								x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
+								selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
 								title:tab_j.title, tooltip:tab_j.tooltip,
 								hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
 								tabid:tab_j.__global_tab_id,owner:obj})
@@ -799,16 +1013,15 @@ W.TabbedDocument=function(id,attrs){
 			obj.m_caption_areas=rendered_areas;
 		}
 		//show the active-caption as a part of the menu
-		if(obj.m_is_in_menu){
-			//menu *bar* goes *above* the tab labels
+		var s_active_title=(obj.active_tab&&obj.active_tab.title);
+		var w_menu_bar=anim.w_menu-w_menu_button;
+		if(anim.w_menu-w_menu_button>0){
 			UI.RoundRect({
-				x:obj.x,y:obj.y,w:w_menu,h:obj.h_caption,
+				x:obj.x+w_menu_button,y:obj.y,w:anim.w_menu-w_menu_button,h:obj.h_caption,
 				color:obj.menu_bar_color,
 				border_width:obj.menu_bar_border_width,
 				border_color:obj.menu_bar_border_color,
 			})
-			var s_active_title=(obj.active_tab&&obj.active_tab.title);
-			var w_menu_bar=anim.w_menu-w_menu_button;
 			if(s_active_title){
 				var dims=UI.MeasureText(tab_label_style.font,s_active_title)
 				UI.PushCliprect(obj.x+w_menu_button,obj.y,w_menu_bar,obj.h_caption);
@@ -820,6 +1033,9 @@ W.TabbedDocument=function(id,attrs){
 				UI.PopCliprect();
 				w_menu_bar-=dims.w;
 			}
+		}
+		if(obj.m_is_in_menu){
+			//menu *bar* goes *above* the tab labels
 			if(w_menu_bar>0){
 				W.TopMenuBar("main_menu_bar",{x:obj.x+w_menu_button,w:w_menu_bar,y:obj.y,h:obj.h_caption,
 					default_value:obj.m_menu_preselect,
@@ -847,6 +1063,7 @@ W.TabbedDocument=function(id,attrs){
 			//this doesn't count as a meaningful switch, it's in-transit
 			obj.just_created_a_tab=0;
 			obj.current_tab_id=num_id
+			UI.SetFocus(undefined)
 			UI.Refresh()
 		}});
 		W.Hotkey("",{key:"CTRL+SHIFT+TAB",action:function(){
@@ -857,6 +1074,7 @@ W.TabbedDocument=function(id,attrs){
 			//this doesn't count as a meaningful switch, it's in-transit
 			obj.just_created_a_tab=0;
 			obj.current_tab_id=num_id
+			UI.SetFocus(undefined)
 			UI.Refresh()
 		}});
 		for(var i=0;i<items.length&&i<10;i++){
@@ -997,7 +1215,6 @@ W.CFancyMenuDesc.prototype={
 		}
 		children.push({type:'newline',context_menu_group:attrs.context_menu_group,action:attrs.action})
 	},
-	//todo: selection widget - bind to some property
 	AddButtonRow:function(attrs,buttons){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$

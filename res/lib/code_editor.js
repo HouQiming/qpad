@@ -3720,7 +3720,7 @@ W.SXS_NewPage=function(id,attrs){
 			value:obj.selected,padding:8,
 			text:"Manage...",
 			tooltip:"Manage projects...",
-			anchor:'parent',anchor_align:'right',anchor_valign:'top',
+			anchor:'parent',anchor_align:'right',anchor_valign:'up',
 			OnClick:function(){
 				UI.top.app.document_area.CloseTab()
 				UI.OpenEditorWindow("*project_list")

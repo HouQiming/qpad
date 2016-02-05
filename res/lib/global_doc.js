@@ -91,11 +91,12 @@ UI.g_current_z_value=0;
 UI.SaveWorkspace=function(){
 	//compact z values
 	var z_values=[];
+	var n=UI.g_all_document_windows.length;
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var wnd=UI.g_all_document_windows[i]
-		z_values.push(wnd.z_order);
+		z_values.push((wnd.z_order||0)*n+i);
 	}
-	z_values.sort();
+	z_values.sort(function(a,b){return a-b});
 	UI.g_current_z_value=0;
 	var ztran={};
 	for(var i=0;i<z_values.length;i++){
@@ -105,8 +106,8 @@ UI.SaveWorkspace=function(){
 		}
 	}
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		var wnd=UI.g_all_document_windows[i]
-		wnd.z_order=ztran[wnd.z_order];
+		var wnd=UI.g_all_document_windows[i];
+		wnd.z_order=ztran[(wnd.z_order||0)*n+i];
 	}
 	//save workspace
 	var workspace=[];

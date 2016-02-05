@@ -78,6 +78,14 @@ UI.NewTab=function(tab){
 	if(UI.top.app.document_area&&UI.top.app.document_area.current_tab_id!=undefined){
 		current_tab_id=UI.top.app.document_area.current_tab_id;
 	}
+	if(tab.z_order==undefined){
+		tab.z_order=UI.g_current_z_value;
+		UI.g_current_z_value++;
+	}
+	var obj_active_tab=(UI.top.app.document_area&&UI.top.app.document_area.active_tab);
+	if(!tab.area_name&&obj_active_tab){
+		tab.area_name=obj_active_tab.area_name;
+	}
 	var new_tab_id=current_tab_id+1;
 	if(new_tab_id<g_all_document_windows.length){
 		var n=g_all_document_windows.length;
@@ -89,9 +97,11 @@ UI.NewTab=function(tab){
 		area[new_tab_id]=undefined;
 		g_all_document_windows[new_tab_id]=tab;
 		area.current_tab_id=new_tab_id;
+		UI.SetFocus(undefined);
 	}else{
 		g_all_document_windows.push(tab);
 		UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
+		UI.SetFocus(undefined);
 	}
 	UI.top.app.document_area.just_created_a_tab=1;
 	UI.Refresh()
@@ -243,7 +253,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 }
 //UI.InstallQPad()
 
-var g_app_inited=0;
+UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
 UI.OpenFileListWindow=function(force_mode){
 	var active_document=UI.top.app.document_area.active_tab
@@ -507,24 +517,27 @@ UI.Application=function(id,attrs){
 			menu_edit=undefined;
 		UI.End();
 	UI.End();
-	if(!g_app_inited){
+	if(!UI.g_app_inited){
 		var workspace=UI.m_ui_metadata["<workspace_v2>"]
 		var fn_current_tab=UI.m_ui_metadata["<current_tab>"]
 		if(workspace){
 			var current_tab_id=undefined
+			UI.g_current_z_value=0;
 			for(var i=0;i<workspace.length;i++){
 				//UI.NewCodeEditorTab(workspace[i])
 				UI.OpenEditorWindow(workspace[i].file_name)
 				var item=UI.top.app.document_area.items[UI.top.app.document_area.items.length-1];
 				item.z_order=workspace[i].z_order;
 				item.area_name=workspace[i].area_name;
-				if(workspace[i]==fn_current_tab){
-					current_tab_id=UI.top.app.document_area.length-1;
+				UI.g_current_z_value=Math.max(UI.g_current_z_value,item.z_order+1);
+				if(workspace[i].file_name==fn_current_tab){
+					current_tab_id=UI.top.app.document_area.items.length-1;
 				}
 			}
 			if(current_tab_id!=undefined){
 				UI.top.app.document_area.SetTab(current_tab_id)
 				UI.top.app.document_area.n_tabs_last_checked=g_all_document_windows.length
+				UI.SetFocus(undefined)
 			}
 			UI.InvalidateCurrentFrame();
 			UI.Refresh()
@@ -535,7 +548,7 @@ UI.Application=function(id,attrs){
 			UI.Refresh()
 			UI.m_cmdline_opens=[];
 		}
-		g_app_inited=1
+		UI.g_app_inited=1;
 	}
 	if(!g_all_document_windows.length){
 		if(app.quit_on_zero_tab){

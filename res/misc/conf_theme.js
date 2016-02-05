@@ -134,6 +134,11 @@ UI.CustomTheme=function(){
 					color:C,
 					shadow_color:0xaa000000,
 				},
+				rendered:{
+					text_color:0xffffffff,
+					color:0xff7f7f7f,
+					shadow_color:0x00000000, 
+				},
 				inactive:{
 					text_color:0xff000000,
 					color:C&0x00ffffff,
@@ -141,9 +146,14 @@ UI.CustomTheme=function(){
 				},
 			}:{//dark
 				active:{
-					text_color:0xffffffff,
+					text_color:0xffe8e8e8,
 					color:C,
 					shadow_color:0xaa000000,
+				},
+				rendered:{
+					text_color:0xffe8e8e8,
+					color:0xff666666,
+					shadow_color:0x00000000, 
 				},
 				inactive:{
 					text_color:0xffe8e8e8,
@@ -158,8 +168,10 @@ UI.CustomTheme=function(){
 			w_menu_button:26,
 			h_menu_button:26,
 			padding:4,
-			caption_drag_tolerance_y:4,
-			caption_drag_tolerance_x:12,
+			caption_drag_tolerance_y:8,
+			split_penalty:16,
+			shadow_size:10,
+			shadow_color:0xaa000000,
 			menu_bar_color:L?[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}]:[{x:0,y:0,color:0xff666666},{x:0,y:1,color:0xff444444}],
 			menu_bar_border_width:0,
 			menu_bar_border_color:L?0xffaaaaaa:0xff444444,
