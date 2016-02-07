@@ -681,6 +681,7 @@ var RenderLayout=function(layout,obj){
 	var rendered_areas=[];
 	//coulddo: animated area sizes for ESC maximize
 	var id_sizing_rect=0;
+	var all_shadows=[];
 	var dfsRender=function(nd,x,y,w,h){
 		if(nd.type=="hsplit"||nd.type=="vsplit"){
 			var ch0=nd.children[0];
@@ -699,6 +700,7 @@ var RenderLayout=function(layout,obj){
 				//nd.temp_has_active
 				if(1){
 					var sizing_rect=undefined;
+					var shadow_rect=undefined;
 					if(nd.type=="hsplit"){
 						var x_split=x+w*split;
 						if(ch0_active){
@@ -706,9 +708,8 @@ var RenderLayout=function(layout,obj){
 						}else{
 							sizing_rect={x:x_split-obj.shadow_size,y:y,w:obj.shadow_size,h:h};
 						}
-						UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h)
-						UI.RoundRect({x:x_split-obj.shadow_size,y:y-obj.shadow_size,w:obj.shadow_size*2,h:h+obj.shadow_size*2,
-							color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size})
+						shadow_rect={x:x_split-obj.shadow_size,y:y-obj.shadow_size,w:obj.shadow_size*2,h:h+obj.shadow_size*2,
+							color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size};
 					}else{
 						var y_split=y+h*split;
 						if(ch0_active){
@@ -716,11 +717,10 @@ var RenderLayout=function(layout,obj){
 						}else{
 							sizing_rect={x:x,y:y_split-obj.shadow_size,w:w,h:obj.shadow_size}
 						}
-						UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h)
-						UI.RoundRect({x:x-obj.shadow_size,y:y_split-obj.shadow_size,w:w+obj.shadow_size*2,h:obj.shadow_size*2,
-							color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size})
+						shadow_rect={x:x-obj.shadow_size,y:y_split-obj.shadow_size,w:w+obj.shadow_size*2,h:obj.shadow_size*2,
+							color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size};
 					}
-					UI.PopCliprect();
+					all_shadows.push(sizing_rect,shadow_rect)
 					sizing_rect.nd=nd;
 					sizing_rect.area_size={x:x,y:y,w:w,h:h};
 					sizing_rect.mouse_cursor=(nd.type=="hsplit"?"sizewe":"sizens"),
@@ -739,7 +739,7 @@ var RenderLayout=function(layout,obj){
 					rendered_areas.push({name:nd.name,x:x,y:y,w:w,h:h})
 					W.RoundRect("",{
 						x:x,y:y+obj.h_caption,w:w,h:obj.h_bar,
-						color:obj.border_color})
+						color:tab==obj.active_tab?obj.border_color_active:obj.border_color})
 					UI.PushSubWindow(x,y+obj.h_caption+obj.h_bar,w,h_content)
 					var n0_topmost=UI.RecordTopMostContext()
 					var s_wrapper_name="active_tab_obj_"+nd.name;
@@ -808,7 +808,7 @@ var RenderLayout=function(layout,obj){
 	}else{
 		dfsRender(layout,obj.x,obj.y,obj.w,obj.h)
 	}
-	return [rendered_areas,windows_to_render];
+	return [rendered_areas,windows_to_render,all_shadows];
 }
 
 var SortTabsByArea=function(layout,obj){
@@ -894,14 +894,14 @@ W.TabbedDocument=function(id,attrs){
 		UI.BigMenu("&File");
 		if(obj.m_is_in_menu){
 			w_menu=obj.w;
-			if(layout.m_is_maximized){
-				w_menu-=w_menu_button;
-			}
+			//if(layout.m_is_maximized){
+			//	w_menu-=w_menu_button;
+			//}
 		}
 		var anim=W.AnimationNode("menu_animation",{transition_dt:0.15,w_menu:w_menu})
 		//menu shadow goes below tab label
 		UI.RoundRect({
-			x:obj.x+w_menu-obj.menu_bar_shadow_size,y:obj.y-obj.menu_bar_shadow_size*0.5,
+			x:obj.x+anim.w_menu-obj.menu_bar_shadow_size,y:obj.y-obj.menu_bar_shadow_size*0.5,
 			w:obj.menu_bar_shadow_size*2,h:obj.h_caption+obj.menu_bar_shadow_size*1.5,
 			round:obj.menu_bar_shadow_size,
 			border_width:-obj.menu_bar_shadow_size,
@@ -952,6 +952,7 @@ W.TabbedDocument=function(id,attrs){
 		var tmp_ret=RenderLayout(layout,obj)
 		var rendered_areas=tmp_ret[0];
 		var windows_to_render=tmp_ret[1];
+		var all_shadows=tmp_ret[2];
 		//compute the caption layout
 		var rendered_area_by_name={};
 		for(var i=0;i<rendered_areas.length;i++){
@@ -1042,13 +1043,16 @@ W.TabbedDocument=function(id,attrs){
 			//active (src) tab
 			var tab_dragging_src=obj.items[obj.m_dragging_tab_src_tabid];
 			var w_src_at_target=UI.MeasureText(tab_label_style.font,tab_dragging_src.title).w+tab_label_style.padding*2;
-			W.TabLabel(tab_dragging_src.__global_tab_id,{
-				x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
-				w:w_src_at_target,h:area_i.h,
-				selected:2,
-				title:tab_dragging_src.title, tooltip:tab_dragging_src.tooltip,
-				hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
-				tabid:tab_dragging_src.__global_tab_id,owner:obj})
+			obj[tab_dragging_src.__global_tab_id]=undefined;
+			UI.TopMostWidget(function(){
+				W.TabLabel(tab_dragging_src.__global_tab_id,{
+					x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
+					w:w_src_at_target,h:area_i.h,
+					selected:2,
+					title:tab_dragging_src.title, tooltip:tab_dragging_src.tooltip,
+					hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
+					tabid:tab_dragging_src.__global_tab_id,owner:obj})
+			})
 			//splitting shade
 			if(obj.m_dragging_tab_target&&obj.m_dragging_tab_target.split_side){
 				var target_position=obj.m_dragging_tab_target;
@@ -1106,6 +1110,31 @@ W.TabbedDocument=function(id,attrs){
 			}
 			obj.m_caption_areas=rendered_areas;
 		}
+		//render the separation shadows
+		for(var i=0;i<all_shadows.length;i+=2){
+			var sizing_rect=all_shadows[i+0];
+			var shadow_rect=all_shadows[i+1];
+			UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h);
+			UI.RoundRect(shadow_rect);
+			UI.PopCliprect();
+		}
+		//restore button
+		if(layout.m_is_maximized&&!obj.m_is_in_menu){
+			//UI.RoundRect({
+			//	x:obj.x+obj.w-w_menu_button,y:obj.y,w:w_menu_button,h:obj.h_caption,
+			//	color:obj.menu_bar_color,
+			//})
+			W.Button("restore_button",{
+				x:obj.x+obj.w-obj.padding-obj.w_menu_button,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),
+				w:obj.w_menu_button,h:obj.h_menu_button,
+				style:obj.menu_button_style,
+				tooltip:'Restore tab size - ESC',
+				font:UI.icon_font,text:"还",
+				value:0,
+				OnClick:function(){
+					obj.ToggleMaximizeMode();
+				}})
+		}
 		//show the active-caption as a part of the menu
 		var s_active_title=(obj.active_tab&&obj.active_tab.title);
 		var w_menu_bar=anim.w_menu-w_menu_button;
@@ -1118,6 +1147,7 @@ W.TabbedDocument=function(id,attrs){
 			})
 			if(s_active_title){
 				var dims=UI.MeasureText(tab_label_style.font,s_active_title)
+				dims.w+=4;
 				UI.PushCliprect(obj.x+w_menu_button,obj.y,w_menu_bar,obj.h_caption);
 					W.Text("",{
 						x:obj.x+w_menu_button+w_menu_bar-dims.w,y:obj.y+(obj.h_caption-dims.h)*0.5,
@@ -1135,22 +1165,6 @@ W.TabbedDocument=function(id,attrs){
 					default_value:obj.m_menu_preselect,
 					owner:obj})
 			}
-		}
-		if(layout.m_is_maximized){
-			UI.RoundRect({
-				x:obj.x+obj.w-w_menu_button,y:obj.y,w:w_menu_button,h:obj.h_caption,
-				color:obj.menu_bar_color,
-			})
-			W.Button("restore_button",{
-				x:obj.x+obj.w-obj.padding-obj.w_menu_button,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),
-				w:obj.w_menu_button,h:obj.h_menu_button,
-				style:obj.menu_button_style,
-				tooltip:'Restore tab size - ESC',
-				font:UI.icon_font,text:"还",
-				value:0,
-				OnClick:function(){
-					obj.ToggleMaximizeMode();
-				}})
 		}
 	UI.End()
 	if(!obj.m_is_in_menu){

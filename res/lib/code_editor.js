@@ -1,6 +1,5 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
-require("res/lib/boxdoc");
 require("res/lib/global_doc");
 var Language=require("res/lib/langdef");
 var MAX_PARSABLE=33554432
@@ -913,7 +912,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		UI.RoundRect({color:edstyle.bgcolor,x:area_x+w_line_numbers,y:area_y,w:area_w-w_line_numbers,h:area_h})
 		//main editor
 		if(enable_interaction){
-			this.RenderAsWidget("doc",
+			this.RenderAsWidget(enable_interaction,
 				area_x+w_line_numbers+edstyle.padding,area_y,
 				area_w-w_line_numbers-edstyle.padding,
 				area_h);
@@ -2156,7 +2155,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		m_y_extent_forward:0,
 	}
 	if(flags&UI.SEARCH_FLAG_GLOBAL){
-		var spath_repo=DetectRepository(doc.m_file_name);
+		var spath_repo=GetEditorProject(doc.m_file_name);
 		ctx.m_repo_path=spath_repo;
 		ctx.m_base_file=doc.m_file_name;
 	}else{
@@ -2893,6 +2892,21 @@ var DetectRepository=function(fname){
 	var ret=DetectRepository(spath);
 	g_is_repo_detected[spath]=ret;
 	return ret;
+}
+
+var GetEditorProject=function(fn){
+	fn=IO.NormalizeFileName(fn);
+	var repos2=g_repo_from_file[fn];
+	if(repos2){
+		for(var spath in repos2){
+			return spath;
+		}
+	}
+	var spath_repo=DetectRepository(fn);
+	if(spath_repo){return spath_repo;}
+	var sdir=UI.GetPathFromFilename(fn);
+	ParseProject(sdir);
+	return sdir;
 }
 
 UI.ClearFileListingCache=function(){
@@ -3795,7 +3809,7 @@ W.FileBrowserPage=function(id,attrs){
 	if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 		W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 			font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-			text:UI._("Listing projects, type to search files")})
+			text:UI._("Type to search or browse")})
 	}
 	////////////////////////////////////////////
 	UI.m_current_file_list=obj.m_current_file_list
@@ -4082,6 +4096,7 @@ UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 	area_name:"h_tools",
 	body:function(){
 		//frontmost doc
+		UI.context_parent.body=this.util_widget;
 		var tab_frontmost=UI.GetFrontMostEditorTab();
 		var body=W.FileBrowserPage('body',{
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
@@ -4693,7 +4708,7 @@ W.CodeEditor=function(id,attrs){
 				doc.RenderWithLineNumbers(doc.scroll_x,doc.scroll_y,
 					obj.x,obj.y+h_top_find,
 					w_obj_area-w_scrolling_area,
-					h_editor-h_top_find,1);
+					h_editor-h_top_find,"doc");
 				if(was_bound_elsewhere){
 					doc.scroll_x=(doc.scroll_x||0);
 					doc.scroll_y=(doc.scroll_y||0);
@@ -4955,8 +4970,8 @@ W.CodeEditor=function(id,attrs){
 					//	x_rect_bar,obj.y+(obj.h_find_bar-20)*0.5,
 					//	UI.default_styles.check_button.text_color,0x5939)//'夹'.charCodeAt(0)
 					//x_rect_bar+=20;
-					var spath_repo=DetectRepository(doc.m_file_name);
-					var s_global_search_hint=UI.Format("in project '@1'",UI.RemovePath(spath_repo))
+					var spath_repo=GetEditorProject(doc.m_file_name);
+					var s_global_search_hint=(spath_repo?UI.Format("in project '@1'",UI.RemovePath(spath_repo)):"")
 					//var dims=UI.MeasureText(obj.find_bar_hint_font,s_global_search_hint);
 					//W.Text("",{x:x_rect_bar+w_rect_bar-dims.w-obj.find_bar_padding,y:obj.y+(obj.h_find_bar-dims.h)*0.5,
 					//	font:obj.find_bar_hint_font,color:UI.default_styles.check_button.text_color,
@@ -6216,7 +6231,7 @@ UI.NewOptionsTab=function(){
 //multi-file editing
 UI.g_editor_from_file={};
 UI.OpenCodeEditorDocument=function(fn,is_preview){
-	if(!(fn&&fn.substr(0,1)=='*')){
+	if(fn&&fn.substr(0,1)!='*'){
 		fn=IO.NormalizeFileName(fn);
 	}
 	///////////////////////////
@@ -6227,7 +6242,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview){
 			return doc;
 		}
 	}
-	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
+	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
 	var language_id=UI.ED_GetFileLanguage(fn);
 	var style=UI.default_styles.code_editor.editor_style;
 	if(style.__proto__!=W.CodeEditor_prototype){
@@ -6260,6 +6275,15 @@ UI.OpenCodeEditorDocument=function(fn,is_preview){
 	}
 	return doc;
 };
+
+UI.CreateEmptyCodeEditor=function(language_id){
+	if(!language_id){language_id="Plain text";}
+	var doc=UI.OpenCodeEditorDocument("",1);
+	doc.language=Language.GetDefinitionByName(language_id);
+	doc.plugin_language_desc=Language.GetDescObjectByName(language_id);
+	doc.m_is_preview=0;
+	return doc;
+}
 
 UI.CloseCodeEditorDocument=function(doc){
 	doc.m_ed_refcnt--;
@@ -6295,7 +6319,7 @@ UI.AddProjectDir=function(spath){
 			UI.Refresh()
 		}
 	}else{
-		UI.OpenFileListWindow('hist_view')
+		UI.ExplicitFileOpen()
 	}
 };
 

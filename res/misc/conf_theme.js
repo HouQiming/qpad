@@ -164,7 +164,9 @@ UI.CustomTheme=function(){
 		},
 		tabbed_document:{
 			transition_dt:0.1,
-			h_caption:32, h_bar:4, color:(L?0xffe8e8e8:0xff444444), border_color:C,
+			h_caption:32, h_bar:4, color:(L?0xffe8e8e8:0xff444444), 
+			border_color_active:C,
+			border_color:0xff7f7f7f,
 			w_menu_button:26,
 			h_menu_button:26,
 			padding:4,
@@ -581,6 +583,12 @@ UI.CustomTheme=function(){
 			damping_shake:8,
 			x_min_shake:0.5,
 			dx_min_shake:0.5,
+		},
+		notebook_view:{
+			max_lines:8,
+			h_gap:16,
+			color:L?0xffc0c0c0:0xff333333,
+			//todo
 		},
 		sxs_build_output:{
 			border_width:0,
