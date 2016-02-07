@@ -75,7 +75,7 @@ var g_all_document_windows=[];
 UI.g_all_document_windows=g_all_document_windows
 UI.NewTab=function(tab){
 	var current_tab_id=g_all_document_windows.length-1;
-	if(UI.top.app.document_area&&UI.top.app.document_area.current_tab_id!=undefined){
+	if(UI.top.app.document_area&&UI.top.app.document_area.current_tab_id!=undefined&&UI.g_app_inited){
 		current_tab_id=UI.top.app.document_area.current_tab_id;
 	}
 	if(tab.z_order==undefined){
@@ -83,7 +83,7 @@ UI.NewTab=function(tab){
 		UI.g_current_z_value++;
 	}
 	var obj_active_tab=UI.GetFrontMostEditorTab();
-	if(obj_active_tab){
+	if(obj_active_tab&&UI.g_app_inited){
 		current_tab_id=obj_active_tab.__global_tab_id;
 	}
 	if(!tab.area_name&&obj_active_tab){
@@ -504,7 +504,7 @@ UI.Application=function(id,attrs){
 				}
 				var item=UI.top.app.document_area.items[UI.top.app.document_area.items.length-1];
 				item.z_order=workspace[i].z_order;
-				item.area_name=workspace[i].area_name;
+				item.area_name=(workspace[i].area_name||"doc_default");
 				UI.g_current_z_value=Math.max(UI.g_current_z_value,item.z_order+1);
 				if(workspace[i].file_name==fn_current_tab){
 					current_tab_id=UI.top.app.document_area.items.length-1;

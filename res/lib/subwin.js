@@ -457,10 +457,28 @@ W.TabbedDocument_prototype={
 					var name0=target_layout.name;
 					if(layout.g_new_layout_id==undefined){layout.g_new_layout_id=0;}
 					var name_new=undefined;
+					var tab0=this.items[this.m_dragging_tab_src_tabid];
 					for(;;){
 						name_new="doc_"+layout.g_new_layout_id.toString();
 						layout.g_new_layout_id++;
 						if(!dfsFindLayoutByName(layout,name_new)){break;}
+					}
+					var name_src=tab0.area_name;
+					if(name_src&&!(name_src.length>=4&&name_src.substr(0,4)=='doc_')){
+						var n_src=0;
+						for(var i=0;i<this.items.length;i++){
+							if(this.items[i].area_name==name_src){
+								n_src++;
+							}
+						}
+						if(n_src<=1){
+							//swap name - drag util into something, keep the area name
+							var nd_src=dfsFindLayoutByName(layout,name_src)
+							nd_src.name=name_new;
+							var tmp=name_new;
+							name_new=name_src;
+							name_src=tmp;
+						}
 					}
 					target_layout.name=undefined;
 					if(target_position.split_side=="up"){
@@ -477,7 +495,6 @@ W.TabbedDocument_prototype={
 						target_layout.children=[{type:type0,name:name0},{type:type0,name:name_new}];
 					}
 					target_layout.split=0.5;
-					var tab0=this.items[this.m_dragging_tab_src_tabid];
 					tab0.area_name=name_new;
 				}
 			}else{
@@ -620,7 +637,7 @@ var RenderLayout=function(layout,obj){
 			if(!is_there&&nd.name=="doc_default"){
 				is_there=1;
 			}
-			if(!is_there&&nd.type!="doc"){
+			if(!is_there&&!(nd.name.length>=4&&nd.name.substr(0,4)=='doc_')){
 				//don't auto-delete, don't render either
 				is_there=1;
 			}
@@ -803,7 +820,7 @@ var SortTabsByArea=function(layout,obj){
 				dfsComputeOrder(nd.children[i]);
 			}
 		}else{
-			order_by_name[nd.name]=order_id;
+			order_by_name[nd.name]=order_id+(nd.name.length>=4&&nd.name.substr(0,4)=='doc_'?0:65536);
 			order_id++;
 		}
 	}

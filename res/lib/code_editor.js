@@ -3547,6 +3547,14 @@ var fnewpage_findbar_plugin=function(){
 				}
 			}
 		}
+		var fbar=obj.find_bar_edit;
+		var ed=fbar.ed;
+		if(ed.GetTextSize()){
+			fbar.HookedEdit([0,ed.GetTextSize(),undefined])
+			fbar.sel0.ccnt=0
+			fbar.sel1.ccnt=0
+			fbar.CallOnChange()
+		}
 		//if(obj.m_close_on_esc){
 		//	UI.top.app.document_area.CloseTab()
 		//	for(var i=0;i<UI.g_all_document_windows.length;i++){
