@@ -2,14 +2,14 @@
 	"type":"hsplit",
 	"split":0.2,
 	"children":[
+		{"type":"util","name":"h_tools"},
 		{
 			"type":"vsplit",
-			"split":0.75,
+			"split":0.8,
 			"children":[
-				{"type":"util","name":"v_tools"},
-				{"type":"util","name":"h_tools"}
+				{"type":"doc","name":"doc_default"},
+				{"type":"util","name":"v_tools"}
 			]
 		},
-		{"type":"doc","name":"doc_default"}
 	]
 }

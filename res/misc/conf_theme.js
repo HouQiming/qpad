@@ -696,6 +696,7 @@ UI.CustomTheme=function(){
 			misc_color:L?0xff7f7f7f:0xff7f7f7f,
 			basepath_color:L?0xffcccccc:0xff666666,
 			sel_bgcolor:C,
+			sel_bgcolor_deactivated:L?0xff7f7f7f:0xff7f7f7f,
 			sel_file_icon_color:L?0xffffffff:0xffe8e8e8,
 			sel_name_color:L?0xffffffff:0xffe8e8e8,
 			sel_misc_color:L?0xffcccccc:0xffcccccc,

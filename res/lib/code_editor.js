@@ -1677,8 +1677,8 @@ var find_context_prototype={
 					if(!repo.is_parsing){
 						this.m_repo_files=repo.files.filter(function(fn){
 							var repos=g_repo_from_file[fn]
-							if(repos&&repos[this.m_repo_path]=='!!'){
-								//do not search ignored files -- even though we show them in the project listing
+							if(repos&&(repos[this.m_repo_path]=='!!'||repos[this.m_repo_path]=='??')){
+								//do not search ignored / untracked files -- even though we show them in the project listing
 								return 0;
 							}
 							if(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE){
@@ -2947,7 +2947,8 @@ W.FileItemOnDemand=function(){
 	if(!this.name_to_find){
 		if(this.is_tree_view){
 			var nd_parent=this.parent;
-			var parent_expanded=(!nd_parent||!nd_parent.is_hidden&&UI.m_current_file_list.m_treeview_metadata[nd_parent.name]);
+			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
+			var parent_expanded=(!nd_parent||!nd_parent.is_hidden&&git_treeview_metadata[nd_parent.name]);
 			this.is_hidden=!parent_expanded;
 			this.h=(this.is_hidden?0:UI.default_styles.file_item.h_dense);
 		}
@@ -2958,7 +2959,6 @@ W.FileItemOnDemand=function(){
 		this.m_find_context=IO.CreateEnumFileContext(this.name_to_find,3)
 	}
 	var ret=[];
-	//var h_item=(UI.m_ui_metadata.new_page_mode=='fs_view'?UI.default_styles.file_item.h_dense:UI.default_styles.file_item.h);
 	var h_item=UI.default_styles.file_item.h_dense;
 	while(UI.g_file_listing_budget>0){
 		var fnext=this.m_find_context()
@@ -3199,9 +3199,10 @@ var FormatRelativeTime=function(then,now){
 		if(now[1]==then[1]){
 			if(now[2]==then[2]){
 				return UI.Format("@1:@2",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
-			}else if(now[2]==then[2]+1){
-				return UI.Format("@1:@2 Yesterday",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
 			}
+			//else if(now[2]==then[2]+1){
+			//	return UI.Format("@1:@2 Yesterday",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
+			//}
 		}
 		return UI.MonthDay(then[1],then[2])
 	}else{
@@ -3211,11 +3212,15 @@ var FormatRelativeTime=function(then,now){
 
 var OpenInPlace=function(obj,name){
 	var fn=IO.NormalizeFileName(name)
+	var editor_widget=obj.editor_widget
 	var my_tabid=undefined
-	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		if(UI.g_all_document_windows[i].main_widget===obj){
-			my_tabid=i
-			break
+	if(editor_widget&&!editor_widget.m_is_special_document){editor_widget=undefined;}
+	if(editor_widget){
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			if(UI.g_all_document_windows[i].main_widget===editor_widget){
+				my_tabid=i
+				break
+			}
 		}
 	}
 	//alt+q searched switch should count BIG toward the switching history
@@ -3239,23 +3244,27 @@ var OpenInPlace=function(obj,name){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		if(i!=my_tabid&&UI.g_all_document_windows[i].file_name==fn){
 			UI.top.app.document_area.SetTab(i)
-			UI.top.app.document_area.CloseTab(my_tabid)
+			if(my_tabid!=undefined){UI.top.app.document_area.CloseTab(my_tabid);}
 			return
 		}
 	}
-	var lang=UI.ED_GetFileLanguage(fn);
-	if(lang.is_binary){
-		UI.top.app.document_area.CloseTab(my_tabid)
-		UI.NewBinaryEditorTab(fn)
-		return
+	if(editor_widget){
+		var lang=UI.ED_GetFileLanguage(fn);
+		if(lang.is_binary){
+			if(my_tabid!=undefined){UI.top.app.document_area.CloseTab(my_tabid);}
+			UI.NewBinaryEditorTab(fn)
+			return
+		}
+		editor_widget.file_name=fn
+		editor_widget.doc=undefined
+		editor_widget.m_is_special_document=undefined;
+		editor_widget.m_is_preview=undefined;
+		UI.top.app.quit_on_zero_tab=0;
+		UI.m_current_file_list=undefined
+		UI.top.app.document_area.SetTab(my_tabid)
+	}else{
+		UI.OpenEditorWindow(fn)
 	}
-	obj.file_name=fn
-	obj.doc=undefined
-	obj.m_is_special_document=undefined;
-	obj.m_is_preview=undefined;
-	obj.m_sxs_visualizer=undefined;
-	UI.top.app.quit_on_zero_tab=0;
-	UI.m_current_file_list=undefined
 	//UI.ClearFileListingCache();
 	UI.Refresh()
 }
@@ -3265,7 +3274,8 @@ var FileItem_prototype={
 		if(this.name_to_find){return;}
 		if(this.is_dir){
 			if(this.is_tree_view){
-				UI.m_current_file_list.m_treeview_metadata[this.name]=!UI.m_current_file_list.m_treeview_metadata[this.name];
+				var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
+				git_treeview_metadata[this.name]=!git_treeview_metadata[this.name];
 				UI.Refresh();
 				return;
 			}
@@ -3279,8 +3289,14 @@ var FileItem_prototype={
 			UI.Refresh()
 			return
 		}
-		var obj=this.owner.owner;
+		var obj=this.owner;
 		OpenInPlace(obj,this.name)
+		var fbar=obj.find_bar_edit
+		var ed=fbar.ed
+		fbar.HookedEdit([0,ed.GetTextSize(),undefined])
+		fbar.sel0.ccnt=0
+		fbar.sel1.ccnt=0
+		fbar.CallOnChange()
 	},
 };
 W.FileItem=function(id,attrs){
@@ -3291,11 +3307,12 @@ W.FileItem=function(id,attrs){
 		obj.x+=dx_indent;
 		obj.w-=dx_indent;
 		var s_try_to_focus=(obj.owner.m_try_to_focus);
+		var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 		if(s_try_to_focus){
 			var is_me_focus=0;
 			if(obj.name==s_try_to_focus){
 				is_me_focus=1;
-			}else if(obj.is_dir&&!UI.m_current_file_list.m_treeview_metadata[obj.name]){
+			}else if(obj.is_dir&&!git_treeview_metadata[obj.name]){
 				if(obj.name.length<s_try_to_focus&&s_try_to_focus.substr(0,obj.name.length)==obj.name){
 					is_me_focus=1;
 				}
@@ -3340,7 +3357,7 @@ W.FileItem=function(id,attrs){
 				var icon_code=(Language.g_icon_overrides[s_ext]||desc.file_icon||'档').charCodeAt(0)
 				if(obj.is_dir){
 					ext_color=obj.dir_icon_color;
-					if(obj.is_tree_view&&UI.m_current_file_list.m_treeview_metadata[obj.name]){
+					if(obj.is_tree_view&&git_treeview_metadata[obj.name]){
 						icon_code=0x5f00;//'开'.charCodeAt(0)
 					}else{
 						icon_code=0x5939;//'夹'.charCodeAt(0)
@@ -3351,14 +3368,8 @@ W.FileItem=function(id,attrs){
 					icon_code='新'.charCodeAt(0)
 				}
 				//var sel_bgcolor=(ext_color|0xff000000)
-				var sel_bgcolor=obj.sel_bgcolor;
+				var sel_bgcolor=obj.owner.activated?obj.sel_bgcolor:obj.sel_bgcolor_deactivated;
 				//////////////
-				//var icon_font=obj.icon_font;
-				//var h_icon=obj.h_icon;
-				//if(UI.m_ui_metadata.new_page_mode=='fs_view'){
-				//	icon_font=obj.icon_font_dense;
-				//	h_icon=obj.h_icon_dense;
-				//}
 				var icon_font=obj.icon_font_dense;
 				var h_icon=obj.h_icon_dense;
 				var w_icon=UI.GetCharacterAdvance(icon_font,icon_code)
@@ -3377,21 +3388,22 @@ W.FileItem=function(id,attrs){
 				var sname=UI.RemovePath(obj.name);
 				if(obj.is_dir){sname=sname+"/";}
 				//var stag=undefined;
-				if((obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!='fs_view')&&obj.is_tree_view!=1){
+				//(obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!='fs_view')&&
+				if(obj.is_tree_view!=1){
 					var repos=g_repo_from_file[obj.name]
 					if(repos){
 						var s_git_status=undefined;
-						if(UI.m_ui_metadata.new_page_mode!='fs_view'){
-							for(var skey in repos){
-								s_git_status=repos[skey];
-								//if(obj.is_tree_view!=1){
-								//	stag=skey;
-								//}
-								break;
-							}
-						}else{
-							s_git_status=repos[obj.owner.m_file_list_repo];
+						for(var skey in repos){
+							s_git_status=repos[skey];
+							//if(obj.is_tree_view!=1){
+							//	stag=skey;
+							//}
+							break;
 						}
+						//if(UI.m_ui_metadata.new_page_mode!='fs_view'){
+						//}else{
+						//	s_git_status=repos[obj.owner.m_file_list_repo];
+						//}
 						var s_git_icon=undefined;
 						var git_icon_color=undefined;
 						if(s_git_status){
@@ -3469,7 +3481,7 @@ W.FileItem=function(id,attrs){
 				var name_font=obj.name_font;
 				var name_font_bold=obj.name_font_bold;
 				var w_name=Math.max(obj.w-20-w_icon-dims_misc.w-4,64);
-				if(UI.m_ui_metadata.new_page_mode=='fs_view'||obj.is_tree_view){
+				if(obj.owner.m_is_fs_view||obj.is_tree_view){
 					var dims=UI.MeasureText(name_font,sname);
 					if(dims.w>w_name){
 						var size=obj.name_font_size*(w_name/dims.w);
@@ -3522,7 +3534,7 @@ W.FileItem=function(id,attrs){
 }
 
 var fnewpage_findbar_plugin=function(){
-	this.AddEventHandler('ESC',function(){
+	/*this.AddEventHandler('ESC',function(){
 		var obj=this.owner
 		if(obj.m_close_on_esc){
 			UI.top.app.document_area.CloseTab()
@@ -3534,19 +3546,21 @@ var fnewpage_findbar_plugin=function(){
 			}
 		}else{
 			var editor_widget=obj.owner
-			editor_widget.m_is_special_document=0
-			if(editor_widget.m_file_name_before_preview){
-				//clear preview
-				editor_widget.file_name=editor_widget.m_file_name_before_preview
-				editor_widget.doc=undefined
-				editor_widget.m_is_preview=0
-				editor_widget.m_file_name_before_preview=undefined
+			if(editor_widget){
+				editor_widget.m_is_special_document=0
+				if(editor_widget.m_file_name_before_preview){
+					//clear preview
+					editor_widget.file_name=editor_widget.m_file_name_before_preview
+					editor_widget.doc=undefined
+					editor_widget.m_is_preview=0
+					editor_widget.m_file_name_before_preview=undefined
+				}
 			}
 		}
 		UI.m_current_file_list=undefined;
 		//UI.ClearFileListingCache();
 		UI.Refresh()
-	})
+	})*/
 	this.OnMouseWheel=function(event){
 		var obj=this.owner
 		obj.file_list.OnMouseWheel(event)
@@ -3556,11 +3570,12 @@ var fnewpage_findbar_plugin=function(){
 		obj.file_list.OnKeyDown(event)
 	}
 	this.AddEventHandler('LEFT',function(){
-		if(UI.m_current_file_list.m_treeview_metadata){
-			var obj=this.owner
+		var obj=this.owner
+		if(obj.m_is_project_mode){
+			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			var cur_item=obj.file_list.items[obj.file_list.value];
-			if(cur_item.is_tree_view&&cur_item.is_dir&&UI.m_current_file_list.m_treeview_metadata[cur_item.name]){
-				UI.m_current_file_list.m_treeview_metadata[cur_item.name]=0;
+			if(cur_item.is_tree_view&&cur_item.is_dir&&git_treeview_metadata[cur_item.name]){
+				git_treeview_metadata[cur_item.name]=0;
 				UI.Refresh();
 				return;
 			}
@@ -3578,11 +3593,12 @@ var fnewpage_findbar_plugin=function(){
 		return 1;
 	})
 	this.AddEventHandler('RIGHT',function(){
-		if(UI.m_current_file_list.m_treeview_metadata){
-			var obj=this.owner
+		var obj=this.owner
+		if(obj.m_is_project_mode){
+			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			var cur_item=obj.file_list.items[obj.file_list.value];
 			if(cur_item.is_tree_view&&cur_item.is_dir){
-				UI.m_current_file_list.m_treeview_metadata[cur_item.name]=1;
+				git_treeview_metadata[cur_item.name]=1;
 				UI.Refresh();
 				return;
 			}
@@ -3661,7 +3677,7 @@ var fnewpage_findbar_plugin=function(){
 		}
 	})
 	this.AddEventHandler('ALT+UP',function(key,event){
-		if(UI.m_ui_metadata.new_page_mode!='fs_view'){return 1;}
+		if(!this.owner.m_is_fs_view){return 1;}
 		var ccnt_end=this.ed.GetTextSize();
 		var s=IO.NormalizeFileName(this.ed.GetText());
 		var s2=UI.GetPathFromFilename(UI.GetPathFromFilename(s));
@@ -3678,17 +3694,18 @@ var fnewpage_findbar_plugin=function(){
 		return 0;
 	})
 	this.AddEventHandler('ALT+LEFT',function(key,event){
-		if(UI.m_ui_metadata.new_page_mode!='fs_view'){return 1;}
+		if(!this.owner.m_is_fs_view){return 1;}
 		this.Undo()
 	})
 	this.AddEventHandler('ALT+RIGHT',function(key,event){
-		if(UI.m_ui_metadata.new_page_mode!='fs_view'){return 1;}
+		if(!this.owner.m_is_fs_view){return 1;}
 		this.Redo()
 	})
 }
 
 var g_regexp_backslash=new RegExp("\\\\","g");
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
+var g_regexp_is_path=new RegExp("(([a-zA-Z]:[\\\\/])|[~\\\\/]|([.]+[\\\\/])).*");
 var FILE_RELEVANCE_SWITCH_SCORE=32
 var FILE_RELEVANCE_REPO_SCORE=8
 var FILE_RELEVANCE_BASE_SCORE=4
@@ -3705,7 +3722,7 @@ var g_root_items;
 	}
 })()
 //var FILE_RELEVANCE_SAME_REPO_NON_HIST=16
-W.SXS_NewPage=function(id,attrs){
+W.FileBrowserPage=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
 	UI.Begin(obj)
 	UI.RoundRect(obj)
@@ -3714,7 +3731,7 @@ W.SXS_NewPage=function(id,attrs){
 	UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h_find_bar,
 		color:obj.find_bar_bgcolor})
 	var w_buttons=0;
-	if(UI.m_ui_metadata.new_page_mode!='fs_view'&&!s_search_text){
+	if(!s_search_text){
 		//manage projects button
 		W.Button("manage_button",{
 			x:0,y:0,h:obj.h_find_bar,
@@ -3723,7 +3740,7 @@ W.SXS_NewPage=function(id,attrs){
 			tooltip:"Manage projects...",
 			anchor:'parent',anchor_align:'right',anchor_valign:'up',
 			OnClick:function(){
-				UI.top.app.document_area.CloseTab()
+				//UI.top.app.document_area.CloseTab()
 				UI.OpenEditorWindow("*project_list")
 			}
 		})
@@ -3749,20 +3766,20 @@ W.SXS_NewPage=function(id,attrs){
 		default_focus:2,
 		tab_width:UI.GetOption("tab_width",4),
 	});
-	if(is_find_bar_new&&UI.m_ui_metadata.new_page_mode=='fs_view'){
-		//set initial path - UI.m_new_document_search_path
-		obj.find_bar_edit.HookedEdit([0,0,(UI.m_new_document_search_path+"/")||"./"])
-		var ccnt=obj.find_bar_edit.ed.GetTextSize();
-		obj.find_bar_edit.SetSelection(ccnt,ccnt)
-	}
+	//if(is_find_bar_new&&UI.m_ui_metadata.new_page_mode=='fs_view'){
+	//	//set initial path - UI.m_new_document_search_path
+	//	obj.find_bar_edit.HookedEdit([0,0,(UI.m_new_document_search_path+"/")||"./"])
+	//	var ccnt=obj.find_bar_edit.ed.GetTextSize();
+	//	obj.find_bar_edit.SetSelection(ccnt,ccnt)
+	//}
 	if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
 		W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
 			font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-			text:UI.m_ui_metadata.new_page_mode=='fs_view'?UI._("Path"):UI._("Listing projects, type to search files")})
+			text:UI._("Listing projects, type to search files")})
 	}
 	////////////////////////////////////////////
 	UI.m_current_file_list=obj.m_current_file_list
-	if(UI.m_ui_metadata.new_page_mode=='fs_view'){
+	if(obj.m_is_fs_view){
 		UI.g_file_listing_budget=FILE_LISTING_BUDGET_FS_VIEW;
 	}else{
 		UI.g_file_listing_budget=FILE_LISTING_BUDGET;
@@ -3777,20 +3794,22 @@ W.SXS_NewPage=function(id,attrs){
 			m_appeared_full_names:{},
 			m_listed_git_repos:{},
 		}
+		obj.m_is_fs_view=0;
 		UI.m_current_file_list=obj.m_current_file_list
 		files=[];
 		///////////////////////
 		var s_search_text=obj.find_bar_edit.ed.GetText()
 		var projects=(UI.m_ui_metadata["<projects>"]||[]);
+		obj.m_is_project_mode=(!s_search_text);
 		//sync current projects to a map - UI.g_transient_projects
-		if(UI.m_ui_metadata.new_page_mode!='fs_view'&&!s_search_text){
+		//UI.m_ui_metadata.new_page_mode!='fs_view'&&
+		if(!s_search_text){
 			//empty search string, project view
 			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			if(!git_treeview_metadata){
 				git_treeview_metadata={};
 				UI.m_ui_metadata["<project-treeview>"]=git_treeview_metadata;
 			}
-			UI.m_current_file_list.m_treeview_metadata=git_treeview_metadata;
 			if(projects.length>0){
 				files.push({caption:"Projects",no_selection:1,h:32})
 				for(var i=0;i<projects.length;i++){
@@ -3818,7 +3837,7 @@ W.SXS_NewPage=function(id,attrs){
 			//only do space split for hist mode
 			//if(s_search_text.indexOf('/')<0){
 			var hist=UI.m_ui_metadata["<history>"]
-			if(hist&&UI.m_ui_metadata.new_page_mode!='fs_view'&&!(s_search_text.search(g_regexp_abspath)>=0)){
+			if(hist&&!(s_search_text.match(g_regexp_is_path))){
 				var hist_keywords=s_search_text.split(" ").filter(function(a){return a.toLowerCase()});
 				for(var i=hist.length-1;i>=0;i--){
 					var fn_i=hist[i],fn_i_search=fn_i.toLowerCase()
@@ -3880,6 +3899,8 @@ W.SXS_NewPage=function(id,attrs){
 				}
 				//sort by relevance
 				files.sort(function(a,b){return b.relevance-a.relevance||b.hist_ord-a.hist_ord;});
+			}else{
+				obj.m_is_fs_view=1;
 			}
 			//file system part, leave them unsorted
 			var spath=s_search_text
@@ -3894,7 +3915,7 @@ W.SXS_NewPage=function(id,attrs){
 				//git project part
 				var spath_repo=DetectRepository(spath+"*")
 				obj.m_file_list_repo=spath_repo;
-				if(spath_repo&&UI.m_ui_metadata.new_page_mode!='fs_view'){
+				if(spath_repo&&!obj.m_is_fs_view){
 					if(!UI.m_current_file_list.m_listed_git_repos[spath_repo]){
 						UI.m_current_file_list.m_listed_git_repos[spath_repo]=1
 						files.push({git_repo_to_list:spath_repo, search_text:s_search_text})
@@ -3913,10 +3934,10 @@ W.SXS_NewPage=function(id,attrs){
 	}
 	UI.default_styles.file_item.__proto__=FileItem_prototype;
 	UI.m_current_file_list.m_ui_obj=W.ListView('file_list',{
-		x:obj.x+4,y:obj.y+obj.h_find_bar+4,w:obj.w-8,h:obj.h-obj.h_find_bar-4,
+		x:obj.x+4,y:obj.y+obj.h_find_bar+4,w:obj.w-10,h:obj.h-obj.h_find_bar-4,
 		mouse_wheel_speed:80,
 		dimension:'y',layout_spacing:0,layout_align:'fill',
-		OnDemandSort:UI.m_ui_metadata.new_page_mode=='fs_view'?W.FileItemOnDemandSort:undefined,
+		OnDemandSort:obj.m_is_fs_view?W.FileItemOnDemandSort:undefined,
 		OnDemand:W.FileItemOnDemand,
 		OnFocus:function(){
 			UI.SetFocus(obj.find_bar_edit);
@@ -3928,7 +3949,8 @@ W.SXS_NewPage=function(id,attrs){
 			this.OpenPreview(value,"explicit")
 		},
 		OpenPreview:function(value,is_explicit){
-			var editor_widget=obj.owner
+			var editor_widget=obj.editor_widget
+			if(!editor_widget){return;}
 			if(!editor_widget.m_is_special_document||!UI.HasFocus(obj.find_bar_edit)&&!is_explicit){return;}
 			if(!this.items.length){return;}
 			if(!this.items[value].name||this.items[value].is_dir){return;}
@@ -3971,7 +3993,86 @@ W.SXS_NewPage=function(id,attrs){
 	UI.PopCliprect()
 	UI.End()
 	return obj
+};
+
+UI.ExplicitFileOpen=function(){
+	//new_page_mode
+	UI.UpdateNewDocumentSearchPath();
+	var tab_frontmost=UI.GetFrontMostEditorTab();
+	if(!tab_frontmost||!tab_frontmost.is_preview_window){
+		var tab_preview=UI.NewCodeEditorTab();
+		tab_preview.is_preview_window=1;
+		tab_preview.title="Preview"
+	}
+	UI.OpenUtilTab('file_browser')
+	UI.Refresh()
 }
+
+UI.g_util_tab_openers={};
+UI.FindUtilTab=function(util_type,do_settab){
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		if(UI.g_all_document_windows[i].util_type==util_type){
+			if(do_settab){
+				UI.top.app.document_area.SetTab(i)
+			}
+			return UI.g_all_document_windows[i];
+		}
+	}
+	return undefined;
+}
+UI.OpenUtilTab=function(util_type){
+	var ret=UI.FindUtilTab(util_type,1);
+	if(ret){
+		return ret;
+	}
+	var f=UI.g_util_tab_openers[util_type];
+	if(f){
+		var ret=f();
+		ret.util_type=util_type;
+		return ret;
+	}else{
+		return undefined;
+	}
+};
+
+UI.RegisterUtilType=function(util_type,f){
+	UI.g_util_tab_openers[util_type]=f;
+};
+
+UI.GetFrontMostEditorTab=function(){
+	var tab_frontmost=undefined;
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var item_i=UI.g_all_document_windows[i];
+		var name=(item_i.area_name||"doc_default");
+		if(name.length<4||name.substr(0,4)!='doc_'){
+			continue;
+		}
+		if(!tab_frontmost||(tab_frontmost.z_order||0)<(item_i.z_order||0)){
+			tab_frontmost=item_i;
+		}
+		item_i.__global_tab_id=i;
+	}
+	return tab_frontmost;
+}
+
+UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
+	title:"Files",
+	area_name:"h_tools",
+	body:function(){
+		//frontmost doc
+		var tab_frontmost=UI.GetFrontMostEditorTab();
+		var body=W.FileBrowserPage('body',{
+			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
+			'editor_widget':tab_frontmost&&tab_frontmost.main_widget,
+			'activated':this==UI.top.app.document_area.active_tab,
+			'x':0,'y':0});
+		this.util_widget=body;
+		return body;
+	},
+	Save:function(){},
+	SaveMetaData:function(){},
+	OnDestroy:function(){},
+})});
 
 UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
 	if(obj.m_prev_next_button_drawn!=UI.m_frame_tick){
@@ -5478,13 +5579,12 @@ UI.NewCodeEditorTab=function(fname0){
 				'file_name':this.file_name,
 			};
 			if(!this.main_widget&&!fname0){
-				if(this.auto_focus_file_search){
-					attrs.m_is_special_document=1;
-					attrs.m_sxs_visualizer=W.SXS_NewPage;
-					UI.InvalidateCurrentFrame();
-				}else if(this.is_options_window){
+				if(this.is_options_window){
 					attrs.m_is_special_document=1;
 					attrs.m_sxs_visualizer=W.SXS_OptionsPage;
+					UI.InvalidateCurrentFrame();
+				}else if(this.is_preview_window){
+					attrs.m_is_special_document=1;
 					UI.InvalidateCurrentFrame();
 				}
 			}
@@ -5525,12 +5625,12 @@ UI.NewCodeEditorTab=function(fname0){
 					this.need_save=1
 				}
 			}
-			if(this.auto_focus_file_search&&body.sxs_visualizer&&body.sxs_visualizer.find_bar_edit){
-				this.auto_focus_file_search=0
-				UI.SetFocus(body.sxs_visualizer.find_bar_edit)
-				body.sxs_visualizer.m_close_on_esc=1
-				UI.Refresh()
-			}
+			//if(this.auto_focus_file_search&&body.sxs_visualizer&&body.sxs_visualizer.find_bar_edit){
+			//	this.auto_focus_file_search=0
+			//	UI.SetFocus(body.sxs_visualizer.find_bar_edit)
+			//	body.sxs_visualizer.m_close_on_esc=1
+			//	UI.Refresh()
+			//}
 			return body;
 		},
 		Save:function(){
@@ -6086,7 +6186,7 @@ UI.NewOptionsTab=function(){
 	var tab=UI.NewCodeEditorTab();
 	tab.is_options_window=1
 	tab.title=UI._("Preferences")
-	tab.file_name="*res/misc/example.cpp"
+	tab.file_name="*res/misc/example.cpp";
 	return tab;
 }
 
@@ -6094,7 +6194,9 @@ UI.NewOptionsTab=function(){
 //multi-file editing
 UI.g_editor_from_file={};
 UI.OpenCodeEditorDocument=function(fn,is_preview){
-	fn=IO.NormalizeFileName(fn);
+	if(!(fn&&fn.substr(0,1)=='*')){
+		fn=IO.NormalizeFileName(fn);
+	}
 	///////////////////////////
 	if(!is_preview){
 		var doc=UI.g_editor_from_file[fn];
@@ -6241,8 +6343,9 @@ UI.RegisterSpecialFile("project_list",{
 			if(!IO.DirExists(fn)){continue;}
 			projects.push(fn)
 			UI.m_ui_metadata["<projects>"]=projects;
-			if(UI.m_current_file_list){
-				var obj=UI.m_current_file_list.m_owner;
+			var tab=UI.FindUtilTab("file_browser",0);
+			if(tab){
+				var obj=tab.util_widget;
 				if(obj){
 					obj.m_file_list=undefined
 					obj.m_try_to_focus=undefined;

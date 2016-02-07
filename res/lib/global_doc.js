@@ -113,6 +113,10 @@ UI.SaveWorkspace=function(){
 	var workspace=[];
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var wnd=UI.g_all_document_windows[i]
+		if(wnd.util_type){
+			workspace.push({util_type:wnd.util_type,z_order:(wnd.z_order||0),area_name:wnd.area_name})
+			continue;
+		}
 		if(wnd.main_widget&&wnd.main_widget.m_is_special_document){continue;}
 		if((wnd.main_widget&&wnd.main_widget.file_name||wnd.file_name).indexOf('<')>=0){continue;}
 		workspace.push({file_name:wnd.file_name,z_order:(wnd.z_order||0),area_name:wnd.area_name})

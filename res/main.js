@@ -82,7 +82,10 @@ UI.NewTab=function(tab){
 		tab.z_order=UI.g_current_z_value;
 		UI.g_current_z_value++;
 	}
-	var obj_active_tab=(UI.top.app.document_area&&UI.top.app.document_area.active_tab);
+	var obj_active_tab=UI.GetFrontMostEditorTab();
+	if(obj_active_tab){
+		current_tab_id=obj_active_tab.__global_tab_id;
+	}
 	if(!tab.area_name&&obj_active_tab){
 		tab.area_name=obj_active_tab.area_name;
 	}
@@ -255,38 +258,6 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 
 UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
-UI.OpenFileListWindow=function(force_mode){
-	var active_document=UI.top.app.document_area.active_tab
-	if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document&&active_document.main_widget.m_sxs_visualizer==W.SXS_NewPage){
-		//repeated alt+q
-		if(!force_mode||force_mode!=UI.m_ui_metadata.new_page_mode){
-			if(force_mode){
-				UI.m_ui_metadata.new_page_mode=force_mode;
-			}else{
-				if(UI.m_ui_metadata.new_page_mode=='fs_view'){
-					UI.m_ui_metadata.new_page_mode='hist_view';
-				}else{
-					UI.m_ui_metadata.new_page_mode='fs_view';
-				}
-			}
-			if(active_document.main_widget.sxs_visualizer){
-				var obj_find_bar_edit=active_document.main_widget.sxs_visualizer.find_bar_edit;
-				if(obj_find_bar_edit){
-					if(obj_find_bar_edit.OnDestroy){obj_find_bar_edit.OnDestroy();}
-					active_document.main_widget.sxs_visualizer.find_bar_edit=undefined;
-				}
-				active_document.main_widget.sxs_visualizer.m_file_list=undefined;
-			}
-		}
-		UI.Refresh()
-		return;
-	}
-	UI.UpdateNewDocumentSearchPath()
-	var tab=UI.NewCodeEditorTab();
-	tab.auto_focus_file_search=1
-	tab.title=UI._("New Tab");
-	UI.Refresh()
-};
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -432,11 +403,12 @@ UI.Application=function(id,attrs){
 			}
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({icon:"时",text:"Recent / projec&t...",
-				key:UI.m_ui_metadata.new_page_mode!='fs_view'?"ALT+Q":"ALT+Q,Q",
-				enable_hotkey:0,action:UI.OpenFileListWindow.bind(undefined,'hist_view')})
-			menu_file.AddNormalItem({text:"&Browse...",
-				key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
-				enable_hotkey:0,action:UI.OpenFileListWindow.bind(undefined,'fs_view')})
+				key:"ALT+Q",
+				enable_hotkey:1,action:UI.ExplicitFileOpen})
+			//UI.OpenUtilTab.bind(undefined,'hist_view')
+			//menu_file.AddNormalItem({text:"&Browse...",
+			//	key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
+			//	enable_hotkey:0,action:UI.OpenUtilTab.bind(undefined,'fs_view')})
 			menu_file.AddNormalItem({text:"Arran&ge tabs",
 				enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
 			menu_file.AddNormalItem({text:"Manage projects...",
@@ -444,7 +416,7 @@ UI.Application=function(id,attrs){
 					UI.OpenEditorWindow("*project_list")
 				}})
 			//obj.ArrangeTabs.bind(obj.current_tab_id)
-			W.Hotkey("",{key:"ALT+Q",action:UI.OpenFileListWindow})
+			//W.Hotkey("",{key:"ALT+Q",action:UI.ExplicitFileOpen})
 			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
 				menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
 					if(UI.m_closed_windows.length>0){
@@ -525,7 +497,11 @@ UI.Application=function(id,attrs){
 			UI.g_current_z_value=0;
 			for(var i=0;i<workspace.length;i++){
 				//UI.NewCodeEditorTab(workspace[i])
-				UI.OpenEditorWindow(workspace[i].file_name)
+				if(workspace[i].util_type){
+					UI.OpenUtilTab(workspace[i].util_type)
+				}else{
+					UI.OpenEditorWindow(workspace[i].file_name)
+				}
 				var item=UI.top.app.document_area.items[UI.top.app.document_area.items.length-1];
 				item.z_order=workspace[i].z_order;
 				item.area_name=workspace[i].area_name;
@@ -568,7 +544,7 @@ UI.Application=function(id,attrs){
 		//UI.UpdateNewDocumentSearchPath()
 		UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
 		UI.m_previous_document=undefined
-		UI.OpenFileListWindow();
+		UI.OpenUtilTab('file_browser');
 		UI.InvalidateCurrentFrame()
 		UI.Refresh()
 		app.quit_on_zero_tab=1;
