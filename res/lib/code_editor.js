@@ -3293,10 +3293,12 @@ var FileItem_prototype={
 		OpenInPlace(obj,this.name)
 		var fbar=obj.find_bar_edit
 		var ed=fbar.ed
-		fbar.HookedEdit([0,ed.GetTextSize(),undefined])
-		fbar.sel0.ccnt=0
-		fbar.sel1.ccnt=0
-		fbar.CallOnChange()
+		if(ed.GetTextSize()){
+			fbar.HookedEdit([0,ed.GetTextSize(),undefined])
+			fbar.sel0.ccnt=0
+			fbar.sel1.ccnt=0
+			fbar.CallOnChange()
+		}
 	},
 };
 W.FileItem=function(id,attrs){
@@ -3488,7 +3490,7 @@ W.FileItem=function(id,attrs){
 						name_font=UI.Font(UI.font_name,size,-50);
 						name_font_bold=UI.Font(UI.font_name,size,100);
 					}
-					W.Text("",{x:obj.x+w_icon+2,y:obj.y+2,
+					W.Text("",{x:obj.x+w_icon+2,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
 						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:name_color})
 				}else{
@@ -3502,11 +3504,11 @@ W.FileItem=function(id,attrs){
 					}
 					var lg_basepath=obj.name.length-sname.length
 					if(lg_basepath>0){
-						W.Text("",{x:obj.x+w_icon+2,y:obj.y+2,
+						W.Text("",{x:obj.x+w_icon+2,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
 							font:name_font,text:obj.name.substr(0,lg_basepath),
 							color:obj.name_to_create?(obj.selected?obj.sel_misc_color:obj.misc_color):(obj.selected?obj.sel_basepath_color:obj.basepath_color)})
 					}
-					W.Text("",{x:obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+2,
+					W.Text("",{x:obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,lg_basepath)).w,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
 						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:obj.name_color})
 					if(obj.history_hl_ranges&&!obj.name_to_create){
@@ -3517,7 +3519,7 @@ W.FileItem=function(id,attrs){
 							var p1=obj.history_hl_ranges[i+1];//Math.max(obj.history_hl_ranges[i+1]-base_offset,0);
 							if(p0<p1){
 								var x=obj.x+w_icon+2+UI.MeasureText(name_font,obj.name.substr(0,p0)).w
-								W.Text("",{x:x,y:obj.y+2,
+								W.Text("",{x:x,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
 									font:name_font_bold,text:obj.name.substr(p0,p1-p0),
 									color:obj.selected?obj.sel_name_color:obj.name_color})
 							}
@@ -3534,33 +3536,42 @@ W.FileItem=function(id,attrs){
 }
 
 var fnewpage_findbar_plugin=function(){
-	/*this.AddEventHandler('ESC',function(){
+	this.AddEventHandler('ESC',function(){
 		var obj=this.owner
-		if(obj.m_close_on_esc){
-			UI.top.app.document_area.CloseTab()
+		var tab_frontmost=UI.GetFrontMostEditorTab();
+		if(tab_frontmost){
 			for(var i=0;i<UI.g_all_document_windows.length;i++){
-				if(UI.g_all_document_windows[i].file_name==UI.m_previous_document){
+				if(UI.g_all_document_windows[i]==tab_frontmost){
 					UI.top.app.document_area.SetTab(i)
 					break
 				}
 			}
-		}else{
-			var editor_widget=obj.owner
-			if(editor_widget){
-				editor_widget.m_is_special_document=0
-				if(editor_widget.m_file_name_before_preview){
-					//clear preview
-					editor_widget.file_name=editor_widget.m_file_name_before_preview
-					editor_widget.doc=undefined
-					editor_widget.m_is_preview=0
-					editor_widget.m_file_name_before_preview=undefined
-				}
-			}
 		}
-		UI.m_current_file_list=undefined;
+		//if(obj.m_close_on_esc){
+		//	UI.top.app.document_area.CloseTab()
+		//	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		//		if(UI.g_all_document_windows[i].file_name==UI.m_previous_document){
+		//			UI.top.app.document_area.SetTab(i)
+		//			break
+		//		}
+		//	}
+		//}else{
+		//	var editor_widget=obj.owner
+		//	if(editor_widget){
+		//		editor_widget.m_is_special_document=0
+		//		if(editor_widget.m_file_name_before_preview){
+		//			//clear preview
+		//			editor_widget.file_name=editor_widget.m_file_name_before_preview
+		//			editor_widget.doc=undefined
+		//			editor_widget.m_is_preview=0
+		//			editor_widget.m_file_name_before_preview=undefined
+		//		}
+		//	}
+		//}
+		//UI.m_current_file_list=undefined;
 		//UI.ClearFileListingCache();
 		UI.Refresh()
-	})*/
+	})
 	this.OnMouseWheel=function(event){
 		var obj=this.owner
 		obj.file_list.OnMouseWheel(event)
@@ -3736,7 +3747,8 @@ W.FileBrowserPage=function(id,attrs){
 		W.Button("manage_button",{
 			x:0,y:0,h:obj.h_find_bar,
 			value:obj.selected,padding:8,
-			text:"Manage...",
+			font:UI.icon_font_20,
+			text:"换",
 			tooltip:"Manage projects...",
 			anchor:'parent',anchor_align:'right',anchor_valign:'up',
 			OnClick:function(){
@@ -3996,14 +4008,13 @@ W.FileBrowserPage=function(id,attrs){
 };
 
 UI.ExplicitFileOpen=function(){
-	//new_page_mode
 	UI.UpdateNewDocumentSearchPath();
-	var tab_frontmost=UI.GetFrontMostEditorTab();
-	if(!tab_frontmost||!tab_frontmost.is_preview_window){
-		var tab_preview=UI.NewCodeEditorTab();
-		tab_preview.is_preview_window=1;
-		tab_preview.title="Preview"
-	}
+	//var tab_frontmost=UI.GetFrontMostEditorTab();
+	//if(!tab_frontmost||!tab_frontmost.is_preview_window){
+	//	var tab_preview=UI.NewCodeEditorTab();
+	//	tab_preview.is_preview_window=1;
+	//	tab_preview.title="Preview"
+	//}
 	UI.OpenUtilTab('file_browser')
 	UI.Refresh()
 }
@@ -4021,6 +4032,9 @@ UI.FindUtilTab=function(util_type,do_settab){
 	return undefined;
 }
 UI.OpenUtilTab=function(util_type){
+	var layout=UI.m_ui_metadata["<layout>"];
+	layout.m_is_maximized=0;
+	UI.Refresh();
 	var ret=UI.FindUtilTab(util_type,1);
 	if(ret){
 		return ret;
