@@ -1390,6 +1390,10 @@ UI.RegisterEditorPlugin(function(){
 				}
 				var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
 				var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
+				if(s_target_indent==undefined){
+					this.Paste()
+					return;
+				}
 				var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
 				if(sinsert==undefined){
 					this.Paste()

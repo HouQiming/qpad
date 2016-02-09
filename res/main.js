@@ -4,6 +4,7 @@ require("gui2d/dockbar");
 require("res/lib/code_editor");
 require("res/lib/bin_editor");
 require("res/lib/subwin");
+require("res/lib/notebook");
 var Language=require("res/lib/langdef");
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
@@ -411,10 +412,10 @@ UI.Application=function(id,attrs){
 			//	enable_hotkey:0,action:UI.OpenUtilTab.bind(undefined,'fs_view')})
 			menu_file.AddNormalItem({text:"Arran&ge tabs",
 				enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
-			menu_file.AddNormalItem({text:"Manage projects...",
-				enable_hotkey:0,action:function(){
-					UI.OpenEditorWindow("*project_list")
-				}})
+			//menu_file.AddNormalItem({text:"Manage projects...",
+			//	enable_hotkey:0,action:function(){
+			//		UI.OpenEditorWindow("*project_list")
+			//	}})
 			//obj.ArrangeTabs.bind(obj.current_tab_id)
 			//W.Hotkey("",{key:"ALT+Q",action:UI.ExplicitFileOpen})
 			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
@@ -470,6 +471,11 @@ UI.Application=function(id,attrs){
 					}
 				}})
 			}
+			//todo
+			menu_file.AddNormalItem({text:"Open notebook...",
+				enable_hotkey:1,key:"ALT+N",
+				action:function(){UI.NewNoteBookTab("Notebook","c:/h/edtest/notebook.json");}})
+			//todo
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({text:"E&xit",action:function(){
 				if(!app.OnClose()){UI.DestroyWindow(app)}

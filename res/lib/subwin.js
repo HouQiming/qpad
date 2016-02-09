@@ -311,9 +311,6 @@ W.TabbedDocument_prototype={
 			this.SetTab(tabid)
 		}
 		var layout=UI.m_ui_metadata["<layout>"];
-		if(layout.m_is_maximized){
-			return;
-		}
 		//create a current tab label x snapshot
 		this.m_dragging_caption_areas=this.m_caption_areas;
 		this.m_dragging_tab_moved=0
@@ -339,6 +336,7 @@ W.TabbedDocument_prototype={
 		var target_position=undefined;
 		this.m_dragging_mouse_x=event.x;
 		this.m_dragging_mouse_y=event.y;
+		var layout=UI.m_ui_metadata["<layout>"];
 		for(var i=0;i<caption_areas.length;i++){
 			var area_i=caption_areas[i];
 			var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
@@ -373,7 +371,7 @@ W.TabbedDocument_prototype={
 			}
 			//window splitting check - cross-split
 			var box=area_i.content_box;
-			if(box.w>0&&box.h>0){
+			if(box.w>0&&box.h>0&&!layout.m_is_maximized){
 				var dist=segDist(box.x,box.x+box.w,event.x)+segDist(box.y,box.y+box.h,event.y)+this.split_penalty;
 				if(target_position==undefined||target_position.score>dist){
 					//source area / other area

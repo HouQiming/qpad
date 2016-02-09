@@ -42,13 +42,13 @@ __generate_json("h_files","hunspell/hunvisapi.h");
 __generate_json("h_files","hunspell/utf_info.cxx");
 
 //coulddo: do we call hunspell_free_list?
-Hunspell_create=__c_function(HSPELLER,"hunspell_initialize","hunspelldll.h")
-Hunspell_add=__c_function(int,"hunspell_add","hunspelldll.h")
-Hunspell_remove=__c_function(int,"hunspell_remove","hunspelldll.h")
-Hunspell_spell=__c_function(int,"hunspell_spell","hunspelldll.h")
-Hunspell_suggest=__c_function(int,"hunspell_suggest","hunspelldll.h")
-Hunspell_free_list=__c_function(int,"hunspell_free_list","hunspelldll.h")
-Hunspell_destroy=__c_function(int,"hunspell_uninitialize","hunspelldll.h")
+Hunspell_create=__c_function(HSPELLER,"hunspell_initialize","hunspell/hunspelldll.h")
+Hunspell_add=__c_function(int,"hunspell_add","hunspell/hunspelldll.h")
+Hunspell_remove=__c_function(int,"hunspell_remove","hunspell/hunspelldll.h")
+Hunspell_spell=__c_function(int,"hunspell_spell","hunspell/hunspelldll.h")
+Hunspell_suggest=__c_function(int,"hunspell_suggest","hunspell/hunspelldll.h")
+Hunspell_free_list=__c_function(int,"hunspell_free_list","hunspell/hunspelldll.h")
+Hunspell_destroy=__c_function(int,"hunspell_uninitialize","hunspell/hunspelldll.h")
 
 g_suggs=NULL
 g_tried_to_init=0

@@ -3416,7 +3416,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if !s_pchar:return 0
 		str=System.detail.pcharToString(s_pchar)
 		if str.IndexOf('\n')<0L:return 0
-		s_target_indent=JS.Param(0).as(string)
+		s_target_indent=JS.Param(0).or("")
 		p_trailing_space=str.n
 		while p_trailing_space>0&&(str[p_trailing_space-1]==' '||str[p_trailing_space-1]=='\t')&&p_trailing_space>str.n-MAX_INDENT:
 			p_trailing_space--
