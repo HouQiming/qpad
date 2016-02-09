@@ -92,7 +92,10 @@ if Platform.BUILD=="debug":
 	JS=new JSContext
 	JS_script_sandbox=new JSContext
 	sbox=setupModuleSystem(JS,1)
-	sbox.UILoadZip(string.NULL)
+	if Platform.BUILD=="debug":
+		sbox.UILoadZip(string.NULL)
+	else
+		sbox.UILoadStaticZip()
 	/////////////
 	jsio=JS.New()
 	JS.GetGlobal()["IO"]=jsio
