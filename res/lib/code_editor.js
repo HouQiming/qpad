@@ -148,8 +148,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			//	}
 			//}
 			this.AddEventHandler('selectionChange',function(){
+				//replace hint
 				var obj=this.owner
-				if(!obj){return;}
+				if(!obj||obj.read_only){return;}
 				var show_replace_hint=0
 				if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
 					var ccnt=this.sel1.ccnt
@@ -4287,16 +4288,20 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 }
 
 var MAX_PARSABLE_FCALL=4096
-var finvoke_find=function(mode){
+var finvoke_find=function(mode,s_force_needle){
 	var obj=this;
-	var sel=obj.doc.GetSelection()
 	obj.show_find_bar=mode;
 	//obj.m_sel0_before_find=obj.doc.sel0.ccnt
 	//obj.m_sel1_before_find=obj.doc.sel1.ccnt
-	if(sel[0]<sel[1]){
-		UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-		if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
-			UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
+	if(s_force_needle!=undefined){
+		UI.m_ui_metadata.find_state.m_current_needle=s_force_needle;
+	}else{
+		var sel=obj.doc.GetSelection()
+		if(sel[0]<sel[1]){
+			UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+			if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
+				UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
+			}
 		}
 	}
 	obj.DismissNotification('find_result')
@@ -4880,8 +4885,9 @@ W.CodeEditor=function(id,attrs){
 						s_status=UI.Format("Ln @1,@2",(lcinfo0[0]+1).toString(),(lcinfo0[1]+1).toString())
 					}
 					var status_dims=UI.MeasureText(obj.status_bar_font,s_status)
+					var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot)
 					var status_x=obj.x+w_obj_area-w_scrolling_area-status_dims.w-obj.status_bar_padding*2;
-					var status_y=obj.y+h_obj_area-status_dims.h-obj.status_bar_padding*2;
+					var status_y=obj.y+Math.min(h_obj_area,h_top_find+ytot)-status_dims.h-obj.status_bar_padding*2;
 					UI.RoundRect({
 						color:obj.status_bar_bgcolor,
 						x:status_x,y:status_y,w:status_dims.w+obj.status_bar_padding*2,h:status_dims.h+obj.status_bar_padding*2,
@@ -5472,6 +5478,20 @@ W.CodeEditor=function(id,attrs){
 							}
 						}
 					}.bind(obj)})
+					menu_search.AddNormalItem({text:"Find all references",context_menu_group:"definition",action:function(){
+						var obj=this
+						var doc=obj.doc
+						var sel=doc.GetSelection();
+						var ed=doc.ed
+						var ccnt_sel1=doc.sel1.ccnt
+						sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
+						sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
+						if(sel[0]<sel[1]){
+							var id=ed.GetText(sel[0],sel[1]-sel[0])
+							UI.m_ui_metadata.find_state.m_find_flags=(UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_WHOLE_WORD|UI.SEARCH_FLAG_HIDDEN);
+							finvoke_find.call(obj,UI.SHOW_GLOBAL_FIND,id)
+						}
+					}.bind(obj)})
 				}
 				doc.CallHooks('menu')
 				menu_edit=undefined;
@@ -5595,7 +5615,7 @@ W.CodeEditor=function(id,attrs){
 					sbar_page_y0-sbar.y>hc_bookmark?sbar_page_y0-hc_bookmark:sbar_page_y1,
 					UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity),"眼".charCodeAt(0))
 				UI.RoundRect({
-					x:sbar.x, y:sbar.y+sbar_page_y0, w:sbar.w, h:sbar_page_y1-sbar_page_y0,
+					x:sbar.x, y:sbar_page_y0, w:sbar.w, h:sbar_page_y1-sbar_page_y0,
 					color:UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity)})
 				//UI.RoundRect({
 				//	x:sbar.x, y:sbar.y+sbar_page_y0, w:sbar.w, h:obj.sbar_page_border_width,
@@ -6187,6 +6207,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{name:UI._('Show outer scope overlays'),stable_name:'show_top_hint'},
 				{name:UI._('Show line numbers'),stable_name:'show_line_numbers'},
 				{name:UI._('Show minimap'),stable_name:'show_minimap'},
+				{name:UI._('Enable sRGB-corrected blending'),stable_name:'enable_srgb'},
 			];
 			plugin_items["Controls"]=[
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
@@ -6224,6 +6245,7 @@ W.SXS_OptionsPage=function(id,attrs){
 			//OSS licenses
 			plugin_items["Open Source Licenses"]=[
 				{license_line:"stb: Public domain, authored from 2009-2013 by Sean Barrett"},
+				{license_line:"SDL: Copyright (C) 1997-2014 Sam Lantinga <slouken@libsdl.org>"},
 				{license_line:"duktape: Copyright (c) 2013-2015 by Duktape authors"},
 				{license_line:"Hunspell: Copyright (c) N\u00e9meth L\u00e1szl\u00f3"},
 			];

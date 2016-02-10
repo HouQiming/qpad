@@ -586,8 +586,16 @@ UI.CustomTheme=function(){
 		},
 		notebook_view:{
 			max_lines:8,
-			h_gap:16,
+			h_caption:24,
+			h_separation:8,
+			padding:8,
+			caption_padding:4,
+			caption_font:UI.Font(UI.font_name,20,-50),
+			caption_color:C,
+			caption_text_color:0xffffffff,
 			color:L?0xffc0c0c0:0xff333333,
+			shadow_size:4,
+			shadow_color:0xaa000000,
 			//todo
 		},
 		sxs_build_output:{

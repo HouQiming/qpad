@@ -633,7 +633,7 @@ var RenderLayout=function(layout,obj){
 			is_there=(windows_to_render[nd.name]?2:0);
 			z_order=(windows_to_render[nd.name]&&windows_to_render[nd.name].z_order||0);
 			if(!is_there&&nd.name=="doc_default"){
-				is_there=1;
+				is_there=2;
 			}
 			if(!is_there&&!(nd.name.length>=4&&nd.name.substr(0,4)=='doc_')){
 				//don't auto-delete, don't render either
@@ -899,8 +899,8 @@ W.TabbedDocument=function(id,attrs){
 		var anim=W.AnimationNode("menu_animation",{transition_dt:0.15,w_menu:w_menu})
 		//menu shadow goes below tab label
 		UI.RoundRect({
-			x:obj.x+anim.w_menu-obj.menu_bar_shadow_size,y:obj.y-obj.menu_bar_shadow_size*0.5,
-			w:obj.menu_bar_shadow_size*2,h:obj.h_caption+obj.menu_bar_shadow_size*1.5,
+			x:obj.x-obj.menu_bar_shadow_size,y:obj.y-obj.menu_bar_shadow_size*0.5,
+			w:anim.w_menu+obj.menu_bar_shadow_size*2,h:obj.h_caption+obj.menu_bar_shadow_size*1.5,
 			round:obj.menu_bar_shadow_size,
 			border_width:-obj.menu_bar_shadow_size,
 			color:obj.menu_bar_shadow_color,

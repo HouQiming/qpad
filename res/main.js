@@ -9,6 +9,9 @@ var Language=require("res/lib/langdef");
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 
+if(!UI.TestOption('enable_srgb')){
+	UI.SetSRGBEnabling(0);
+}
 UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.SetFontSharpening(1);
 (function(){
@@ -472,9 +475,11 @@ UI.Application=function(id,attrs){
 				}})
 			}
 			//todo
-			menu_file.AddNormalItem({text:"Open notebook...",
-				enable_hotkey:1,key:"ALT+N",
-				action:function(){UI.NewNoteBookTab("Notebook","c:/h/edtest/notebook.json");}})
+			if(UI.Platform.BUILD=="debug"){
+				menu_file.AddNormalItem({text:"Open notebook...",
+					enable_hotkey:1,key:"ALT+N",
+					action:function(){UI.NewNoteBookTab("Notebook","c:/h/edtest/notebook.json");}})
+			}
 			//todo
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({text:"E&xit",action:function(){
@@ -505,6 +510,8 @@ UI.Application=function(id,attrs){
 				//UI.NewCodeEditorTab(workspace[i])
 				if(workspace[i].util_type){
 					UI.OpenUtilTab(workspace[i].util_type)
+				}else if(workspace[i].document_type=='notebook'){
+					UI.NewNoteBookTab("Notebook",workspace[i].file_name)
 				}else{
 					UI.OpenEditorWindow(workspace[i].file_name)
 				}
@@ -531,6 +538,10 @@ UI.Application=function(id,attrs){
 			UI.m_cmdline_opens=[];
 		}
 		UI.g_app_inited=1;
+	}
+	if(!UI.m_ui_metadata["<has_opened_us_before>"]){
+		UI.NewOptionsTab();
+		UI.m_ui_metadata["<has_opened_us_before>"]=1;
 	}
 	if(!g_all_document_windows.length){
 		if(app.quit_on_zero_tab){

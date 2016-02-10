@@ -2,6 +2,7 @@ import "text-box.jc"
 import "bin-editor.jc"
 import "code-editor.jc"
 import "code-parser.jc"
+import "encoding.jc"
 //import "txtx-editor.jc"
 //import "zip-doc.jc"
 //import "ooc-mipmap.jc"
@@ -394,6 +395,8 @@ if Platform.BUILD=="debug":
 			if proc.pipe.WouldBlock():return 0
 			//line-based parsing? do it in JS
 			s=proc.pipe.Read(n)
+			if Platform.IS_WINDOWS:
+				s=Encoding.OSConvertString(0,"",s)
 			//System.Algorithm.NativeToUtf8()
 			return JS.Return(s)
 		}

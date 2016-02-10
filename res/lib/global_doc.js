@@ -119,7 +119,9 @@ UI.SaveWorkspace=function(){
 		}
 		if(wnd.main_widget&&wnd.main_widget.m_is_special_document){continue;}
 		if((wnd.main_widget&&wnd.main_widget.file_name||wnd.file_name).indexOf('<')>=0){continue;}
-		workspace.push({file_name:wnd.file_name,z_order:(wnd.z_order||0),area_name:wnd.area_name})
+		workspace.push({
+			file_name:wnd.file_name,document_type:wnd.document_type,
+			z_order:(wnd.z_order||0),area_name:wnd.area_name})
 	}
 	UI.m_ui_metadata["<workspace_v2>"]=workspace
 	var obj_current_tab=UI.g_all_document_windows[UI.top.app.document_area.current_tab_id]
