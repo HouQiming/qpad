@@ -1025,8 +1025,22 @@ Language.RegisterCompiler(["jc"],{
 	m_regex_cc:new RegExp('^([^:]*):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
 	m_regex_vc:new RegExp('^[ \t]*([^:]*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
 	m_regex_jc:new RegExp('([^:]*):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]+)\\)\r?\n'),
+	//m_regex_js:new RegExp('\t([^:]*):([0-9]+).*\r?\n'),
 	ParseOutput:function(sline){
-		var matches=sline.match(this.m_regex_jc)
+		//JS failure: eval, relative path and stuff...
+		//var matches=sline.match(this.m_regex_js)
+		//if(matches){
+		//	var err={}
+		//	var name=matches[1];
+		//	var linea=parseInt(matches[2]);
+		//	var err={
+		//		file_name:name,
+		//		color:this.color_tilde_compiler_warning,
+		//		message:'JS callstack dump',line0:linea-1,
+		//	}
+		//	return err
+		//}
+		var matches=sline.match(this.m_regex_jc);
 		if(matches){
 			var err={}
 			var name=matches[1];
