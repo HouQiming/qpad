@@ -3272,7 +3272,7 @@ var FormatFileSize=function(size){
 	}
 }
 
-var FormatRelativeTime=function(then,now){
+UI.FormatRelativeTime=function(then,now){
 	if(now[0]==then[0]){
 		if(now[1]==then[1]){
 			if(now[2]==then[2]){
@@ -3459,7 +3459,7 @@ W.FileItem=function(id,attrs){
 						x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
 						color:sel_bgcolor})
 				}
-				var s_time=obj.name_to_create?"":FormatRelativeTime(obj.time,UI.m_current_file_list.m_now);
+				var s_time=obj.name_to_create?"":UI.FormatRelativeTime(obj.time,UI.m_current_file_list.m_now);
 				var s_misc_text=(
 					obj.name_to_create?
 						UI._("Create new file"):
@@ -5995,7 +5995,8 @@ Language.Register({
 		'exe','dll','lib','o',
 		"png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr",
 		"mp4","mpg","mpeg","h264","avi","mov","rm","rmvb",
-		'ttf','otf'],
+		'ttf','otf',
+		'pdb','sdf'],
 	////////////////////////
 	rules:function(lang){
 		lang.DefineDefaultColor("color")

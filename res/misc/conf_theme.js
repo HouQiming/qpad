@@ -585,17 +585,18 @@ UI.CustomTheme=function(){
 			dx_min_shake:0.5,
 		},
 		notebook_view:{
-			max_lines:8,
-			h_caption:24,
+			max_lines:12,
+			h_caption:36,
 			h_separation:8,
-			padding:8,
+			padding:12,
 			caption_padding:4,
-			caption_font:UI.Font(UI.font_name,20,-50),
+			caption_font:UI.Font(UI.font_name,28,-50),
 			caption_color:C,
 			caption_text_color:0xffffffff,
 			color:L?0xffc0c0c0:0xff333333,
-			shadow_size:4,
+			shadow_size:6,
 			shadow_color:0xaa000000,
+			scale:1.0/1.25,
 			//todo
 		},
 		sxs_build_output:{

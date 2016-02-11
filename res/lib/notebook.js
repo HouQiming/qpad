@@ -84,10 +84,19 @@ var AddErrorToEditor=function(doc,err){
 	doc.m_error_overlays.push(err)
 }
 
+var JsifyBuffer=function(a){
+	var ret=[];
+	for(var i=0;i<a.length;i++){
+		ret[i]=a[i];
+	}
+	return ret;
+};
+
 W.notebook_prototype={
 	m_configuration:{},
 	Save:function(){
 		var docs=[];
+		var procs=[];
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
 			var doc_in=cell_i.m_text_in;
@@ -100,6 +109,7 @@ W.notebook_prototype={
 			docs[i*2+1]=doc_out;
 			//doc_out.saved_point=doc_out.ed.GetUndoQueueLength();
 			//doc_out.ResetSaveDiff();
+			procs[i]=cell_i.m_proc;cell_i.m_proc=undefined;
 		}
 		var s=JSON.stringify({cells:this.m_cells})
 		var sz_std=Duktape.__byte_length(s);
@@ -108,6 +118,7 @@ W.notebook_prototype={
 			var cell_i=this.m_cells[i];
 			cell_i.m_text_in=docs[i*2+0];
 			cell_i.m_text_out=docs[i*2+1];
+			cell_i.m_proc=procs[i];
 		}
 		if(!(sz_written>=sz_std)){
 			return 0;
@@ -385,27 +396,31 @@ W.notebook_prototype={
 		args.push(fn_script)
 		var proc=IO.RunToolRedirected(args,this.m_configuration.path||UI.GetPathFromFilename(this.file_name),0)
 		if(proc){
-			var fpoll=(function(){
+			var fpoll=(function(cell_i){
+				this.need_save|=2;
 				var s=proc.Read(65536)
 				//print('fpoll',s,JSON.stringify(args),proc.IsRunning())
 				if(s){
-					this.WriteCellOutput(id,s)
+					this.WriteCellOutput(cell_i.m_cell_id,s)
 					UI.NextTick(fpoll)
 				}else if(proc.IsRunning()){
 					UI.setTimeout(fpoll,100)
 				}else{
 					var code=proc.GetExitCode()
 					if(code!=0){
-						this.WriteCellOutput(id,this.file_name+":1:1: fatal error: the script has returned an error "+code+"\n")
+						this.WriteCellOutput(cell_i.m_cell_id,this.file_name+":1:1: fatal error: the script has returned an error "+code+"\n")
 					}
+					cell_i.m_proc=undefined;
+					cell_i.m_completion_time=JsifyBuffer(IO.WallClockTime());
 					IO.DeleteFile(fn_script)
 				}
-			}).bind(this)
+			}).bind(this,cell_i)
 			UI.NextTick(fpoll)
 		}else{
 			this.WriteCellOutput(id,this.file_name+":1:1: fatal error: failed to execute the script\n")
 		}
 		this.need_save|=2;
+		cell_i.m_proc={proc:proc,fn_script:fn_script};
 		UI.Refresh()
 	},
 };
@@ -413,6 +428,9 @@ W.NotebookView=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"notebook_view",W.notebook_prototype);
 	UI.Begin(obj)
 	UI.RoundRect(obj)
+	UI.PushSubWindow(obj.x,obj.y,obj.w,obj.h,obj.scale)
+	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
+	obj.x=0;obj.y=0;obj.w/=obj.scale;obj.h/=obj.scale;
 	if(!obj.m_cells){
 		//we shouldn't make build output clog global metadata - a separate json file
 		//just a flat list of cells
@@ -435,13 +453,13 @@ W.NotebookView=function(id,attrs){
 		}
 	}
 	//todo: manually-culling, global scroll bar
-	//todo: time in caption, kill button
 	var scroll_y=(obj.scroll_y||0);
 	var current_y=-scroll_y;
 	var widget_style=UI.default_styles.code_editor;
 	var edstyle=widget_style.editor_style;
 	var hc=UI.GetCharacterHeight(edstyle.font);
 	obj.need_save&=~1;
+	var now=IO.WallClockTime()
 	for(var i=0;i<obj.m_cells.length;i++){
 		var cell_i=obj.m_cells[i];
 		var doc_in=cell_i.m_text_in;
@@ -450,8 +468,8 @@ W.NotebookView=function(id,attrs){
 		var h_out=MeasureEditorSize(doc_out,0);
 		current_y+=obj.padding;
 		UI.RoundRect({
-			x:obj.x+obj.padding-obj.shadow_size,y:obj.y+current_y-obj.shadow_size,
-			w:obj.w-obj.padding*2+obj.shadow_size*2,h:h_in+obj.h_caption*2+h_out+obj.shadow_size*2,
+			x:obj.x+obj.padding-obj.shadow_size*0.5,y:obj.y+current_y-obj.shadow_size*0.5,
+			w:obj.w-obj.padding*2+obj.shadow_size*1.5,h:h_in+obj.h_caption*2+h_out+obj.shadow_size*1.5,
 			round:obj.shadow_size,
 			border_width:-obj.shadow_size,
 			color:obj.shadow_color,
@@ -480,16 +498,38 @@ W.NotebookView=function(id,attrs){
 		//	"doc_in_"+i.toString())
 		current_y+=h_in;
 		is_focused=(UI.nd_focus&&UI.nd_focus==doc_out);
-		UI.RoundRect({
+		var rect_bar=UI.RoundRect({
 			x:obj.x+obj.padding,y:obj.y+current_y,
 			w:obj.w-obj.padding*2,h:obj.h_caption,
 			color:is_focused?obj.caption_color:widget_style.line_number_bgcolor,
 		})
 		W.Text("",{
 			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y,
-			font:obj.caption_font,text:"Output",
+			font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":"Output",
 			color:is_focused?obj.caption_text_color:widget_style.line_number_color,
 		})
+		if(cell_i.m_proc){
+			W.Button("kill_btn_"+i.toString(),{
+				x:4,y:2,
+				font:obj.caption_font,text:"Stop",padding:12,border_width:0,
+				anchor:rect_bar,anchor_align:'right',anchor_valign:'fill',
+				OnClick:function(cell_i){
+					if(cell_i.m_proc){
+						this.WriteCellOutput(cell_i.m_cell_id,"Stopped...\n")
+						cell_i.m_proc.proc.Terminate()
+						UI.Refresh()
+					}
+				}.bind(obj,cell_i),
+			})
+		}else if(cell_i.m_completion_time){
+			var s_time=UI.FormatRelativeTime(cell_i.m_completion_time,now);
+			var dims_time=UI.MeasureText(obj.caption_font,s_time)
+			W.Text("",{
+				x:obj.x+obj.w-obj.padding-obj.caption_padding-dims_time.w,y:obj.y+current_y,
+				font:obj.caption_font,text:s_time,
+				color:is_focused?obj.caption_text_color:widget_style.line_number_color,
+			})
+		}
 		current_y+=obj.h_caption;
 		//UI.RoundRect({
 		//	x:obj.x+obj.padding,y:obj.y+current_y,w:obj.w-obj.padding*2,h:h_out,
@@ -516,8 +556,9 @@ W.NotebookView=function(id,attrs){
 		if((doc_in.saved_point||0)<doc_in.ed.GetUndoQueueLength()){
 			obj.need_save|=1;
 		}
+		cell_i.m_cell_id=i;
 	}
-	//todo: tool bar
+	//coulddo: tool bar
 	var menu_notebook=UI.BigMenu("Note&book")
 	menu_notebook.AddNormalItem({
 		text:"&New cell",
@@ -531,7 +572,7 @@ W.NotebookView=function(id,attrs){
 			break;
 		}
 	}
-	if(focus_cell_id!=undefined){
+	if(focus_cell_id!=undefined&&!obj.m_cells[focus_cell_id].m_proc){
 		menu_notebook.AddNormalItem({
 			text:"&Run cell",
 			enable_hotkey:1,key:"CTRL+RETURN",action:(function(){
@@ -539,6 +580,8 @@ W.NotebookView=function(id,attrs){
 			}).bind(obj)})
 	}
 	menu_notebook=undefined;
+	UI.PopSubWindow()
+	obj.x=bk_dims[0];obj.y=bk_dims[1];obj.w=bk_dims[2];obj.h=bk_dims[3];
 	UI.End()
 	return obj
 }
@@ -566,11 +609,8 @@ UI.NewNoteBookTab=function(file_name){
 				this.main_widget=body;
 			}
 			this.need_save=this.main_widget.need_save;
-			body.title=UI.Format("@1 (Notebook)",UI.GetMainFileName(this.file_name));
+			body.title=UI.Format("@1 (Notebook)",UI.GetMainFileName(this.file_name)+(this.need_save?'*':''));
 			body.tooltip=this.file_name;
-			if(this.need_save){
-				this.title=this.title+'*';
-			}
 			return body;
 		},
 		Save:function(){
