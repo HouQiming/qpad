@@ -474,13 +474,17 @@ UI.Application=function(id,attrs){
 					}
 				}})
 			}
-			//todo
-			if(UI.Platform.BUILD=="debug"){
-				menu_file.AddNormalItem({text:"Open notebook...",
-					enable_hotkey:1,key:"ALT+N",
-					action:function(){UI.NewNoteBookTab("c:/h/edtest/notebook.json");}})
+			var obj_active_tab=UI.GetFrontMostEditorTab();
+			if(obj_active_tab&&obj_active_tab.file_name){
+				var spath_repo=UI.GetEditorProject(obj_active_tab.file_name);
+				if(spath_repo){
+					menu_file.AddNormalItem({text:"Open notebook...",
+						enable_hotkey:1,key:"ALT+N",
+						action:UI.NewNoteBookTab.bind(undefined,spath_repo+"/notebook.json")
+					})
+				}
 			}
-			//todo
+			obj_active_tab=undefined;
 			menu_file.AddSeparator();
 			menu_file.AddNormalItem({text:"E&xit",action:function(){
 				if(!app.OnClose()){UI.DestroyWindow(app)}

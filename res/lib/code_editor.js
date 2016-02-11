@@ -2158,7 +2158,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		m_y_extent_forward:0,
 	}
 	if(flags&UI.SEARCH_FLAG_GLOBAL){
-		var spath_repo=GetEditorProject(doc.m_file_name);
+		var spath_repo=UI.GetEditorProject(doc.m_file_name);
 		ctx.m_repo_path=spath_repo;
 		ctx.m_base_file=doc.m_file_name;
 	}else{
@@ -2897,7 +2897,7 @@ var DetectRepository=function(fname){
 	return ret;
 }
 
-var GetEditorProject=function(fn){
+UI.GetEditorProject=function(fn){
 	fn=IO.NormalizeFileName(fn);
 	var repos2=g_repo_from_file[fn];
 	if(repos2){
@@ -5040,7 +5040,7 @@ W.CodeEditor=function(id,attrs){
 					//	x_rect_bar,obj.y+(obj.h_find_bar-20)*0.5,
 					//	UI.default_styles.check_button.text_color,0x5939)//'夹'.charCodeAt(0)
 					//x_rect_bar+=20;
-					var spath_repo=GetEditorProject(doc.m_file_name);
+					var spath_repo=UI.GetEditorProject(doc.m_file_name);
 					var s_global_search_hint=(spath_repo?UI.Format("in project '@1'",UI.RemovePath(spath_repo)):"")
 					//var dims=UI.MeasureText(obj.find_bar_hint_font,s_global_search_hint);
 					//W.Text("",{x:x_rect_bar+w_rect_bar-dims.w-obj.find_bar_padding,y:obj.y+(obj.h_find_bar-dims.h)*0.5,
@@ -6011,6 +6011,12 @@ UI.RegisterEditorPlugin(function(){
 		UI.FillLanguageMenu(UI.GetFileNameExtension(this.m_file_name),this.m_language_id,(function(name){
 			if(name==this.m_language_id){return;}
 			this.m_language_id=name;
+			if(this.notebook_owner){
+				var desc=Language.GetDescObjectByName(name);
+				if(desc.is_binary){return;}
+				this.notebook_owner.UpdateLanguage(this.m_cell_id,name);
+				return;
+			}
 			//try to reload
 			if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
 				//make a notification
@@ -6368,6 +6374,7 @@ UI.CreateEmptyCodeEditor=function(language_id){
 	var doc=UI.OpenCodeEditorDocument("",1);
 	doc.language=Language.GetDefinitionByName(language_id);
 	doc.plugin_language_desc=Language.GetDescObjectByName(language_id);
+	doc.m_language_id=language_id;
 	doc.m_is_preview=0;
 	return doc;
 }

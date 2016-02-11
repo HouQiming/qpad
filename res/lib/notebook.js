@@ -227,6 +227,7 @@ W.notebook_prototype={
 		};
 		this.ProcessCell(cell_i)
 		this.m_cells.push(cell_i)
+		this.need_save|=2;
 	},
 	GotoSubCell:function(sub_cell_id,sel_side){
 		var obj_cell=this[((sub_cell_id&1)?"doc_out_":"doc_in_")+(sub_cell_id>>1).toString()];
@@ -342,6 +343,7 @@ W.notebook_prototype={
 		UI.Refresh()
 	},
 	RunCell:function(id){
+		//todo: check language registration
 		var cell_i=this.m_cells[id];
 		var doc=cell_i.m_text_out;
 		var ed_out=cell_i.m_text_out.ed;
@@ -423,6 +425,27 @@ W.notebook_prototype={
 		cell_i.m_proc={proc:proc,fn_script:fn_script};
 		UI.Refresh()
 	},
+	UpdateLanguage:function(id,name){
+		var cell_i=this.m_cells[id];
+		cell_i.m_language=name;
+		var doc_in=cell_i.m_text_in;
+		var s_text=doc_in.ed.GetText();
+		var sel0=doc_in.sel0.ccnt;
+		var sel1=doc_in.sel1.ccnt;
+		var need_save=(doc_in.saved_point!=doc_in.ed.GetUndoQueueLength());
+		doc_in.OnDestroy()
+		/////////
+		doc_in=UI.CreateEmptyCodeEditor(cell_i.m_language);
+		doc_in.plugins=this.m_cell_plugins;
+		doc_in.wrap_width=0;
+		doc_in.notebook_owner=this;
+		doc_in.Init();
+		doc_in.scroll_x=0;doc_in.scroll_y=0;
+		if(s_text){doc_in.ed.Edit([0,0,s_text],1);}
+		doc_in.saved_point=(need_save?-1:doc_in.ed.GetUndoQueueLength());
+		cell_i.m_text_in=doc_in;
+		UI.Refresh()
+	},
 };
 W.NotebookView=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"notebook_view",W.notebook_prototype);
@@ -450,6 +473,9 @@ W.NotebookView=function(id,attrs){
 		for(var i=0;i<obj.m_cells.length;i++){
 			var cell_i=obj.m_cells[i];
 			obj.ProcessCell(cell_i);
+		}
+		if(!obj.m_cells.length){
+			obj.NewCell();
 		}
 	}
 	//todo: manually-culling, global scroll bar
@@ -556,6 +582,7 @@ W.NotebookView=function(id,attrs){
 		if((doc_in.saved_point||0)<doc_in.ed.GetUndoQueueLength()){
 			obj.need_save|=1;
 		}
+		doc_in.m_cell_id=i;
 		cell_i.m_cell_id=i;
 	}
 	//coulddo: tool bar
@@ -609,7 +636,7 @@ UI.NewNoteBookTab=function(file_name){
 				this.main_widget=body;
 			}
 			this.need_save=this.main_widget.need_save;
-			body.title=UI.Format("@1 (Notebook)",UI.GetMainFileName(this.file_name)+(this.need_save?'*':''));
+			body.title=UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(this.file_name)))+(this.need_save?'*':'');
 			body.tooltip=this.file_name;
 			return body;
 		},
