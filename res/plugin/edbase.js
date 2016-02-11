@@ -616,7 +616,11 @@ Language.Register({
 /////////////////////////////////////////////
 var g_compiler_by_ext={}
 var CompilerDone=function(){UI.already_compiling=0}
+UI.g_output_parsers=[];
 Language.RegisterCompiler=function(s_exts,obj){
+	if(obj.ParseOutput){
+		UI.g_output_parsers.push(obj.ParseOutput.bind(obj))
+	}
 	for(var i=0;i<s_exts.length;i++){
 		var s_ext_lower=s_exts[i].toLowerCase()
 		var ret=g_compiler_by_ext[s_ext_lower]
@@ -884,72 +888,6 @@ UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 	}
 }
 
-var g_re_errors=new RegExp("^error_.*$")
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	this.m_error_overlays=[]
-	this.PushError=function(err){
-		var go_prev_line=0
-		if(!err.line1){
-			err.line1=err.line0
-		}
-		if(!err.col0){
-			err.col0=0;
-			err.col1=0;
-			if(err.line0==err.line1){
-				err.line1++
-				go_prev_line=1
-			}
-		}else if(!err.col1){
-			err.col1=err.col0;
-		}
-		if(err.col0==err.col1&&err.line0==err.line1){
-			err.col1++;
-		}
-		err.ccnt0=this.SeekLC(err.line0,err.col0)
-		err.ccnt1=this.SeekLC(err.line1,err.col1)
-		if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
-		var hl_items=this.CreateTransientHighlight({
-			'depth':1,
-			'color':err.color||this.color_tilde_compiler_error,
-			'display_mode':UI.HL_DISPLAY_MODE_TILDE,
-			'invertible':0,
-		});
-		hl_items[0].ccnt=err.ccnt0;err.ccnt0=hl_items[0];hl_items[0].undo_tracked=1
-		hl_items[1].ccnt=err.ccnt1;err.ccnt1=hl_items[1];hl_items[1].undo_tracked=1
-		err.highlight=hl_items[2];
-		err.id=this.m_error_overlays.length
-		err.is_ready=1
-		////////////
-		this.m_error_overlays.push(err)
-	}
-	this.AddEventHandler('menu',function(){
-		var ed=this.ed;
-		var sel=this.GetSelection()
-		this.owner.DismissNotificationsByRegexp(g_re_errors)
-		if(sel[0]==sel[1]){
-			var error_overlays=this.m_error_overlays
-			if(error_overlays&&error_overlays.length){
-				var ccnt=sel[0]
-				for(var i=0;i<error_overlays.length;i++){
-					var err=error_overlays[i]
-					if(ccnt>=err.ccnt0.ccnt&&ccnt<=err.ccnt1.ccnt){
-						var color=(err.color||this.color_tilde_compiler_error)
-						this.owner.CreateNotification({
-							id:"error_"+err.id.toString(),icon:'警',
-							text:err.message,
-							icon_color:color,
-							//text_color:color,
-							color:UI.lerp_rgba(color,0xffffffff,0.95),
-						},"quiet")
-					}
-				}
-			}
-		}
-		return 0;
-	})
-}).prototype.desc={category:"Tools",name:"Error overlays",stable_name:"error_overlay"};
-
 UI.ClearCompilerErrors=function(){
 	//keep the locators for seeking but remove the highlights
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
@@ -1003,7 +941,7 @@ Language.RegisterCompiler(["tex"],{
 			pause_after_run:0,
 		}
 	},
-	m_regex:new RegExp('^(.*?):([0-9]+): (.+)\r?\n'),
+	m_regex:new RegExp('^([^:]*):([0-9]+): (.+)\r?\n'),
 	ParseOutput:function(sline){
 		var matches=sline.match(this.m_regex)
 		if(matches){
@@ -1016,7 +954,7 @@ Language.RegisterCompiler(["tex"],{
 				message:message,line0:linea-1,
 			}
 			//another plugin for error overlay
-			return UI.CreateCompilerError(err)
+			return err
 		}
 	},
 })
@@ -1043,8 +981,8 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 		}
 		return ret
 	},
-	m_regex_cc:new RegExp('^(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('^[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	m_regex_cc:new RegExp('^([^:]*):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('^[ \t]*([^:]*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
 	ParseOutput:function(sline){
 		var matches=sline.match(this.m_regex_vc)
 		if(matches){
@@ -1057,7 +995,7 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
 				message:message,line0:linea-1,
 			}
-			return UI.CreateCompilerError(err)
+			return err
 		}
 		matches=sline.match(this.m_regex_cc)
 		if(matches){
@@ -1076,7 +1014,7 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 			if(matches[4]){
 				err.col0=parseInt(matches[4])-1
 			}
-			return UI.CreateCompilerError(err)
+			return err
 		}
 	},
 })
@@ -1084,10 +1022,39 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 /////////////////////////////////////////////
 Language.RegisterCompiler(["jc"],{
 	name:"jacy",
-	m_regex_cc:new RegExp('^(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('^[ \t]*(.*?)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	m_regex_cc:new RegExp('^([^:]*):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('^[ \t]*([^:]*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	m_regex_jc:new RegExp('([^:]*):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]+)\\)\r?\n'),
 	ParseOutput:function(sline){
-		var matches=sline.match(this.m_regex_vc)
+		var matches=sline.match(this.m_regex_jc)
+		if(matches){
+			var err={}
+			var name=matches[1];
+			var linea=parseInt(matches[2]);
+			var cola=parseInt(matches[3]);
+			var lineb=undefined;
+			if(matches[4]){
+				lineb=parseInt(matches[4]);
+			}else{
+				lineb=linea;
+			}
+			//print(err.lineb,' ',matches[4],' ',matches[5],' ',matches[6],'\n')
+			var colb=undefined;
+			if(matches[6]){
+				colb=parseInt(matches[6]);
+			}
+			var message=matches[7]
+			var category=matches[8]
+			var err={
+				file_name:name,
+				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				message:message,
+				line0:linea-1,col0:cola-1,
+				line1:lineb-1,col1:colb-1,
+			}
+			return err;
+		}
+		matches=sline.match(this.m_regex_vc)
 		if(matches){
 			var name=matches[1]
 			var linea=parseInt(matches[2])
@@ -1098,7 +1065,7 @@ Language.RegisterCompiler(["jc"],{
 				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
 				message:message,line0:linea-1,
 			}
-			return UI.CreateCompilerError(err)
+			return err
 		}
 		matches=sline.match(this.m_regex_cc)
 		if(matches){
@@ -1117,7 +1084,7 @@ Language.RegisterCompiler(["jc"],{
 			if(matches[4]){
 				err.col0=parseInt(matches[4])-1
 			}
-			return UI.CreateCompilerError(err)
+			return err
 		}
 	},
 	make:function(doc,run_it){

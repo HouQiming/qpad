@@ -111,6 +111,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks={}
 		this.m_event_hooks['load']=[]
 		this.m_event_hooks['save']=[]
+		this.m_event_hooks['close']=[]
 		this.m_event_hooks['parse']=[]
 		this.m_event_hooks['menu']=[]
 		this.m_event_hooks['beforeEdit']=[]
@@ -257,6 +258,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 	},
 	OnDestroy:function(){
+		this.CallHooks('close')
 		this.m_is_destroyed=1;
 		//break the connections for rc
 		this.m_ac_context=undefined;
@@ -2308,7 +2310,7 @@ W.CodeEditorWidget_prototype={
 			ccnt=0;
 			force_ccnt=0;
 		}
-		ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt==undefined?doc.sel0.ccnt:ccnt,force_ccnt==undefined?doc.sel1.ccnt:ccnt)
+		var ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt==undefined?doc.sel0.ccnt:ccnt,force_ccnt==undefined?doc.sel1.ccnt:ccnt)
 		ctx.SetRenderingHeight(this.h-this.h_find_bar);
 		if((flags&UI.SEARCH_FLAG_GLOBAL)&&this.m_current_find_context&&this.m_current_find_context.m_temp_documents){
 			//carry over docs to avoid re-loading
@@ -5811,7 +5813,7 @@ UI.OpenEditorWindow=function(fname,fcallback){
 		}
 	}
 	if(fcallback){
-		if(obj_tab.main_widget){
+		if(obj_tab.main_widget&&obj_tab.main_widget.doc){
 			fcallback.call(obj_tab.main_widget.doc)
 		}else{
 			if(obj_tab.opening_callbacks){

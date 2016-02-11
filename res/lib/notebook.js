@@ -1,5 +1,6 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
+var Language=require("res/lib/langdef");
 require("res/lib/global_doc");
 require("res/lib/code_editor");
 
@@ -10,6 +11,78 @@ var MeasureEditorSize=function(doc,dlines){
 	var ytot=ed.XYFromCcnt(ccnt_tot).y+hc*(dlines+1);
 	return Math.min(ytot,UI.default_styles.notebook_view.max_lines*hc);
 };
+
+var g_re_errors=new RegExp("^error_.*$")
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	//do not reload errors
+	//this.AddEventHandler('load',function(){})
+	this.m_error_overlays=[]
+	this.AddEventHandler('save',function(){
+		for(var i=0;i<this.m_error_overlays.length;i++){
+			var err=this.m_error_overlays[i];
+			if(!err.is_in_active_doc){continue;}
+			err.ccnt0=err.sel_ccnt0.ccnt;
+			err.ccnt1=err.sel_ccnt1.ccnt;
+		}
+	})
+	this.AddEventHandler('close',function(){
+		for(var i=0;i<this.m_error_overlays.length;i++){
+			var err=this.m_error_overlays[i];
+			if(!err.is_in_active_doc){continue;}
+			err.is_in_active_doc=0;
+			err.sel_ccnt0=undefined;
+			err.sel_ccnt1=undefined;
+			err.highlight=undefined;
+		}
+	})
+	this.AddEventHandler('menu',function(){
+		var ed=this.ed;
+		var sel=this.GetSelection()
+		this.owner.DismissNotificationsByRegexp(g_re_errors)
+		if(sel[0]==sel[1]){
+			var error_overlays=this.m_error_overlays
+			if(error_overlays&&error_overlays.length){
+				var ccnt=sel[0]
+				var error_overlays_new=[];
+				for(var i=0;i<error_overlays.length;i++){
+					var err=error_overlays[i]
+					if(!err.is_in_active_doc){continue;}
+					if(ccnt>=err.sel_ccnt0.ccnt&&ccnt<=err.sel_ccnt1.ccnt){
+						var color=(err.color||this.color_tilde_compiler_error)
+						this.owner.CreateNotification({
+							id:"error_"+err.id.toString(),icon:'警',
+							text:err.message,
+							icon_color:color,
+							//text_color:color,
+							color:UI.lerp_rgba(color,0xffffffff,0.95),
+						},"quiet")
+					}
+					error_overlays_new.push(err);
+				}
+				this.m_error_overlays=error_overlays_new;
+			}
+		}
+		return 0;
+	})
+});//.prototype.desc={category:"Tools",name:"Error overlays",stable_name:"error_overlay"};
+
+var AddErrorToEditor=function(doc,err){
+	if(err.is_in_active_doc){return;}
+	var hl_items=doc.CreateTransientHighlight({
+		'depth':1,
+		'color':err.color||doc.color_tilde_compiler_error,
+		'display_mode':UI.HL_DISPLAY_MODE_TILDE,
+		'invertible':0,
+	});
+	hl_items[0].ccnt=err.ccnt0;err.sel_ccnt0=hl_items[0];hl_items[0].undo_tracked=1
+	hl_items[1].ccnt=err.ccnt1;err.sel_ccnt1=hl_items[1];hl_items[1].undo_tracked=1
+	err.highlight=hl_items[2];
+	err.id=doc.m_error_overlays.length
+	err.is_in_active_doc=1
+	////////////
+	doc.m_error_overlays.push(err)
+}
 
 W.notebook_prototype={
 	m_configuration:{},
@@ -69,17 +142,26 @@ W.notebook_prototype={
 				}
 				return 0
 			};
-			this.AddEventHandler('selectionChange',function(){fselchange.call(this,0);})
+			//this.AddEventHandler('selectionChange',function(){fselchange.call(this,0);})
 			this.AddEventHandler('doubleClick',function(){
-				fselchange.call(this,1);
+				if(fselchange.call(this,1)){
+					this.is_dragging=0;
+					UI.ReleaseMouse(this);
+				}
 			})
 			this.ClearClickableRanges=function(){
-				//todo: m_error_overlays ~ highlights
 				for(var i=0;i<this.m_clickable_ranges.length;i++){
 					var crange=this.m_clickable_ranges[i];
 					crange.loc0.discard()
 					crange.loc1.discard()
 					crange.hlobj.discard()
+					var err=crange.err;
+					if(err.is_in_active_doc){
+						err.is_in_active_doc=0;
+						err.sel_ccnt0.discard()
+						err.sel_ccnt1.discard()
+						err.highlight.discard()
+					}
 				}
 				this.m_clickable_ranges=[]
 			}
@@ -89,7 +171,7 @@ W.notebook_prototype={
 			if(sel[0]>0||sel[1]>0){return 1;}
 			var sub_cell_id=this.sub_cell_id;
 			if(sub_cell_id>0){
-				this.notebook_owner.GotoSubCell(sub_cell_id-1);
+				this.notebook_owner.GotoSubCell(sub_cell_id-1,1);
 				return 0;
 			}
 			return 1;
@@ -100,7 +182,7 @@ W.notebook_prototype={
 			if(sel[0]<size||sel[1]<size){return 1;}
 			var sub_cell_id=this.sub_cell_id;
 			if(sub_cell_id<this.notebook_owner.m_cells.length*2-1){
-				this.notebook_owner.GotoSubCell(sub_cell_id+1);
+				this.notebook_owner.GotoSubCell(sub_cell_id+1,0);
 				return 0;
 			}
 			return 1;
@@ -110,14 +192,17 @@ W.notebook_prototype={
 		//////
 		var doc_in=UI.CreateEmptyCodeEditor(cell_i.m_language);
 		doc_in.plugins=this.m_cell_plugins;
+		doc_in.wrap_width=0;
 		doc_in.notebook_owner=this;
 		doc_in.Init();
 		doc_in.scroll_x=0;doc_in.scroll_y=0;
 		if(cell_i.m_text_in){doc_in.ed.Edit([0,0,cell_i.m_text_in],1);}
+		doc_in.saved_point=doc_in.ed.GetUndoQueueLength();
 		cell_i.m_text_in=doc_in;
 		//////
 		var doc_out=UI.CreateEmptyCodeEditor();
 		doc_out.plugins=this.m_cell_plugins;
+		doc_out.wrap_width=0;
 		doc_out.notebook_owner=this;
 		doc_out.read_only=1;
 		doc_out.Init();
@@ -132,28 +217,132 @@ W.notebook_prototype={
 		this.ProcessCell(cell_i)
 		this.m_cells.push(cell_i)
 	},
-	GotoSubCell:function(sub_cell_id){
+	GotoSubCell:function(sub_cell_id,sel_side){
 		var obj_cell=this[((sub_cell_id&1)?"doc_out_":"doc_in_")+(sub_cell_id>>1).toString()];
 		if(obj_cell&&obj_cell.doc){
 			UI.SetFocus(obj_cell.doc)
+			var doc=obj_cell.doc;
+			var ccnt=0;
+			if(sel_side>0){
+				ccnt=doc.ed.GetTextSize()
+			}
+			doc.SetSelection(ccnt,ccnt)
 			UI.Refresh()
 		}
 	},
-	WriteCellOutput:function(id,s){
-		//todo: error parser
+	CreateCompilerError:function(id,err,ccnt_lh,ccnt_next){
+		//we could afford to discard dangling highlights - give discard responsibility to the cell
+		UI.OpenEditorWindow(err.file_name,function(){
+			var go_prev_line=0
+			if(!err.line1){
+				err.line1=err.line0
+			}
+			if(!err.col0){
+				err.col0=0;
+				err.col1=0;
+				if(err.line0==err.line1){
+					err.line1++
+					go_prev_line=1
+				}
+			}else if(!err.col1){
+				err.col1=err.col0;
+			}
+			//if(err.col0==err.col1&&err.line0==err.line1){
+			//	err.col1++;
+			//}
+			//for(var shit in this){
+			//	print(shit,this[shit])
+			//}
+			err.ccnt0=this.SeekLC(err.line0,err.col0)
+			err.ccnt1=this.SeekLC(err.line1,err.col1)
+			if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
+			if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
+			err.cell_id=id;
+			/////////////////
+			AddErrorToEditor(this,err)
+		})
+		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
+			if(!err.is_in_active_doc){
+				UI.OpenEditorWindow(err.file_name,function(){
+					this.SetSelection(err.ccnt0,err.ccnt0)
+					this.CallOnSelectionChange();
+					if(do_onfocus){
+						UI.SetFocus(this)
+					}
+					AddErrorToEditor(this,err)
+				})
+			}else{
+				UI.OpenEditorWindow(err.file_name,function(){
+					this.SetSelection(err.sel_ccnt0.ccnt,err.sel_ccnt0.ccnt)
+					this.CallOnSelectionChange();
+					if(do_onfocus){
+						UI.SetFocus(this)
+					}
+				})
+			}
+			this.SetSelection(ccnt_lh,ccnt_next)
+		}
 		var cell_i=this.m_cells[id];
-		var ed_out=cell_i.m_text_out.ed;
-		var ccnt_tot=ed_out.GetTextSize();
-		ed_out.Edit([ccnt_tot,0,s],1);
+		var doc=cell_i.m_text_out;
+		cell_i.m_has_any_error=1;
+		var loc0=doc.ed.CreateLocator(ccnt_lh,1)
+		var loc1=doc.ed.CreateLocator(ccnt_next,-1)
+		var hlobj=doc.ed.CreateHighlight(loc0,loc1,-1)
+		hlobj.color=doc.color;
+		hlobj.display_mode=UI.HL_DISPLAY_MODE_EMBOLDEN
+		hlobj.invertible=0;
+		doc.m_clickable_ranges.push({
+			loc0:loc0,
+			loc1:loc1,
+			hlobj:hlobj,
+			err:err,
+			f:fclick_callback})
+		doc=undefined;
+	},
+	WriteCellOutput:function(id,s){
+		var cell_i=this.m_cells[id];
+		var doc=cell_i.m_text_out;
+		var ed=doc.ed;
+		var ccnt=ed.GetTextSize();
+		var sel=doc.GetSelection();
+		ed.Edit([ccnt,0,s],1);
+		if(sel[0]==sel[1]&&sel[1]==ccnt){
+			var ccnt_end=doc.ed.GetTextSize()
+			doc.SetSelection(ccnt_end,ccnt_end)
+		}
+		if(UI.g_output_parsers){
+			var line=doc.GetLC(ccnt)[0]
+			var ccnt_lh=doc.SeekLC(line,0)
+			var ccnt_tot=doc.ed.GetTextSize()
+			for(;;){
+				var ccnt_next=doc.SeekLineBelowKnownPosition(ccnt_lh,line,line+1)
+				if(!(ccnt_next<ccnt_tot)){
+					if(!(doc.GetLC(ccnt_next)[0]>line)){break;}
+				}
+				var sline=doc.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh);
+				for(var i=0;i<UI.g_output_parsers.length;i++){
+					var err=UI.g_output_parsers[i](sline);
+					if(err){this.CreateCompilerError(id,err,ccnt_lh,ccnt_next);}
+				}
+				ccnt_lh=ccnt_next;
+				line++;
+			}
+		}
 		UI.Refresh()
 	},
 	RunCell:function(id){
 		var cell_i=this.m_cells[id];
+		var doc=cell_i.m_text_out;
 		var ed_out=cell_i.m_text_out.ed;
 		if(ed_out.GetTextSize()){
-			cell_i.m_text_out.ClearClickableRanges()
+			doc.scroll_x=0;
+			doc.scroll_y=0;
+			doc.sel0.ccnt=0;
+			doc.sel1.ccnt=0;
+			doc.ClearClickableRanges()
 			ed_out.Edit([0,ed_out.GetTextSize(),undefined]);
-			cell_i.m_text_out.ResetSaveDiff()
+			doc.ResetSaveDiff()
+			cell_i.m_has_any_error=0;
 		}
 		if(id==0&&cell_i.m_language=='Javascript'){
 			//run cell 0 as qpad js to update the configuration
@@ -207,7 +396,7 @@ W.notebook_prototype={
 				}else{
 					var code=proc.GetExitCode()
 					if(code!=0){
-						this.WriteCellOutput(id,this.file_name+":1:1: fatal error: the script has returned an error\n")
+						this.WriteCellOutput(id,this.file_name+":1:1: fatal error: the script has returned an error "+code+"\n")
 					}
 					IO.DeleteFile(fn_script)
 				}
@@ -216,6 +405,7 @@ W.notebook_prototype={
 		}else{
 			this.WriteCellOutput(id,this.file_name+":1:1: fatal error: failed to execute the script\n")
 		}
+		this.need_save|=2;
 		UI.Refresh()
 	},
 };
@@ -245,12 +435,13 @@ W.NotebookView=function(id,attrs){
 		}
 	}
 	//todo: manually-culling, global scroll bar
-	//todo: time / running status in caption
+	//todo: time in caption, kill button
 	var scroll_y=(obj.scroll_y||0);
 	var current_y=-scroll_y;
 	var widget_style=UI.default_styles.code_editor;
 	var edstyle=widget_style.editor_style;
 	var hc=UI.GetCharacterHeight(edstyle.font);
+	obj.need_save&=~1;
 	for(var i=0;i<obj.m_cells.length;i++){
 		var cell_i=obj.m_cells[i];
 		var doc_in=cell_i.m_text_in;
@@ -317,9 +508,14 @@ W.NotebookView=function(id,attrs){
 		//	doc_out.scroll_x||0,doc_out.scroll_y||0,
 		//	obj.x,obj.y+current_y,obj.w,h_out,
 		//	"doc_out_"+i.toString())
+		doc_in.AutoScroll("show")
+		doc_out.AutoScroll("show")
 		current_y+=h_out;
 		current_y+=obj.padding;
 		current_y+=obj.h_separation;
+		if((doc_in.saved_point||0)<doc_in.ed.GetUndoQueueLength()){
+			obj.need_save|=1;
+		}
 	}
 	//todo: tool bar
 	var menu_notebook=UI.BigMenu("Note&book")
@@ -347,13 +543,13 @@ W.NotebookView=function(id,attrs){
 	return obj
 }
 
-UI.NewNoteBookTab=function(title,file_name){
+UI.NewNoteBookTab=function(file_name){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
 	file_name=IO.NormalizeFileName(file_name);
 	UI.top.app.quit_on_zero_tab=0;
 	return UI.NewTab({
 		file_name:file_name,
-		title:title,
+		title:"Notebook",
 		tooltip:file_name,
 		document_type:"notebook",
 		body:function(){
@@ -370,10 +566,19 @@ UI.NewNoteBookTab=function(title,file_name){
 				this.main_widget=body;
 			}
 			this.need_save=this.main_widget.need_save;
+			body.title=UI.Format("@1 (Notebook)",UI.GetMainFileName(this.file_name));
+			body.tooltip=this.file_name;
+			if(this.need_save){
+				this.title=this.title+'*';
+			}
 			return body;
 		},
 		Save:function(){
 			if(!this.main_widget){return;}
+			if(this.main_widget.file_name&&this.main_widget.file_name.indexOf('<')>=0){
+				this.SaveAs()
+				return
+			}
 			this.main_widget.Save();
 			this.need_save=this.main_widget.need_save;
 		},

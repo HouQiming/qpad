@@ -1009,7 +1009,7 @@ W.TabbedDocument=function(id,attrs){
 		if(area_autoscroll_target){
 			var scroll_x=(UI.g_caption_scroll_by_name[area_autoscroll_target.name]||0);
 			x_reveal_target-=area_autoscroll_target.x;
-			scroll_x0=scroll_x;
+			var scroll_x0=scroll_x;
 			scroll_x=Math.min(Math.max(scroll_x,x_reveal_target+w_active_tab-area_autoscroll_target.w),x_reveal_target);
 			scroll_x=Math.max(Math.min(scroll_x,area_autoscroll_target.wtot-area_autoscroll_target.w),0);
 			if(scroll_x!=scroll_x0){

@@ -97,7 +97,7 @@ UI.NewTab=function(tab){
 	if(new_tab_id<g_all_document_windows.length){
 		var n=g_all_document_windows.length;
 		var area=UI.top.app.document_area;
-		for(j=n;j>new_tab_id;j--){
+		for(var j=n;j>new_tab_id;j--){
 			area[j]=area[j-1];
 			g_all_document_windows[j]=g_all_document_windows[j-1];
 		}
@@ -478,7 +478,7 @@ UI.Application=function(id,attrs){
 			if(UI.Platform.BUILD=="debug"){
 				menu_file.AddNormalItem({text:"Open notebook...",
 					enable_hotkey:1,key:"ALT+N",
-					action:function(){UI.NewNoteBookTab("Notebook","c:/h/edtest/notebook.json");}})
+					action:function(){UI.NewNoteBookTab("c:/h/edtest/notebook.json");}})
 			}
 			//todo
 			menu_file.AddSeparator();
@@ -511,7 +511,7 @@ UI.Application=function(id,attrs){
 				if(workspace[i].util_type){
 					UI.OpenUtilTab(workspace[i].util_type)
 				}else if(workspace[i].document_type=='notebook'){
-					UI.NewNoteBookTab("Notebook",workspace[i].file_name)
+					UI.NewNoteBookTab(workspace[i].file_name)
 				}else{
 					UI.OpenEditorWindow(workspace[i].file_name)
 				}
