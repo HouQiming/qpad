@@ -36,10 +36,14 @@ UI.RegisterEditorPlugin(function(){
 			err.highlight=undefined;
 		}
 	})
+	this.AddEventHandler('selectionChange',function(){
+		if(this.owner){
+			this.owner.DismissNotificationsByRegexp(g_re_errors);
+		}
+	})
 	this.AddEventHandler('menu',function(){
 		var ed=this.ed;
 		var sel=this.GetSelection()
-		this.owner.DismissNotificationsByRegexp(g_re_errors)
 		if(sel[0]==sel[1]){
 			var error_overlays=this.m_error_overlays
 			if(error_overlays&&error_overlays.length){
@@ -168,11 +172,13 @@ W.notebook_prototype={
 					crange.hlobj.discard()
 					var err=crange.err;
 					if(err.is_in_active_doc){
+						//print("cleared error: ",i,err.message)
 						err.is_in_active_doc=0;
 						err.sel_ccnt0.discard()
 						err.sel_ccnt1.discard()
 						err.highlight.discard()
 					}
+					err.is_in_active_doc=undefined;
 				}
 				this.m_clickable_ranges=[]
 			}
@@ -225,6 +231,25 @@ W.notebook_prototype={
 		if(cell_i.m_text_out){doc_out.ed.Edit([0,0,cell_i.m_text_out],1);}
 		cell_i.m_text_out=doc_out;
 	},
+	Load:function(){
+		var fn_notes=this.file_name;
+		this.m_cells=[];
+		if(fn_notes){
+			try{
+				this.m_cells=JSON.parse(IO.ReadAll(fn_notes)).cells;
+			}catch(err){
+				this.m_cells=[];
+			}
+		}
+		//create the initial data thisects
+		for(var i=0;i<this.m_cells.length;i++){
+			var cell_i=this.m_cells[i];
+			this.ProcessCell(cell_i);
+		}
+		if(!this.m_cells.length){
+			this.NewCell();
+		}
+	},
 	NewCell:function(template){
 		var cell_i=(template||{});
 		if(cell_i.m_language==undefined){
@@ -239,9 +264,9 @@ W.notebook_prototype={
 		//cell name? no need, could put "@echo off" in the mark if needed
 		var lg=Duktape.__byte_length(s_mark);
 		for(var i=0;i<this.m_cells.length;i++){
-			var cell_i=this.m_cells;
+			var cell_i=this.m_cells[i];
 			var doc_in=cell_i.m_text_in;
-			if(doc_in.ed.GetTextSize()>=lg&&doc_in.GetText(0,lg)==s_mark){
+			if(doc_in.ed.GetTextSize()>=lg&&doc_in.ed.GetText(0,lg)==s_mark){
 				return i;
 			}
 		}
@@ -282,8 +307,10 @@ W.notebook_prototype={
 	},
 	CreateCompilerError:function(id,err,ccnt_lh,ccnt_next){
 		//we could afford to discard dangling highlights - give discard responsibility to the cell
+		err.is_in_active_doc=0;//the callback may end up getting called later than error clearing
 		UI.OpenEditorWindow(err.file_name,function(){
 			var go_prev_line=0
+			if(err.is_in_active_doc==undefined){return;}
 			if(!err.line1){
 				err.line1=err.line0
 			}
@@ -303,6 +330,7 @@ W.notebook_prototype={
 			//for(var shit in this){
 			//	print(shit,this[shit])
 			//}
+			err.color=((err.category||'error')=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning);
 			err.ccnt0=this.SeekLC(err.line0,err.col0)
 			err.ccnt1=this.SeekLC(err.line1,err.col1)
 			if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
@@ -310,7 +338,7 @@ W.notebook_prototype={
 			err.cell_id=id;
 			/////////////////
 			AddErrorToEditor(this,err)
-		})
+		},"quiet")
 		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
 			if(!err.is_in_active_doc){
 				UI.OpenEditorWindow(err.file_name,function(){
@@ -380,8 +408,7 @@ W.notebook_prototype={
 		}
 		UI.Refresh()
 	},
-	RunCell:function(id){
-		//todo: check language registration
+	ClearCellOutput:function(id){
 		var cell_i=this.m_cells[id];
 		var doc=cell_i.m_text_out;
 		var ed_out=cell_i.m_text_out.ed;
@@ -390,11 +417,18 @@ W.notebook_prototype={
 			doc.scroll_y=0;
 			doc.sel0.ccnt=0;
 			doc.sel1.ccnt=0;
-			doc.ClearClickableRanges()
 			ed_out.Edit([0,ed_out.GetTextSize(),undefined]);
 			doc.ResetSaveDiff()
-			cell_i.m_has_any_error=0;
 		}
+		cell_i.m_has_any_error=0;;
+		doc.ClearClickableRanges();
+	},
+	RunCell:function(id){
+		//todo: check language registration
+		var cell_i=this.m_cells[id];
+		var doc=cell_i.m_text_out;
+		var ed_out=cell_i.m_text_out.ed;
+		this.ClearCellOutput(id)
 		if(id==0&&cell_i.m_language=='Javascript'){
 			//run cell 0 as qpad js to update the configuration
 			var s_cell_i=cell_i.doc_in.ed.GetText();
@@ -513,28 +547,7 @@ W.NotebookView=function(id,attrs){
 	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
 	obj.x=0;obj.y=0;obj.w=(obj.w-obj.w_scroll_bar)/obj.scale+obj.padding*0.5;obj.h/=obj.scale;
 	if(!obj.m_cells){
-		//we shouldn't make build output clog global metadata - a separate json file
-		//just a flat list of cells
-		//var notes=UI.m_ui_metadata["<notebooks>"];
-		//if(!notes){notes={};UI.m_ui_metadata["<notebooks>"]=notes;}
-		//notes[obj.file_name];
-		var fn_notes=obj.file_name;
-		obj.m_cells=[];
-		if(fn_notes){
-			try{
-				obj.m_cells=JSON.parse(IO.ReadAll(fn_notes)).cells;
-			}catch(err){
-				obj.m_cells=[];
-			}
-		}
-		//create the initial data objects
-		for(var i=0;i<obj.m_cells.length;i++){
-			var cell_i=obj.m_cells[i];
-			obj.ProcessCell(cell_i);
-		}
-		if(!obj.m_cells.length){
-			obj.NewCell();
-		}
+		obj.Load();
 	}
 	var scroll_y=(obj.scroll_y||0);obj.scroll_y=scroll_y;
 	var current_y=0;
@@ -709,22 +722,27 @@ W.NotebookView=function(id,attrs){
 	return obj
 }
 
-UI.OpenNoteBookTab=function(file_name){
+UI.OpenNoteBookTab=function(file_name,is_quiet){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab_i=UI.g_all_document_windows[i];
 		if(obj_tab_i.file_name==file_name&&obj_tab_i.document_type=="notebook"){
-			UI.top.app.document_area.SetTab(i)
+			if(!is_quiet){UI.top.app.document_area.SetTab(i)}
 			return obj_tab_i;
 		}
 	}
 	file_name=IO.NormalizeFileName(file_name);
 	UI.top.app.quit_on_zero_tab=0;
-	return UI.NewTab({
+	var bk_current_tab_id=undefined;
+	if(is_quiet){
+		bk_current_tab_id=UI.top.app.document_area.current_tab_id;
+	}
+	var ret=UI.NewTab({
 		file_name:file_name,
 		title:"Notebook",
 		tooltip:file_name,
 		document_type:"notebook",
+		area_name:"h_tools",
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
@@ -742,6 +760,15 @@ UI.OpenNoteBookTab=function(file_name){
 			body.title=UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(this.file_name)))+(this.need_save?'*':'');
 			body.tooltip=this.file_name;
 			return body;
+		},
+		NeedMainWidget:function(){
+			if(!this.main_widget){
+				this.main_widget=Object.create(W.notebook_prototype);
+				this.main_widget.file_name=this.file_name;
+			}
+			if(!this.main_widget.m_cells){
+				this.main_widget.Load();
+			}
 		},
 		Save:function(){
 			if(!this.main_widget){return;}
@@ -775,4 +802,8 @@ UI.OpenNoteBookTab=function(file_name){
 		},
 		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
+	if(is_quiet){
+		UI.top.app.document_area.current_tab_id=bk_current_tab_id;
+	}
+	return ret;
 };

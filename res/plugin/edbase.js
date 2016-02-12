@@ -950,7 +950,7 @@ Language.RegisterCompiler(["tex"],{
 			var message=matches[3]
 			var err={
 				file_name:name,
-				color:this.color_tilde_compiler_error,
+				category:"error",
 				message:message,line0:linea-1,
 			}
 			//another plugin for error overlay
@@ -992,7 +992,7 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 			var category=matches[4]
 			var err={
 				file_name:name,
-				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				category:category,
 				message:message,line0:linea-1,
 			}
 			return err
@@ -1008,7 +1008,7 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 			//}
 			var err={
 				file_name:name,
-				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				category:category,
 				message:message,line0:linea-1
 			}
 			if(matches[4]){
@@ -1061,7 +1061,7 @@ Language.RegisterCompiler(["jc"],{
 			var category=matches[8]
 			var err={
 				file_name:name,
-				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				category:category,
 				message:message,
 				line0:linea-1,col0:cola-1,
 				line1:lineb-1,col1:colb-1,
@@ -1076,7 +1076,7 @@ Language.RegisterCompiler(["jc"],{
 			var category=matches[4]
 			var err={
 				file_name:name,
-				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				category:category,
 				message:message,line0:linea-1,
 			}
 			return err
@@ -1092,7 +1092,7 @@ Language.RegisterCompiler(["jc"],{
 			//}
 			var err={
 				file_name:name,
-				color:category=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning,
+				category:category,
 				message:message,line0:linea-1
 			}
 			if(matches[4]){

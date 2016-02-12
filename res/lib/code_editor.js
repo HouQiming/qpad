@@ -8,6 +8,7 @@ var KEY_DECL_CLASS=TOK_TYPE*1
 var KEY_DECL_FUNCTION=TOK_TYPE*0
 var CALL_GC_DOC_SIZE_THRESHOLD=4194304;
 var GRACEFUL_WORD_SIZE=256;
+var MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT=256;
 
 UI.m_code_editor_persistent_members_doc=[
 	"m_language_id",
@@ -1460,6 +1461,31 @@ var find_context_prototype={
 				return 1024;
 			}
 		}
+		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
+			var cell_desc=this.m_result_cell;
+			if(cell_desc&&this.m_forward_matches.length<MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
+				var obj_notebook=cell_desc.obj_notebook;
+				var cell_id=cell_desc.cell_id;
+				var lc0=doc.GetLC(ccnt0);
+				var lc1=doc.GetLC(ccnt1);
+				var hint_items=[doc.m_file_name,':'];
+				hint_items.push(lc0[0]+1)
+				hint_items.push(',')
+				hint_items.push(lc0[1]+1)
+				hint_items.push('-')
+				if(lc0!=lc1){
+					hint_items.push(lc1[0]+1)
+					hint_items.push(',')
+				}
+				hint_items.push(lc1[1]+1)
+				hint_items.push(': match "')
+				hint_items.push(doc.ed.GetText(ccnt0,ccnt1-ccnt0))
+				hint_items.push('" (found)\n')
+				obj_notebook.WriteCellOutput(cell_id,hint_items.join(""));
+			}else if(cell_desc&&this.m_forward_matches.length==MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
+				obj_notebook.WriteCellOutput(cell_id,"additional matches omitted\n");
+			}
+		}
 		this.m_forward_matches.push(ccnt0,ccnt1,doc)
 		this.CreateHighlight(doc,ccnt0,ccnt1)
 		return 1024
@@ -2124,6 +2150,18 @@ var find_context_prototype={
 	},
 };
 
+//initiator + mark
+UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language){
+	var spath_repo=UI.GetEditorProject(doc.m_file_name);
+	var obj_notebook_tab=UI.OpenNoteBookTab(spath_repo+"/notebook.json",'quiet')
+	if(!obj_notebook_tab.main_widget){
+		obj_notebook_tab.NeedMainWidget();
+	}
+	var obj_notebook=obj_notebook_tab.main_widget;
+	var cell_id=obj_notebook.GetSpecificCell(s_mark,s_language)
+	return {obj_notebook:obj_notebook,cell_id:cell_id};
+}
+
 var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 	var hc=UI.GetCharacterHeight(UI.default_styles.code_editor.editor_style.font)
 	var ccnt_tot=doc.ed.GetTextSize()
@@ -2156,11 +2194,15 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		m_current_merged_item:0,
 		m_y_extent_backward:0,
 		m_y_extent_forward:0,
-	}
+	};
 	if(flags&UI.SEARCH_FLAG_GLOBAL){
 		var spath_repo=UI.GetEditorProject(doc.m_file_name);
 		ctx.m_repo_path=spath_repo;
 		ctx.m_base_file=doc.m_file_name;
+		ctx.m_result_cell=UI.OpenNotebookCellFromEditor(doc,"Search result","Markdown")
+		if(ctx.m_result_cell){
+			ctx.m_result_cell.obj_notebook.ClearCellOutput(ctx.m_result_cell.cell_id)
+		}
 	}else{
 		ctx.m_sel0_before_find=doc.sel0.ccnt;
 		ctx.m_sel1_before_find=doc.sel1.ccnt;
@@ -2170,12 +2212,12 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 	var y_id0=Math.max(y_id-hc*ctx.m_context_size,0),y_id1=Math.min(y_id+hc*(ctx.m_context_size+1),ytot)
 	//id, virtual_screen_y, scroll_y, h
 	//the middle segment is duplicated for convenience
-	ctx.m_merged_y_windows_backward.push(0,-hc*ctx.m_context_size,y_id0,y_id1-y_id0)
-	ctx.m_merged_y_windows_forward.push(0,-hc*ctx.m_context_size,y_id0,y_id1-y_id0)
+	ctx.m_merged_y_windows_backward.push(0,-hc*ctx.m_context_size,y_id0,y_id1-y_id0);
+	ctx.m_merged_y_windows_forward.push(0,-hc*ctx.m_context_size,y_id0,y_id1-y_id0);
 	//ctx.m_mergable_ccnt_backward=doc.ed.SeekXY(0,y_id)
 	//ctx.m_mergable_ccnt_forward=doc.ed.SeekXY(1e17,y_id)
-	ctx.m_y_extent_backward=-hc*ctx.m_context_size
-	ctx.m_y_extent_forward=hc*(ctx.m_context_size+1)
+	ctx.m_y_extent_backward=-hc*ctx.m_context_size;
+	ctx.m_y_extent_forward=hc*(ctx.m_context_size+1);
 	//if(flags&UI.SEARCH_FLAG_GLOBAL){
 	//	UI.g_is_in_global_search++;
 	//}
@@ -5792,7 +5834,7 @@ UI.NewCodeEditorTab=function(fname0){
 	})
 };
 
-UI.OpenEditorWindow=function(fname,fcallback){
+UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 	if(!(fname&&fname[0]=='*')){
 		fname=IO.NormalizeFileName(fname).replace(/[\\]/g,"/");
 	}
@@ -5800,16 +5842,25 @@ UI.OpenEditorWindow=function(fname,fcallback){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		if(UI.g_all_document_windows[i].file_name==fname){
 			obj_tab=UI.g_all_document_windows[i]
-			UI.top.app.document_area.SetTab(i)
+			if(!is_quiet){
+				UI.top.app.document_area.SetTab(i)
+			}
 			break
 		}
 	}
 	if(!obj_tab){
+		var bk_current_tab_id=undefined;
+		if(is_quiet){
+			bk_current_tab_id=UI.top.app.document_area.current_tab_id;
+		}
 		var lang=UI.ED_GetFileLanguage(fname);
 		if(lang.is_binary){
 			obj_tab=UI.NewBinaryEditorTab(fname)
 		}else{
 			obj_tab=UI.NewCodeEditorTab(fname)
+		}
+		if(is_quiet){
+			UI.top.app.document_area.current_tab_id=bk_current_tab_id;
 		}
 	}
 	if(fcallback){
