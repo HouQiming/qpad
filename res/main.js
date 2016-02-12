@@ -479,14 +479,13 @@ UI.Application=function(id,attrs){
 				var spath_repo=UI.GetEditorProject(obj_active_tab.file_name);
 				if(spath_repo){
 					var obj_real_active_tab=app.document_area.active_tab;
-					var fn_notebook=IO.NormalizeFilename(spath_repo+"/notebook.json");
-					var f_action=undefined;
+					var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");
 					if(obj_real_active_tab&&obj_real_active_tab.document_type=='notebook'&&obj_real_active_tab.file_name==fn_notebook){
 						menu_file.AddNormalItem({text:"Return to file",
 							enable_hotkey:1,key:"ALT+N",
 							action:app.document_area.SetTab.bind(
 								app.document_area,
-								obj_real_active_tab.__global_tab_id),
+								obj_active_tab.__global_tab_id),
 						})
 					}else{
 						menu_file.AddNormalItem({text:"Open notebook...",
