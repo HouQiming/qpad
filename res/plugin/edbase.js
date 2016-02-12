@@ -717,7 +717,6 @@ IO.AsyncShell=function(cmdline){
 		IO.Shell(cmdline.concat(["&"]))
 	}
 }
-
 UI.WriteBuildOutput=function(fparse,s){
 	if(!UI.g_build_output_editor){
 		var obj=Object.create(W.CodeEditor_prototype)
@@ -814,7 +813,6 @@ UI.WriteBuildOutput=function(fparse,s){
 	}
 	UI.Refresh()
 }
-
 W.SXS_BuildOutput=function(id,attrs){
 	var obj=UI.Keep(id,attrs);
 	UI.StdStyling(id,obj,attrs, "sxs_build_output",(obj.doc&&UI.HasFocus(obj.doc))?"focus":"blur");
@@ -832,7 +830,6 @@ W.SXS_BuildOutput=function(id,attrs){
 	UI.End()
 	return obj
 }
-
 UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 	//redirect and parse the output
 	var args
@@ -887,7 +884,6 @@ UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
 		UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: unable to invoke the compiler\n")
 	}
 }
-
 UI.ClearCompilerErrors=function(){
 	//keep the locators for seeking but remove the highlights
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
@@ -901,7 +897,6 @@ UI.ClearCompilerErrors=function(){
 		}
 	}
 }
-
 UI.CreateCompilerError=function(err){
 	UI.OpenEditorWindow(err.file_name,function(){
 		if(this.m_error_overlays){
