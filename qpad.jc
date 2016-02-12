@@ -437,6 +437,9 @@ if Platform.BUILD=="debug":
 				return JS.ReturnError("bad args")
 		pproc=System.Processes.RunPiped(args,spath,show,"new_job,output,error")
 		if !pproc:
+			//job object creation may fail
+			pproc=System.Processes.RunPiped(args,spath,show,"output,error")
+		if !pproc:
 			return 0
 		return JS.Return(new CProcessWrapper(){proc:pproc})
 	}

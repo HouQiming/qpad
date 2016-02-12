@@ -193,6 +193,7 @@ IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){
 	//segment by line, then test regexp
 	var proc=IO.RunToolRedirected(args,work_dir,0)
 	if(!proc){
+		print('runtool failed: ',JSON.stringify(args),work_dir)//todo
 		return 0;
 	}
 	proc.sregex=new RegExp(sregex,"");

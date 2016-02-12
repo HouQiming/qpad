@@ -469,7 +469,7 @@ UI.Application=function(id,attrs){
 							"-e",'tell application "System Events" to delay 0.1'])
 						IO.Shell(["osascript",
 							"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
-						IO.Shell(["osascript",	
+						IO.Shell(["osascript",
 							"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
 					}
 				}})

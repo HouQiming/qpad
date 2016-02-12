@@ -1017,9 +1017,10 @@ Language.RegisterCompiler(["c","cpp","cxx","cc"],{
 /////////////////////////////////////////////
 Language.RegisterCompiler(["jc"],{
 	name:"jacy",
-	m_regex_cc:new RegExp('^([^:]*):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('^[ \t]*([^:]*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
-	m_regex_jc:new RegExp('([^:]*):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]+)\\)\r?\n'),
+	m_regex_cc:new RegExp('^(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
+	m_regex_vc:new RegExp('^[ \t]*(.*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
+	m_regex_jc:new RegExp('^(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]+)\\)\r?\n'),
+	m_regex_search:new RegExp('^(.*?):([0-9]+)[.][.]([0-9]+): (.*)\r?\n'),
 	//m_regex_js:new RegExp('\t([^:]*):([0-9]+).*\r?\n'),
 	ParseOutput:function(sline){
 		//JS failure: eval, relative path and stuff...
@@ -1035,7 +1036,24 @@ Language.RegisterCompiler(["jc"],{
 		//	}
 		//	return err
 		//}
-		var matches=sline.match(this.m_regex_jc);
+		var matches=sline.match(this.m_regex_search);
+		if(matches){
+			var err={}
+			var name=matches[1];
+			var ccnt0=parseInt(matches[2]);
+			var ccnt1=parseInt(matches[3]);
+			var message=matches[4];
+			var err={
+				file_name:name,
+				category:'match',
+				message:message,
+				ccnt0:ccnt0,
+				ccnt1:ccnt1,
+				is_quiet:1,
+			}
+			return err;
+		}
+		matches=sline.match(this.m_regex_jc);
 		if(matches){
 			var err={}
 			var name=matches[1];
@@ -1414,7 +1432,7 @@ UI.RegisterEditorPlugin(function(){
 });//.prototype.desc={category:"Display",name:"Enable spell checks"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.owner){return;}
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();

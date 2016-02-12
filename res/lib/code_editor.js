@@ -1466,21 +1466,26 @@ var find_context_prototype={
 			if(cell_desc&&this.m_forward_matches.length<MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
 				var obj_notebook=cell_desc.obj_notebook;
 				var cell_id=cell_desc.cell_id;
-				var lc0=doc.GetLC(ccnt0);
-				var lc1=doc.GetLC(ccnt1);
 				var hint_items=[doc.m_file_name,':'];
-				hint_items.push(lc0[0]+1)
-				hint_items.push(',')
-				hint_items.push(lc0[1]+1)
-				hint_items.push('-')
-				if(lc0!=lc1){
-					hint_items.push(lc1[0]+1)
-					hint_items.push(',')
-				}
-				hint_items.push(lc1[1]+1)
-				hint_items.push(': match "')
+				hint_items.push(ccnt0)
+				hint_items.push('..')
+				hint_items.push(ccnt1)
+				//var lc0=doc.GetLC(ccnt0);
+				//var lc1=doc.GetLC(ccnt1);
+				//hint_items.push(lc0[0]+1)
+				//hint_items.push(',')
+				//hint_items.push(lc0[1]+1)
+				//hint_items.push('-')
+				//if(lc0!=lc1){
+				//	hint_items.push(lc1[0]+1)
+				//	hint_items.push(',')
+				//}
+				//hint_items.push(lc1[1]+1)
+				//hint_items.push(': match "')
+				hint_items.push(': ')
 				hint_items.push(doc.ed.GetText(ccnt0,ccnt1-ccnt0))
-				hint_items.push('" (found)\n')
+				//hint_items.push('" (found)\n')
+				hint_items.push('\n')
 				obj_notebook.WriteCellOutput(cell_id,hint_items.join(""));
 			}else if(cell_desc&&this.m_forward_matches.length==MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
 				obj_notebook.WriteCellOutput(cell_id,"additional matches omitted\n");
@@ -4667,6 +4672,9 @@ W.CodeEditor=function(id,attrs){
 				is_preview:1,file_name:obj.file_name,
 			})
 		}else{
+			if(obj.show_find_bar&&doc&&doc.notebook_owner){
+				obj.show_find_bar&=~UI.SEARCH_FLAG_GLOBAL;
+			}
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar
 				obj.m_hide_find_highlight=0;

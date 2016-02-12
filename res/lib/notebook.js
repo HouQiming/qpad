@@ -73,6 +73,7 @@ UI.RegisterEditorPlugin(function(){
 
 var AddErrorToEditor=function(doc,err){
 	if(err.is_in_active_doc){return;}
+	if(err.is_quiet){return;}
 	var hl_items=doc.CreateTransientHighlight({
 		'depth':1,
 		'color':err.color||doc.color_tilde_compiler_error,
@@ -185,7 +186,9 @@ W.notebook_prototype={
 		}
 		this.AddEventHandler('UP',function(){
 			var sel=this.GetSelection();
-			if(sel[0]>0||sel[1]>0){return 1;}
+			if(sel[0]!=sel[1]){return 1;}
+			var y=this.ed.XYFromCcnt(sel[1]).y;
+			if(y>0){return 1;}
 			var sub_cell_id=this.sub_cell_id;
 			if(sub_cell_id>0){
 				this.notebook_owner.GotoSubCell(sub_cell_id-1,1);
@@ -196,7 +199,9 @@ W.notebook_prototype={
 		this.AddEventHandler('DOWN',function(){
 			var sel=this.GetSelection();
 			var size=this.ed.GetTextSize();
-			if(sel[0]<size||sel[1]<size){return 1;}
+			if(sel[0]!=sel[1]){return 1;}
+			var y=this.ed.XYFromCcnt(sel[1]).y;
+			if(y<this.ed.XYFromCcnt(size).y){return 1;}
 			var sub_cell_id=this.sub_cell_id;
 			if(sub_cell_id<this.notebook_owner.m_cells.length*2-1){
 				this.notebook_owner.GotoSubCell(sub_cell_id+1,0);
@@ -214,6 +219,8 @@ W.notebook_prototype={
 		var doc_in=UI.CreateEmptyCodeEditor(cell_i.m_language);
 		doc_in.plugins=this.m_cell_plugins;
 		doc_in.wrap_width=0;
+		doc_in.m_enable_wrapping=0;
+		doc_in.m_current_wrap_width=512;
 		doc_in.notebook_owner=this;
 		doc_in.Init();
 		doc_in.scroll_x=0;doc_in.scroll_y=0;
@@ -224,6 +231,8 @@ W.notebook_prototype={
 		var doc_out=UI.CreateEmptyCodeEditor();
 		doc_out.plugins=this.m_cell_plugins;
 		doc_out.wrap_width=0;
+		doc_out.m_enable_wrapping=0;
+		doc_out.m_current_wrap_width=512;
 		doc_out.notebook_owner=this;
 		doc_out.read_only=1;
 		doc_out.Init();
@@ -307,38 +316,41 @@ W.notebook_prototype={
 	},
 	CreateCompilerError:function(id,err,ccnt_lh,ccnt_next){
 		//we could afford to discard dangling highlights - give discard responsibility to the cell
+		var edstyle=UI.default_styles.code_editor.editor_style;
 		err.is_in_active_doc=0;//the callback may end up getting called later than error clearing
-		UI.OpenEditorWindow(err.file_name,function(){
-			var go_prev_line=0
-			if(err.is_in_active_doc==undefined){return;}
-			if(!err.line1){
-				err.line1=err.line0
-			}
-			if(!err.col0){
-				err.col0=0;
-				err.col1=0;
-				if(err.line0==err.line1){
-					err.line1++
-					go_prev_line=1
+		err.color=((err.category||'error')=='error'?edstyle.color_tilde_compiler_error:edstyle.color_tilde_compiler_warning);
+		err.cell_id=id;
+		if(!err.is_quiet){
+			UI.OpenEditorWindow(err.file_name,function(){
+				var go_prev_line=0
+				if(err.is_in_active_doc==undefined){return;}
+				if(!err.line1){
+					err.line1=err.line0
 				}
-			}else if(!err.col1){
-				err.col1=err.col0;
-			}
-			//if(err.col0==err.col1&&err.line0==err.line1){
-			//	err.col1++;
-			//}
-			//for(var shit in this){
-			//	print(shit,this[shit])
-			//}
-			err.color=((err.category||'error')=='error'?this.color_tilde_compiler_error:this.color_tilde_compiler_warning);
-			err.ccnt0=this.SeekLC(err.line0,err.col0)
-			err.ccnt1=this.SeekLC(err.line1,err.col1)
-			if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
-			if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
-			err.cell_id=id;
-			/////////////////
-			AddErrorToEditor(this,err)
-		},"quiet")
+				if(!err.col0){
+					err.col0=0;
+					err.col1=0;
+					if(err.line0==err.line1){
+						err.line1++
+						go_prev_line=1
+					}
+				}else if(!err.col1){
+					err.col1=err.col0;
+				}
+				//if(err.col0==err.col1&&err.line0==err.line1){
+				//	err.col1++;
+				//}
+				//for(var shit in this){
+				//	print(shit,this[shit])
+				//}
+				err.ccnt0=this.SeekLC(err.line0,err.col0)
+				err.ccnt1=this.SeekLC(err.line1,err.col1)
+				if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
+				if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
+				/////////////////
+				AddErrorToEditor(this,err)
+			},"quiet")
+		}
 		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
 			if(!err.is_in_active_doc){
 				UI.OpenEditorWindow(err.file_name,function(){
@@ -469,6 +481,7 @@ W.notebook_prototype={
 		IO.CreateFile(fn_script,cell_i.m_text_in.ed.GetText())
 		args.push(fn_script)
 		var proc=IO.RunToolRedirected(args,this.m_configuration.path||UI.GetPathFromFilename(this.file_name),0)
+		var idle_wait=100;
 		if(proc){
 			var fpoll=(function(cell_i){
 				this.need_save|=2;
@@ -476,10 +489,12 @@ W.notebook_prototype={
 				//print('fpoll',s,JSON.stringify(args),proc.IsRunning())
 				if(s){
 					this.WriteCellOutput(cell_i.m_cell_id,s)
+					idle_wait=100;
 					UI.NextTick(fpoll)
 				}else if(proc.IsRunning()){
-					UI.setTimeout(fpoll,100)
-					UI.Refresh();
+					idle_wait=Math.min(idle_wait*2,1000);
+					UI.setTimeout(fpoll,idle_wait);
+					//UI.Refresh();
 				}else{
 					var code=proc.GetExitCode()
 					if(code!=0){
@@ -513,6 +528,8 @@ W.notebook_prototype={
 		doc_in=UI.CreateEmptyCodeEditor(cell_i.m_language);
 		doc_in.plugins=this.m_cell_plugins;
 		doc_in.wrap_width=0;
+		doc_in.m_enable_wrapping=0;
+		doc_in.m_current_wrap_width=512;
 		doc_in.notebook_owner=this;
 		doc_in.Init();
 		doc_in.scroll_x=0;doc_in.scroll_y=0;
