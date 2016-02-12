@@ -586,6 +586,7 @@ UI.CustomTheme=function(){
 		},
 		notebook_view:{
 			max_lines:12,
+			w_scroll_bar:20,
 			h_caption:36,
 			h_separation:8,
 			padding:12,
@@ -597,7 +598,6 @@ UI.CustomTheme=function(){
 			shadow_size:6,
 			shadow_color:0xaa000000,
 			scale:1.0/1.25,
-			//todo
 		},
 		sxs_build_output:{
 			border_width:0,
@@ -887,12 +887,17 @@ UI.CustomTheme=function(){
 			padding:0,
 			szbar_min:32,
 			middle_bar:{
-				w:8,h:8,
+				w:12,h:12,
 				round:6,
 				color:[{x:0,y:0,color:0xff999999},{x:1,y:1,color:0xff666666}],
 				border_color:0,
 			},
 			text_color:0xff999999,//dummy
+		},
+		list_view:{
+			color:0,border_color:0,
+			size_scroll_bar:12,
+			has_scroll_bar:1,
 		},
 		sxs_options_page:{
 			border_width:0,

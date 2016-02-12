@@ -480,7 +480,7 @@ UI.Application=function(id,attrs){
 				if(spath_repo){
 					menu_file.AddNormalItem({text:"Open notebook...",
 						enable_hotkey:1,key:"ALT+N",
-						action:UI.NewNoteBookTab.bind(undefined,spath_repo+"/notebook.json")
+						action:UI.OpenNoteBookTab.bind(undefined,spath_repo+"/notebook.json")
 					})
 				}
 			}
@@ -515,7 +515,7 @@ UI.Application=function(id,attrs){
 				if(workspace[i].util_type){
 					UI.OpenUtilTab(workspace[i].util_type)
 				}else if(workspace[i].document_type=='notebook'){
-					UI.NewNoteBookTab(workspace[i].file_name)
+					UI.OpenNoteBookTab(workspace[i].file_name)
 				}else{
 					UI.OpenEditorWindow(workspace[i].file_name)
 				}

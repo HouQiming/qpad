@@ -198,6 +198,10 @@ W.notebook_prototype={
 			}
 			return 1;
 		})
+		this.AddEventHandler('selectionChange',function(){
+			this.notebook_owner.need_auto_scroll=1;
+			UI.Refresh();
+		})
 	}],
 	ProcessCell:function(cell_i){
 		//////
@@ -228,6 +232,7 @@ W.notebook_prototype={
 		this.ProcessCell(cell_i)
 		this.m_cells.push(cell_i)
 		this.need_save|=2;
+		UI.Refresh();
 	},
 	GotoSubCell:function(sub_cell_id,sel_side){
 		var obj_cell=this[((sub_cell_id&1)?"doc_out_":"doc_in_")+(sub_cell_id>>1).toString()];
@@ -239,6 +244,7 @@ W.notebook_prototype={
 				ccnt=doc.ed.GetTextSize()
 			}
 			doc.SetSelection(ccnt,ccnt)
+			this.need_auto_scroll=1;
 			UI.Refresh()
 		}
 	},
@@ -423,6 +429,7 @@ W.notebook_prototype={
 		}
 		this.need_save|=2;
 		cell_i.m_proc={proc:proc,fn_script:fn_script};
+		this.need_auto_scroll=1;
 		UI.Refresh()
 	},
 	UpdateLanguage:function(id,name){
@@ -446,14 +453,31 @@ W.notebook_prototype={
 		cell_i.m_text_in=doc_in;
 		UI.Refresh()
 	},
+	ScrollShowRange:function(y0,h0, y1,h1){
+		var scroll_y0=this.scroll_y;
+		var h_scrolling_area=this.h;//this is the replaced subwindow h here!
+		if(h_scrolling_area>=h0){
+			this.scroll_y=Math.max(Math.min(this.scroll_y,y0),y0+h0-h_scrolling_area);
+		}else if(h_scrolling_area>=h1){
+			this.scroll_y=Math.max(Math.min(this.scroll_y,y1),y1+h1-h_scrolling_area);
+		}else{
+			this.scroll_y=Math.max(Math.min(this.scroll_y,y1+h1-h_scrolling_area),y1);
+		}
+		this.scroll_y=Math.max(Math.min(this.scroll_y,(this.m_ytot_all_notes||0)-h_scrolling_area),0)
+		this.need_auto_scroll=0;
+		if(this.scroll_y!=scroll_y0){
+			UI.InvalidateCurrentFrame();
+			UI.Refresh();
+		}
+	},
 };
 W.NotebookView=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"notebook_view",W.notebook_prototype);
 	UI.Begin(obj)
 	UI.RoundRect(obj)
-	UI.PushSubWindow(obj.x,obj.y,obj.w,obj.h,obj.scale)
+	UI.PushSubWindow(obj.x,obj.y,obj.w-obj.w_scroll_bar+obj.padding*0.5*obj.scale,obj.h,obj.scale)
 	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
-	obj.x=0;obj.y=0;obj.w/=obj.scale;obj.h/=obj.scale;
+	obj.x=0;obj.y=0;obj.w=(obj.w-obj.w_scroll_bar)/obj.scale+obj.padding*0.5;obj.h/=obj.scale;
 	if(!obj.m_cells){
 		//we shouldn't make build output clog global metadata - a separate json file
 		//just a flat list of cells
@@ -478,14 +502,14 @@ W.NotebookView=function(id,attrs){
 			obj.NewCell();
 		}
 	}
-	//todo: manually-culling, global scroll bar
-	var scroll_y=(obj.scroll_y||0);
-	var current_y=-scroll_y;
+	var scroll_y=(obj.scroll_y||0);obj.scroll_y=scroll_y;
+	var current_y=0;
 	var widget_style=UI.default_styles.code_editor;
 	var edstyle=widget_style.editor_style;
 	var hc=UI.GetCharacterHeight(edstyle.font);
 	obj.need_save&=~1;
 	var now=IO.WallClockTime()
+	var w_content=obj.w;
 	for(var i=0;i<obj.m_cells.length;i++){
 		var cell_i=obj.m_cells[i];
 		var doc_in=cell_i.m_text_in;
@@ -494,43 +518,53 @@ W.NotebookView=function(id,attrs){
 		var h_out=MeasureEditorSize(doc_out,0);
 		current_y+=obj.padding;
 		UI.RoundRect({
-			x:obj.x+obj.padding-obj.shadow_size*0.5,y:obj.y+current_y-obj.shadow_size*0.5,
-			w:obj.w-obj.padding*2+obj.shadow_size*1.5,h:h_in+obj.h_caption*2+h_out+obj.shadow_size*1.5,
+			x:obj.x+obj.padding-obj.shadow_size*0.5,y:obj.y+current_y-scroll_y-obj.shadow_size*0.5,
+			w:w_content-obj.padding*2+obj.shadow_size*1.5,h:h_in+obj.h_caption*2+h_out+obj.shadow_size*1.5,
 			round:obj.shadow_size,
 			border_width:-obj.shadow_size,
 			color:obj.shadow_color,
 		})
+		if(obj.need_auto_scroll){
+			if(UI.nd_focus==doc_in){
+				obj.ScrollShowRange(current_y,h_in+obj.h_caption*2+h_out,current_y,h_in+obj.h_caption)
+			}else if(UI.nd_focus==doc_out){
+				obj.ScrollShowRange(current_y,h_in+obj.h_caption*2+h_out,current_y+h_in+obj.h_caption,h_out+obj.h_caption)
+			}
+		}
 		var is_focused=(UI.nd_focus&&UI.nd_focus==doc_in);
 		UI.RoundRect({
-			x:obj.x+obj.padding,y:obj.y+current_y,
-			w:obj.w-obj.padding*2,h:obj.h_caption,
+			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
+			w:w_content-obj.padding*2,h:obj.h_caption,
 			color:is_focused?obj.caption_color:widget_style.line_number_bgcolor,
 		})
 		W.Text("",{
-			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y,
+			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
 			font:obj.caption_font,text:cell_i.m_language,
 			color:is_focused?obj.caption_text_color:widget_style.line_number_color,
 		})
 		current_y+=obj.h_caption;
-		W.CodeEditor("doc_in_"+i.toString(),{
-			doc:doc_in,
-			x:obj.x+obj.padding,y:obj.y+current_y,w:obj.w-obj.padding*2,h:h_in+hc,
-		})
+		if(UI.nd_focus==doc_in||current_y-scroll_y<obj.h&&current_y-scroll_y+h_in+hc>0||Math.abs(obj.m_last_focus_cell_id-(i*2))<=1){
+			W.CodeEditor("doc_in_"+i.toString(),{
+				doc:doc_in,
+				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in+hc,
+			})
+		}
 		doc_in.sub_cell_id=i*2+0;
+		doc_in.default_focus=(obj.m_last_focus_cell_id==doc_in.sub_cell_id?2:1)
 		//var w_line_numbers=doc_in.m_rendering_w_line_numbers+UI.default_styles.code_editor.padding;
 		//doc_in.RenderWithLineNumbers(
 		//	doc_in.scroll_x||0,doc_in.scroll_y||0,
-		//	obj.x,obj.y+current_y,obj.w,h_in,
+		//	obj.x,obj.y+current_y,w_content,h_in,
 		//	"doc_in_"+i.toString())
 		current_y+=h_in;
 		is_focused=(UI.nd_focus&&UI.nd_focus==doc_out);
 		var rect_bar=UI.RoundRect({
-			x:obj.x+obj.padding,y:obj.y+current_y,
-			w:obj.w-obj.padding*2,h:obj.h_caption,
+			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
+			w:w_content-obj.padding*2,h:obj.h_caption,
 			color:is_focused?obj.caption_color:widget_style.line_number_bgcolor,
 		})
 		W.Text("",{
-			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y,
+			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
 			font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":"Output",
 			color:is_focused?obj.caption_text_color:widget_style.line_number_color,
 		})
@@ -551,31 +585,34 @@ W.NotebookView=function(id,attrs){
 			var s_time=UI.FormatRelativeTime(cell_i.m_completion_time,now);
 			var dims_time=UI.MeasureText(obj.caption_font,s_time)
 			W.Text("",{
-				x:obj.x+obj.w-obj.padding-obj.caption_padding-dims_time.w,y:obj.y+current_y,
+				x:obj.x+w_content-obj.padding-obj.caption_padding-dims_time.w,y:obj.y+current_y-scroll_y,
 				font:obj.caption_font,text:s_time,
 				color:is_focused?obj.caption_text_color:widget_style.line_number_color,
 			})
 		}
 		current_y+=obj.h_caption;
 		//UI.RoundRect({
-		//	x:obj.x+obj.padding,y:obj.y+current_y,w:obj.w-obj.padding*2,h:h_out,
+		//	x:obj.x+obj.padding,y:obj.y+current_y,w:w_content-obj.padding*2,h:h_out,
 		//	color:UI.default_styles.code_editor.bgcolor,
 		//})
 		//doc_out.RenderAsWidget("doc_out_"+i.toString(),
-		//	obj.x+obj.padding+w_line_numbers,obj.y+current_y,obj.w-w_line_numbers,h_out);
-		W.CodeEditor("doc_out_"+i.toString(),{
-			doc:doc_out,
-			read_only:doc_out.read_only,
-			//x:obj.x+obj.padding,y:obj.y+current_y,w:obj.w-obj.padding*2,h:h_in+hc,
-			x:obj.x+obj.padding,y:obj.y+current_y,w:obj.w-obj.padding*2,h:h_out,
-		})
+		//	obj.x+obj.padding+w_line_numbers,obj.y+current_y,w_content-w_line_numbers,h_out);
+		if(UI.nd_focus==doc_out||current_y-scroll_y<obj.h&&current_y-scroll_y+h_out>0||Math.abs(obj.m_last_focus_cell_id-(i*2+1))<=1){
+			W.CodeEditor("doc_out_"+i.toString(),{
+				doc:doc_out,
+				read_only:doc_out.read_only,
+				//x:obj.x+obj.padding,y:obj.y+current_y,w:w_content-obj.padding*2,h:h_in+hc,
+				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_out,
+			})
+		}
 		doc_out.sub_cell_id=i*2+1;
+		doc_out.default_focus=(obj.m_last_focus_cell_id==doc_out.sub_cell_id?2:1)
 		//doc_out.RenderWithLineNumbers(
 		//	doc_out.scroll_x||0,doc_out.scroll_y||0,
-		//	obj.x,obj.y+current_y,obj.w,h_out,
+		//	obj.x,obj.y+current_y,w_content,h_out,
 		//	"doc_out_"+i.toString())
-		doc_in.AutoScroll("show")
-		doc_out.AutoScroll("show")
+		doc_in.AutoScroll("bound")
+		doc_out.AutoScroll("bound")
 		current_y+=h_out;
 		current_y+=obj.padding;
 		current_y+=obj.h_separation;
@@ -585,6 +622,7 @@ W.NotebookView=function(id,attrs){
 		doc_in.m_cell_id=i;
 		cell_i.m_cell_id=i;
 	}
+	var ytot_all_notes=current_y-obj.h_separation;
 	//coulddo: tool bar
 	var menu_notebook=UI.BigMenu("Note&book")
 	menu_notebook.AddNormalItem({
@@ -593,28 +631,55 @@ W.NotebookView=function(id,attrs){
 	var focus_cell_id=undefined;
 	for(var i=0;i<obj.m_cells.length;i++){
 		var cell_i=obj.m_cells[i];
-		var doc_in=cell_i.m_text_in;
-		if(doc_in==UI.nd_focus){
-			focus_cell_id=i;
+		if(cell_i.m_text_in==UI.nd_focus){
+			focus_cell_id=i*2;
+			break;
+		}
+		if(cell_i.m_text_out==UI.nd_focus){
+			focus_cell_id=i*2+1;
 			break;
 		}
 	}
-	if(focus_cell_id!=undefined&&!obj.m_cells[focus_cell_id].m_proc){
+	if(focus_cell_id!=undefined&&!obj.m_cells[focus_cell_id>>1].m_proc&&!(focus_cell_id&1)){
 		menu_notebook.AddNormalItem({
 			text:"&Run cell",
 			enable_hotkey:1,key:"CTRL+RETURN",action:(function(){
 				this.RunCell(focus_cell_id)
 			}).bind(obj)})
 	}
+	if(focus_cell_id!=undefined){
+		obj.m_last_focus_cell_id=focus_cell_id;
+	}
 	menu_notebook=undefined;
 	UI.PopSubWindow()
 	obj.x=bk_dims[0];obj.y=bk_dims[1];obj.w=bk_dims[2];obj.h=bk_dims[3];
+	//scroll bar - obj.w_scroll_bar
+	var h_scrolling_area=obj.h/obj.scale;
+	var sbar_value=Math.max(Math.min(scroll_y/(ytot_all_notes-h_scrolling_area),1),0);
+	obj.m_ytot_all_notes=ytot_all_notes;
+	if(h_scrolling_area<ytot_all_notes){
+		W.ScrollBar("sbar",{
+			x:obj.x+obj.w-obj.w_scroll_bar, y:obj.y, w:obj.w_scroll_bar, h:obj.h, dimension:'y',
+			page_size:h_scrolling_area, total_size:ytot_all_notes, value:sbar_value,
+			OnChange:function(value){
+				obj.scroll_y=value*(this.total_size-this.page_size)
+				UI.Refresh()
+			},
+		})
+	}
 	UI.End()
 	return obj
 }
 
-UI.NewNoteBookTab=function(file_name){
+UI.OpenNoteBookTab=function(file_name){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var obj_tab_i=UI.g_all_document_windows[i];
+		if(obj_tab_i.file_name==file_name&&obj_tab_i.document_type=="notebook"){
+			UI.top.app.document_area.SetTab(i)
+			return obj_tab_i;
+		}
+	}
 	file_name=IO.NormalizeFileName(file_name);
 	UI.top.app.quit_on_zero_tab=0;
 	return UI.NewTab({

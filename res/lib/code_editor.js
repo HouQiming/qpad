@@ -2203,9 +2203,9 @@ W.CodeEditorWidget_prototype={
 		UI.Refresh()
 	},
 	///////////////////////////
-	SaveMetaData:function(){
+	SaveMetaData:function(is_forced){
 		var doc=this.doc
-		if(this.m_is_preview||doc&&doc.ed.hfile_loading){return;}
+		if(this.m_is_preview||doc&&doc.ed.hfile_loading&&!is_forced){return;}
 		if(!doc||!IO.FileExists(this.file_name)&&!(this.file_name.length&&this.file_name[0]=='*')){return;}
 		var new_metadata=(UI.m_ui_metadata[this.file_name]||{});
 		new_metadata.m_tabswitch_count=this.m_tabswitch_count;
@@ -6024,9 +6024,9 @@ UI.RegisterEditorPlugin(function(){
 				this.saved_point=-1;
 			}else{
 				//what is reload? nuke it
+				this.owner.SaveMetaData("forced");
 				if(Language.GetDescObjectByName(name).is_binary){
 					var fn=this.owner.file_name;
-					this.owner.SaveMetaData();
 					UI.top.app.document_area.just_created_a_tab=1;
 					UI.top.app.document_area.CloseTab();
 					UI.OpenEditorWindow(fn);
