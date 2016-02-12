@@ -225,14 +225,46 @@ W.notebook_prototype={
 		if(cell_i.m_text_out){doc_out.ed.Edit([0,0,cell_i.m_text_out],1);}
 		cell_i.m_text_out=doc_out;
 	},
-	NewCell:function(){
-		var cell_i={
-			m_language:(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64")?"Windows BAT":'Unix Shell Script',
-		};
+	NewCell:function(template){
+		var cell_i=(template||{});
+		if(cell_i.m_language==undefined){
+			cell_i.m_language=(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64")?"Windows BAT":'Unix Shell Script';
+		}
 		this.ProcessCell(cell_i)
 		this.m_cells.push(cell_i)
 		this.need_save|=2;
 		UI.Refresh();
+	},
+	GetSpecificCell:function(s_mark,s_language){
+		//cell name? no need, could put "@echo off" in the mark if needed
+		var lg=Duktape.__byte_length(s_mark);
+		for(var i=0;i<this.m_cells.length;i++){
+			var cell_i=this.m_cells;
+			var doc_in=cell_i.m_text_in;
+			if(doc_in.ed.GetTextSize()>=lg&&doc_in.GetText(0,lg)==s_mark){
+				return i;
+			}
+		}
+		var id=this.m_cells.length;
+		this.NewCell({m_language:s_language,m_text_in:s_mark})
+		return id;
+	},
+	DeleteCell:function(id){
+		var ret=[];
+		for(var i=0;i<this.m_cells.length;i++){
+			if(i==id){
+				var doc_in=this.m_cells[i].m_text_in;
+				var doc_out=this.m_cells[i].m_text_out;
+				doc_out.ClearClickableRanges();
+				doc_in.OnDestroy()
+				doc_out.OnDestroy()
+				continue;
+			}
+			ret.push(this.m_cells[i]);
+		}
+		this.m_cells=ret;
+		this.need_save|=2;
+		UI.Refresh()
 	},
 	GotoSubCell:function(sub_cell_id,sel_side){
 		var obj_cell=this[((sub_cell_id&1)?"doc_out_":"doc_in_")+(sub_cell_id>>1).toString()];
@@ -413,6 +445,7 @@ W.notebook_prototype={
 					UI.NextTick(fpoll)
 				}else if(proc.IsRunning()){
 					UI.setTimeout(fpoll,100)
+					UI.Refresh();
 				}else{
 					var code=proc.GetExitCode()
 					if(code!=0){
@@ -421,6 +454,7 @@ W.notebook_prototype={
 					cell_i.m_proc=undefined;
 					cell_i.m_completion_time=JsifyBuffer(IO.WallClockTime());
 					IO.DeleteFile(fn_script)
+					UI.Refresh();
 				}
 			}).bind(this,cell_i)
 			UI.NextTick(fpoll)
@@ -515,6 +549,7 @@ W.NotebookView=function(id,attrs){
 		var doc_in=cell_i.m_text_in;
 		var doc_out=cell_i.m_text_out;
 		var h_in=MeasureEditorSize(doc_in,0);
+		var h_in1=MeasureEditorSize(doc_in,1);
 		var h_out=MeasureEditorSize(doc_out,0);
 		current_y+=obj.padding;
 		UI.RoundRect({
@@ -546,7 +581,7 @@ W.NotebookView=function(id,attrs){
 		if(UI.nd_focus==doc_in||current_y-scroll_y<obj.h&&current_y-scroll_y+h_in+hc>0||Math.abs(obj.m_last_focus_cell_id-(i*2))<=1){
 			W.CodeEditor("doc_in_"+i.toString(),{
 				doc:doc_in,
-				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in+hc,
+				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in1,
 			})
 		}
 		doc_in.sub_cell_id=i*2+0;
@@ -644,11 +679,14 @@ W.NotebookView=function(id,attrs){
 		menu_notebook.AddNormalItem({
 			text:"&Run cell",
 			enable_hotkey:1,key:"CTRL+RETURN",action:(function(){
-				this.RunCell(focus_cell_id)
+				this.RunCell(focus_cell_id>>1)
 			}).bind(obj)})
 	}
 	if(focus_cell_id!=undefined){
 		obj.m_last_focus_cell_id=focus_cell_id;
+		menu_notebook.AddNormalItem({
+			text:"&Delete cell",
+			action:obj.DeleteCell.bind(obj,focus_cell_id>>1)})
 	}
 	menu_notebook=undefined;
 	UI.PopSubWindow()

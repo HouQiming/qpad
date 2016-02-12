@@ -5287,7 +5287,7 @@ W.CodeEditor=function(id,attrs){
 				var menu_search=UI.BigMenu("&Search")
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
 				W.Hotkey("",{key:"CTRL+R",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
-				menu_search.AddNormalItem({text:"Find... in project",enable_hotkey:1,key:"CTRL+SHIFT+F",action:finvoke_find.bind(obj,UI.SHOW_GLOBAL_FIND)})
+				menu_search.AddNormalItem({text:"Find in project...",enable_hotkey:1,key:"CTRL+SHIFT+F",action:finvoke_find.bind(obj,UI.SHOW_GLOBAL_FIND)})
 				menu_search.AddButtonRow({text:"Find previous / next"},[
 					{key:"SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+F3',action:function(){
 						obj.FindNext(-1)
@@ -5315,7 +5315,7 @@ W.CodeEditor=function(id,attrs){
 				}
 				menu_search.AddSeparator();
 				menu_search.AddNormalItem({text:"&Go to...",icon:'去',enable_hotkey:1,key:"CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GOTO)})
-				menu_search.AddNormalItem({text:"Go to... in project",enable_hotkey:1,key:"CTRL+SHIFT+G",action:finvoke_goto.bind(obj,UI.SHOW_GLOBAL_GOTO)})
+				menu_search.AddNormalItem({text:"Go to ... in project",enable_hotkey:1,key:"CTRL+SHIFT+G",action:finvoke_goto.bind(obj,UI.SHOW_GLOBAL_GOTO)})
 				var neib=doc.ed.GetUtf8CharNeighborhood(doc.sel1.ccnt);
 				if(UI.g_goto_definition_context&&obj.m_prev_next_button_drawn!=UI.m_frame_tick){
 					//render the current gotodef context, and put up #/# text as notification
