@@ -97,8 +97,69 @@ var JsifyBuffer=function(a){
 	return ret;
 };
 
+//output parser system
+var g_output_parsers=[];
+var g_processed_output_parser=undefined;
+UI.RegisterOutputParser=function(s_regex_string,n_brackets,fmatch_to_err){
+	g_output_parsers.push({s:s_regex_string,n:n_brackets,f:fmatch_to_err});
+	g_processed_output_parser=undefined;
+};
+
+var ParseOutput=function(sline){
+	if(!g_processed_output_parser){
+		//create the grand regexp
+		var regex=new RegExp(["^(",g_output_parsers.map(function(a){return a.s}).join(")|("),")\r?\n"].join(""))
+		var match_places=[];
+		var cur_id=1;
+		for(var i=0;i<g_output_parsers.length;i++){
+			match_places.push(cur_id);
+			cur_id++;
+			cur_id+=g_output_parsers[i].n;
+			match_places.push(cur_id);
+		}
+		g_processed_output_parser={
+			m_big_regex:regex,
+			m_match_places:match_places
+		};
+	}
+	var big_match=sline.match(g_processed_output_parser.m_big_regex);
+	if(!big_match){return undefined;}
+	var match_places=g_processed_output_parser.m_match_places;
+	for(var i=0;i<match_places.length;i+=2){
+		var p_tester=match_places[i];
+		if(big_match[p_tester]){
+			return g_output_parsers[i>>1].f(big_match.slice(match_places[i],match_places[i+1]))
+		}
+	}
+}
+
+UI.RegisterCodeEditorPersistentMember("m_compiler_name");
+UI.RegisterBuildEnv=function(s_lang_name,obj){
+	var desc=Language.GetDescObjectByName(s_lang_name);
+	if(!desc.m_buildenvs){
+		desc.m_buildenvs=[];
+		desc.m_buildenv_by_name={};
+		desc.m_buildenv_default_default=obj.name;
+	}
+	desc.m_buildenvs.push(obj);
+	desc.m_buildenv_by_name[obj.name]=obj;
+};
+UI.GetDefaultBuildEnv=function(s_lang){
+	var s_name_default=undefined;
+	var compiler_assoc=UI.m_ui_metadata["<compiler_assoc>"];
+	if(!compiler_assoc){
+		compiler_assoc={};
+		UI.m_ui_metadata["<compiler_assoc>"]=compiler_assoc;
+	}
+	s_name_default=compiler_assoc[s_lang];
+	if(!s_name_default){
+		var desc=Language.GetDescObjectByName(s_lang);
+		s_name_default=desc.m_buildenv_default_default;
+	}
+	return s_name_default;
+}
+
 W.notebook_prototype={
-	m_configuration:{},
 	Save:function(){
 		var docs=[];
 		var procs=[];
@@ -132,7 +193,7 @@ W.notebook_prototype={
 		return 1;
 	},
 	SaveMetaData:function(){
-		//todo
+		//for now, we do not save editor metadata on notebooks...
 	},
 	m_cell_plugins:[function(){
 		this.m_clickable_ranges=[];
@@ -213,6 +274,29 @@ W.notebook_prototype={
 			this.notebook_owner.need_auto_scroll=1;
 			UI.Refresh();
 		})
+		if(!this.read_only){
+			//interpreter selection
+			this.AddEventHandler('menu',function(){
+				var desc=this.plugin_language_desc;
+				if(desc.m_buildenvs&&desc.m_buildenvs.length>1){
+					var menu_run=UI.BigMenu("&Run");
+					var obj_notebook=this.notebook_owner;
+					var cell_id=this.m_cell_id;
+					var cur_compiler_name=(obj_notebook[cell_id].m_compiler_name||UI.GetDefaultBuildEnv(obj_notebook[cell_id].m_language));
+					for(var i=0;i<desc.m_buildenvs.length;i++){
+						var s_name_i=desc.m_buildenvs[i].name;
+						menu_run.AddNormalItem({
+							text:s_name_i,
+							icon:(cur_compiler_name==s_name_i)?"对":undefined,
+							action:function(name){
+								this.m_compiler_name=name;
+								UI.Refresh();
+							}.bind(obj_notebook[cell_id],s_name_i)})
+					}
+					menu_run=undefined;
+				}
+			})
+		}
 	}],
 	ProcessCell:function(cell_i){
 		//////
@@ -269,7 +353,7 @@ W.notebook_prototype={
 		this.need_save|=2;
 		UI.Refresh();
 	},
-	GetSpecificCell:function(s_mark,s_language){
+	GetSpecificCell:function(s_mark,s_language,create_if_not_found){
 		//cell name? no need, could put "@echo off" in the mark if needed
 		var lg=Duktape.__byte_length(s_mark);
 		for(var i=0;i<this.m_cells.length;i++){
@@ -279,6 +363,7 @@ W.notebook_prototype={
 				return i;
 			}
 		}
+		if(!create_if_not_found){return -1;}
 		var id=this.m_cells.length;
 		this.NewCell({m_language:s_language,m_text_in:s_mark})
 		return id;
@@ -400,24 +485,22 @@ W.notebook_prototype={
 			var ccnt_end=doc.ed.GetTextSize()
 			doc.SetSelection(ccnt_end,ccnt_end)
 		}
-		if(UI.g_output_parsers){
-			var line=doc.GetLC(ccnt)[0]
-			var ccnt_lh=doc.SeekLC(line,0)
-			var ccnt_tot=doc.ed.GetTextSize()
-			for(;;){
-				var ccnt_next=doc.SeekLineBelowKnownPosition(ccnt_lh,line,line+1)
-				if(!(ccnt_next<ccnt_tot)){
-					if(!(doc.GetLC(ccnt_next)[0]>line)){break;}
-				}
-				var sline=doc.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh);
-				for(var i=0;i<UI.g_output_parsers.length;i++){
-					var err=UI.g_output_parsers[i](sline);
-					if(err){this.CreateCompilerError(id,err,ccnt_lh,ccnt_next);}
-				}
-				ccnt_lh=ccnt_next;
-				line++;
+		//if(UI.g_output_parsers){
+		var line=doc.GetLC(ccnt)[0]
+		var ccnt_lh=doc.SeekLC(line,0)
+		var ccnt_tot=doc.ed.GetTextSize()
+		for(;;){
+			var ccnt_next=doc.SeekLineBelowKnownPosition(ccnt_lh,line,line+1)
+			if(!(ccnt_next<ccnt_tot)){
+				if(!(doc.GetLC(ccnt_next)[0]>line)){break;}
 			}
+			var sline=doc.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh);
+			var err=ParseOutput(sline);
+			if(err){this.CreateCompilerError(id,err,ccnt_lh,ccnt_next);}
+			ccnt_lh=ccnt_next;
+			line++;
 		}
+		//}
 		UI.Refresh()
 	},
 	ClearCellOutput:function(id){
@@ -436,52 +519,38 @@ W.notebook_prototype={
 		doc.ClearClickableRanges();
 	},
 	RunCell:function(id){
-		//todo: check language registration
 		var cell_i=this.m_cells[id];
+		if(cell_i.m_proc){return;}
 		var doc=cell_i.m_text_out;
 		var ed_out=cell_i.m_text_out.ed;
 		this.ClearCellOutput(id)
-		if(id==0&&cell_i.m_language=='Javascript'){
-			//run cell 0 as qpad js to update the configuration
-			var s_cell_i=cell_i.doc_in.ed.GetText();
-			var cfg_eval=undefined;
-			var err="";
-			try{
-				cfg_eval=JSON.parse(Duktape.__eval_expr_sandbox(s_cell_i))
-				if(typeof(cfg_eval)!='object'){
-					cfg_eval=undefined;
-				}
-			}catch(e){
-				err=e.message;
-				cfg_eval=undefined;
-			}
-			if(cfg_eval!=undefined){
-				this.m_configuration=cfg_eval;
-				err=JSON.stringify(cfg_eval);
-			}
-			this.WriteCellOutput(id,err);
-			return;
-		}
+		var desc=Language.GetDescObjectByName(cell_i.m_language);
+		if(!desc.m_buildenv_by_name){return;}
+		var obj_buildenv=desc.m_buildenv_by_name[cell_i.m_compiler_name||UI.GetDefaultBuildEnv(cell_i.m_language)];
+		if(!obj_buildenv||!obj_buildenv.CreateInterpreterCall){return;}
 		//direct execution for _nix, %COMSPEC% for Windows
 		//coulddo: manual interpreter setup
-		var args=[];
-		if(this.m_configuration.interpreter){
-			args.push(this.m_configuration.m_interpreter)
-		}else if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-			if(cell_i.m_language=='Unix Shell Script'){
-				args.push(IO.ProcessUnixFileName("sh.exe"))
-			}else{
-				args.push(IO.ProcessUnixFileName("%COMSPEC%"))
-				args.push("/c")
-			}
-		}
-		var desc=Language.GetDescObjectByName(cell_i.m_language);
 		var sext=(desc&&desc.extensions&&desc.extensions[0]||(cell_i.m_language=='Unix Shell Script'?"sh":"bat"));
 		var fn_script=IO.GetNewDocumentName("qnb",sext,"temp")
 		IO.CreateFile(fn_script,cell_i.m_text_in.ed.GetText())
-		args.push(fn_script)
-		var proc=IO.RunToolRedirected(args,this.m_configuration.path||UI.GetPathFromFilename(this.file_name),0)
+		var args=obj_buildenv.CreateInterpreterCall(fn_script,undefined);
+		if(typeof(args)=='string'){
+			//qpad js
+			try{
+				eval(cell_i.m_text_in.ed.GetText());
+			}catch(e){
+				this.WriteCellOutput(id,e.stack);
+			}
+			this.need_save|=2;
+			this.need_auto_scroll=1;
+			UI.Refresh()
+			return;
+		}
+		var proc=IO.RunToolRedirected(args,UI.GetPathFromFilename(this.file_name),0)
 		var idle_wait=100;
+		for(var i=0;i<this.m_cells.length;i++){
+			this.m_cells[i].m_cell_id=i;
+		}
 		if(proc){
 			var fpoll=(function(cell_i){
 				this.need_save|=2;
@@ -574,6 +643,9 @@ W.NotebookView=function(id,attrs){
 	obj.need_save&=~1;
 	var now=IO.WallClockTime()
 	var w_content=obj.w;
+	var is_tab_active=(UI.top.app.document_area.active_tab&&UI.top.app.document_area.active_tab.main_widget==obj);
+	var caption_color=(is_tab_active?obj.caption_color:obj.inactive_caption_color);
+	var caption_text_color=(is_tab_active?obj.caption_text_color:obj.inactive_caption_text_color);
 	for(var i=0;i<obj.m_cells.length;i++){
 		var cell_i=obj.m_cells[i];
 		var doc_in=cell_i.m_text_in;
@@ -596,16 +668,20 @@ W.NotebookView=function(id,attrs){
 				obj.ScrollShowRange(current_y,h_in+obj.h_caption*2+h_out,current_y+h_in+obj.h_caption,h_out+obj.h_caption)
 			}
 		}
-		var is_focused=(UI.nd_focus&&UI.nd_focus==doc_in);
+		var is_focused=(i*2==(obj.m_last_focus_cell_id||0)||UI.nd_focus&&UI.nd_focus==doc_in);
 		UI.RoundRect({
 			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
 			w:w_content-obj.padding*2,h:obj.h_caption,
-			color:is_focused?obj.caption_color:widget_style.line_number_bgcolor,
+			color:is_focused?caption_color:widget_style.line_number_bgcolor,
 		})
+		var s_caption=cell_i.m_language;
+		if(cell_i.m_compiler_name){
+			s_caption=s_caption+' - '+cell_i.m_compiler_name;
+		}
 		W.Text("",{
 			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
-			font:obj.caption_font,text:cell_i.m_language,
-			color:is_focused?obj.caption_text_color:widget_style.line_number_color,
+			font:obj.caption_font,text:s_caption,
+			color:is_focused?caption_text_color:widget_style.line_number_color,
 		})
 		current_y+=obj.h_caption;
 		if(UI.nd_focus==doc_in||current_y-scroll_y<obj.h&&current_y-scroll_y+h_in+hc>0||Math.abs(obj.m_last_focus_cell_id-(i*2))<=1){
@@ -622,16 +698,16 @@ W.NotebookView=function(id,attrs){
 		//	obj.x,obj.y+current_y,w_content,h_in,
 		//	"doc_in_"+i.toString())
 		current_y+=h_in;
-		is_focused=(UI.nd_focus&&UI.nd_focus==doc_out);
+		is_focused=(i*2+1==(obj.m_last_focus_cell_id||0)||UI.nd_focus&&UI.nd_focus==doc_out);
 		var rect_bar=UI.RoundRect({
 			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
 			w:w_content-obj.padding*2,h:obj.h_caption,
-			color:is_focused?obj.caption_color:widget_style.line_number_bgcolor,
+			color:is_focused?caption_color:widget_style.line_number_bgcolor,
 		})
 		W.Text("",{
 			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
 			font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":"Output",
-			color:is_focused?obj.caption_text_color:widget_style.line_number_color,
+			color:is_focused?caption_text_color:widget_style.line_number_color,
 		})
 		if(cell_i.m_proc){
 			W.Button("kill_btn_"+i.toString(),{
@@ -652,7 +728,7 @@ W.NotebookView=function(id,attrs){
 			W.Text("",{
 				x:obj.x+w_content-obj.padding-obj.caption_padding-dims_time.w,y:obj.y+current_y-scroll_y,
 				font:obj.caption_font,text:s_time,
-				color:is_focused?obj.caption_text_color:widget_style.line_number_color,
+				color:is_focused?caption_text_color:widget_style.line_number_color,
 			})
 		}
 		current_y+=obj.h_caption;
@@ -689,10 +765,6 @@ W.NotebookView=function(id,attrs){
 	}
 	var ytot_all_notes=current_y-obj.h_separation;
 	//coulddo: tool bar
-	var menu_notebook=UI.BigMenu("Note&book")
-	menu_notebook.AddNormalItem({
-		text:"&New cell",
-		icon:'新',enable_hotkey:1,key:"CTRL+M",action:obj.NewCell.bind(obj)})
 	var focus_cell_id=undefined;
 	for(var i=0;i<obj.m_cells.length;i++){
 		var cell_i=obj.m_cells[i];
@@ -704,6 +776,13 @@ W.NotebookView=function(id,attrs){
 			focus_cell_id=i*2+1;
 			break;
 		}
+	}
+	var menu_notebook=undefined;
+	if(focus_cell_id!=undefined){
+		menu_notebook=UI.BigMenu("Note&book");
+		menu_notebook.AddNormalItem({
+			text:"&New cell",
+			icon:'新',enable_hotkey:1,key:"CTRL+M",action:obj.NewCell.bind(obj)})
 	}
 	if(focus_cell_id!=undefined&&!obj.m_cells[focus_cell_id>>1].m_proc&&!(focus_cell_id&1)){
 		menu_notebook.AddNormalItem({
@@ -756,7 +835,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 	}
 	var ret=UI.NewTab({
 		file_name:file_name,
-		title:"Notebook",
+		title:UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(file_name))),
 		tooltip:file_name,
 		document_type:"notebook",
 		area_name:"h_tools",

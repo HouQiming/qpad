@@ -5,6 +5,7 @@ require("res/lib/code_editor");
 require("res/lib/bin_editor");
 require("res/lib/subwin");
 require("res/lib/notebook");
+require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";

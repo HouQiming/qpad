@@ -1,6 +1,7 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
+require("res/lib/notebook");
 
 Language.RegisterFileIcon("M",["png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr"]);
 Language.RegisterFileIcon("V",["mp4","mpg","mpeg","h264","avi","mov","rm","rmvb"]);
@@ -466,9 +467,34 @@ Language.Register({
 	file_icon_color:0xff444444,
 	file_icon:'プ',
 	rules:function(lang){
-		return f_shell_like(lang,{
+		lang.DefineDefaultColor("color_symbol")
+		var bid_comment=lang.ColoredDelimiter("key","rem ","\n","color_comment");
+		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
+		lang.DefineToken('\\\n')
+		var kwset=lang.DefineKeywordSet("color_symbol");
+		var keywords={
 			'keyword':['if','exists','not','goto','for','do'],
-		})
+			'type':['ASSOC','BREAK','CALL','CD','CHDIR','CHCP','CLS','COLOR','COPY','DATE','DEL, ERASE','DIR','ECHO','ELSE','ENDLOCAL','EXIT','FTYPE','MD','MKDIR','MOVE','PATH','PAUSE','POPD','PROMPT','PUSHD','RD','RMDIR','REM','REN','RENAME','SET','SETLOCAL','SHIFT','START','TIME','TITLE','TYPE','VER','VERIFY','VOL']
+		}
+		for(var k in keywords){
+			var words=[];
+			var words0=keywords[k];
+			for(var i=0;i<words0.length;i++){
+				words.push(words0[i].toLowerCase())
+				words.push(words0[i].toUpperCase())
+			}
+			kwset.DefineKeywords("color_"+k,words)
+		}
+		kwset.DefineWordColor("color")
+		kwset.DefineWordType("color_number","0-9")
+		return (function(lang){
+			lang.Enable(bid_comment)
+			if(lang.isInside(bid_comment)){
+				lang.Disable(bid_bracket);
+			}else{
+				lang.Enable(bid_bracket);
+			}
+		});
 	}
 });
 
@@ -614,522 +640,328 @@ Language.Register({
 });
 
 /////////////////////////////////////////////
-var g_compiler_by_ext={}
-var CompilerDone=function(){UI.already_compiling=0}
-UI.g_output_parsers=[];
-Language.RegisterCompiler=function(s_exts,obj){
-	if(obj.ParseOutput){
-		UI.g_output_parsers.push(obj.ParseOutput.bind(obj))
+//compiler output parsers
+//texify -q
+UI.RegisterOutputParser('([^:]*):([0-9]+): (.+)',3,function(matches){
+	var name=matches[1]
+	var linea=parseInt(matches[2])
+	var message=matches[3]
+	var err={
+		file_name:name,
+		category:"error",
+		message:message,line0:linea-1,
 	}
-	for(var i=0;i<s_exts.length;i++){
-		var s_ext_lower=s_exts[i].toLowerCase()
-		var ret=g_compiler_by_ext[s_ext_lower]
-		if(!ret){
-			ret={m_hash:{},m_array:[]}
-			g_compiler_by_ext[s_ext_lower]=ret
-		}
-		ret.m_array.push(obj)
-		ret.m_hash[obj.name]=obj
-	}
-	if(!obj.make){
-		obj.make=function(doc,run_it){
-			UI.already_compiling=1
-			UI.CallPMJS("make",this.GetDesc(doc), doc,this.ParseOutput.bind(this),
-				run_it?function(code){
-					if(code==0){
-						UI.CallPMJS("run",this.GetDesc(doc), doc,this.ParseOutput.bind(this),CompilerDone)
-					}
-				}.bind(this):CompilerDone)
-		};
-	}
-	return obj
-}
-
-var GetCompiler=function(doc){
-	if(!doc.m_file_name){return undefined}
-	var s_ext=UI.GetFileNameExtension(doc.m_file_name)
-	if(!s_ext){return undefined}
-	var compilers=g_compiler_by_ext[s_ext.toLowerCase()]
-	if(!compilers){return undefined}
-	if(doc.m_compiler_name){
-		return compilers.m_hash[doc.m_compiler_name];
-	}else{
-		doc.m_compiler_name=compilers.m_array[0].name
-		return compilers.m_array[0]
-	}
-}
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	UI.RegisterCodeEditorPersistentMember("m_compiler_name")
-	this.AddEventHandler('selectionChange',function(){
-		if(this.owner){
-			this.owner.DismissNotification("double_compilation")
-		}
-	})
-	this.AddEventHandler('menu',function(){
-		var compiler=GetCompiler(this)
-		if(!compiler){return 1}
-		var menu_run=UI.BigMenu("&Run")
-		var doc=this
-		menu_run.AddNormalItem({text:"&Compile",enable_hotkey:1,key:"F7",action:function(){
-			if(UI.already_compiling){
-				if(doc.owner){
-					doc.owner.CreateNotification({
-						id:"double_compilation",icon:'警',
-						text:"Already compiling something else",
-					})
-				}
-				return;
-			}
-			if(!UI.top.app.document_area.SaveAll()){return;}
-			if(doc.owner){
-				doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
-				doc.owner.hide_sxs_visualizer=0;
-			}
-			UI.ClearCompilerErrors()
-			compiler.make(doc,0)
-		}})
-		menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
-			if(UI.already_compiling){
-				if(doc.owner){
-					doc.owner.CreateNotification({
-						id:"double_compilation",icon:'警',
-						text:"Already compiling something else",
-					})
-				}
-				return;
-			}
-			if(!UI.top.app.document_area.SaveAll()){return;}
-			if(doc.owner){
-				doc.owner.m_sxs_visualizer=W.SXS_BuildOutput
-				doc.owner.hide_sxs_visualizer=0;
-			}
-			UI.ClearCompilerErrors()
-			compiler.make(doc,1)
-		}})
-	})
-}).prototype.desc={category:"Tools",name:"Build and run",stable_name:"build_and_run"};
-
-IO.AsyncShell=function(cmdline){
-	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-		IO.Shell(["start"," ","/b"].concat(cmdline))
-	}else{
-		IO.Shell(cmdline.concat(["&"]))
-	}
-}
-UI.WriteBuildOutput=function(fparse,s){
-	if(!UI.g_build_output_editor){
-		var obj=Object.create(W.CodeEditor_prototype)
-		var style=UI.default_styles.sxs_build_output.editor_style
-		obj.style=style
-		for(var attr in style){
-			obj[attr]=style[attr]
-		}
-		obj.w=9999;obj.h=9999//for initial scrolling
-		obj.m_clickable_ranges=[]
-		obj.plugins=[function(){
-			var fselchange=function(do_onfocus){
-				var sel=this.GetSelection()
-				var l=0;
-				var r=this.m_clickable_ranges.length-1;
-				while(l<=r){
-					var m=(l+r)>>1;
-					if(this.m_clickable_ranges[m].loc0.ccnt<=sel[0]){
-						l=m+1
-					}else{
-						r=m-1
-					}
-				}
-				if(r>=0&&this.m_clickable_ranges[r].loc0.ccnt<=sel[0]&&sel[1]<=this.m_clickable_ranges[r].loc1.ccnt){
-					//yes, it's clickable
-					var crange=this.m_clickable_ranges[r]
-					crange.f.call(this,do_onfocus,crange.loc0.ccnt,crange.loc1.ccnt)
-					return 1
-				}
-				return 0
-			};
-			this.AddEventHandler('selectionChange',function(){fselchange.call(this,0);})
-			this.AddEventHandler('doubleClick',function(){
-				fselchange.call(this,1);
-			})
-			this.AddEventHandler('ESC',function(){
-				var sztext=this.ed.GetTextSize()
-				if(sztext){
-					this.ed.Edit([0,sztext,undefined])
-					this.SetSelection(0,0)
-				}
-				for(var i=0;i<this.m_clickable_ranges.length;i++){
-					var crange=this.m_clickable_ranges[i];
-					crange.loc0.discard()
-					crange.loc1.discard()
-					crange.hlobj.discard()
-				}
-				this.m_clickable_ranges=[]
-				UI.ClearCompilerErrors()
-			})
-		}];
-		obj.language=Language.GetDefinitionByName("Plain text")
-		obj.Init()
-		UI.g_build_output_editor=obj
-	}
-	var obj=UI.g_build_output_editor;
-	var ccnt=obj.ed.GetTextSize()
-	var sel=obj.GetSelection()
-	obj.ed.Edit([ccnt,0,s])//hookededit discards: it's read_only
-	if(sel[1]==ccnt&&sel[0]==ccnt){
-		var ccnt_end=obj.ed.GetTextSize()
-		obj.SetSelection(ccnt_end,ccnt_end)
-	}
-	//do the parsing
-	var line=obj.GetLC(ccnt)[0]
-	var ccnt_lh=obj.SeekLC(line,0)
-	var ccnt_tot=obj.ed.GetTextSize()
-	for(;;){
-		var ccnt_next=obj.SeekLineBelowKnownPosition(ccnt_lh,line,line+1)
-		if(!(ccnt_next<ccnt_tot)){
-			if(!(obj.GetLC(ccnt_next)[0]>line)){break;}
-		}
-		var fclick_callback=undefined
-		try{
-			fclick_callback=fparse(obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
-		}catch(err){}
-		if(fclick_callback){
-			//print("*** ",fclick_callback,' ',obj.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh))
-			UI.got_any_error_this_run=1
-			var loc0=obj.ed.CreateLocator(ccnt_lh,1)
-			var loc1=obj.ed.CreateLocator(ccnt_next,-1)
-			var hlobj=obj.ed.CreateHighlight(loc0,loc1,-1)
-			hlobj.color=obj.color;
-			hlobj.display_mode=UI.HL_DISPLAY_MODE_EMBOLDEN
-			hlobj.invertible=0;
-			obj.m_clickable_ranges.push({
-				loc0:loc0,
-				loc1:loc1,
-				hlobj:hlobj,
-				f:fclick_callback})
-		}
-		ccnt_lh=ccnt_next;
-		line++;
-	}
-	UI.Refresh()
-}
-W.SXS_BuildOutput=function(id,attrs){
-	var obj=UI.Keep(id,attrs);
-	UI.StdStyling(id,obj,attrs, "sxs_build_output",(obj.doc&&UI.HasFocus(obj.doc))?"focus":"blur");
-	UI.StdAnchoring(id,obj);
-	UI.Begin(obj)
-		UI.RoundRect(obj)
-		if(UI.g_build_output_editor){
-			//coulddo: use code editor with wrap width
-			obj.doc=UI.g_build_output_editor;
-			W.Edit("doc",{
-				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
-				'x':4,'y':4,
-			})
-		}
-	UI.End()
-	return obj
-}
-UI.CallPMJS=function(cmd,desc, doc,fparse, fcallback_completion){
-	//redirect and parse the output
-	var args
-	if(desc.is_jc_call){
-		//call jc
-		args=["jc"].concat(desc.args)
-	}else{
-		desc.delete_json_file=1
-		if(cmd=="run"&&desc.pause_after_run==undefined){
-			desc.pause_after_run=1
-		}
-		var fn_json=IO.GetNewDocumentName("pmjs","json","temp")
-		IO.CreateFile(fn_json,JSON.stringify(desc))
-		//IO.AsyncShell(["pmjs",cmd,fn_json])
-		UI.got_any_error_this_run=0
-		args=["pmjs",cmd,fn_json]
-	}
-	if(cmd=="run"){
-		IO.RunProcess(args,UI.GetPathFromFilename(doc.m_file_name),1)
-		if(fcallback_completion){fcallback_completion()}
-		return
-	}
-	var proc=IO.RunToolRedirected(args,UI.GetPathFromFilename(doc.m_file_name),0)
-	if(proc){
-		var fpoll=function(){
-			var s=proc.Read(65536)
-			//print('fpoll',cmd,!s,proc.IsRunning())
-			if(s){
-				UI.WriteBuildOutput(fparse,s)
-				UI.NextTick(fpoll)
-			}else if(proc.IsRunning()){
-				UI.setTimeout(fpoll,100)
-			}else{
-				var code=proc.GetExitCode()
-				if(code!=0&&!UI.got_any_error_this_run){
-					UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: build failed somehow\n")
-				}
-				if(cmd=="make"){
-					UI.WriteBuildOutput(function(){},code==0?"===== Build completed =====\n":"===== Build FAILED =====\n")
-				}else if(cmd=="run"){
-					UI.WriteBuildOutput(function(){},"===== Program terminated =====\n")
-				}
-				if(fcallback_completion){
-					fcallback_completion(code)
-				}else{
-					UI.WriteBuildOutput(function(){},"\n")
-				}
-			}
-		}
-		UI.NextTick(fpoll)
-	}else{
-		UI.WriteBuildOutput(fparse,doc.m_file_name+":1:1: fatal error: unable to invoke the compiler\n")
-	}
-}
-UI.ClearCompilerErrors=function(){
-	//keep the locators for seeking but remove the highlights
-	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		var obj=UI.g_all_document_windows[i].main_widget;
-		if(obj&&obj.doc&&obj.doc.m_error_overlays){
-			for(var j=0;j<obj.doc.m_error_overlays.length;j++){
-				var err_j=obj.doc.m_error_overlays[j]
-				if(err_j.highlight){err_j.highlight.discard()}
-			}
-			obj.doc.m_error_overlays=[]
-		}
-	}
-}
-UI.CreateCompilerError=function(err){
-	UI.OpenEditorWindow(err.file_name,function(){
-		if(this.m_error_overlays){
-			this.PushError(err)
-		}
-	})
-	return function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
-		if(!err.is_ready){return;}
-		UI.OpenEditorWindow(err.file_name,function(){
-			this.SetSelection(err.ccnt0.ccnt,err.ccnt1.ccnt)
-			this.CallOnSelectionChange();
-			if(do_onfocus){
-				UI.SetFocus(this)
-			}
-		})
-	}
-}
-
-///////////////////////
-//todo: remove pmjs dependency
-UI.RegisterCodeEditorPersistentMember("m_latex_sync")
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
-	this.m_latex_sync=1;
+	//another plugin for error overlay
+	return err
 });
-Language.RegisterCompiler(["tex"],{
-	name:"pdftexify",
-	GetDesc:function(doc){
-		return {
-			Platform_BUILD:["release"],
-			Platform_ARCH:[UI.Platform.ARCH],
-			include_js:["make_tex.js"],
-			input_files:[doc.m_file_name],
-			m_latex_sync:doc.m_latex_sync,
-			m_editor_exe:IO.m_my_name,
-			m_line:doc.GetLC(doc.sel1.ccnt)[0]+1,
-			pause_after_run:0,
-		}
-	},
-	m_regex:new RegExp('^([^:]*):([0-9]+): (.+)\r?\n'),
-	ParseOutput:function(sline){
-		var matches=sline.match(this.m_regex)
-		if(matches){
-			var name=matches[1]
-			var linea=parseInt(matches[2])
-			var message=matches[3]
-			var err={
-				file_name:name,
-				category:"error",
-				message:message,line0:linea-1,
-			}
-			//another plugin for error overlay
-			return err
-		}
-	},
+
+//our own search output
+UI.RegisterOutputParser('(.*?):([0-9]+)[.][.]([0-9]+): (.*)',4,function(matches){
+	var err={}
+	var name=matches[1];
+	var ccnt0=parseInt(matches[2]);
+	var ccnt1=parseInt(matches[3]);
+	var message=matches[4];
+	var err={
+		file_name:name,
+		category:'match',
+		message:message,
+		ccnt0:ccnt0,
+		ccnt1:ccnt1,
+		is_quiet:1,
+	}
+	return err;
 })
 
-///////////////////////
-UI.RegisterCodeEditorPersistentMember("m_cflags")
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
-	this.m_cflags={
-		build:"debug",
-		arch:UI.Platform.ARCH,
-	};
-	//coulddo: true cflags
+//unix cc
+UI.RegisterOutputParser('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)',8,function(matches){
+	var name=matches[1]
+	var linea=parseInt(matches[2])
+	var message=matches[8]
+	var category=(matches[5]?matches[5].toLowerCase():"error")
+	//for(var i=0;i<matches.length;i++){
+	//	print(i,matches[i])
+	//}
+	var err={
+		file_name:name,
+		category:category,
+		message:message,line0:linea-1
+	}
+	if(matches[4]){
+		err.col0=parseInt(matches[4])-1
+	}
+	return err
 });
-Language.RegisterCompiler(["c","cpp","cxx","cc"],{
-	name:"cc",
-	GetDesc:function(doc){
-		var ret={
-			Platform_BUILD:[(doc.m_cflags?doc.m_cflags.build:undefined)||"debug"],
-			Platform_ARCH:[(doc.m_cflags?doc.m_cflags.arch:undefined)||UI.Platform.ARCH],
-			c_files:[doc.m_file_name],
-			h_files:[],
-			input_files:[doc.m_file_name],
-		}
-		return ret
-	},
-	m_regex_cc:new RegExp('^([^:]*):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('^[ \t]*([^:]*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
-	ParseOutput:function(sline){
-		var matches=sline.match(this.m_regex_vc)
-		if(matches){
-			var name=matches[1]
-			var linea=parseInt(matches[2])
-			var message=matches[7]
-			var category=matches[4]
-			var err={
-				file_name:name,
-				category:category,
-				message:message,line0:linea-1,
-			}
-			return err
-		}
-		matches=sline.match(this.m_regex_cc)
-		if(matches){
-			var name=matches[1]
-			var linea=parseInt(matches[2])
-			var message=matches[8]
-			var category=(matches[5]?matches[5].toLowerCase():"error")
-			//for(var i=0;i<matches.length;i++){
-			//	print(i,matches[i])
-			//}
-			var err={
-				file_name:name,
-				category:category,
-				message:message,line0:linea-1
-			}
-			if(matches[4]){
-				err.col0=parseInt(matches[4])-1
-			}
-			return err
-		}
-	},
+
+//jc
+UI.RegisterOutputParser('(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]+)\\)',8,function(matches){
+	var err={}
+	var name=matches[1];
+	var linea=parseInt(matches[2]);
+	var cola=parseInt(matches[3]);
+	var lineb=undefined;
+	if(matches[4]){
+		lineb=parseInt(matches[4]);
+	}else{
+		lineb=linea;
+	}
+	//print(err.lineb,' ',matches[4],' ',matches[5],' ',matches[6],'\n')
+	var colb=undefined;
+	if(matches[6]){
+		colb=parseInt(matches[6]);
+	}
+	var message=matches[7]
+	var category=matches[8]
+	var err={
+		file_name:name,
+		category:category,
+		message:message,
+		line0:linea-1,col0:cola-1,
+		line1:lineb-1,col1:colb-1,
+	}
+	return err;
+});
+
+//vc
+UI.RegisterOutputParser('[ \t]*(.*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)',7,function(matches){
+	var name=matches[1]
+	var linea=parseInt(matches[2])
+	var message=matches[7]
+	var category=matches[4]
+	var err={
+		file_name:name,
+		category:category,
+		message:message,line0:linea-1,
+	}
+	return err
 })
 
 /////////////////////////////////////////////
-Language.RegisterCompiler(["jc"],{
-	name:"jacy",
-	m_regex_cc:new RegExp('^(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)\r?\n'),
-	m_regex_vc:new RegExp('^[ \t]*(.*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)\r?\n'),
-	m_regex_jc:new RegExp('^(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]+)\\)\r?\n'),
-	m_regex_search:new RegExp('^(.*?):([0-9]+)[.][.]([0-9]+): (.*)\r?\n'),
-	//m_regex_js:new RegExp('\t([^:]*):([0-9]+).*\r?\n'),
-	ParseOutput:function(sline){
-		//JS failure: eval, relative path and stuff...
-		//var matches=sline.match(this.m_regex_js)
-		//if(matches){
-		//	var err={}
-		//	var name=matches[1];
-		//	var linea=parseInt(matches[2]);
-		//	var err={
-		//		file_name:name,
-		//		color:this.color_tilde_compiler_warning,
-		//		message:'JS callstack dump',line0:linea-1,
-		//	}
-		//	return err
-		//}
-		var matches=sline.match(this.m_regex_search);
-		if(matches){
-			var err={}
-			var name=matches[1];
-			var ccnt0=parseInt(matches[2]);
-			var ccnt1=parseInt(matches[3]);
-			var message=matches[4];
-			var err={
-				file_name:name,
-				category:'match',
-				message:message,
-				ccnt0:ccnt0,
-				ccnt1:ccnt1,
-				is_quiet:1,
-			}
-			return err;
-		}
-		matches=sline.match(this.m_regex_jc);
-		if(matches){
-			var err={}
-			var name=matches[1];
-			var linea=parseInt(matches[2]);
-			var cola=parseInt(matches[3]);
-			var lineb=undefined;
-			if(matches[4]){
-				lineb=parseInt(matches[4]);
+//interpreters / notebook cell generators
+//todo: ipython
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
+	this.AddEventHandler('menu',function(){
+		var desc=this.plugin_language_desc;
+		if(!desc.m_buildenv_by_name){return 1;}
+		var s_name_default=UI.GetDefaultBuildEnv(desc.name);
+		var obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
+		if(!obj_buildenv){return 1;}
+		var menu_run=UI.BigMenu("&Run")
+		var fgencell=function(is_project){
+			var s_script=undefined;
+			if(obj_buildenv.CreateInterpreterCall){
+				var args=obj_buildenv.CreateInterpreterCall(this.m_file_name,this);
+				if(typeof(args)=='string'){
+					//qpad js
+					s_script='eval(IO.ReadAll('+this.m_file_name,'));';
+				}else{
+					s_script=IO.ShellCmd(args);
+				}
 			}else{
-				lineb=linea;
+				s_script=obj_buildenv.CreateBuildScript(this.m_file_name,this)
 			}
-			//print(err.lineb,' ',matches[4],' ',matches[5],' ',matches[6],'\n')
-			var colb=undefined;
-			if(matches[6]){
-				colb=parseInt(matches[6]);
+			var s_mark=undefined;
+			var s_language=undefined;
+			var s_name_in_script="'"+this.m_file_name+"'";
+			if(is_project){
+				s_name_in_script='the project'
 			}
-			var message=matches[7]
-			var category=matches[8]
-			var err={
-				file_name:name,
-				category:category,
-				message:message,
-				line0:linea-1,col0:cola-1,
-				line1:lineb-1,col1:colb-1,
+			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				s_mark="@echo off\nrem build script for "+s_name_in_script+"\n";
+				s_language="Windows BAT";
+			}else{
+				s_mark="#!/bin/sh\n#build script for "+s_name_in_script+"\n";
+				s_language='Unix Shell Script';
 			}
-			return err;
+			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,1);
+			if(result_cell){
+				var obj_notebook=result_cell.obj_notebook;
+				var cell_i=obj_notebook.m_cells[result_cell.cell_id];
+				var doc_in=cell_i.m_text_in;
+				var size=doc_in.ed.GetTextSize();
+				doc_in.ed.Edit([0,size,s_mark+s_script]);
+				UI.Refresh()
+			}
+		}; 
+		menu_run.AddNormalItem({text:"Make notebook cell",enable_hotkey:0,action:fgencell})
+		menu_run.AddNormalItem({text:"Make project cell",enable_hotkey:0,action:function(){
+			fgencell.call(this,1);
+		}})
+		menu_run.AddSeparator()
+		/////////////////
+		var fruncell=function(is_project){
+			var s_mark=undefined;
+			var s_language=undefined;
+			var s_name_in_script="'"+this.m_file_name+"'";
+			if(is_project){
+				s_name_in_script='the project'
+			}
+			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				s_mark="@echo off\nrem build script for "+s_name_in_script+"\n";
+				s_language="Windows BAT";
+			}else{
+				s_mark="#!/bin/sh\n#build script for "+s_name_in_script+"\n";
+				s_language='Unix Shell Script';
+			}
+			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,"non_quiet");
+			if(result_cell){
+				var obj_notebook=result_cell.obj_notebook;
+				var cell_i=obj_notebook.m_cells[result_cell.cell_id];
+				var doc_in=cell_i.m_text_in;
+				UI.SetFocus(doc_in)
+				obj_notebook.RunCell(result_cell.cell_id)
+			}else{
+				//create cell and focus it
+				fgencell.call(this,is_project)
+				result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0);
+				if(result_cell){
+					var obj_notebook=result_cell.obj_notebook;
+					var cell_i=obj_notebook.m_cells[result_cell.cell_id];
+					var doc_in=cell_i.m_text_in;
+					UI.SetFocus(doc_in)
+				}
+			}
+			UI.Refresh()
+		}.bind(this);
+		if(obj_buildenv.m_is_interpreted){
+			//run it without redirection
+			menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+				var args=obj_buildenv.CreateInterpreterCall(this.m_file_name)
+				if(typeof(args)=='string'){
+					//qpad js
+					try{
+						eval(IO.ReadAll(this.m_file_name))
+					}catch(e){
+						//todo: produce output in a notification
+					}
+				}else{
+					IO.Shell(args)
+				}
+			}})
+		}else{
+			menu_run.AddNormalItem({text:"Build / &run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+				fruncell(0)
+			}})
 		}
-		matches=sline.match(this.m_regex_vc)
-		if(matches){
-			var name=matches[1]
-			var linea=parseInt(matches[2])
-			var message=matches[7]
-			var category=matches[4]
-			var err={
-				file_name:name,
-				category:category,
-				message:message,line0:linea-1,
+		menu_run.AddNormalItem({text:"Build / run project",enable_hotkey:1,key:"F5",action:function(){
+			fruncell(1)
+		}})
+		if(desc.m_buildenvs.length>1){
+			menu_run.AddSeparator()
+			for(var i=0;i<desc.m_buildenvs.length;i++){
+				var s_name_i=desc.m_buildenvs[i].name;
+				menu_run.AddNormalItem({
+					text:s_name_i,
+					enable_hotkey:0,
+					key:s_name_i==s_name_default?"\u2605":undefined,
+					icon:(obj_buildenv==desc.m_buildenv_by_name[s_name_i])?"对":undefined,
+					action:function(name,s_lang_name,is_selected,is_default){
+						if(is_selected&&!is_default){
+							UI.m_ui_metadata["<compiler_assoc>"][s_lang_name]=name;
+						}
+						this.m_compiler_name=name;
+						UI.Refresh();
+					}.bind(this,s_name_i,desc.name,
+						obj_buildenv==desc.m_buildenv_by_name[s_name_i],s_name_i==s_name_default)})
 			}
-			return err
 		}
-		matches=sline.match(this.m_regex_cc)
-		if(matches){
-			var name=matches[1]
-			var linea=parseInt(matches[2])
-			var message=matches[8]
-			var category=(matches[5]?matches[5].toLowerCase():"error")
-			//for(var i=0;i<matches.length;i++){
-			//	print(i,matches[i])
-			//}
-			var err={
-				file_name:name,
-				category:category,
-				message:message,line0:linea-1
-			}
-			if(matches[4]){
-				err.col0=parseInt(matches[4])-1
-			}
-			return err
+		menu_run=undefined;
+	})
+}).prototype.desc={category:"Tools",name:"Build and run",stable_name:"build_and_run"};
+
+///////////////////////
+UI.RegisterBuildEnv("TeX/LaTeX",{
+	name:"pdftexify",
+	CreateBuildScript:function(fname,doc){
+		var fname_pdf=UI.RemoveExtension(fname)
+		var cmdline_viewer=[
+				"SumatraPDF","-reuse-instance",fname_pdf,
+				"-inverse-search",'"'+IO.m_my_name+'" "%f" --seek %l'];
+		if(doc){
+			cmdline_viewer.push("-forward-search",fname,doc.GetLC(doc.sel1.ccnt)[0]+1);
 		}
-	},
-	make:function(doc,run_it){
-		var args=[]
-		if(doc.m_cflags){
-			args.push("--build="+doc.m_cflags.build)
-			args.push("--arch="+doc.m_cflags.arch)
+		return [
+			IO.ShellCmd(["texify","--tex-option=--max-print-line=9999","-q","--pdf","--tex-option=--synctex=1",fname])," && ",
+			IO.ShellCmd(cmdline_viewer),"\n",
+		].join("");
+	}
+});
+
+//compiled languages are not that important
+if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+	var g_vc_compiler_path=undefined;
+	var DetectVC=function(){
+		if(g_vc_compiler_path){return g_vc_compiler_path;}
+		var testbat=function(spath0){
+			var spath=IO.ProcessUnixFileName(spath0);
+			if(IO.FileExists(spath+"/vsvars32.bat")){return spath;}
+			return 0;
 		}
-		args.push(doc.m_file_name)
-		if(run_it){
-			args.push("--run")
+		g_vc_compiler_path=(testbat("%VS120COMNTOOLS%")||testbat("%VS110COMNTOOLS%")||testbat("%VS100COMNTOOLS%")||testbat("%VS90COMNTOOLS%")||testbat("%VS80COMNTOOLS%"));
+		if(!g_vc_compiler_path){return 0;}
+		return g_vc_compiler_path;
+	};
+	UI.RegisterBuildEnv("C/C++",{
+		name:"Visual Studio",
+		CreateBuildScript:function(fname,doc){
+			var compiler_path=(DetectVC()||"???");
+			return [
+				'call "',
+				(compiler_path+'/../../vc/bin/x86_amd64/vcvarsx86_amd64.bat').replace(/[/]/g,'\\'),
+				'"\n',
+				'cd /d ',UI.GetPathFromFilename(fname),'\n',
+				'cl /Zi /D_HAS_ITERATOR_DEBUGGING=0 /D_SECURE_SCL=0 /D_SCL_SECURE_NO_WARNINGS /MT /DPM_C_MODE /DNEED_MAIN_WRAPPING ',fname,' && ',
+				UI.GetMainFileName(fname),'\n',
+			].join("");
 		}
-		UI.CallPMJS("make",{
-			is_jc_call:1,
-			args:args,
-		}, doc,this.ParseOutput.bind(this),undefined)
+	})
+}
+
+UI.RegisterBuildEnv("Jacy",{
+	name:"jc",
+	CreateBuildScript:function(fname,doc){
+		return [
+			'cd /d ',UI.GetPathFromFilename(fname),'\n',
+			'jc ',fname,' --run\n',
+		].join("");
 	}
 })
+
+UI.RegisterBuildEnv("Python",{
+	name:"python",
+	CreateInterpreterCall:function(fname,doc){
+		return ["python",fname];
+	}
+})
+
+UI.RegisterBuildEnv("Javascript",{
+	name:"node.js",
+	CreateInterpreterCall:function(fname,doc){
+		return [UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"?"nodejs":"node",fname];
+	}
+})
+
+UI.RegisterBuildEnv("Javascript",{
+	name:"run in editor",
+	CreateInterpreterCall:function(fname,doc){
+		return "qpad js hack";
+	}
+})
+
+UI.RegisterBuildEnv("Windows BAT",{
+	name:"cmd",
+	CreateInterpreterCall:function(fname,doc){
+		return ["cmd","/c",fname];
+	}
+});
+
+UI.RegisterBuildEnv("Unix Shell Script",{
+	name:"exec",
+	CreateInterpreterCall:function(fname,doc){
+		return [fname];
+	}
+});
 
 /////////////////////////////////////////////
 UI.RegisterEditorPlugin(function(){
@@ -2671,7 +2503,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		this.m_detect_autoedit_at=ccnt_lh
 		if(this.m_do_not_detect_autoedit_at!=undefined&&this.GetLC(this.sel1.ccnt)[0]!=this.m_do_not_detect_autoedit_at){
-			this.m_do_not_detect_autoedit_at=undefined
+			this.m_do_not_detect_autoedit_at=undefined
 		}
 		//could allow multi-exampling this
 		InvalidateAutoEdit.call(this)
@@ -2696,7 +2528,7 @@ UI.RegisterEditorPlugin(function(){
 				StartAutoEdit.call(this,ctx.m_cclines,"auto")
 				this.m_do_not_detect_autoedit_at=undefined
 			}else{
-				this.m_do_not_detect_autoedit_at=this.GetLC(this.m_detect_autoedit_at)[0];
+				this.m_do_not_detect_autoedit_at=this.GetLC(this.m_detect_autoedit_at)[0];
 			}
 		}
 		if(!ctx){return}

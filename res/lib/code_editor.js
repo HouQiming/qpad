@@ -30,7 +30,6 @@ UI.m_special_files=[];
 UI.RegisterSpecialFile=function(fn,obj){
 	UI.m_special_files[fn]=obj;
 }
-require("res/plugin/edbase");
 
 ///////////////////////////////////////////////////////
 //the code editor
@@ -237,7 +236,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				//}
 				obj.DestroyFindingContext()
 				obj.m_hide_find_highlight=1
-				UI.top.app.document_area.ToggleMaximizeMode();
+				if(!(obj.doc&&obj.doc.notebook_owner)){
+					UI.top.app.document_area.ToggleMaximizeMode();
+				}
 				UI.g_goto_definition_context=undefined;
 				UI.Refresh()
 				return 1
@@ -940,7 +941,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					border_width:Math.min(hc/8,2),
 					round:4})
 				if(id>=0){
-					UI.DrawChar(edstyle.bookmark_font,4,y+4,edstyle.bookmark_text_color,48+id)
+					UI.DrawChar(edstyle.bookmark_font,area_x+4,y+4,edstyle.bookmark_text_color,48+id)
 				}
 			}
 			UI.PopCliprect()
@@ -2156,14 +2157,18 @@ var find_context_prototype={
 };
 
 //initiator + mark
-UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language){
+UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found,is_non_quiet){
 	var spath_repo=UI.GetEditorProject(doc.m_file_name);
-	var obj_notebook_tab=UI.OpenNoteBookTab(spath_repo+"/notebook.json",'quiet')
+	var obj_notebook_tab=UI.OpenNoteBookTab(spath_repo+"/notebook.json",is_non_quiet?undefined:'quiet')
 	if(!obj_notebook_tab.main_widget){
 		obj_notebook_tab.NeedMainWidget();
 	}
 	var obj_notebook=obj_notebook_tab.main_widget;
-	var cell_id=obj_notebook.GetSpecificCell(s_mark,s_language)
+	var cell_id=obj_notebook.GetSpecificCell(s_mark,s_language,create_if_not_found)
+	if(cell_id<0){return undefined;}
+	if(is_non_quiet){
+		UI.SetFocus(obj_notebook.m_cells[cell_id].m_text_in);
+	}
 	return {obj_notebook:obj_notebook,cell_id:cell_id};
 }
 
@@ -2204,7 +2209,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		var spath_repo=UI.GetEditorProject(doc.m_file_name);
 		ctx.m_repo_path=spath_repo;
 		ctx.m_base_file=doc.m_file_name;
-		ctx.m_result_cell=UI.OpenNotebookCellFromEditor(doc,"Search result","Markdown")
+		ctx.m_result_cell=UI.OpenNotebookCellFromEditor(doc,"Search result","Markdown",1)
 		if(ctx.m_result_cell){
 			ctx.m_result_cell.obj_notebook.ClearCellOutput(ctx.m_result_cell.cell_id)
 		}
@@ -5939,6 +5944,10 @@ UI.OnApplicationSwitch=function(){
 					obj.Reload()
 				}
 			}
+		}else if(obj_tab.main_widget&&obj_tab.document_type=='notebook'){
+			var obj_notebook=obj_tab.main_widget
+			!? //todo: global notification... cell 0?
+			//loaded time
 		}
 	}
 }
@@ -6029,7 +6038,7 @@ UI.FillLanguageMenu=function(s_ext,language_id,f_set_language_id){
 			icon:(language_id==langs[i].name)?"对":undefined,
 			action:function(name,s_ext,is_selected,is_default){
 				if(is_selected&&!is_default){
-					UI.m_ui_metadata["language_assoc"][s_ext]=name;
+					UI.m_ui_metadata["<language_assoc>"][s_ext]=name;
 				}
 				f_set_language_id(name)
 				UI.Refresh();

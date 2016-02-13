@@ -51,6 +51,15 @@ UI.GetFileNameExtension=function(fname){
 	}
 }
 
+UI.RemoveExtension=function(fname){
+	var ret=fname.match(g_regexp_chopext);
+	if(ret){
+		return ret[1];
+	}else{
+		return "";
+	}
+}
+
 ////////////////////////////////////
 UI.m_ui_metadata={};
 (function(){

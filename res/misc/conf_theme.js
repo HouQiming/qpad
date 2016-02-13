@@ -594,6 +594,8 @@ UI.CustomTheme=function(){
 			caption_font:UI.Font(UI.font_name,28,-50),
 			caption_color:C,
 			caption_text_color:0xffffffff,
+			inactive_caption_color:L?0xff7f7f7f:0xff666666,
+			inactive_caption_text_color:L?0xffffffff:0xffe8e8e8,
 			color:L?0xffc0c0c0:0xff333333,
 			shadow_size:6,
 			shadow_color:0xaa000000,
