@@ -552,6 +552,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		return 0;
 	},
 	///////////////////////////////////////
+	NeedSave:function(){
+		return (this.saved_point||0)!=this.ed.GetUndoQueueLength();
+	},
+	///////////////////////////////////////
 	//smarter clipboard actions
 	//Cut:function(){
 	//	var ccnt0=this.sel0.ccnt
@@ -3883,7 +3887,7 @@ W.FileBrowserPage=function(id,attrs){
 	if(!s_search_text){
 		//manage projects button
 		W.Button("manage_button",{
-			x:0,y:0,h:obj.h_find_bar,
+			x:w_buttons,y:0,h:obj.h_find_bar,
 			value:obj.selected,padding:8,
 			font:UI.icon_font_20,
 			text:"换",
@@ -3896,6 +3900,21 @@ W.FileBrowserPage=function(id,attrs){
 		})
 		w_buttons+=obj.manage_button.w
 	}
+	W.Button("refresh_button",{
+		x:w_buttons,y:0,h:obj.h_find_bar,
+		value:obj.selected,padding:8,
+		font:UI.icon_font_20,
+		text:"刷",
+		tooltip:"Refresh - F5",
+		anchor:'parent',anchor_align:'right',anchor_valign:'up',
+		OnClick:function(){
+			UI.ClearFileListingCache();
+			this.m_file_list=undefined
+			this.m_try_to_focus=undefined;
+			UI.Refresh()
+		}.bind(obj)
+	})
+	w_buttons+=obj.refresh_button.w
 	var rect_bar=UI.RoundRect({
 		x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
 		w:obj.w-w_buttons-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
@@ -5945,9 +5964,27 @@ UI.OnApplicationSwitch=function(){
 				}
 			}
 		}else if(obj_tab.main_widget&&obj_tab.document_type=='notebook'){
-			var obj_notebook=obj_tab.main_widget
-			!? //todo: global notification... cell 0?
-			//loaded time
+			var obj_notebook=obj_tab.main_widget;
+			if(obj_notebook.m_loaded_time!=IO.GetFileTimestamp(obj_notebook.file_name)){
+				var obj_notification_receiver=obj_notebook["doc_in_0"];
+				if(!IO.FileExists(obj_notebook.file_name)){
+					//make a notification
+					if(obj_notification_receiver){
+						obj_notification_receiver.CreateNotification({id:'saving_progress',icon:'警',text:"IT'S DELETED!\nSave your changes to dismiss this"})
+					}
+					obj_notebook.need_save|=2;
+				}else if(obj_tab.need_save){
+					//make a notification
+					if(obj_notification_receiver){
+						obj_notification_receiver.CreateNotification({id:'saving_progress',icon:'警',text:"FILE CHANGED OUTSIDE!\n - Use File-Revert to reload\n - Save your changes to dismiss this"})
+					}
+					obj_notebook.need_save|=2;
+				}else{
+					//what is reload? nuke it
+					obj_notebook.Reload()
+				}
+				//loaded time
+			}
 		}
 	}
 }

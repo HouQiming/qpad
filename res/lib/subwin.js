@@ -67,18 +67,28 @@ W.TabLabel=function(id,attrs){
 			var dims=UI.MeasureText(obj.hotkey_font,obj.hotkey_str)
 			W.Text("",{
 				'anchor':'parent','anchor_align':"left",'anchor_valign':"up",
-				'x':obj.padding-dims.w-2,'y':6,
+				'x':12-dims.w,'y':6,
 				'font':obj.hotkey_font,'text':obj.hotkey_str,
 				'color':UI.lerp_rgba(obj.text_color&0xffffff,obj.text_color,0.5),
 			})
 		}
 		W.Text("",{
-			'anchor':'parent','anchor_align':"center",'anchor_valign':"center",
-			'x':0,'y':0,
+			'anchor':'parent','anchor_align':"left",'anchor_valign':"center",
+			'x':14,'y':0,
 			'font':obj.font,'text':obj.title,'color':obj.text_color,
 		})
-		if(obj.mouse_state=="over"&&obj.tooltip){
-			W.DrawTooltip(obj)
+		if(obj.mouse_state=="over"||obj.close_button&&(obj.close_button.mouse_state||"out")!="out"){
+			if(obj.tooltip){W.DrawTooltip(obj);}
+			W.Button("close_button",{
+				style:obj.button_style,
+				text:"✕",
+				x:4,y:12,
+				text_color:obj.text_color&0x7fffffff,
+				'anchor':'parent','anchor_align':"right",'anchor_valign':"up",
+				OnClick:function(){
+					this.owner.CloseTab(this.tabid)
+				}.bind(obj),
+			});
 		}
 	UI.End()
 	return obj

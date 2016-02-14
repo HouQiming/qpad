@@ -180,6 +180,7 @@ W.notebook_prototype={
 		var s=JSON.stringify({cells:this.m_cells})
 		var sz_std=Duktape.__byte_length(s);
 		var sz_written=IO.CreateFile(this.file_name,s);
+		this.m_loaded_time=IO.GetFileTimestamp(this.file_name);
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
 			cell_i.m_text_in=docs[i*2+0];
@@ -328,6 +329,7 @@ W.notebook_prototype={
 		var fn_notes=this.file_name;
 		this.m_cells=[];
 		if(fn_notes){
+			this.m_loaded_time=IO.GetFileTimestamp(fn_notes);
 			try{
 				this.m_cells=JSON.parse(IO.ReadAll(fn_notes)).cells;
 			}catch(err){
@@ -343,15 +345,53 @@ W.notebook_prototype={
 			this.NewCell();
 		}
 	},
-	NewCell:function(template){
+	Reload:function(){
+		for(var i=0;i<this.m_cells.length;i++){
+			this.ClearCellOutput(i)
+			var doc_in=this.m_cells[i].m_text_in;
+			var doc_out=this.m_cells[i].m_text_out;
+			doc_in.OnDestroy();
+			doc_out.OnDestroy();
+			this["doc_in_"+i.toString()]=undefined;
+			this["doc_out_"+i.toString()]=undefined;
+		}
+		this.m_cells=undefined;
+		this.Load()
+	},
+	NewCell:function(template,id_add_after){
 		var cell_i=(template||{});
 		if(cell_i.m_language==undefined){
 			cell_i.m_language=(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64")?"Windows BAT":'Unix Shell Script';
 		}
 		this.ProcessCell(cell_i)
-		this.m_cells.push(cell_i)
+		if(id_add_after==undefined){
+			this.m_cells.push(cell_i);
+		}else{
+			var ret=[];
+			for(var i=0;i<this.m_cells.length;i++){
+				ret.push(this.m_cells[i]);
+				if(i==id_add_after){
+					ret.push(cell_i);
+				}
+			}
+			this.m_cells=ret;
+		}
+		for(var i=0;i<this.m_cells.length;i++){
+			this.m_cells[i].m_cell_id=i;
+		}
 		this.need_save|=2;
 		UI.Refresh();
+	},
+	SwapCells:function(id0,id1){
+		var tmp=undefined;
+		var s0="doc_in_"+id0.toString();
+		var s1="doc_in_"+id1.toString();
+		tmp=this[s0];this[s0]=this[s1];this[s1]=tmp;
+		s0="doc_out_"+id0.toString();
+		s1="doc_out_"+id1.toString();
+		tmp=this[s0];this[s0]=this[s1];this[s1]=tmp;
+		tmp=this.m_cells[id0];this.m_cells[id0]=this.m_cells[id1];this.m_cells[id1]=tmp;
+		UI.Refresh()
 	},
 	GetSpecificCell:function(s_mark,s_language,create_if_not_found){
 		//cell name? no need, could put "@echo off" in the mark if needed
@@ -382,6 +422,9 @@ W.notebook_prototype={
 			ret.push(this.m_cells[i]);
 		}
 		this.m_cells=ret;
+		for(var i=0;i<this.m_cells.length;i++){
+			this.m_cells[i].m_cell_id=i;
+		}
 		this.need_save|=2;
 		UI.Refresh()
 	},
@@ -630,6 +673,7 @@ W.NotebookView=function(id,attrs){
 	UI.Begin(obj)
 	UI.RoundRect(obj)
 	UI.PushSubWindow(obj.x,obj.y,obj.w-obj.w_scroll_bar+obj.padding*0.5*obj.scale,obj.h,obj.scale)
+	var n0_topmost=UI.RecordTopMostContext()
 	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
 	obj.x=0;obj.y=0;obj.w=(obj.w-obj.w_scroll_bar)/obj.scale+obj.padding*0.5;obj.h/=obj.scale;
 	if(!obj.m_cells){
@@ -669,11 +713,83 @@ W.NotebookView=function(id,attrs){
 			}
 		}
 		var is_focused=(i*2==(obj.m_last_focus_cell_id||0)||UI.nd_focus&&UI.nd_focus==doc_in);
-		UI.RoundRect({
+		var rect_bar=UI.RoundRect({
 			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
 			w:w_content-obj.padding*2,h:obj.h_caption,
 			color:is_focused?caption_color:widget_style.line_number_bgcolor,
 		})
+		var cur_caption_text_color=(is_focused?caption_text_color:widget_style.line_number_color);
+		obj.button_style["$"].out.text_color=cur_caption_text_color;
+		var btn_last=W.Button("close_btn_"+i.toString(),{
+			style:obj.button_style,
+			text:"✕",
+			tooltip:"Delete cell",
+			x:obj.caption_button_padding,y:0,anchor:rect_bar,anchor_align:'right',anchor_valign:'center',
+			OnClick:function(i){
+				this.DeleteCell(i)
+				UI.Refresh()
+			}.bind(obj,i),
+		});
+		if(i<obj.m_cells.length-1){
+			btn_last=W.Button("move_down_btn_"+i.toString(),{
+				style:obj.button_style,
+				text:"下",
+				tooltip:'Move down',
+				x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
+				OnClick:function(i){
+					this.SwapCells(i,i+1)
+					UI.Refresh()
+				}.bind(obj,i),
+			})
+		}
+		if(i){
+			btn_last=W.Button("move_up_btn_"+i.toString(),{
+				style:obj.button_style,
+				text:"上",
+				tooltip:'Move up',
+				x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
+				OnClick:function(i){
+					this.SwapCells(i,i-1)
+					UI.Refresh()
+				}.bind(obj,i),
+			})
+		}
+		btn_last=W.Button("add_btn_"+i.toString(),{
+			style:obj.button_style,
+			text:"+",
+			tooltip:"Add cell below",
+			x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
+			OnClick:function(i){
+				this.NewCell(undefined,i)
+				UI.Refresh()
+			}.bind(obj,i),
+		})
+		if(cell_i.m_proc){
+			btn_last=W.Button("kill_btn_"+i.toString(),{
+				style:obj.button_style,
+				text:"停",
+				tooltip:'Stop',
+				x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
+				OnClick:function(cell_i){
+					if(cell_i.m_proc){
+						this.WriteCellOutput(cell_i.m_cell_id,"Stopped...\n")
+						cell_i.m_proc.proc.Terminate()
+						UI.Refresh()
+					}
+				}.bind(obj,cell_i),
+			})
+		}else{
+			W.Button("play_btn_"+i.toString(),{
+				style:obj.button_style,
+				text:"放",
+				tooltip:'Run cell',
+				x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
+				OnClick:function(i){
+					this.RunCell(i)
+					UI.Refresh()
+				}.bind(obj,i),
+			});
+		}
 		var s_caption=cell_i.m_language;
 		if(cell_i.m_compiler_name){
 			s_caption=s_caption+' - '+cell_i.m_compiler_name;
@@ -681,7 +797,7 @@ W.NotebookView=function(id,attrs){
 		W.Text("",{
 			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
 			font:obj.caption_font,text:s_caption,
-			color:is_focused?caption_text_color:widget_style.line_number_color,
+			color:cur_caption_text_color,
 		})
 		current_y+=obj.h_caption;
 		if(UI.nd_focus==doc_in||current_y-scroll_y<obj.h&&current_y-scroll_y+h_in+hc>0||Math.abs(obj.m_last_focus_cell_id-(i*2))<=1){
@@ -699,38 +815,28 @@ W.NotebookView=function(id,attrs){
 		//	"doc_in_"+i.toString())
 		current_y+=h_in;
 		is_focused=(i*2+1==(obj.m_last_focus_cell_id||0)||UI.nd_focus&&UI.nd_focus==doc_out);
-		var rect_bar=UI.RoundRect({
+		rect_bar=UI.RoundRect({
 			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
 			w:w_content-obj.padding*2,h:obj.h_caption,
 			color:is_focused?caption_color:widget_style.line_number_bgcolor,
 		})
+		var cur_caption_text_color=(is_focused?caption_text_color:widget_style.line_number_color);
+		obj.button_style["$"].out.text_color=cur_caption_text_color;
 		W.Text("",{
 			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
-			font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":"Output",
-			color:is_focused?caption_text_color:widget_style.line_number_color,
+			font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":(cell_i.m_completion_time?UI.Format("Output - @1",UI.FormatRelativeTime(cell_i.m_completion_time,now)):"Output"),
+			color:cur_caption_text_color,
 		})
-		if(cell_i.m_proc){
-			W.Button("kill_btn_"+i.toString(),{
-				x:4,y:2,
-				font:obj.caption_font,text:"Stop",padding:12,border_width:0,
-				anchor:rect_bar,anchor_align:'right',anchor_valign:'fill',
-				OnClick:function(cell_i){
-					if(cell_i.m_proc){
-						this.WriteCellOutput(cell_i.m_cell_id,"Stopped...\n")
-						cell_i.m_proc.proc.Terminate()
-						UI.Refresh()
-					}
-				}.bind(obj,cell_i),
-			})
-		}else if(cell_i.m_completion_time){
-			var s_time=UI.FormatRelativeTime(cell_i.m_completion_time,now);
-			var dims_time=UI.MeasureText(obj.caption_font,s_time)
-			W.Text("",{
-				x:obj.x+w_content-obj.padding-obj.caption_padding-dims_time.w,y:obj.y+current_y-scroll_y,
-				font:obj.caption_font,text:s_time,
-				color:is_focused?caption_text_color:widget_style.line_number_color,
-			})
-		}
+		btn_last=W.Button("clear_btn_"+i.toString(),{
+			style:obj.button_style,
+			text:"清",
+			tooltip:"Clear output",
+			x:obj.caption_button_padding,y:0,anchor:rect_bar,anchor_align:'right',anchor_valign:'center',
+			OnClick:function(i){
+				this.ClearCellOutput(i)
+				UI.Refresh()
+			}.bind(obj,i),
+		});
 		current_y+=obj.h_caption;
 		//UI.RoundRect({
 		//	x:obj.x+obj.padding,y:obj.y+current_y,w:w_content-obj.padding*2,h:h_out,
@@ -798,6 +904,7 @@ W.NotebookView=function(id,attrs){
 			action:obj.DeleteCell.bind(obj,focus_cell_id>>1)})
 	}
 	menu_notebook=undefined;
+	UI.FlushTopMostContext(n0_topmost)
 	UI.PopSubWindow()
 	obj.x=bk_dims[0];obj.y=bk_dims[1];obj.w=bk_dims[2];obj.h=bk_dims[3];
 	//scroll bar - obj.w_scroll_bar
@@ -894,7 +1001,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 			//if(this.main_widget){this.main_widget.OnDestroy();}
 		},
 		Reload:function(){
-			//if(this.main_widget){this.main_widget.Reload();}
+			if(this.main_widget){this.main_widget.Reload();}
 		},
 		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})

@@ -746,6 +746,10 @@ UI.RegisterEditorPlugin(function(){
 		if(!desc.m_buildenv_by_name){return 1;}
 		var s_name_default=UI.GetDefaultBuildEnv(desc.name);
 		var obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
+		if(!obj_buildenv&&this.m_compiler_name){
+			this.m_compiler_name=undefined;
+			obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
+		}
 		if(!obj_buildenv){return 1;}
 		var menu_run=UI.BigMenu("&Run")
 		var fgencell=function(is_project){
@@ -824,9 +828,13 @@ UI.RegisterEditorPlugin(function(){
 			}
 			UI.Refresh()
 		}.bind(this);
-		if(obj_buildenv.m_is_interpreted){
+		if(obj_buildenv.CreateInterpreterCall){
 			//run it without redirection
 			menu_run.AddNormalItem({text:"&Run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+				if(this.owner){this.owner.Save();}
+				if(this.NeedSave()){
+					return;
+				}
 				var args=obj_buildenv.CreateInterpreterCall(this.m_file_name)
 				if(typeof(args)=='string'){
 					//qpad js
@@ -841,12 +849,21 @@ UI.RegisterEditorPlugin(function(){
 			}})
 		}else{
 			menu_run.AddNormalItem({text:"Build / &run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+				if(this.owner){this.owner.Save();}
+				if(this.NeedSave()){
+					return;
+				}
 				fruncell(0)
-			}})
+			}.bind(this)})
 		}
 		menu_run.AddNormalItem({text:"Build / run project",enable_hotkey:1,key:"F5",action:function(){
+			//coulddo: save other files in the project
+			if(this.owner){this.owner.Save();}
+			if(this.NeedSave()){
+				return;
+			}
 			fruncell(1)
-		}})
+		}.bind(this)})
 		if(desc.m_buildenvs.length>1){
 			menu_run.AddSeparator()
 			for(var i=0;i<desc.m_buildenvs.length;i++){

@@ -128,6 +128,12 @@ UI.CustomTheme=function(){
 			shadow_size:8,
 			hotkey_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,10,0):UI.Font(UI.font_name,12,0),
 			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,22,-50):UI.Font(UI.font_name,24,-50), padding:16,
+			button_style:{
+				transition_dt:0.1,
+				round:0,
+				font:UI.Font(UI.icon_font_name,12),border_width:0,padding:0,
+				border_color:0,color:0,
+			},
 			$:(L?{//light
 				active:{
 					text_color:0xffffffff,
@@ -592,6 +598,7 @@ UI.CustomTheme=function(){
 			padding:12,
 			caption_padding:4,
 			caption_font:UI.Font(UI.font_name,28,-50),
+			caption_button_padding:0,
 			caption_color:C,
 			caption_text_color:0xffffffff,
 			inactive_caption_color:L?0xff7f7f7f:0xff666666,
@@ -600,6 +607,29 @@ UI.CustomTheme=function(){
 			shadow_size:6,
 			shadow_color:0xaa000000,
 			scale:1.0/1.25,
+			button_style:{
+				transition_dt:0.1,
+				round:0,
+				font:UI.Font(UI.icon_font_name,22),border_width:0,padding:1,
+				$:{
+					out:{
+						//border_color:0xff444444,color:0xffffffff,
+						border_color:0,color:0,
+						icon_color:L?0xff7f7f7f:0xff7f7f7f,
+						text_color:L?0xff7f7f7f:0xff7f7f7f,
+					},
+					over:{
+						border_color:0xff444444,color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
+						icon_color:0xff000000,
+						text_color:0xff000000,
+					},
+					down:{
+						border_color:0xff7f7f7f,color:[{x:0,y:0,color:0xff7f7f7f},{x:0,y:1,color:0xff7f7f7f}],
+						icon_color:0xff000000,
+						text_color:0xff000000,
+					},
+				}
+			},
 		},
 		sxs_build_output:{
 			border_width:0,
