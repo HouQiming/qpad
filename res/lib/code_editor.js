@@ -3021,7 +3021,7 @@ W.FileItemOnDemand=function(){
 		//	return GenerateGitRepoTreeView(repo);
 		//}
 		var ret=[]
-		var hist_keywords=this.search_text.split(" ").filter(function(a){return a.toLowerCase()});
+		var hist_keywords=this.search_text.split(" ").map(function(a){return a.toLowerCase()});
 		for(var i=0;i<repo.files.length;i++){
 			var fname_i=repo.files[i]
 			if(UI.m_current_file_list.m_appeared_full_names[fname_i]){continue;}
@@ -4040,7 +4040,7 @@ W.FileBrowserPage=function(id,attrs){
 			//if(s_search_text.indexOf('/')<0){
 			var hist=UI.m_ui_metadata["<history>"]
 			if(hist&&!(s_search_text.match(g_regexp_is_path))){
-				var hist_keywords=s_search_text.split(" ").filter(function(a){return a.toLowerCase()});
+				var hist_keywords=s_search_text.split(" ").map(function(a){return a.toLowerCase()});
 				for(var i=hist.length-1;i>=0;i--){
 					var fn_i=hist[i],fn_i_search=fn_i.toLowerCase()
 					var is_invalid=0;
