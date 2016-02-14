@@ -190,6 +190,13 @@ W.TabbedDocument_prototype={
 		//	UI.dumpMemoryUsage();
 		//}
 	},
+	//bring up a tab *without* focusing it
+	BringUpTab:function(tabid){
+		var tab0=this.items[tabid];
+		tab0.z_order=UI.g_current_z_value;
+		UI.g_current_z_value++;
+		UI.Refresh()
+	},
 	SetTab:function(tabid){
 		var tabid0=this.current_tab_id
 		if(tabid0!=undefined){

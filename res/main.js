@@ -112,6 +112,9 @@ UI.NewTab=function(tab){
 		UI.SetFocus(undefined);
 	}
 	UI.top.app.document_area.just_created_a_tab=1;
+	for(var i=0;i<g_all_document_windows.length;i++){
+		g_all_document_windows[i].__global_tab_id=i;
+	}
 	UI.Refresh()
 	return tab;
 }

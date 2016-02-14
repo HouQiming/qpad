@@ -258,7 +258,7 @@ class CLayouter_programmer
 	/////////////////
 	//this thing isn't line-only
 	name=function(){return "renderer"}
-	stateSize=function(){return 4}
+	stateSize=function(){return 5}
 	/////////////////
 	isLineOnly=function(){
 		return m_enable_advanced_wrapping
@@ -271,16 +271,18 @@ class CLayouter_programmer
 			return i64[].NULL
 	}
 	/////////////////
-	//final format: pre-tab width, has-tabbed-ness, tab-enter width, has-enter-ness, post-enter width
+	//final format: pre-tab width, has-tabbed-ness, tab-enter width, has-enter-ness, post-enter width, max width
 	//do not use a render-central design
 	AddString=function(i64[] a,i64[] pp,string s_context,string s,iptr ofs){
 		w_pre_tab=a[0]
 		w_tab_enter=a[1]
 		w_post_enter=a[2]
 		flags=int(a[3])
+		w_max=a[4]
 		if m_enable_advanced_wrapping:
 			//the fancy mode only uses w_pre_tab
 			w_pre_tab=_RenderText(MODE_BB,0LL,a,pp,s,ofs, u8[].NULL, 0LL,0LL,0LL,0LL,0.f,0.f,0.f)
+			w_max=a[4]
 			//flags|=FLAG_HAS_ENTER
 		else
 			foreach ch,I in Utf8Chars(s)
@@ -294,10 +296,18 @@ class CLayouter_programmer
 					else
 						w_post_enter=(w_post_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
 				else if ch=='\n':
+					w_curline=0LL
 					if !(flags&FLAG_HAS_ENTER):
 						flags|=FLAG_HAS_ENTER
+						w_curline=w_pre_tab
+						if flags&FLAG_HAS_TAB:
+							w_curline=(w_curline/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+						w_curline+=w_tab_enter
 					else
-						w_post_enter=(w_post_enter/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+						y=w_post_enter/m_wrap_width_in_fp
+						w_curline=w_post_enter-y*m_wrap_width_in_fp
+						w_post_enter=(y+1LL)*m_wrap_width_in_fp
+					if w_max<w_curline:w_max=w_curline
 				else if ch!='\r':
 					dx=charWidth(ch)
 					if !(flags&FLAG_HAS_ENTER):
@@ -307,34 +317,50 @@ class CLayouter_programmer
 							w_tab_enter+=dx
 					else
 						w_post_enter+=dx
+			w_curline=0LL
+			if !(flags&FLAG_HAS_ENTER):
+				w_curline=w_pre_tab
+				if flags&FLAG_HAS_TAB:
+					w_curline=(w_curline/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+				w_curline+=w_tab_enter
+			else
+				y=w_post_enter/m_wrap_width_in_fp
+				w_curline=w_post_enter-y*m_wrap_width_in_fp
+			if w_max<w_curline:w_max=w_curline
 		a[0]=w_pre_tab
 		a[1]=w_tab_enter
 		a[2]=w_post_enter
 		a[3]=i64(flags)
+		a[4]=w_max
 	}
 	Add=function(i64[] a,i64[] b){
 		a_w_pre_tab=a[0]
 		a_w_tab_enter=a[1]
 		a_w_post_enter=a[2]
 		a_flags=int(a[3])
+		a_w_max=int(a[4])
 		b_w_pre_tab=b[0]
 		b_w_tab_enter=b[1]
 		b_w_post_enter=b[2]
 		b_flags=int(b[3])
+		b_w_max=int(b[4])
 		if a_flags&FLAG_HAS_ENTER:
 			//a_w_post_enter
 			a_w_post_enter+=b_w_pre_tab
 			if b_flags&FLAG_HAS_TAB:
 				a_w_post_enter=(a_w_post_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
 			a_w_post_enter+=b_w_tab_enter
+			y=a_w_post_enter/m_wrap_width_in_fp
+			w_curline=a_w_post_enter-y*m_wrap_width_in_fp
+			if a_w_max<w_curline:a_w_max=w_curline
 			if b_flags&FLAG_HAS_ENTER:
-				a_w_post_enter=(a_w_post_enter/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+				a_w_post_enter=(y+1LL)*m_wrap_width_in_fp
 			a_w_post_enter+=b_w_post_enter
 		else if a_flags&FLAG_HAS_TAB:
 			a_w_tab_enter+=b_w_pre_tab
 			if b_flags&FLAG_HAS_TAB:
 				a_w_tab_enter=(a_w_tab_enter/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
-			a_w_post_enter+=b_w_tab_enter
+			a_w_tab_enter+=b_w_tab_enter
 			if b_flags&FLAG_HAS_ENTER:
 				a_flags|=FLAG_HAS_ENTER
 				a_w_post_enter=b_w_post_enter
@@ -343,10 +369,21 @@ class CLayouter_programmer
 			a_flags=b_flags
 			a_w_tab_enter=b_w_tab_enter
 			a_w_post_enter=b_w_post_enter
+		//retest the first line for max - merging single-line a with non-single-line b
+		if m_enable_advanced_wrapping:
+			//don't max w_curline into it, it's shit in this mode
+			a_w_max=a[4]
+		else
+			w_curline=a_w_pre_tab
+			if a_flags&FLAG_HAS_TAB:
+				w_curline=(w_curline/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+			w_curline+=a_w_tab_enter
+			if a_w_max<w_curline:a_w_max=w_curline
 		a[0]=a_w_pre_tab
 		a[1]=a_w_tab_enter
 		a[2]=a_w_post_enter
 		a[3]=i64(a_flags)
+		a[4]=max(a_w_max,b_w_max)
 	}
 	GetFlatX=inline(i64[] a){
 		w_pre_tab=a[0]
@@ -1153,9 +1190,11 @@ class CLayouter_programmer
 		//	return float2(fixed2float(x-scroll_x)*scale+screen_x,fixed2float(y-scroll_y)*scale+screen_y)
 		//re-create the atoms, convert string, then render
 		flat_x=a[0]
+		auto w_max=a[4]
 		y=flat_x/wrap_width
 		x=flat_x-y*wrap_width
-		x=AddOverlayOffset(x,y)
+		if mode==MODE_RENDER:
+			x=AddOverlayOffset(x,y)
 		p_overlay=m_overlays.InlineBisect(inline(a){return a.flatx<flat_x})
 		//if flat_x>m_caret_overlay.x&&flat_x<m_caret_overlay.y:
 		//	//it's an abuse of the separate x/y: we must avoid wrapping
@@ -1179,7 +1218,10 @@ class CLayouter_programmer
 		OfsCheck=__inline_loop_body(ccnt){
 			if mode==MODE_BB&&h_line:
 				//never return before the first newline
-				if ccnt>=ofs:return flat_x
+				if ccnt>=ofs:
+					if w_max<x:w_max=x
+					a[4]=w_max
+					return flat_x
 		}
 		SeekCheck=__inline_loop_body(ccnt){
 			if mode==MODE_SEEK:
@@ -1210,6 +1252,7 @@ class CLayouter_programmer
 				if mode==MODE_RENDER&&(newline_flags&ATOM_FLAG_HYPHEN):
 					color=m_cached_color_virtual_hyphen
 					myDrawChar(int('-'))
+				if w_max<x:w_max=x
 				flat_x-=x
 				flat_x+=wrap_width
 				x=0LL
@@ -1218,14 +1261,17 @@ class CLayouter_programmer
 		//skip to the line
 		i_start=0L
 		if mode==MODE_BB:
-			for i=0L:pp.n-1
-				if int(pp[i]>>32)==-1:
-					//found a line
-					value0=int(pp[i])
-					if (value0&ATOM_MASK_CCNT)>=ofs:break
-					i_start=i+1
-					NewlineCheck()
-					newline_flags=(value0&(ATOM_FLAG_NEWLINE|ATOM_FLAG_HYPHEN))
+			if m_wrap_width>0.f:
+				for i=0L:pp.n-1
+					if int(pp[i]>>32)==-1:
+						//found a line
+						value0=int(pp[i])
+						if (value0&ATOM_MASK_CCNT)>=ofs:break
+						i_start=i+1
+						NewlineCheck()
+						newline_flags=(value0&(ATOM_FLAG_NEWLINE|ATOM_FLAG_HYPHEN))
+			else
+				//if it's unwrapped, we need w_max, we can't skip it
 		else if mode==MODE_SEEK:
 			for i=0L:pp.n-1
 				if int(pp[i]>>32)==-1:
@@ -1255,7 +1301,9 @@ class CLayouter_programmer
 					if mode==MODE_SEEK:
 						return i64(value0)
 					else
-						//if mode==MODE_BB:
+						if mode==MODE_BB:
+							if w_max<x:w_max=x
+							a[4]=w_max
 						return flat_x
 			else if value1&0x80000000:
 				//space
@@ -1364,11 +1412,13 @@ class CLayouter_programmer
 						flat_x+=dx_temp
 						ch32_prev=ch32
 						SeekCheck(value0+I)
-					
 		NewlineCheck()
 		if mode==MODE_SEEK:
 			return i64(s.n)
 		else
+			if mode==MODE_BB:
+				if w_max<x:w_max=x
+				a[4]=w_max
 			return flat_x
 	}
 	///////////////////////

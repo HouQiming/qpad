@@ -4,12 +4,18 @@ var Language=require("res/lib/langdef");
 require("res/lib/global_doc");
 require("res/lib/code_editor");
 
-var MeasureEditorSize=function(doc,dlines){
+var MeasureEditorSize=function(doc,dlines,w_content){
 	var ed=doc.ed;
 	var ccnt_tot=ed.GetTextSize();
 	var hc=ed.GetCharacterHeightAt(ccnt_tot);
 	var ytot=ed.XYFromCcnt(ccnt_tot).y+hc*(dlines+1);
-	return Math.min(ytot,UI.default_styles.notebook_view.max_lines*hc);
+	var h_max=UI.default_styles.notebook_view.max_lines*hc;
+	if(ytot<h_max){
+		if(doc.NeedXScrollAtWidth(w_content)){
+			ytot+=UI.default_styles.code_editor.w_scroll_bar;
+		}
+	}
+	return Math.min(ytot,h_max);
 };
 
 var g_re_errors=new RegExp("^error_.*$")
@@ -694,9 +700,8 @@ W.NotebookView=function(id,attrs){
 		var cell_i=obj.m_cells[i];
 		var doc_in=cell_i.m_text_in;
 		var doc_out=cell_i.m_text_out;
-		var h_in=MeasureEditorSize(doc_in,0);
-		var h_in1=MeasureEditorSize(doc_in,1);
-		var h_out=MeasureEditorSize(doc_out,0);
+		var h_in=MeasureEditorSize(doc_in,0,w_content-obj.padding*2);
+		var h_out=MeasureEditorSize(doc_out,0,w_content-obj.padding*2);
 		current_y+=obj.padding;
 		UI.RoundRect({
 			x:obj.x+obj.padding-obj.shadow_size*0.5,y:obj.y+current_y-scroll_y-obj.shadow_size*0.5,
@@ -803,7 +808,7 @@ W.NotebookView=function(id,attrs){
 		if(UI.nd_focus==doc_in||current_y-scroll_y<obj.h&&current_y-scroll_y+h_in+hc>0||Math.abs(obj.m_last_focus_cell_id-(i*2))<=1){
 			W.CodeEditor("doc_in_"+i.toString(),{
 				doc:doc_in,
-				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in1,
+				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in,
 			})
 		}
 		doc_in.sub_cell_id=i*2+0;
