@@ -414,6 +414,9 @@ class CLayouter_programmer
 		//seeked into hidden text?
 		x_goal=AddHiddenRanges(ed,b[0],b[1])
 		x=GetFlatX(a)
+		is_end=0
+		if b[0]>=m_wrap_width_in_fp:
+			is_end=1
 		if b.n>2:
 			//hint
 			x_last_known=AddHiddenRanges(ed,b[2],b[3])
@@ -429,7 +432,11 @@ class CLayouter_programmer
 					else if ch!='\r':
 						dx=charWidth(ch)
 						x+=dx
-					if x>x_goal:return I+p
+					if x>x_goal:
+						if is_end:
+							is_end=0
+						else
+							return I+p
 				return s.n
 		foreach ch,I in Utf8Chars(s)
 			if ch=='\t':
@@ -440,7 +447,10 @@ class CLayouter_programmer
 				dx=charWidth(ch)
 				x+=dx
 			if x>x_goal:
-				return I
+				if is_end:
+					is_end=0
+				else
+					return I
 		return s.n
 	}
 	/////////////////
@@ -1120,9 +1130,14 @@ class CLayouter_programmer
 			//not \n and divides m_wrap_width_in_fp
 			a2=new(a)
 			AddString(a2,pp,new string,s,ofs)
-			x0=GetFlatX(a2)
+			x1=GetFlatX(a2)
+			ch_prev=0
+			foreach ch in CharToUtf8Backward(s[:ofs-1].ReverseOrder(),iptr)
+				ch_prev=ch
+				break
 			//we could have \n in the block above... and the test is done outside
-			if !(x0%m_wrap_width_in_fp):
+			x0=x1-charWidth(ch_prev)
+			if x1/m_wrap_width_in_fp>x0/m_wrap_width_in_fp:
 				//if ofs&&s[ofs-1]!='\n':
 				return -1
 		return 0

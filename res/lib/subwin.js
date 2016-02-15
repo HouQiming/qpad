@@ -166,8 +166,8 @@ W.TabbedDocument_prototype={
 		}
 		this[window_list.length-1]=undefined;
 		window_list.pop()
-		if(this.just_created_a_tab){
-			//just closed, go to previous tab
+		if(this.just_created_a_tab||((window_list[this.current_tab_id]||{}).area_name||"doc_default")!=(tab.area_name||"doc_default")){
+			//just closed or about to go to the next region, go to previous tab
 			if(this.current_tab_id>=tabid){this.current_tab_id--}
 		}else{
 			//switched, go to next tab
@@ -789,7 +789,8 @@ var RenderLayout=function(layout,obj){
 						}
 					}
 					var tabid=tab.__global_tab_id;
-					W.SaveDialog("savedlg_"+tabid.toString(),{x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content,
+					W.SaveDialog("savedlg_"+tabid.toString(),{
+						x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content,
 						value:(tab.in_save_dialog||0),tabid:tabid,parent:obj})
 				}
 			}

@@ -1361,14 +1361,16 @@ var CallParseMore=function(){
 				//	//	print("panic: failed to set m_file_index",ret.file_name)
 				//	//}
 				//}
-				UI.NextTick(fcallmore)
 			}else{
 				g_is_parse_more_running=0;
 				UI.Refresh();
 				return;
 			}
 			var tick1=Duktape.__ui_get_tick()
-			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>1.0/FPS_PARSING){break;}
+			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>1.0/FPS_PARSING){
+				UI.NextTick(fcallmore)
+				break;
+			}
 		}
 	});
 	g_is_parse_more_running=1;

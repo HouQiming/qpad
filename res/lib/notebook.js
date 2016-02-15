@@ -421,11 +421,11 @@ W.notebook_prototype={
 		var ret=[];
 		for(var i=0;i<this.m_cells.length;i++){
 			if(i==id){
-				var doc_in=this.m_cells[i].m_text_in;
-				var doc_out=this.m_cells[i].m_text_out;
-				doc_out.ClearClickableRanges();
-				doc_in.OnDestroy()
-				doc_out.OnDestroy()
+				var proc_desc=this.m_cells[i].m_proc;
+				if(proc_desc){
+					proc_desc.proc.Terminate()
+				}
+				this.ClearCellOutput(i)
 				continue;
 			}
 			ret.push(this.m_cells[i]);
@@ -959,7 +959,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 	}
 	var ret=UI.NewTab({
 		file_name:file_name,
-		title:UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(file_name))),
+		title:UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(file_name)),"Notebook"),
 		tooltip:file_name,
 		document_type:"notebook",
 		area_name:"h_tools",
@@ -977,7 +977,19 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 				this.main_widget=body;
 			}
 			this.need_save=this.main_widget.need_save;
-			body.title=UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(this.file_name)))+(this.need_save?'*':'');
+			var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
+			var is_running=0;
+			for(var i=0;i<body.m_cells.length;i++){
+				if(body.m_cells[i].m_proc){
+					is_running=1;
+					break
+				}
+			}
+			if(is_running){
+				body.title=UI.Format("@1 (running)",s_name)+(this.need_save?'*':'');
+			}else{
+				body.title=UI.Format("@1 - Notebook",s_name)+(this.need_save?'*':'');
+			}
 			body.tooltip=this.file_name;
 			return body;
 		},
