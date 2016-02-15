@@ -111,7 +111,9 @@ UI.RegisterOutputParser=function(s_regex_string,n_brackets,fmatch_to_err){
 	g_processed_output_parser=undefined;
 };
 
+var MAX_PARSABLE_LINE=1024;
 var ParseOutput=function(sline){
+	if(Duktape.__byte_length(sline)>MAX_PARSABLE_LINE){return undefined;}
 	if(!g_processed_output_parser){
 		//create the grand regexp
 		var regex=new RegExp(["^(",g_output_parsers.map(function(a){return a.s}).join(")|("),")\r?\n"].join(""))
@@ -137,6 +139,7 @@ var ParseOutput=function(sline){
 			return g_output_parsers[i>>1].f(big_match.slice(match_places[i],match_places[i+1]))
 		}
 	}
+	return undefined;
 }
 
 UI.RegisterCodeEditorPersistentMember("m_compiler_name");
@@ -633,6 +636,15 @@ W.notebook_prototype={
 		this.need_auto_scroll=1;
 		UI.Refresh()
 	},
+	OnDestroy:function(){
+		for(var i=0;i<this.m_cells.length;i++){
+			this.ClearCellOutput(i)
+			var proc_desc=this.m_cells[i].m_proc;
+			if(proc_desc){
+				proc_desc.proc.Terminate()
+			}
+		}
+	},
 	UpdateLanguage:function(id,name){
 		var cell_i=this.m_cells[id];
 		cell_i.m_language=name;
@@ -1003,7 +1015,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 			if(this.main_widget){this.main_widget.SaveMetaData();}
 		},
 		OnDestroy:function(){
-			//if(this.main_widget){this.main_widget.OnDestroy();}
+			if(this.main_widget){this.main_widget.OnDestroy();}
 		},
 		Reload:function(){
 			if(this.main_widget){this.main_widget.Reload();}

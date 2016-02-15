@@ -3021,7 +3021,7 @@ W.FileItemOnDemand=function(){
 		//	return GenerateGitRepoTreeView(repo);
 		//}
 		var ret=[]
-		var hist_keywords=this.search_text.split(" ").map(function(a){return a.toLowerCase()});
+		var hist_keywords=this.search_text.toLowerCase().split(" ");
 		for(var i=0;i<repo.files.length;i++){
 			var fname_i=repo.files[i]
 			if(UI.m_current_file_list.m_appeared_full_names[fname_i]){continue;}
@@ -4040,7 +4040,7 @@ W.FileBrowserPage=function(id,attrs){
 			//if(s_search_text.indexOf('/')<0){
 			var hist=UI.m_ui_metadata["<history>"]
 			if(hist&&!(s_search_text.match(g_regexp_is_path))){
-				var hist_keywords=s_search_text.split(" ").map(function(a){return a.toLowerCase()});
+				var hist_keywords=s_search_text.toLowerCase().split(" ");
 				for(var i=hist.length-1;i>=0;i--){
 					var fn_i=hist[i],fn_i_search=fn_i.toLowerCase()
 					var is_invalid=0;
@@ -4279,7 +4279,7 @@ UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 	OnDestroy:function(){},
 })});
 
-UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
+UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,tooltips,fprev,fall,fnext){
 	if(obj.m_prev_next_button_drawn!=UI.m_frame_tick){
 		obj.m_prev_next_button_drawn=UI.m_frame_tick;
 	}else{
@@ -4313,19 +4313,19 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,stext2,fprev,fall,fnext){
 		W.Button("button_edit_up",{style:UI.default_styles.check_button,
 			x:x_button_box+padding,y:y_button_box+sz_button*0+padding,
 			w:sz_button,h:sz_button,
-			font:UI.icon_font_20,text:"上",tooltip:stext2.replace("@1","prev")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),
+			font:UI.icon_font_20,text:"上",tooltip:tooltips[0]+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),
 			tooltip_placement:'right',
 			OnClick:fprev})
 		W.Button("button_edit_all",{style:UI.default_styles.check_button,
 			x:x_button_box+padding,y:y_button_box+sz_button*1+padding,
 			w:sz_button,h:sz_button,
-			font:UI.icon_font_20,text:"换",tooltip:stext2.replace("@1","all")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),
+			font:UI.icon_font_20,text:"换",tooltip:tooltips[1]+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),
 			tooltip_placement:'right',
 			OnClick:fall})
 		W.Button("button_edit_down",{style:UI.default_styles.check_button,
 			x:x_button_box+padding,y:y_button_box+sz_button*2+padding,
 			w:sz_button,h:sz_button,
-			font:UI.icon_font_20,text:"下",tooltip:stext2.replace("@1","next")+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),
+			font:UI.icon_font_20,text:"下",tooltip:tooltips[2]+' - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),
 			tooltip_placement:'right',
 			OnClick:fnext})
 	}
@@ -4402,7 +4402,7 @@ var finvoke_find=function(mode,s_force_needle){
 		UI.m_ui_metadata.find_state.m_current_needle=s_force_needle;
 	}else{
 		var sel=obj.doc.GetSelection()
-		if(sel[0]<sel[1]){
+		if(sel[0]<sel[1]&&obj.doc.GetLC(sel[0])[0]==obj.doc.GetLC(sel[1])[0]){
 			UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
 			if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
 				UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
@@ -5031,6 +5031,8 @@ W.CodeEditor=function(id,attrs){
 				if(srep_ccnt0<=doc.sel0.ccnt&&doc.sel0.ccnt<=srep_ccnt1&&
 				srep_ccnt0<=doc.sel1.ccnt&&doc.sel1.ccnt<=srep_ccnt1){
 					doc.m_hide_prev_next_buttons=0;
+				}else if(doc.sel0.ccnt!=doc.sel1.ccnt){
+					doc.m_hide_prev_next_buttons=0;
 				}
 				obj.DismissNotification('replace_hint')
 				if(rctx.m_needle==s_replace){
@@ -5462,7 +5464,8 @@ W.CodeEditor=function(id,attrs){
 					var ed_caret=doc.GetIMECaretXY();
 					var y_caret=(ed_caret.y-doc.visible_scroll_y);
 					var hc=UI.GetCharacterHeight(doc.font)
-					UI.DrawPrevNextAllButtons(obj,obj.x+w_line_numbers,obj.y+y_caret+hc*0.5, menu_search,"Replace","Replace @1",
+					UI.DrawPrevNextAllButtons(obj,obj.x+w_line_numbers,obj.y+y_caret+hc*0.5, menu_search,
+						"Replace",["Replace previous",doc.sel0.ccnt==doc.sel1.ccnt?"Replace all":"Replace selection","Replace next"],
 						function(){obj.DoReplaceFromUI(-1);},
 						function(){obj.DoReplaceFromUI( 0);},
 						function(){obj.DoReplaceFromUI( 1);})

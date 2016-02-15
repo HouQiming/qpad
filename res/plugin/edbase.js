@@ -694,7 +694,7 @@ UI.RegisterOutputParser('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)
 });
 
 //jc
-UI.RegisterOutputParser('(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]+)\\)',8,function(matches){
+UI.RegisterOutputParser('(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([^()]*)\\)',8,function(matches){
 	var err={}
 	var name=matches[1];
 	var linea=parseInt(matches[2]);
@@ -739,6 +739,32 @@ UI.RegisterOutputParser('[ \t]*(.*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((
 	}
 	return err
 })
+
+//python
+UI.RegisterOutputParser('[ \t]*File[ \t]*"([^"]+)",[ \t]*line[ \t]*([0-9]+).*',2,function(matches){
+	var name=matches[1]
+	var linea=parseInt(matches[2])
+	var err={
+		file_name:name,
+		category:"error",
+		message:"Python stack dump",line0:linea-1,
+	}
+	return err
+});
+
+//node.js
+UI.RegisterOutputParser('[ \t]*at[ \t]*.*[ \t]*\\((.*):([0-9]+):([0-9]+)\\).*',3,function(matches){
+	var name=matches[1]
+	var linea=parseInt(matches[2])
+	//var cola=parseInt(matches[3])
+	var err={
+		file_name:name,
+		category:"error",
+		message:"node,js stack dump",
+		line0:linea-1,
+	}
+	return err
+});
 
 /////////////////////////////////////////////
 //interpreters / notebook cell generators
@@ -1777,8 +1803,8 @@ UI.RegisterEditorPlugin(function(){
 		if(this.m_error_overlays){
 			for(var i=0;i<this.m_error_overlays.length;i++){
 				var err=this.m_error_overlays[i];
-				var ccnt_err0=err.ccnt0.ccnt;
-				var ccnt_err1=err.ccnt1.ccnt;
+				var ccnt_err0=err.sel_ccnt0?err.sel_ccnt0.ccnt:err.ccnt0;
+				var ccnt_err1=err.sel_ccnt1?err.sel_ccnt1.ccnt:err.ccnt1;
 				if(ccnt_err0<=ccnt&&ccnt<=ccnt_err1){continue;}
 				propose(ccnt_err0);
 			}
@@ -2613,8 +2639,10 @@ UI.RegisterEditorPlugin(function(){
 			var ed_caret=this.GetIMECaretXY();
 			var y_caret=(ed_caret.y-this.visible_scroll_y);
 			var hc=UI.GetCharacterHeight(this.font)
+			this.m_hide_prev_next_buttons=0;
 			UI.DrawPrevNextAllButtons(this.owner,
-				this.owner.x+this.owner.w_line_numbers,this.owner.y+y_caret+hc*0.5, menu_edit,"Apply changes","Apply @1",
+				this.owner.x+this.owner.w_line_numbers,this.owner.y+y_caret+hc*0.5, menu_edit,
+				"Apply changes",["Apply to the previous line","Apply to all","Apply to the next line"],
 				function(){
 					var locs=this.m_autoedit_locators
 					var sel=this.GetSelection()

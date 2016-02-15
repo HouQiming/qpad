@@ -553,7 +553,7 @@ class CLayouter_programmer
 				//////
 				hid=caller.m_handler_registration["renderer"].as(int)
 				a=caller.GetStateEnMasse(hid,ccnts)
-				flatxs=[GetFlatX(a[i*4:]) for i=0:n*2-1]
+				flatxs=[GetFlatX(a[i*5:]) for i=0:n*2-1]
 				for i=0:n-1
 					s_i=m_tentative_editops[i*3+2].as(string)
 					if !s_i:
@@ -585,7 +585,7 @@ class CLayouter_programmer
 			n=n3/3
 			hid=caller.m_handler_registration["renderer"].as(int)
 			a=caller.GetStateEnMasse(hid,ccnts)
-			flatxs=[GetFlatX(a[i*4:]) for i=0:n*2-1]
+			flatxs=[GetFlatX(a[i*5:]) for i=0:n*2-1]
 			for i=0:n-1
 				ccnt_j=m_virtual_diffs[i*3+0].as(i64)
 				sz_j=m_virtual_diffs[i*3+1].as(i64)
@@ -1468,7 +1468,7 @@ class CLayouter_programmer
 		m_enable_hidden=-1
 		a=ed.GetStateEnMasse(hid,ccnts)
 		m_enable_hidden=1
-		all_x=[GetFlatX(a[i:]) for i=0:4:a.n-4]
+		all_x=[GetFlatX(a[i:]) for i=0:5:a.n-5]
 		dx_add=new long4[all_x.n>>1]
 		dx_sub=new long4[all_x.n>>1]
 		m_hidden_dx_add=dx_add
@@ -2444,7 +2444,7 @@ auto KmpBuildTable(string s,int ocase)
 	//use next[s.n] for match denial
 	return next
 
-auto SearchPlainText(CEditableText ed,i64 ccnt_starting,const direction, string s,int ocase,function(i64,i64):int ReportMatch, int budget)
+auto SearchPlainText(CEditableText ed,i64 ccnt_starting,i64 ccnt_end,const direction, string s,int ocase,function(i64,i64):int ReportMatch, int budget)
 	//use KMP: two-part is not worth it here
 	sfind=(direction>0?s:[ch for ch in s.ReverseOrder()])
 	if ocase:
@@ -2477,6 +2477,8 @@ auto SearchPlainText(CEditableText ed,i64 ccnt_starting,const direction, string 
 		if pbudget<=0:
 			//we are out of budget, exit
 			return ccnt+w*i64(-direction)
+		if ccnt_end!=-1LL&&(direction>0?(ccnt>=ccnt_end):(ccnt<ccnt_end)):
+			return -1LL
 	return -1LL
 
 SEARCH_FLAG_CASE_SENSITIVE=1
@@ -2492,7 +2494,7 @@ class CRegexpSearchContext
 		proto.ExportProperty(this,"ccnt")
 	};
 
-auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int flags,function(i64,i64):int ReportMatch, int budget)
+auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sregexp,int flags,function(i64,i64):int ReportMatch, int budget)
 	//use the old regexp code - duk code too complicated
 	ctx=JS.Param(1).as(CRegexpSearchContext)
 	if !ctx:
@@ -2526,7 +2528,13 @@ auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int fla
 			matcher.Add('\n')
 			ccnt_base-=dir
 		match0=iptr[].NULL
-		ctx=new CRegexpSearchContext(){matcher:matcher,has4:has4,has6:has6,ccnt:ccnt_starting,ccnt_base:ccnt_base,match0:match0}
+		ctx=new CRegexpSearchContext(){
+			matcher:matcher,
+			has4:has4,has6:has6,
+			ccnt:ccnt_starting,
+			ccnt_base:ccnt_base,
+			match0:match0
+		}
 	else
 		matcher=ctx.matcher
 		ccnt_starting=ctx.ccnt
@@ -2567,6 +2575,7 @@ auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int fla
 		ccnt_base=ccnt+(dir<0)
 		match0=matcher.GetMatch()
 	}
+	ccnt_final=(dir>0?ed.GetTextSize():-1LL)
 	for ch,ccnt in dir>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
 		matcher.Add(char(ch))
 		auto match=matcher.GetMatch()
@@ -2585,6 +2594,9 @@ auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int fla
 			ctx.ccnt=ccnt+(dir>0)
 			ctx.ccnt_base=ccnt_base
 			return JS.Return(ctx)
+		if ccnt_end!=-1LL&&(dir>0?(ccnt>=ccnt_end):(ccnt<ccnt_end)):
+			ccnt_final=ccnt
+			break
 	ch=(has_tail_enter?int('\n'):-1)
 	if ch!=-1:matcher.Add(char(ch))
 	match=matcher.GetMatch()
@@ -2594,7 +2606,7 @@ auto SearchRegexp(JSContext JS,CEditableText ed,const dir,string sregexp,int fla
 		match=match0
 	match0=match
 	if (is_sliding||!matcher.is_matching()||ch==-1)&&match:
-		testMatch(ch,dir>0?ed.GetTextSize():-1LL,match)
+		testMatch(ch,ccnt_final,match)
 	return JS.Return(-1LL)
 
 class CFuzzySearchContext
@@ -2763,7 +2775,8 @@ auto CreateFuzzyDFA(string s,int oword,int maxdist, int budget)
 	return ret
 
 FUZZY_DFA_BUDGET=131072//65536
-auto SearchFuzzy(JSContext JS,CEditableText ed,const dir,string s,int flags,function(i64,i64):int ReportMatch, int budget)
+auto SearchFuzzy(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string s,int flags,function(i64,i64):int ReportMatch, int budget)
+	assert(ccnt_end==-1LL)
 	ctx=JS.Param(1).as(CFuzzySearchContext)
 	maxdist=int(max(min((s.n-2)/3+1,3),1))
 	if !ctx:
@@ -3369,8 +3382,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		js_callback=JS.Param(6).as(JSObject)
 		js_this=JS.Param(7).as(JSObject)
 		/////////////
+		range_ccnt0=-1LL
+		range_ccnt1=-1LL
 		if !js_callback:
 			//need a context for m_match_cost and stuff
+			range_ccnt0=js_this["m_ccnt0"].as(i64)
+			range_ccnt1=js_this["m_ccnt1"].as(i64)
 			rjob=js_this["m_current_replace_job"].as(CReplaceJob)
 			if !rjob:
 				rjob=new CReplaceJob
@@ -3415,21 +3432,21 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			assert(!(flags&SEARCH_FLAG_FUZZY))
 			//the regexp version returns an object to JS
 			if direction>0:
-				return SearchRegexp(JS,ed,1, s,flags,ReportMatch, budget)
+				return SearchRegexp(JS,ed,range_ccnt1,1, s,flags,ReportMatch, budget)
 			else
-				return SearchRegexp(JS,ed,-1, s,flags,ReportMatch, budget)
+				return SearchRegexp(JS,ed,range_ccnt0,-1, s,flags,ReportMatch, budget)
 		else if flags&SEARCH_FLAG_FUZZY:
 			if direction>0:
-				return SearchFuzzy(JS,ed,1, s,flags,ReportMatch, budget)
+				return SearchFuzzy(JS,ed,range_ccnt1,1, s,flags,ReportMatch, budget)
 			else
-				return SearchFuzzy(JS,ed,-1, s,flags,ReportMatch, budget)
+				return SearchFuzzy(JS,ed,range_ccnt0,-1, s,flags,ReportMatch, budget)
 		else
 			ocase=(flags&SEARCH_FLAG_CASE_SENSITIVE)
 			ccnt0=JS.Param(1).as(i64)
 			if direction>0:
-				ret=SearchPlainText(ed,ccnt0,1, s,ocase,ReportMatch, budget)
+				ret=SearchPlainText(ed,ccnt0,range_ccnt1,1, s,ocase,ReportMatch, budget)
 			else
-				ret=SearchPlainText(ed,ccnt0,-1, s,ocase,ReportMatch, budget)
+				ret=SearchPlainText(ed,ccnt0,range_ccnt0,-1, s,ocase,ReportMatch, budget)
 		return JS.Return(ret)
 	}
 	//this is not hook-friendly
