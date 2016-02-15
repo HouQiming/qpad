@@ -788,8 +788,8 @@ var RenderLayout=function(layout,obj){
 							UI.Refresh()
 						}
 					}
-					var tabid=(obj.current_tab_id||0);
-					W.SaveDialog("savedlg",{x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content,
+					var tabid=tab.__global_tab_id;
+					W.SaveDialog("savedlg_"+tabid.toString(),{x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content,
 						value:(tab.in_save_dialog||0),tabid:tabid,parent:obj})
 				}
 			}

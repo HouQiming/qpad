@@ -4019,7 +4019,7 @@ W.FileBrowserPage=function(id,attrs){
 				}
 			}
 			if(UI.g_transient_projects.length>0){
-				files.push({caption:"Auto-detected projects",no_selection:1,h:32})
+				files.push({caption:"Auto-detected repositories",no_selection:1,h:32})
 				UI.g_transient_projects.sort(function(a,b){
 					a=UI.RemovePath(a);
 					b=UI.RemovePath(b);
@@ -6645,7 +6645,7 @@ UI.RegisterSpecialFile("project_list",{
 			ret.push(projects[i])
 		}
 		if(UI.g_transient_projects.length>0){
-			ret.push('*** Auto detected projects ***');
+			ret.push('*** Auto-detected repositories ***');
 			UI.g_transient_projects.sort(function(a,b){
 				a=UI.RemovePath(a);
 				b=UI.RemovePath(b);
@@ -6662,6 +6662,7 @@ UI.RegisterSpecialFile("project_list",{
 		var files=stext.split('\n');
 		var n_stars=0;
 		var projects=[];
+		UI.g_is_dir_a_project={};
 		for(var i=0;i<files.length;i++){
 			var fn=files[i];
 			if(!fn){continue;}
@@ -6672,15 +6673,16 @@ UI.RegisterSpecialFile("project_list",{
 			}
 			if(!IO.DirExists(fn)){continue;}
 			projects.push(fn)
-			UI.m_ui_metadata["<projects>"]=projects;
-			var tab=UI.FindUtilTab("file_browser",0);
-			if(tab){
-				var obj=tab.util_widget;
-				if(obj){
-					obj.m_file_list=undefined
-					obj.m_try_to_focus=undefined;
-					UI.Refresh()
-				}
+			UI.g_is_dir_a_project[fn]='permanent'
+		}
+		UI.m_ui_metadata["<projects>"]=projects;
+		var tab=UI.FindUtilTab("file_browser",0);
+		if(tab){
+			var obj=tab.util_widget;
+			if(obj){
+				obj.m_file_list=undefined
+				obj.m_try_to_focus=undefined;
+				UI.Refresh()
 			}
 		}
 	},
