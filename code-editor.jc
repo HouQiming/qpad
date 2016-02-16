@@ -2472,6 +2472,8 @@ auto SearchPlainText(CEditableText ed,i64 ccnt_starting,i64 ccnt_end,const direc
 	pbudget=budget
 	w=0
 	for ch,ccnt in direction>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
+		if ccnt_end!=-1LL&&(direction>0?(ccnt>=ccnt_end):(ccnt<ccnt_end)):
+			return -1LL
 		for(;;)
 			if ch==sfind[w]:break
 			if ch==sfind2[w]:break
@@ -2492,8 +2494,6 @@ auto SearchPlainText(CEditableText ed,i64 ccnt_starting,i64 ccnt_end,const direc
 		if pbudget<=0:
 			//we are out of budget, exit
 			return ccnt+w*i64(-direction)
-		if ccnt_end!=-1LL&&(direction>0?(ccnt>=ccnt_end):(ccnt<ccnt_end)):
-			return -1LL
 	return -1LL
 
 SEARCH_FLAG_CASE_SENSITIVE=1
@@ -2512,6 +2512,17 @@ class CRegexpSearchContext
 auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sregexp,int flags,function(i64,i64):int ReportMatch, int budget)
 	//use the old regexp code - duk code too complicated
 	ctx=JS.Param(1).as(CRegexpSearchContext)
+	js_report_callback=JS.Param(6).as(JSObject)
+	js_this=JS.Param(7).as(JSObject)
+	match_cost=64
+	if !js_report_callback:
+		rjob=js_this["m_current_replace_job"].as(CReplaceJob)
+		js_replace_callback=js_this["m_s_replace_callback"].as(JSObject)
+		//js_doc=js_this["m_owner"].as(JSObject)
+		match_cost=js_this["m_match_cost"].or(match_cost)
+	else
+		rjob=CReplaceJob.NULL
+		js_replace_callback=JSObject.NULL
 	if !ctx:
 		ccnt_starting=JS.Param(1).as(i64)
 		//6:^, 4:$
@@ -2584,7 +2595,20 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 			if has4&&ch1!='\n'&&ch1!='\r':
 				match_is_invalid=1
 		if !match_is_invalid:
-			pbudget-=ReportMatch(ccnt0,ccnt1)*16
+			if js_replace_callback:
+				assert(dir==1)
+				js_replace_callback.PushAsFunction()
+				JS._push_value(ed.GetText(ccnt0,ccnt1-ccnt0))
+				for i=1:(match.n>>1)-1
+					JS._push_value(ed.GetText(ccnt_base+i64(match[i*2-2]),i64(match[i*2-1]-match[i*2-2])))
+				JS._push_value(ccnt0)
+				//JS._push_value(js_doc)
+				s_ret=JS.VCall(string,(match.n>>1)+1)
+				if s_ret:
+					rjob.m_ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:s_ret})
+				pbudget-=match_cost
+			else 
+				pbudget-=ReportMatch(ccnt0,ccnt1)
 		matcher.Clear()
 		matcher.Add(char(ch))
 		ccnt_base=ccnt+(dir<0)
@@ -2592,6 +2616,9 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 	}
 	ccnt_final=(dir>0?ed.GetTextSize():-1LL)
 	for ch,ccnt in dir>0?ed.enumCharsForward(ccnt_starting):ed.enumCharsBackward(ccnt_starting)
+		if ccnt_end!=-1LL&&(dir>0?(ccnt>=ccnt_end):(ccnt<ccnt_end)):
+			ccnt_final=ccnt
+			break
 		matcher.Add(char(ch))
 		auto match=matcher.GetMatch()
 		is_sliding=0
@@ -2609,9 +2636,6 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 			ctx.ccnt=ccnt+(dir>0)
 			ctx.ccnt_base=ccnt_base
 			return JS.Return(ctx)
-		if ccnt_end!=-1LL&&(dir>0?(ccnt>=ccnt_end):(ccnt<ccnt_end)):
-			ccnt_final=ccnt
-			break
 	ch=(has_tail_enter?int('\n'):-1)
 	if ch!=-1:matcher.Add(char(ch))
 	match=matcher.GetMatch()

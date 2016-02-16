@@ -936,6 +936,51 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		return range
 	},
+	SmartReplace:function(ccnt0,ccnt1,s_regexp,fcallback){
+		var rctx={
+			m_ccnt0:ccnt0,
+			m_ccnt1:ccnt1,
+			m_frontier:ccnt0,
+			m_match_cost:64,
+			m_s_replace:"",
+			m_s_replace_callback:fcallback,
+			m_owner:this,
+		}
+		if(this.owner){
+			this.owner.AcquireEditLock();
+		}
+		var ffind_next=(function(){
+			//print("replace: ffind_next ",rctx.m_frontier)
+			rctx.m_frontier=UI.ED_Search(this.ed,rctx.m_frontier,1,s_regexp,UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_HIDDEN|UI.SEARCH_FLAG_REGEXP,
+				1048576,undefined,rctx)
+			//print("search finished ",s_replace)
+			var ccnt_frontier=UI.GetSearchFrontierCcnt(rctx.m_frontier)
+			if(!(ccnt_frontier>0)){
+				var need_onchange=0
+				if(this.owner){
+					this.owner.DismissNotification('replace_progress')
+					this.owner.ReleaseEditLock();
+				}
+				if(rctx.m_current_replace_job){
+					var n_replaced=UI.ED_ApplyReplaceOps(this.ed,rctx.m_current_replace_job)
+					if(n_replaced){
+						this.CallOnChange();
+					}
+				}
+				UI.Refresh()
+			}else{
+				if(this.owner){
+					var progress=(ccnt_frontier-rctx.m_ccnt0)/(rctx.m_ccnt1-rctx.m_ccnt0);
+					this.owner.CreateNotification({id:'replace_progress',icon:undefined,
+						text:"Replacing @1%...".replace('@1',(progress*100).toFixed(0)),
+						progress:progress
+					},"quiet")
+				}
+				UI.NextTick(ffind_next);
+			}
+		}).bind(this);
+		ffind_next();
+	},
 	RenderWithLineNumbers:function(scroll_x,scroll_y, area_x,area_y,area_w,area_h,enable_interaction){
 		this.PrepareForRendering();
 		var w_line_numbers=this.m_rendering_w_line_numbers;
@@ -2548,8 +2593,8 @@ W.CodeEditorWidget_prototype={
 				rctx.m_owner.ReleaseEditLock();
 				if(rctx.m_current_replace_job){
 					var n_replaced=UI.ED_ApplyReplaceOps(doc.ed,rctx.m_current_replace_job)
-					need_onchange=1
 					if(n_replaced){
+						need_onchange=1
 						rctx.m_owner.CreateNotification({id:'find_result',icon:'对',text:UI._("Replaced @1 matches").replace("@1",n_replaced.toString())})
 					}else{
 						var direction=(is_first||1)

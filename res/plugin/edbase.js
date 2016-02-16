@@ -2980,3 +2980,48 @@ UI.RegisterEditorPlugin(function(){
 		this.m_diff_minimap_h_obj_area=this.owner.h_obj_area
 	})
 }).prototype.desc={category:"Display",name:"Show changed lines in scrollbar",stable_name:"changed_lines"};
+
+var fsmart_replace=function(s_regexp,fcallback){
+	var sel=this.GetSelection();
+	var ccnt0=sel[0];
+	var ccnt1=sel[1];
+	if(!(ccnt0<ccnt1)){
+		ccnt0=0
+		ccnt1=this.ed.GetTextSize()
+	}
+	this.SmartReplace(ccnt0,ccnt1,s_regexp,fcallback);
+}
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('menu',function(){
+		var menu_convert=UI.BigMenu("Con&vert")
+		var tab_width=UI.GetOption("tab_width",4);
+		var s_tab_space=Array(tab_width+1).join(' ');
+		menu_convert.AddNormalItem({text:"Leading &tabs to spaces",action:
+			fsmart_replace.bind(this,"^[\t]+",function(smatch){
+				return Array(smatch.length+1).join(s_tab_space);
+			})})
+		menu_convert.AddNormalItem({text:"Leading &spaces to tabs",action:
+			fsmart_replace.bind(this,"^("+s_tab_space+")+",function(smatch){
+				return Array(((smatch.length/tab_width)|0)+1).join('\t');
+			})})
+		menu_convert.AddNormalItem({text:"Letters to &UPPERCASE",action:
+			fsmart_replace.bind(this,"[a-z]+",function(smatch){
+				return smatch.toUpperCase();
+			})})
+		menu_convert.AddNormalItem({text:"Letters to &lowercase",action:
+			fsmart_replace.bind(this,"[A-Z]+",function(smatch){
+				return smatch.toLowerCase();
+			})})
+		menu_convert.AddNormalItem({text:"Line ending to &DOS",action:
+			fsmart_replace.bind(this,"\r?\n",function(smatch){
+				return "\r\n"
+			})})
+		menu_convert.AddNormalItem({text:"Line ending to Uni&x",action:
+			fsmart_replace.bind(this,"\r?\n",function(smatch){
+				return "\n";
+			})})
+		menu_convert=undefined;
+	})
+})
