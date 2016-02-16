@@ -1364,7 +1364,7 @@ var CallParseMore=function(){
 			}else{
 				g_is_parse_more_running=0;
 				UI.Refresh();
-				return;
+				break;
 			}
 			var tick1=Duktape.__ui_get_tick()
 			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>1.0/FPS_PARSING){
@@ -4523,35 +4523,59 @@ W.CodeEditor=function(id,attrs){
 				var rendering_ccnt0=doc.SeekXY(doc.scroll_x,doc.scroll_y)
 				var ccnt=doc.GetEnhancedHome(doc.sel1.ccnt)
 				//prev_h_top_hint
+				var key_decl_check_frontier=0;
+				var i_tot=0;
 				for(;;){
 					var ccnti=ccnt
 					ccnt=doc.FindOuterLevel(ccnti)
 					if(ccnt<0||ccnt>=ccnti){break}
-					if(ccnt<rendering_ccnt0){
+					var ccnt_push=ccnt;
+					if(doc.ed.GetUtf8CharNeighborhood(ccnt_push)[1]==0x7B){
+						//lonely { case
+						var ccnt_ehome=doc.ed.MoveToBoundary(ccnt_push,-1,"space");
+						if(doc.ed.GetUtf8CharNeighborhood(ccnt_ehome)[0]==10&&ccnt_ehome>0){
+							//\n space {, guilty
+							ccnt_push=ccnt_ehome-1;
+						}
+					}
+					if(ccnt_push<rendering_ccnt0&&(!top_hints.n||top_hints[top_hints.length]>ccnt_push)){
 						//var ilevel=doc.GetIndentLevel(ccnt);
 						//remove the under-indented: #endif and stuff in C
 						//while(top_hints_indent.length&&top_hints_indent[top_hints_indent.length-1]<ilevel){
 						//	top_hints.pop()
 						//	top_hints_indent.pop()
 						//}
-						top_hints.push(ccnt)
+						if(top_hints.length>=obj.top_hint_max_lines){
+							top_hints.pop()
+						}
+						top_hints.push(ccnt_push)
 						//top_hints_indent.push(ilevel)
 					}
-					if(top_hints.length>=obj.top_hint_max_levels){break;}
+					if(i_tot>=obj.top_hint_max_levels){
+						break;
+					}
+					i_tot++;
+					if(top_hints.length>=obj.top_hint_max_lines){
+						var has_kd=0;
+						for(;key_decl_check_frontier<top_hints.length;key_decl_check_frontier++){
+							var line_i=doc.GetLC(top_hints[key_decl_check_frontier])[0]
+							var line_ccnts_i=doc.SeekAllLinesBetween(line_i,line_i+2)
+							if(UI.ED_HasKeyDeclInCcntRange(doc,line_ccnts_i[0],line_ccnts_i[1])){
+								has_kd=1;
+								print(has_kd,key_decl_check_frontier)
+								break
+							}
+						}
+						if(has_kd){
+							break;
+						}
+					}
 				}
 				if(top_hints.length){
 					//convert to bbs
 					var top_hint_inv=[];
 					for(var i=top_hints.length-1;i>=0;i--){
 						var ccnt=top_hints[i];
-						if(doc.ed.GetUtf8CharNeighborhood(ccnt)[1]==0x7B){
-							//lonely { case
-							var ccnt_ehome=doc.ed.MoveToBoundary(ccnt,-1,"space");
-							if(doc.ed.GetUtf8CharNeighborhood(ccnt_ehome)[0]==10&&ccnt_ehome>0){
-								//\n space {, guilty
-								ccnt=ccnt_ehome-1;
-							}
-						}
 						top_hint_inv.push(ccnt);
 					}
 					top_hints=undefined;
@@ -5753,6 +5777,24 @@ W.CodeEditor=function(id,attrs){
 							y-sbar.y>hc_bookmark?y-obj.bookmark_scroll_bar_marker_size*0.5-hc_bookmark:y+obj.bookmark_scroll_bar_marker_size*0.5,
 							obj.bookmark_text_color,48+id)
 					}
+				}
+			}
+			//at-scrollbar error markers
+			if(doc.m_error_overlays){
+				var error_ccnts=[];
+				for(var i=0;i<doc.m_error_overlays.length;i++){
+					var err=doc.m_error_overlays[i];
+					if(!err.is_in_active_doc){continue;}
+					error_ccnts.push(err.sel_ccnt0.ccnt)
+				}
+				error_ccnts.sort(function(a,b){return a-b})
+				var error_xys=doc.ed.GetXYEnMasse(error_ccnts)
+				for(var i=0;i<error_xys.length;i+=2){
+					var y=Math.max(Math.min(error_xys[i+1]/ytot,1),0)*sbar.h+sbar.y
+					UI.RoundRect({
+						x:sbar.x, w:sbar.w,
+						y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
+						color:doc.color_tilde_compiler_error})
 				}
 			}
 			//the actual bar

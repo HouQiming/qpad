@@ -3520,7 +3520,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				pindent_first=pindent
 				got_first_indent=1
 			if pindent<pindent_first:
-				if !pindent:
+				if !pindent&&!sline.n:
 					//empty line, keep it empty but add the full indent
 					sinsert.push(s_target_indent)
 				else

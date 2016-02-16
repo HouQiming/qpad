@@ -1234,7 +1234,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			ppm_pool.push(int2(id,int(duplicates.getForEachRepeatCount())))
 		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
 	all_decls.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
-	all_key_decls.Sortby(inline(di){return (u64(di.id_type)<<32)+u64(di.epos0)})
+	//all_key_decls.Sortby(inline(di){return (u64(di.id_type)<<32)+u64(di.epos0)})
+	all_key_decls.Sortby(byMember("epos0"))
 	if has_dangling_deps:
 		g_dangling_deps_queue.push(idfn_base)
 	return new CFileIndex(){
@@ -1743,11 +1744,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//if !s:s=new string
 		all_key_decls=fidx.m_all_key_decls
 		if !all_key_decls:return 0
-		tmp=new(all_key_decls)
-		tmp.Sortby(byMember("epos0"))
+		//tmp=new(all_key_decls)
+		//tmp.Sortby(byMember("epos0"))
 		ret=JS.NewArray()
 		p=0
-		foreach kd,I in tmp
+		//foreach kd,I in tmp
+		foreach kd,I in all_key_decls
 			ccnt=i64(kd.epos0)
 			s=getIdString(kd.id_type&~KEY_DECL_MASK)
 			if diff_from_save:
@@ -1774,6 +1776,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret[n*2+1]=g_key_decls[p].epos0
 			n++
 		return JS.Return(ret)
+	}
+	JS_UI["ED_HasKeyDeclInCcntRange"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["m_file_index"].as(CFileIndex)
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		if !fidx||!fidx.m_all_key_decls:return 0
+		diff_from_save=doc["m_diff_from_save"].as(CDiffTracker)
+		if diff_from_save:
+			ccnt0=diff_from_save.CurrentToBase(ccnt0)
+			ccnt1=diff_from_save.CurrentToBase(ccnt1)
+		p0=fidx.m_all_key_decls.InlineBisect(inline(di){return di.epos0<ccnt0})
+		if uptr(p0)<uptr(fidx.m_all_key_decls.n):
+			if fidx.m_all_key_decls[p0].epos0<ccnt1:
+				return JS.Return(1)
+		return 0
 	}
 	JS_UI["ED_QueryDepTokenByBaseCcnt"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)
