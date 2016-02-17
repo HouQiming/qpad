@@ -153,7 +153,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				var obj=this.owner
 				if(!obj||obj.read_only){return;}
 				var show_replace_hint=0
-				if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
+				if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_no_more_replace){
 					var ccnt=this.sel1.ccnt
 					var ctx=obj.m_current_find_context;
 					var match_id=ctx.BisectMatches(this,ccnt)
@@ -178,7 +178,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			this.AddEventHandler('beforeEdit',function(ops){
 				var obj=this.owner
 				if(!obj){return;}
-				if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_current_find_context.m_no_more_replace){
+				if(obj.m_current_find_context&&ops.length>0&&!obj.m_replace_context&&!obj.m_no_more_replace){
 					var ctx=obj.m_current_find_context;
 					var match_id=ctx.BisectMatches(this,ops[0])
 					if(match_id){
@@ -203,12 +203,24 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 						if(intersected){
 							//start replacing - *every* op intersects with the match...
 							obj.SetReplacingContext(match_ccnt0,match_ccnt1)
+							if((obj.m_current_find_context.m_flags&UI.SEARCH_FLAG_REGEXP)&&UI.TestOption("auto_edit")){
+								var match_ccnts=UI.ED_AutoEdit_RegexpMatch(
+									obj.doc.ed,match_ccnt0,match_ccnt1,
+									obj.m_current_find_context.m_needle,
+									obj.m_current_find_context.m_flags);
+								if(match_ccnts){
+									var rctx=obj.m_replace_context;
+									rctx.m_ae_raw_text=obj.doc.ed.GetText(match_ccnt0,match_ccnt1-match_ccnt0);
+									rctx.m_ae_ctx=UI.ED_AutoEdit_RegexpCtxCreate(
+										obj.doc.ed,match_ccnts);
+								}
+							}
 						}else{
-							obj.m_current_find_context.m_no_more_replace=1;
+							obj.m_no_more_replace=1;
 						}
 					}else{
 						if(obj.m_current_find_context){
-							obj.m_current_find_context.m_no_more_replace=1;
+							obj.m_no_more_replace=1;
 						}
 					}
 				}
@@ -220,6 +232,27 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				var obj=this.owner
 				if(!obj){return;}
 				obj.DestroyFindingContext()
+				if(obj.m_replace_context){
+					var rctx=obj.m_replace_context;
+					var match_ccnt0=rctx.m_locators[0].ccnt;
+					var match_ccnt1=rctx.m_locators[1].ccnt;
+					if(rctx.m_ae_ctx){
+						var srep_ccnt0=rctx.m_locators[0].ccnt
+						var srep_ccnt1=rctx.m_locators[1].ccnt
+						if(srep_ccnt0<srep_ccnt1){
+							s_replace=this.ed.GetText(srep_ccnt0,srep_ccnt1-srep_ccnt0)
+						}else{
+							s_replace='';
+						}
+						var prg_tbl=UI.ED_AutoEdit_RegexpCtxSetExample(rctx.m_ae_ctx,s_replace);
+						rctx.m_ae_prg=undefined;
+						rctx.m_ae_match_table=undefined;
+						if(prg_tbl){
+							rctx.m_ae_prg=prg_tbl.m_prg;
+							rctx.m_ae_match_table=prg_tbl.m_match_table;
+						}
+					}
+				}
 			})
 			this.AddEventHandler('ESC',function(){
 				this.CancelAutoCompletion()
@@ -1304,10 +1337,16 @@ W.NotificationItem=function(id,attrs){
 		UI.AutoRefresh()
 	}
 	///////////
-	var tmp={w:obj.w_text,h:1e17,font:obj.font,text:obj.text}
-	UI.LayoutText(tmp);
+	if(!obj.m_cached_prt||obj.text!=obj.m_cached_text){
+		obj.m_cached_prt=UI.ED_FormatRichText(
+			Language.GetHyphenator(UI.m_ui_language),
+			obj.text,4,obj.w_text,obj.styles);
+		obj.m_cached_text=obj.text;
+	}
+	//var tmp={w:obj.w_text,h:1e17,font:obj.font,text:obj.text}
+	//UI.LayoutText(tmp);
 	obj.w=obj.padding*2+obj.w_icon+obj.w_text
-	obj.h=obj.padding*2+Math.max(obj.w_icon,tmp.h_text)
+	obj.h=obj.padding*2+Math.max(obj.w_icon,obj.m_cached_prt.m_h_text)
 	UI.StdAnchoring(id,obj);
 	UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width-obj.shadow_size*0.375,y:obj.y-obj.shadow_size*0.375,
 		w:obj.w+obj.shadow_size*1.125,h:obj.h+obj.shadow_size*1.125,
@@ -1326,7 +1365,9 @@ W.NotificationItem=function(id,attrs){
 		UI.PopCliprect()
 	}
 	if(obj.icon){UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,fadein(obj.icon_color,obj.alpha),obj.icon.charCodeAt(0))}
-	UI.DrawTextControl(tmp,obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding,fadein(obj.text_color,obj.alpha))
+	//UI.DrawTextControl(tmp,obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding,fadein(obj.text_color,obj.alpha))
+	UI.ED_RenderRichText(obj.m_cached_prt,obj.text,
+		obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding)
 	if(obj.OnClick){
 		W.PureRegion(id,obj)
 	}
@@ -1609,7 +1650,7 @@ var find_context_prototype={
 		this.m_current_visual_h=h0/edstyle.find_item_scale-edstyle.find_item_expand_current*this.m_hfont;
 	},
 	AutoScrollFindItems:function(){
-		this.m_no_more_replace=0
+		this.m_owner.m_no_more_replace=0
 		var l0=-((this.m_merged_y_windows_backward.length>>2)-1)
 		var l=l0
 		var r=(this.m_merged_y_windows_forward.length>>2)-1
@@ -2720,6 +2761,7 @@ W.CodeEditorWidget_prototype={
 			return;
 		}
 		this.m_hide_find_highlight=0
+		this.m_no_more_replace=0;
 		this.DestroyReplacingContext(1)
 		var doc=this.doc
 		var ccnt=doc.sel1.ccnt
@@ -2729,7 +2771,6 @@ W.CodeEditorWidget_prototype={
 			m_needle:UI.m_ui_metadata.find_state.m_current_needle,
 			m_flags:UI.m_ui_metadata.find_state.m_find_flags,
 			m_match_reported:0,
-			m_no_more_replace:0,
 			ReportMatch:function(ccnt0,ccnt1){
 				if(direction>0){
 					//doc.sel0.ccnt=ccnt0
@@ -4439,6 +4480,9 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 	return ''
 }
 
+var RICHTEXT_COMMAND_RUBBER_SPACE=0x107fff;
+var RICHTEXT_COMMAND_SET_STYLE=0x108000;
+
 var MAX_PARSABLE_FCALL=4096
 var finvoke_find=function(mode,s_force_needle){
 	var obj=this;
@@ -4607,7 +4651,6 @@ W.CodeEditor=function(id,attrs){
 							var line_ccnts_i=doc.SeekAllLinesBetween(line_i,line_i+2)
 							if(UI.ED_HasKeyDeclInCcntRange(doc,line_ccnts_i[0],line_ccnts_i[1])){
 								has_kd=1;
-								print(has_kd,key_decl_check_frontier)
 								break
 							}
 						}
@@ -4806,6 +4849,7 @@ W.CodeEditor=function(id,attrs){
 			if(obj.show_find_bar){
 				h_top_find+=obj.h_find_bar
 				obj.m_hide_find_highlight=0;
+				obj.m_no_more_replace=0;
 			}
 			//individual lines, each with a box and a little shadow for separation
 			var h_max_find_items_per_side=(h_obj_area-obj.h_find_bar)*obj.find_item_space_percentage*0.5
@@ -5109,9 +5153,52 @@ W.CodeEditor=function(id,attrs){
 				if(rctx.m_needle==s_replace){
 					obj.DismissNotification('find_result')
 				}else{
-					obj.CreateNotification({
-						id:'find_result',icon:"换",text:[rctx.m_needle,'  \u2193',s_replace].join("\n")
-					},"quiet")
+					if(rctx.m_ae_prg){
+						//use coloring
+						var s_middle='  \u2193\u2193\u2193';
+						var s_text=[rctx.m_ae_raw_text,s_middle,s_replace].join("\n");
+						var offset_tar=rctx.m_ae_raw_text.length+s_middle.length+2
+						var ranges=[];
+						for(var i=0;i<rctx.m_ae_match_table.length;i+=3){
+							var psrc=rctx.m_ae_match_table[i+0]-1;
+							var ptar=rctx.m_ae_match_table[i+1]+offset_tar;
+							var lg=rctx.m_ae_match_table[i+2];
+							ranges.push([psrc*2+1,i/3],[(psrc+lg)*2,0])
+							ranges.push([ptar*2+1,i/3],[(ptar+lg)*2,0])
+						}
+						ranges.sort(function(a,b){return a[0]-b[0]})
+						var p_last=0;
+						var a_rich=[];
+						var stk=[0];
+						var notification_style=UI.default_styles.code_editor_notification
+						var p_color_max=notification_style.styles.length;
+						for(var i=0;i<ranges.length;i++){
+							var p_i=(ranges[i][0]>>1);
+							if(p_last<p_i){
+								a_rich.push(s_text.substr(p_last,p_i-p_last))
+								p_last=p_i;
+							}
+							if(ranges[i][0]&1){
+								stk.push(ranges[i][1]%(p_color_max-1)+1);
+							}else{
+								stk.pop()
+							}
+							a_rich.push(UI.ED_RichTextCommandChar(
+								RICHTEXT_COMMAND_SET_STYLE+stk[stk.length-1]))
+						}
+						if(p_last<s_text.length){
+							a_rich.push(s_text.substr(p_last))
+							p_last=p_i;
+						}
+						s_text=a_rich.join("");
+						obj.CreateNotification({
+							id:'find_result',icon:"换",text:s_text,
+						},"quiet")
+					}else{
+						obj.CreateNotification({
+							id:'find_result',icon:"换",text:[rctx.m_needle,'  \u2193',s_replace].join("\n")
+						},"quiet")
+					}
 				}
 			}
 			//generic drawing function
@@ -5376,7 +5463,7 @@ W.CodeEditor=function(id,attrs){
 					var sbar_value_x=Math.max(Math.min(doc.visible_scroll_x/(desc_x_scroll_bar.total_size-desc_x_scroll_bar.page_size),1),0);
 					var sbar=UI.RoundRect({
 						x:obj.x, y:obj.y+y_horizontal_scrollbar, 
-						w:w_obj_area-w_scrolling_area+1, h:obj.w_scroll_bar,
+						w:w_obj_area-w_scrolling_area+(obj.doc.notebook_owner?0:1), h:obj.w_scroll_bar,
 						color:obj.line_number_bgcolor
 					})
 					var sbar_x_padding=0;

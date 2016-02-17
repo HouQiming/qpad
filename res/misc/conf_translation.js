@@ -13,3 +13,4 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 }
 
 UI.m_translation={};
+UI.m_ui_language="en_us";

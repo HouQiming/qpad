@@ -618,7 +618,7 @@ W.notebook_prototype={
 					//UI.Refresh();
 				}else{
 					var code=proc.GetExitCode()
-					if(code!=0){
+					if(code!=0&&!cell_i.m_has_any_error){
 						this.WriteCellOutput(cell_i.m_cell_id,this.file_name+":1:1: fatal error: the script has returned an error "+code+"\n")
 					}
 					cell_i.m_proc=undefined;

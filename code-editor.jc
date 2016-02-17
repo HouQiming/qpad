@@ -2509,6 +2509,8 @@ class CRegexpSearchContext
 		proto.ExportProperty(this,"ccnt")
 	};
 
+class CProgramWrapper
+	TProgramItem[] prg
 auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sregexp,int flags,function(i64,i64):int ReportMatch, int budget)
 	//use the old regexp code - duk code too complicated
 	ctx=JS.Param(1).as(CRegexpSearchContext)
@@ -2523,6 +2525,8 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 	else
 		rjob=CReplaceJob.NULL
 		js_replace_callback=JSObject.NULL
+	native_replace_ctx=js_this["m_ae_ctx"].as(CReplaceContext)
+	native_replace_prg=js_this["m_ae_prg"].as(CProgramWrapper)
 	if !ctx:
 		ccnt_starting=JS.Param(1).as(i64)
 		//6:^, 4:$
@@ -2596,16 +2600,26 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 				match_is_invalid=1
 		if !match_is_invalid:
 			if js_replace_callback:
+				//match contains shit - the first pair includes .*
 				assert(dir==1)
 				js_replace_callback.PushAsFunction()
 				JS._push_value(ed.GetText(ccnt0,ccnt1-ccnt0))
-				for i=1:(match.n>>1)-1
-					JS._push_value(ed.GetText(ccnt_base+i64(match[i*2-2]),i64(match[i*2-1]-match[i*2-2])))
+				for i=1:(match.n>>1)-2
+					JS._push_value(ed.GetText(ccnt_base+i64(match[i*2]),i64(match[i*2]-match[i*2+1])))
 				JS._push_value(ccnt0)
 				//JS._push_value(js_doc)
-				s_ret=JS.VCall(string,(match.n>>1)+1)
+				s_ret=JS.VCall(string,(match.n>>1))
 				if s_ret:
 					rjob.m_ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:s_ret})
+				pbudget-=match_cost
+			else if native_replace_prg:
+				(s_unicode,nbras_old)=TextToAutoEditText(1,1,ed.GetText(i64(ccnt0),i64(ccnt1-ccnt0)))
+				match_positions=[int(a)-match[match.n-2]+1 for a in match[2:]]
+				//Writeln(s_unicode,' ',match_positions)
+				(s_replaced,errs,edhint0)=native_replace_ctx.ApplyReplaceProgram(
+					native_replace_prg.prg,s_unicode,nbras_old,match_positions,0, 0)
+				if s_replaced:
+					rjob.m_ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:Unicode32ToUtf8(s_replaced)})
 				pbudget-=match_cost
 			else 
 				pbudget-=ReportMatch(ccnt0,ccnt1)
@@ -3180,6 +3194,13 @@ auto AutoEdit_Precompute(string stext0,iptr[] cclines)
 		inputs.push(TReplaceInput(){s_unicode:s_unicode,nbras:nbras})
 	return SF.CreateReplaceInstance(inputs)
 
+auto AutoEdit_SingleExamplePrecompute(string stext,int[] match_positions)
+	(s_unicode,nbras)=TextToAutoEditText(1,1,stext)
+	return SF.CreateReplaceInstance([TReplaceInput(){
+		s_unicode:s_unicode,nbras:nbras,
+		match_positions:match_positions,
+	}])
+
 auto AutoEdit_SetExample(CReplaceContext ctx,int input_id,string s_new)
 	return ctx.SetReplaceExample(
 		input_id,Utf8ToUnicode32(s_new),
@@ -3307,7 +3328,7 @@ auto RawEditDistance(int[] su0,int[] su1, int ocase)//(string ss0,string ss1)
 
 auto AutoEdit_Evaluate(TEditop[] ops,i64 ccnt_base, CReplaceContext ctx, TProgramItem[] prg, int line_id,int[] s_unicode,int[] nbras_old)
 	//just return the edit ops?
-	(s_replaced,errs,edhint0)=ctx.ApplyReplaceProgram(prg,s_unicode,nbras_old,line_id, 1)
+	(s_replaced,errs,edhint0)=ctx.ApplyReplaceProgram(prg,s_unicode,nbras_old,int[].NULL,line_id, 1)
 	if errs&&errs.n:
 		return 0
 	edhint=ProcessEditDistance(edhint0, s_unicode, s_replaced)
@@ -3610,8 +3631,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret["m_example_lines"]=JS.New()
 			return JS.Return(ret)
 	}
-	class CProgramWrapper
-		TProgramItem[] prg
 	JS_UI["ED_AutoEdit_SetExample"]=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)
 		if !obj:return JS.ReturnError("invalid object")
@@ -3619,7 +3638,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		s_new=JS.Param(2).as(string)
 		ctx=obj["m_ctx"].as(CReplaceContext)
 		example_lines=obj["m_example_lines"].as(JSObject)
-		prg=AutoEdit_SetExample(ctx,line_id,s_new)
+		(prg,match_table)=AutoEdit_SetExample(ctx,line_id,s_new)
 		if prg:
 			obj["m_prg"]=new CProgramWrapper(){prg:prg}
 			example_lines[line_id]=1
@@ -3654,6 +3673,59 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret[I*3+2]=op.s
 		return JS.Return(ret)
 	}
+	//////////////
+	JS_UI["ED_AutoEdit_RegexpCtxCreate"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		js_cc_matches=JS.Param(1).as(JSObject)
+		n=js_cc_matches["length"].as(iptr)
+		ccnt0=js_cc_matches[0].as(i64)
+		ccnt1=js_cc_matches[1].as(i64)
+		match_positions=[int(js_cc_matches[i].as(i64)-ccnt0) for i=2:n-1]
+		stext=ed.GetText(ccnt0,ccnt1-ccnt0)
+		//Writeln('match_positions=',match_positions)
+		ctx=AutoEdit_SingleExamplePrecompute(stext,match_positions)
+		return ctx?JS.Return(ctx):0
+	}
+	JS_UI["ED_AutoEdit_RegexpCtxSetExample"]=function(JSContext JS){
+		ctx=JS.Param(0).as(CReplaceContext)
+		if !ctx:return JS.ReturnError("invalid context")
+		s_new=JS.Param(1).as(string)
+		(prg,match_table)=AutoEdit_SetExample(ctx,0,s_new)
+		//just a colorer
+		if prg:
+			ret=JS.New()
+			ret["m_prg"]=new CProgramWrapper(){prg:prg}
+			ret["m_match_table"]=match_table
+			return JS.Return(ret)
+		else
+			return 0
+	}
+	JS_UI["ED_AutoEdit_RegexpMatch"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		sregexp=JS.Param(3).as(string)
+		flags=JS.Param(4).as(int)
+		stext=ed.GetText(ccnt0,ccnt1-ccnt0)
+		se=sregexp
+		if se.n&&se[0]=='^':
+			se=se[1:]
+		if se.n&&se.back()=='$':
+			se=se[:se.n-2]
+		if se=="":se="\"\""
+		reo=ParseRegex(se)
+		if !(flags&SEARCH_FLAG_CASE_SENSITIVE):reo=RegexMakeCaseInsensitive(reo)
+		reo=RegexBracket(reo)
+		regex=new Regex(reo)
+		match=regex.MatchExi(stext)
+		if !match:
+			return 0
+		else
+			return JS.Return([double(ccnt0+i64(p)) foreach p in match])
+	}
+	//////////////
 	JS_UI["ED_CreateDiffTrackerBitmap"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
 		if !ed:return 0
@@ -3764,6 +3836,99 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ss[i]=ret[i]
 		return 0
 	}
+	/////////////////////////////
+	struct TRenderJob
+		float x,y
+		int style_id
+		int ccnt0,ccnt1
+	class CPreprocessedRichText
+		TRenderJob[] m_rjobs
+		CStyleHolder m_styles
+		float m_h_text
+		__JS_prototype=function(JSObject proto){
+			proto.ExportProperty(this,"m_h_text")
+		};
+	JS_UI["ED_FormatRichText"]=function(JSContext JS){
+		//leave objects for later
+		auto hyp=JS.Param(0).as(CHyphenator)
+		auto sblock=JS.Param(1).as(string)
+		auto tab_width=JS.Param(2).or(4)
+		auto w_line=double2fixed(JS.Param(3).as(double))
+		auto js_styles=JS.Param(4).as(JSObject)
+		n=js_styles["length"].as(iptr)
+		styles=new CStyleHolder(){m_styles:new CStyle[n],m_enable_ligatures:1}
+		for i=0:n-1
+			style_i=new CStyle
+			styles.m_styles[i]=style_i
+			js_style_i=js_styles[i].as(JSObject)
+			style_i.color=js_style_i["color"].as(int)
+			fnt=js_style_i["font"].as(TFont)
+			if g_renderer.m_srgb_supported:
+				fnt.SmartEmbolden(style_i.color)
+			style_i.font=fnt
+			style_i.flags=js_style_i["flags"].or(0)
+			style_i.line_space=int(double2fixed(js_style_i["line_space"].or(0.0)))
+			style_i.paragraph_space=int(double2fixed(js_style_i["paragraph_space"].or(0.0)))
+			style_i.raise_height=int(float2fixed(g_renderer.GetFontBaseline(fnt))+double2fixed(js_style_i["raise_height"].or(0.0)))
+		x=0LL
+		y=0LL
+		y_next=0LL
+		rjobs=new TRenderJob[]
+		foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
+			(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,tab_width,1, styles,CEmbededObject[].NULL)
+			line_breaks=GreedyLayoutGeneral(atoms,w_line)
+			GenerateTextLayout(
+				styles,
+				s,atoms,line_breaks,tail_style_id,
+				int(I),w_line,s.EndsWith("\n"),1,
+				inline(int style_id, int ccnt0,int ccnt1){
+					//char range
+					assert(ccnt0>=0&&ccnt1>ccnt0)
+					rjobs.push(TRenderJob(){
+						x:fixed2float(x),
+						y:fixed2float(y-styles.m_styles[style_id].raise_height),
+						style_id:style_id,ccnt0:ccnt0,ccnt1:ccnt1})
+					for ch in Utf8Chars(sblock[ccnt0:ccnt1-1])
+						x+=styles.charWidth(style_id,ch)
+				},
+				inline(i64 dw,int ccnt){
+					//space
+					x+=dw
+				},
+				inline(i64 h_up,i64 h_line,int aflag_ccnt){
+					x=0LL
+					y=y_next
+					y_next=y+h_line
+					y+=h_up
+				},
+				inline(int oid, int ccnt){
+					//object
+					//do nothing
+				})
+		return JS.Return(new CPreprocessedRichText(){m_rjobs:rjobs,m_styles:styles,m_h_text:fixed2float(y)})
+	}
+	JS_UI["ED_RenderRichText"]=function(JSContext JS){
+		auto prt=JS.Param(0).as(CPreprocessedRichText)
+		auto sblock=JS.Param(1).as(string)
+		auto x=JS.Param(2).as(float)
+		auto y=JS.Param(3).as(float)
+		foreach rj in prt.m_rjobs
+			auto xi=x+rj.x
+			auto yi=y+rj.y
+			auto style_i=prt.m_styles.m_styles[rj.style_id]
+			auto C=style_i.color
+			auto fnt=style_i.font
+			for ch in Utf8Chars(sblock[rj.ccnt0:rj.ccnt1-1])
+				//coulddo: UNDERLINED,STRIKED_OUT... or strikeout-y
+				dx=g_renderer.DrawChar(fnt,xi,yi,C,ch)
+				xi+=dx
+		return 0
+	}
+	JS_UI["ED_RichTextCommandChar"]=function(JSContext JS){
+		ch=JS.Param(0).as(int)
+		return JS.Return(Unicode32ToUtf8([ch]))
+	}
+	/////////////////////////////
 	g_model_cn=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_cn.bin").ConvertToAsBinary(u32))
 	g_model_jp=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_jp.bin").ConvertToAsBinary(u32))
 	g_model_b5=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_b5.bin").ConvertToAsBinary(u32))

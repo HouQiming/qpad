@@ -513,8 +513,6 @@ class CStyleHolder
 class CStyle
 	UNDERLINED=1
 	STRIKED_OUT=2
-	SUPERSCRIPT=4
-	SUBSCRIPT=8
 	///////
 	TFont font
 	int color
@@ -523,6 +521,7 @@ class CStyle
 	//these could be negative
 	int line_space
 	int paragraph_space
+	int raise_height
 	///////
 	string[] ligatures
 	auto FindLigatures()
@@ -559,8 +558,6 @@ COMMAND_RUBBER_SPACE=0x107fff
 COMMAND_SET_STYLE=0x108000
 COMMAND_END=0x110000
 //they're relative to font height
-SUPERSCRIPT_BASELINE=-32//.0/64.0
-SUBSCRIPT_BASELINE=12//.0/64.0
 inline pushUTF8(string ret,chi)
 	if chi>=65536:
 		ret.push(char(((chi>>18)&0xf)+0xf0))
@@ -609,7 +606,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_c
 						words.push(int3(-1,obj_id,int(I)))
 				else
 					style_id_new=ch-COMMAND_SET_STYLE
-					if u32(style_id_new)<u32(styles.n):
+					if u32(style_id_new)<u32(styles.m_styles.n):
 						style_id=style_id_new
 			else
 				words.push(int3(style_id,int(I),int(I_next)))
@@ -671,7 +668,6 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_c
 		style_id=(word_i.x&~FLAG_HYPHENATE_AFTER)
 		//pre-apply ligatures and pre-hack arabics, but do the real deed during rendering
 		//disable them for now
-		assert(!styles.m_enable_ligatures)
 		//////////////////////////
 		//s_render=PremakeRenderingText(style_id,s[word_i.y:word_i.z-1])
 		//auto su32=Utf8ToUnicode32(s)
@@ -690,9 +686,12 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_c
 		//		w_word+=styles.GetKerning(style_id,ch_prev,ch)
 		//	ch_prev=ch
 		//	w_word+=styles.charWidth(style_id,ch)
+		s_slice=s[word_i.y:word_i.z-1]
+		if styles.m_enable_ligatures:
+			s_slice=s_slice.Replace(styles.GetLigatures(style_id))
 		w_word=0LL
 		ch_prev=-1
-		foreach ch in Utf8Chars(s[word_i.y:word_i.z-1])
+		foreach ch in Utf8Chars(s_slice)
 			if ch_prev>=0:
 				w_word+=styles.GetKerning(style_id,ch_prev,ch)
 			ch_prev=ch
@@ -726,7 +725,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_c
 		if flags&FLAG_BAD_EOL:
 			eol_badness+=BAD_BOLEOL_BADNESS(style_id)
 		atoms.push(TLayoutAtom(){
-			flags:flags, w:w_word,h:hc, y_baseline:y_baseline, 
+			flags:flags, w:w_word,h:hc, y_baseline:y_baseline,
 			tail_kerning:tail_kerning,bol_badness:bol_badness,eol_badness:eol_badness,w_extra_eol:w_extra_eol,
 			style_id:style_id, pword0:word_i.y,pword1:word_i.z
 		})

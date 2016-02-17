@@ -64,6 +64,8 @@ module detail
 	TOK_CHARSET=0x200000
 	TOK_SUBSTRING=0x300000
 	TOK_DONTCARE=-1
+	TOK_SPECIAL=-2
+	TOK_SPECIAL_MATCH_POS=0
 	NBRA0_DONTCARE=0x80000000
 	
 	auto StartsWith(i32[] a,i32[] b)
@@ -111,6 +113,7 @@ module detail
 		//s should include the prev/next chars
 		i32[] s_unicode
 		int[] nbras
+		int[] match_positions
 	////////////////
 	struct TReplaceMatch
 		TRuleMatch[] pos0
@@ -215,6 +218,8 @@ module detail
 				substrs.Sort()
 				substrs.Unique()
 			//remove entirely-contained cases... 1st example only
+			if inputs.n==1:
+				substrs.clear()
 			m_all_substrs=substrs
 			//.all_substrs=[substrs[id] foreach id in chowner if id>=0]
 			//Writeln(.all_substrs)
@@ -326,9 +331,11 @@ module detail
 							bi++
 					poses_union=poses_union2
 				if !poses_union.n:break
-			m_poses_union=poses_union
+			if inputs.n==1:
+				poses_union.clear()
 			//special rule for the head and the tail
-			m_poses_union.push(make_pair(TPositionDescriptor(){tok0:TOK_DONTCARE,tok1:TOK_DONTCARE,nbra0:NBRA0_DONTCARE},2L))
+			poses_union.push(make_pair(TPositionDescriptor(){tok0:TOK_DONTCARE,tok1:TOK_DONTCARE,nbra0:NBRA0_DONTCARE},2L))
+			m_poses_union=poses_union
 		/////////////////////////////////////////
 		COST_BASE=5.f
 		//COST_SCONST_BASE_NUMBER=12.f//10
@@ -382,6 +389,7 @@ module detail
 			//Gui.Managed.UI.TBegin("SetReplaceExample")
 			s0=m_inputs[input_id].s_unicode
 			nbras0=m_inputs[input_id].nbras
+			match_positions=m_inputs[input_id].match_positions
 			s1=target_unicode
 			best_rule_for_pos=new TRuleMatch[]
 			bcost_rule_for_pos=new float[]
@@ -407,6 +415,13 @@ module detail
 					cost+=COST_BREAKING_CHARSET_SRC
 				best_rule_for_pos.push(ma)
 				bcost_rule_for_pos.push(cost)
+			if match_positions:
+				//non-existent pair: m_poses_union.n
+				//no need of -1: [0] and [s0.n-1] are the bol/eol markers
+				foreach pos,I in match_positions
+					//if pos>0&&pos<s0.n:
+					best_rule_for_pos[pos]=TRuleMatch(){id:m_poses_union.n,cnt:I}
+					bcost_rule_for_pos[pos]=0.f
 			//number matching
 			auto ParseNumbers(int[] s)
 				auto ret=new iptr[]
@@ -524,6 +539,8 @@ module detail
 						costs[j]=bcost
 						hows[j]=int2(best,int(j-i))
 			ret=new TProgramItem[]
+			//src,dst,length
+			match_table=new int[]
 			p=s1.n
 			while p>0:
 				hi=hows[p]
@@ -538,6 +555,9 @@ module detail
 					pmatch=(hi.x&0x7fffffff)
 					(bp0,dummy)=GetDescriptorAt(pmatch)
 					(bp1,dummy)=GetDescriptorAt(pmatch+hi.y)
+					match_table.push(pmatch)
+					match_table.push(p0)
+					match_table.push(hi.y)
 					//Writeln('  ',bp0,' ',bp1)
 					if hi.x&0x80000000:
 						//Writeln('^_^')
@@ -556,8 +576,8 @@ module detail
 					else
 						cases=i8[].NULL
 					ret.push(TProgramItem(){
-						pos0:this.m_poses_union[bp0.id].a,
-						pos1:this.m_poses_union[bp1.id].a,
+						pos0:bp0.id>=this.m_poses_union.n?TPositionDescriptor(){tok0:TOK_SPECIAL,tok1:TOK_SPECIAL_MATCH_POS}:this.m_poses_union[bp0.id].a,
+						pos1:bp1.id>=this.m_poses_union.n?TPositionDescriptor(){tok0:TOK_SPECIAL,tok1:TOK_SPECIAL_MATCH_POS}:this.m_poses_union[bp1.id].a,
 						match_id0:bp0.cnt,
 						match_id1:bp1.cnt,
 						new_case:cases,
@@ -577,6 +597,9 @@ module detail
 						else
 							Write("'",UnicodeToUtf8([i16(a)]),"'")
 					auto dumpPos(TPositionDescriptor pd,iptr id,char is_left)
+						if pd.tok0==TOK_SPECIAL:
+							Write('match_pos(',id,')')
+							return
 						Write(is_left?'matchLeft(':'match(')
 						dumpTok(pd.tok0)
 						Write(',')
@@ -600,13 +623,13 @@ module detail
 							foreach cid in pi.new_case
 								Write(int(cid))
 						Writeln()
-			return [pi foreach pi in ret.ReverseOrder()]
+			return ([pi foreach pi in ret.ReverseOrder()],match_table)
 		auto RebaseReplaceProgram(TProgramItem[] prg,int d)
 			foreach pi,I in prg
 				if pi.numerical_delta:
 					prg[I].numerical_base+=d*pi.numerical_delta
 		//ret,errs,longest match sequence
-		auto ApplyReplaceProgram(TProgramItem[] prg,int[] s,int[] nbras,int line_id, int compute_matchseq)
+		auto ApplyReplaceProgram(TProgramItem[] prg,int[] s,int[] nbras,int[] match_positions,int line_id, int compute_matchseq)
 			WEIGHT_PROGRAM_MATCH=256
 			struct TMatchDPState
 				iptr best
@@ -625,8 +648,16 @@ module detail
 						raw_matches.push(TProgramMatch(){pm0:-1L,pm1:pi.sconst.n,pret:ret.n})
 					ret.push(pi.sconst)
 					continue
-				pm0=pi.pos0.Search(this,s,nbras,pi.match_id0)
-				pm1=pi.pos1.Search(this,s,nbras,pi.match_id1)
+				if pi.pos0.tok0==TOK_SPECIAL:
+					assert(pi.pos0.tok1==TOK_SPECIAL_MATCH_POS)
+					pm0=match_positions[pi.match_id0]
+				else
+					pm0=pi.pos0.Search(this,s,nbras,pi.match_id0)
+				if pi.pos1.tok0==TOK_SPECIAL:
+					assert(pi.pos1.tok1==TOK_SPECIAL_MATCH_POS)
+					pm1=match_positions[pi.match_id1]
+				else
+					pm1=pi.pos1.Search(this,s,nbras,pi.match_id1)
 				if pm0<0||pm1<0||pm0>=pm1:
 					//not found, ignore... it's an error
 					if !errors:errors=new iptr[]
