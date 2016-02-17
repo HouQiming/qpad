@@ -991,12 +991,12 @@ UI.RegisterBuildEnv("Javascript",{
 	}
 })
 
-UI.RegisterBuildEnv("Javascript",{
-	name:"run in editor",
-	CreateInterpreterCall:function(fname,doc){
-		return "qpad js hack";
-	}
-})
+//UI.RegisterBuildEnv("Javascript",{
+//	name:"run in editor",
+//	CreateInterpreterCall:function(fname,doc){
+//		return "qpad js hack";
+//	}
+//})
 
 UI.RegisterBuildEnv("Windows BAT",{
 	name:"cmd",

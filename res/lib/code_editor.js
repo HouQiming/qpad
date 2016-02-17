@@ -1379,6 +1379,7 @@ UI.SEARCH_FLAG_WHOLE_WORD=2;
 UI.SEARCH_FLAG_REGEXP=4;
 UI.SEARCH_FLAG_FUZZY=8;
 UI.SEARCH_FLAG_HIDDEN=16;
+UI.SEARCH_FLAG_CODE_ONLY=32;
 UI.SEARCH_FLAG_GOTO_MODE=1024;
 UI.SEARCH_FLAG_GLOBAL=2048;
 //only used in show_find_bar
@@ -1581,6 +1582,9 @@ var find_context_prototype={
 				return 1024;
 			}
 		}
+		if((this.m_flags&UI.SEARCH_FLAG_CODE_ONLY)&&!doc.IsBracketEnabledAt(ccnt0)){
+			return 1024;
+		}
 		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
 			var cell_desc=this.m_result_cell;
 			if(cell_desc&&this.m_forward_matches.length<MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
@@ -1616,6 +1620,9 @@ var find_context_prototype={
 		return 1024
 	},
 	ReportMatchBackward:function(doc,ccnt0,ccnt1){
+		if((this.m_flags&UI.SEARCH_FLAG_CODE_ONLY)&&!doc.IsBracketEnabledAt(ccnt0)){
+			return 1024;
+		}
 		if(!(this.m_flags&UI.SEARCH_FLAG_HIDDEN)){
 			if(doc.GetRenderer().IsRangeHidden(doc.ed,ccnt0,ccnt1)){
 				return 1024;
@@ -5155,7 +5162,7 @@ W.CodeEditor=function(id,attrs){
 				}else{
 					if(rctx.m_ae_prg){
 						//use coloring
-						var s_middle='  \u2193\u2193\u2193';
+						var s_middle='  \u2193 regexp \u2193';
 						var s_text=[rctx.m_ae_raw_text,s_middle,s_replace].join("\n");
 						var offset_tar=rctx.m_ae_raw_text.length+s_middle.length+2
 						var ranges=[];
@@ -5291,7 +5298,7 @@ W.CodeEditor=function(id,attrs){
 				var show_flag_buttons=!(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)
 				//fuzzy match disclaimer... fade, red search bar with "fuzzy match" written on
 				var x_rect_bar=obj.x+obj.find_bar_padding;
-				var w_rect_bar=w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?5:1);
+				var w_rect_bar=w_obj_area-w_scrolling_area-obj.find_bar_padding*2-(obj.find_bar_button_size+obj.find_bar_padding)*(show_flag_buttons?6:1);
 				var x_buttons=x_rect_bar+w_rect_bar;
 				var rect_bar=UI.RoundRect({
 					x:x_rect_bar,y:obj.y+obj.find_bar_padding,
@@ -5379,6 +5386,19 @@ W.CodeEditor=function(id,attrs){
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick()}})
+					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+					var btn_code=W.Button("find_button_code",{style:UI.default_styles.check_button,
+						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
+						font:UI.icon_font,text:"プ",tooltip:"Only search code - ALT+D",
+						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CODE_ONLY?1:0),
+						OnChange:function(value){
+							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CODE_ONLY)|(value?UI.SEARCH_FLAG_CODE_ONLY:0)
+							obj.DestroyReplacingContext();
+							var ctx=obj.m_current_find_context;
+							if(ctx){ctx.RestoreSel();}
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+						}})
+					W.Hotkey("",{key:"ALT+D",action:function(){btn_code.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_hidden=W.Button("find_button_hidden",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
