@@ -3865,6 +3865,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			js_style_i=js_styles[i].as(JSObject)
 			style_i.color=js_style_i["color"].as(int)
 			fnt=js_style_i["font"].as(TFont)
+			//fnt.h*=g_renderer.m_pixels_per_unit
 			style_i.font=fnt
 			style_i.flags=js_style_i["flags"].or(0)
 			style_i.line_space=int(double2fixed(js_style_i["line_space"].or(0.0)))
@@ -3915,7 +3916,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto ret=new CPreprocessedRichText(){
 			m_rjobs:rjobs,m_styles:styles,
 			m_h_text:fixed2float(y),
-			m_scale0:g_renderer.m_pixels_per_unit,
+			m_scale0:1.f,
 		}
 		return JS.Return(ret)
 	}
