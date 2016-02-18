@@ -266,6 +266,165 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 
 UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
+var CreateMenus=function(){
+	var doc_area=UI.top.app.document_area;
+	var menu_file=UI.BigMenu("&File")
+	menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:1,action:function(){
+		var active_document=UI.top.app.document_area.active_tab
+		if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
+			UI.top.app.document_area.CloseTab();
+		}
+		UI.UpdateNewDocumentSearchPath()
+		UI.NewCodeEditorTab()
+		UI.Refresh()
+	}})
+	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
+		//var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
+		//if(!fn){return;}
+		UI.UpdateNewDocumentSearchPath()
+		var fn=IO.DoFileDialog(["All File","*.*"],UI.m_new_document_search_path+"/*");
+		if(!fn){return;}
+		var active_document=UI.m_the_document_area.active_tab
+		if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
+			UI.m_the_document_area.CloseTab();
+		}
+		UI.OpenEditorWindow(fn);
+		UI.Refresh()
+	}});
+	if(doc_area.active_tab&&doc_area.active_tab.Save){
+		menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
+			UI.top.app.document_area.SaveCurrent();
+		}});
+	}
+	if(doc_area.active_tab&&doc_area.active_tab.SaveAs){
+		menu_file.AddNormalItem({text:"Save &as...",key:"SHIFT+CTRL+S",enable_hotkey:1,action:function(){
+			UI.top.app.document_area.SaveAs();
+		}});
+	}
+	menu_file.AddNormalItem({text:"Save a&ll",icon:'保',action:function(){
+		UI.top.app.document_area.SaveAll();
+	}});
+	if(UI.top.app.document_area.active_tab){
+		menu_file.AddNormalItem({text:"&Close",key:"CTRL+W",enable_hotkey:0,action:function(){
+			UI.top.app.document_area.CloseTab();
+		}});
+		menu_file.AddSeparator();
+		menu_file.AddNormalItem({text:"Revert changes",action:function(){
+			var obj_tab=UI.top.app.document_area.active_tab;
+			if(obj_tab&&obj_tab.Reload){obj_tab.Reload();};
+		}});
+	}
+	menu_file.AddSeparator();
+	menu_file.AddNormalItem({icon:"时",text:"Recent / projec&t...",
+		key:"ALT+Q",
+		enable_hotkey:1,action:UI.ExplicitFileOpen})
+	//UI.OpenUtilTab.bind(undefined,'hist_view')
+	//menu_file.AddNormalItem({text:"&Browse...",
+	//	key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
+	//	enable_hotkey:0,action:UI.OpenUtilTab.bind(undefined,'fs_view')})
+	menu_file.AddNormalItem({text:"Arran&ge tabs",
+		enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
+	//menu_file.AddNormalItem({text:"Manage projects...",
+	//	enable_hotkey:0,action:function(){
+	//		UI.OpenEditorWindow("*project_list")
+	//	}})
+	//obj.ArrangeTabs.bind(obj.current_tab_id)
+	//W.Hotkey("",{key:"ALT+Q",action:UI.ExplicitFileOpen})
+	if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
+		menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
+			if(UI.m_closed_windows.length>0){
+				var active_document=UI.top.app.document_area.active_tab
+				var fn=UI.m_closed_windows.pop();
+				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
+					UI.top.app.document_area.CloseTab();
+				}
+				//if(g_all_document_windows.length>0){
+				//	//hack: put the tab at the end of it
+				//	UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
+				//}
+				UI.OpenEditorWindow(fn);
+				UI.Refresh();
+			}
+		}})
+	}
+	menu_file.AddSeparator();
+	W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
+	W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
+	W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
+	menu_file.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
+		{text:"-",tooltip:'CTRL -',action:function(){
+			UI.ZoomRelative(1/ZOOM_RATE)
+		}},{text:"100%",tooltip:'CTRL+0',action:function(){
+			UI.ZoomReset()
+		}},{text:"+",tooltip:'CTRL +',action:function(){
+			UI.ZoomRelative(ZOOM_RATE)
+		}}])
+	if(!UI.Platform.IS_MOBILE){
+		//OS shell
+		menu_file.AddSeparator();
+		menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:function(){
+			UI.UpdateNewDocumentSearchPath()
+			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
+			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+				IO.Shell(["xterm",
+					"-e",'cd '+UI.m_new_document_search_path+'; bash'])
+			}else{
+				//mac
+				//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
+				IO.Shell(["osascript",
+					"-e",'tell application "Terminal" to activate'])
+				IO.Shell(["osascript",
+					"-e",'tell application "System Events" to delay 0.1'])
+				IO.Shell(["osascript",
+					"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
+				IO.Shell(["osascript",
+					"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
+			}
+		}})
+	}
+	var obj_active_tab=UI.GetFrontMostEditorTab();
+	if(obj_active_tab&&obj_active_tab.file_name){
+		var spath_repo=UI.GetEditorProject(obj_active_tab.file_name,"polite");
+		if(spath_repo){
+			var obj_real_active_tab=UI.top.app.document_area.active_tab;
+			var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");
+			if(obj_real_active_tab&&obj_real_active_tab.document_type=='notebook'&&obj_real_active_tab.file_name==fn_notebook){
+				menu_file.AddNormalItem({text:"Return to file",
+					enable_hotkey:1,key:"ALT+N",
+					action:UI.top.app.document_area.SetTab.bind(
+						UI.top.app.document_area,
+						obj_active_tab.__global_tab_id),
+				})
+			}else{
+				menu_file.AddNormalItem({icon:"本",text:"Open notebook...",
+					enable_hotkey:1,key:"ALT+N",
+					action:UI.OpenNoteBookTab.bind(undefined,fn_notebook),
+				})
+			}
+		}
+	}
+	obj_active_tab=undefined;
+	menu_file.AddSeparator();
+	menu_file.AddNormalItem({text:"E&xit",action:function(){
+		if(!UI.top.app.OnClose()){UI.DestroyWindow(UI.top.app)}
+	}});
+	menu_file=undefined;
+	//if(!UI.m_current_file_list){
+	//	UI.ClearFileListingCache();
+	//}
+	//////////////////////////
+	var menu_edit=UI.BigMenu("&Edit")
+	if(menu_edit.$.length){
+		menu_edit.AddSeparator();
+	}
+	menu_edit.AddNormalItem({text:"Preferences...",icon:"设",key:" ",enable_hotkey:0,action:function(){
+		UI.NewOptionsTab();
+	}});
+	menu_edit=undefined;
+	doc_area=undefined;
+}
+
 UI.Application=function(id,attrs){
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -311,213 +470,9 @@ UI.Application=function(id,attrs){
 				'x':0,'y':0,'w':app.w,//obj_panel.x,
 				items:g_all_document_windows,
 				Close:function(){UI.DestroyWindow(app)},
+				fmenu_callback:CreateMenus,
 			})
-			//}
-			var property_windows=[]
-			if(app.document_area.active_tab){
-				property_windows=(app.document_area.active_tab.property_windows||property_windows);
-			}
-			//UI.context_regions.push(reg_panel)
 			//////////////////////////
-			//var w_shadow=6
-			//var w_bar=4;
-			//var shadow_color=0xaa000000
-			//if(panel_placement=='down'){
-			//	UI.RoundRect({
-			//		x:-w_shadow,y:obj_panel.y-w_bar-w_shadow,w:app.w+w_shadow*2,h:w_shadow*2,
-			//		color:shadow_color,border_width:-w_shadow,round:w_shadow,
-			//	})
-			//	UI.RoundRect({
-			//		x:0,y:obj_panel.y-w_bar,w:app.w,h:w_property_bar,
-			//		color:0xfff0f0f0,border_width:0,
-			//	})
-			//	W.Group("property_bar",{
-			//		'anchor':obj_panel,'anchor_align':"fill",'anchor_valign':"up",
-			//		'x':0,'y':0,'h':w_property_bar,
-			//		item_template:{'object_type':W.SubWindow},items:property_windows,
-			//		///////////
-			//		'layout_direction':'right','layout_spacing':0,'layout_align':'left','layout_valign':'fill',
-			//		'property_sheet':UI.document_property_sheet,
-			//	});
-			//	W.RoundRect("",{
-			//		'anchor':obj_panel,'anchor_align':"fill",'anchor_valign':"up",
-			//		'x':0,'y':-w_bar,'h':w_bar,
-			//		'color':UI.current_theme_color,
-			//	})
-			//}else{
-			//UI.RoundRect({
-			//	x:obj_panel.x-w_bar-w_shadow,y:-w_shadow,w:w_shadow*2,h:app.h+w_shadow*2,
-			//	color:shadow_color,border_width:-w_shadow,round:w_shadow,
-			//})
-			//UI.RoundRect({
-			//	x:obj_panel.x-w_bar,y:0,w:w_property_bar,h:app.h,
-			//	color:0xfff0f0f0,border_width:0,
-			//})
-			//W.Group("property_bar",{
-			//	'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
-			//	'x':0,'y':0,'w':w_property_bar,
-			//	item_template:{'object_type':W.SubWindow},items:property_windows,
-			//	///////////
-			//	'layout_direction':'down','layout_spacing':0,'layout_align':'fill','layout_valign':'up',
-			//	'property_sheet':UI.document_property_sheet,
-			//});
-			//W.RoundRect("",{
-			//	'anchor':obj_panel,'anchor_align':"left",'anchor_valign':"fill",
-			//	'x':-w_bar,'y':0,'w':w_bar,
-			//	'color':UI.current_theme_color,
-			//})
-			//}
-			//////////////////////////
-			var menu_file=UI.BigMenu("&File")
-			menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:1,action:function(){
-				var active_document=UI.top.app.document_area.active_tab
-				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
-					app.document_area.CloseTab();
-				}
-				UI.UpdateNewDocumentSearchPath()
-				UI.NewCodeEditorTab()
-				UI.Refresh()
-			}})
-			menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
-				//var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
-				//if(!fn){return;}
-				UI.UpdateNewDocumentSearchPath()
-				var fn=IO.DoFileDialog(["All File","*.*"],UI.m_new_document_search_path+"/*");
-				if(!fn){return;}
-				var active_document=UI.m_the_document_area.active_tab
-				if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
-					UI.m_the_document_area.CloseTab();
-				}
-				UI.OpenEditorWindow(fn);
-				UI.Refresh()
-			}});
-			menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
-				app.document_area.SaveCurrent();
-			}});
-			menu_file.AddNormalItem({text:"Save &as...",key:"SHIFT+CTRL+S",enable_hotkey:1,action:function(){
-				app.document_area.SaveAs();
-			}});
-			menu_file.AddNormalItem({text:"Save a&ll",icon:'保',action:function(){
-				app.document_area.SaveAll();
-			}});
-			if(app.document_area.active_tab){
-				menu_file.AddNormalItem({text:"&Close",key:"CTRL+W",enable_hotkey:0,action:function(){
-					app.document_area.CloseTab();
-				}});
-				menu_file.AddSeparator();
-				menu_file.AddNormalItem({text:"Revert changes",action:function(){
-					var obj_tab=app.document_area.active_tab;
-					if(obj_tab&&obj_tab.Reload){obj_tab.Reload();};
-				}});
-			}
-			menu_file.AddSeparator();
-			menu_file.AddNormalItem({icon:"时",text:"Recent / projec&t...",
-				key:"ALT+Q",
-				enable_hotkey:1,action:UI.ExplicitFileOpen})
-			//UI.OpenUtilTab.bind(undefined,'hist_view')
-			//menu_file.AddNormalItem({text:"&Browse...",
-			//	key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
-			//	enable_hotkey:0,action:UI.OpenUtilTab.bind(undefined,'fs_view')})
-			menu_file.AddNormalItem({text:"Arran&ge tabs",
-				enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
-			//menu_file.AddNormalItem({text:"Manage projects...",
-			//	enable_hotkey:0,action:function(){
-			//		UI.OpenEditorWindow("*project_list")
-			//	}})
-			//obj.ArrangeTabs.bind(obj.current_tab_id)
-			//W.Hotkey("",{key:"ALT+Q",action:UI.ExplicitFileOpen})
-			if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
-				menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
-					if(UI.m_closed_windows.length>0){
-						var active_document=UI.top.app.document_area.active_tab
-						var fn=UI.m_closed_windows.pop();
-						if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
-							UI.top.app.document_area.CloseTab();
-						}
-						//if(g_all_document_windows.length>0){
-						//	//hack: put the tab at the end of it
-						//	UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
-						//}
-						UI.OpenEditorWindow(fn);
-						UI.Refresh();
-					}
-				}})
-			}
-			menu_file.AddSeparator();
-			W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
-			W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
-			W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
-			menu_file.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
-				{text:"-",tooltip:'CTRL -',action:function(){
-					UI.ZoomRelative(1/ZOOM_RATE)
-				}},{text:"100%",tooltip:'CTRL+0',action:function(){
-					UI.ZoomReset()
-				}},{text:"+",tooltip:'CTRL +',action:function(){
-					UI.ZoomRelative(ZOOM_RATE)
-				}}])
-			if(!UI.Platform.IS_MOBILE){
-				//OS shell
-				menu_file.AddSeparator();
-				menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:function(){
-					UI.UpdateNewDocumentSearchPath()
-					if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-						IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
-					}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
-						IO.Shell(["xterm",
-							"-e",'cd '+UI.m_new_document_search_path+'; bash'])
-					}else{
-						//mac
-						//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
-						IO.Shell(["osascript",
-							"-e",'tell application "Terminal" to activate'])
-						IO.Shell(["osascript",
-							"-e",'tell application "System Events" to delay 0.1'])
-						IO.Shell(["osascript",
-							"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
-						IO.Shell(["osascript",
-							"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
-					}
-				}})
-			}
-			var obj_active_tab=UI.GetFrontMostEditorTab();
-			if(obj_active_tab&&obj_active_tab.file_name){
-				var spath_repo=UI.GetEditorProject(obj_active_tab.file_name,"polite");
-				if(spath_repo){
-					var obj_real_active_tab=app.document_area.active_tab;
-					var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");
-					if(obj_real_active_tab&&obj_real_active_tab.document_type=='notebook'&&obj_real_active_tab.file_name==fn_notebook){
-						menu_file.AddNormalItem({text:"Return to file",
-							enable_hotkey:1,key:"ALT+N",
-							action:app.document_area.SetTab.bind(
-								app.document_area,
-								obj_active_tab.__global_tab_id),
-						})
-					}else{
-						menu_file.AddNormalItem({icon:"本",text:"Open notebook...",
-							enable_hotkey:1,key:"ALT+N",
-							action:UI.OpenNoteBookTab.bind(undefined,fn_notebook),
-						})
-					}
-				}
-			}
-			obj_active_tab=undefined;
-			menu_file.AddSeparator();
-			menu_file.AddNormalItem({text:"E&xit",action:function(){
-				if(!app.OnClose()){UI.DestroyWindow(app)}
-			}});
-			menu_file=undefined;
-			//if(!UI.m_current_file_list){
-			//	UI.ClearFileListingCache();
-			//}
-			//////////////////////////
-			var menu_edit=UI.BigMenu("&Edit")
-			if(menu_edit.$.length){
-				menu_edit.AddSeparator();
-			}
-			menu_edit.AddNormalItem({text:"Preferences...",icon:"设",key:" ",enable_hotkey:0,action:function(){
-				UI.NewOptionsTab();
-			}});
-			menu_edit=undefined;
 		UI.End();
 	UI.End();
 	if(!UI.g_app_inited){
@@ -561,6 +516,11 @@ UI.Application=function(id,attrs){
 	}
 	if(!UI.m_ui_metadata["<has_opened_us_before>"]){
 		UI.NewOptionsTab();
+		UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
+		UI.m_previous_document=undefined
+		UI.OpenUtilTab('file_browser');
+		UI.InvalidateCurrentFrame()
+		UI.Refresh()
 		UI.m_ui_metadata["<has_opened_us_before>"]=1;
 	}
 	/*if(!g_all_document_windows.length){

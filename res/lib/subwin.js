@@ -221,16 +221,19 @@ W.TabbedDocument_prototype={
 	},
 	SaveTab:function(tabid){
 		var active_document=this.items[tabid];
+		if(!active_document||!active_document.Save){return 0;}
 		active_document.Save()
 		return !active_document.need_save
 	},
 	SaveCurrent:function(){
 		var active_document=this.active_tab;
+		if(!active_document||!active_document.Save){return 0;}
 		active_document.Save()
 		return !active_document.need_save
 	},
 	SaveAs:function(){
 		var active_document=this.active_tab;
+		if(!active_document||!active_document.SaveAs){return 0;}
 		active_document.SaveAs()
 		return !active_document.need_save
 	},
@@ -302,10 +305,12 @@ W.TabbedDocument_prototype={
 		if(this.m_is_in_menu){
 			//g_menu_action_invoked=0;
 			UI.m_frozen_global_menu=UI.m_global_menu
-			UI.m_frozen_global_menu.bk_tabbar_scroll_x=this.scroll_x
+			//UI.m_frozen_global_menu.bk_tabbar_scroll_x=this.scroll_x
+			UI.m_frozen_global_menu.bk_focus=UI.nd_focus;
 		}else{
 			if(UI.m_frozen_global_menu){
-				this.scroll_x=UI.m_frozen_global_menu.bk_tabbar_scroll_x;
+				//this.scroll_x=UI.m_frozen_global_menu.bk_tabbar_scroll_x;
+				UI.SetFocus(UI.m_frozen_global_menu.bk_focus)
 			}
 			UI.m_frozen_global_menu=undefined;
 		}
@@ -613,7 +618,7 @@ var g_sizing_rect_prototype={
 		UI.ReleaseMouse(this);
 	},
 };
-var RenderLayout=function(layout,obj){
+var RenderLayout=function(layout,obj,y_base){
 	//per-tab z_order, sort and reset on workspace save / restore
 	var has_area_name={};
 	var windows_to_render={};
@@ -824,9 +829,9 @@ var RenderLayout=function(layout,obj){
 			type:"doc",
 			name:tab_maximized.area_name||"doc_default",
 			temp_is_there:2,temp_has_active:1,temp_z_order:UI.g_current_z_value-1,
-		},obj.x,obj.y,obj.w,obj.h)
+		},obj.x,obj.y+y_base,obj.w,obj.h)
 	}else{
-		dfsRender(layout,obj.x,obj.y,obj.w,obj.h)
+		dfsRender(layout,obj.x,obj.y+y_base,obj.w,obj.h)
 	}
 	return [rendered_areas,windows_to_render,all_shadows];
 }
@@ -870,6 +875,7 @@ var SortTabsByArea=function(layout,obj){
 UI.g_caption_scroll_by_name={};
 W.TabbedDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabbedDocument_prototype);
+	var auto_hide_menu=!UI.TestOption("always_show_menu");
 	UI.StdStyling(id,obj,attrs, "tabbed_document");
 	UI.StdAnchoring(id,obj);
 	var items=obj.items
@@ -907,12 +913,15 @@ W.TabbedDocument=function(id,attrs){
 		var y_label_area=obj.y
 		var w_label_area=obj.w
 		var w_menu_button=obj.w_menu_button+obj.padding*2;
+		if(!auto_hide_menu){
+			w_menu_button=0;
+		}
 		var w_menu=w_menu_button;
 		//the big menu
 		var bk_menu=UI.m_global_menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
 		UI.BigMenu("&File");
-		if(obj.m_is_in_menu){
+		if(obj.m_is_in_menu||!auto_hide_menu){
 			w_menu=obj.w;
 			//if(layout.m_is_maximized){
 			//	w_menu-=w_menu_button;
@@ -958,18 +967,20 @@ W.TabbedDocument=function(id,attrs){
 				}
 			}
 		}
-		W.Button("main_menu_button",{
-			x:obj.x+obj.padding,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
-			style:obj.menu_button_style,
-			tooltip:'Menu',
-			font:UI.icon_font,text:"单",
-			value:obj.m_is_in_menu,
-			OnChange:function(value){
-				obj.SetMenuState(value);
-			}})
+		if(auto_hide_menu){
+			W.Button("main_menu_button",{
+				x:obj.x+obj.padding,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),w:obj.w_menu_button,h:obj.h_menu_button,
+				style:obj.menu_button_style,
+				tooltip:'Menu',
+				font:UI.icon_font,text:"单",
+				value:obj.m_is_in_menu,
+				OnChange:function(value){
+					obj.SetMenuState(value);
+				}})
+		}
 		obj.active_tab=items[tabid]
 		//render the main layout
-		var tmp_ret=RenderLayout(layout,obj)
+		var tmp_ret=RenderLayout(layout,obj,auto_hide_menu?0:obj.h_caption)
 		var rendered_areas=tmp_ret[0];
 		var windows_to_render=tmp_ret[1];
 		var all_shadows=tmp_ret[2];
@@ -979,7 +990,7 @@ W.TabbedDocument=function(id,attrs){
 			var area_i=rendered_areas[i];
 			rendered_area_by_name[area_i.name]=area_i;
 			area_i.content_box={x:area_i.x,y:area_i.y+obj.h_caption+obj.h_bar,w:area_i.w,h:Math.max(area_i.h-(obj.h_caption+obj.h_bar),0)}
-			if(area_i.x==obj.x&&area_i.y==obj.y){
+			if(area_i.x==obj.x&&area_i.y==obj.y&&auto_hide_menu){
 				area_i.x+=w_menu_button;
 				area_i.w-=w_menu_button;
 				if(layout.m_is_maximized){
@@ -1139,7 +1150,7 @@ W.TabbedDocument=function(id,attrs){
 			UI.PopCliprect();
 		}
 		//restore button
-		if(layout.m_is_maximized&&!obj.m_is_in_menu){
+		if(layout.m_is_maximized&&!obj.m_is_in_menu&&auto_hide_menu){
 			//UI.RoundRect({
 			//	x:obj.x+obj.w-w_menu_button,y:obj.y,w:w_menu_button,h:obj.h_caption,
 			//	color:obj.menu_bar_color,
@@ -1165,7 +1176,7 @@ W.TabbedDocument=function(id,attrs){
 				border_width:obj.menu_bar_border_width,
 				border_color:obj.menu_bar_border_color,
 			})
-			if(s_active_title){
+			if(s_active_title&&auto_hide_menu){
 				var dims=UI.MeasureText(tab_label_style.font,s_active_title)
 				dims.w+=4;
 				UI.PushCliprect(obj.x+w_menu_button,obj.y,w_menu_bar,obj.h_caption);
@@ -1178,8 +1189,17 @@ W.TabbedDocument=function(id,attrs){
 				w_menu_bar-=dims.w;
 			}
 		}
-		if(obj.m_is_in_menu){
+		obj.fmenu_callback()
+		if(obj.m_is_in_menu||!auto_hide_menu){
 			//menu *bar* goes *above* the tab labels
+			if(!obj.m_is_in_menu){
+				//if(obj.main_menu_bar){
+				//	var bk_listview=obj.main_menu_bar.list_view;
+				//	obj.main_menu_bar={list_view:bk_listview};
+				//}
+				obj.main_menu_bar=undefined;
+				obj.m_menu_preselect=undefined;
+			}
 			if(w_menu_bar>0){
 				W.TopMenuBar("main_menu_bar",{x:obj.x+w_menu_button,w:w_menu_bar,y:obj.y,h:obj.h_caption,
 					default_value:obj.m_menu_preselect,
@@ -1427,7 +1447,7 @@ UI.BigMenu=function(){
 //make the top menu horizontal and disable nested child menus? with scrollable menus... it should work
 W.TopMenuItem=function(id,attrs){
 	var obj=UI.Keep(id,attrs);
-	UI.StdStyling(id,obj,attrs, "top_menu_item",obj.selected?"active":"inactive");
+	UI.StdStyling(id,obj,attrs, "top_menu_item",obj.selected&&obj.owner.owner.m_is_in_menu?"active":"inactive");
 	var text_attrs={font:obj.font,text:obj.text,color:obj.text_color,flags:8}
 	if(!text_attrs.__layout){UI.LayoutText(text_attrs);}
 	obj.w=(obj.w||text_attrs.w_text+obj.padding*2);
@@ -1441,7 +1461,7 @@ W.TopMenuItem=function(id,attrs){
 		var owner=obj.owner
 		var parent=owner.list_view
 		var p_and=attrs.text.indexOf('&')
-		if(p_and>=0){
+		if(p_and>=0&&UI.top.app.document_area.m_is_in_menu){
 			//hotkey - listview selection setting
 			W.Hotkey("",{key:attrs.text.substr(p_and+1,1).toUpperCase(),action:function(){
 				parent.OnChange(parseInt(obj.id.substr(1)))
@@ -1470,7 +1490,7 @@ W.TopMenuBar=function(id,attrs){
 	var obj=UI.Keep(id,attrs);
 	UI.StdStyling(id,obj,attrs, "top_menu");
 	UI.StdAnchoring(id,obj);
-	var desc=UI.m_frozen_global_menu
+	var desc=(UI.m_frozen_global_menu||UI.m_global_menu)
 	//var lv_items=[]
 	//for(var i=0;i<desc.$.length;i++){
 	//	var submenu_i=desc.$[i];
@@ -1479,17 +1499,27 @@ W.TopMenuBar=function(id,attrs){
 	//}
 	//UI.RoundRect(obj)
 	UI.Begin(obj)
-		var is_first=!obj.list_view
+		var is_first=(!obj.m_was_in_menu&&obj.owner.m_is_in_menu);
+		obj.m_was_in_menu=obj.owner.m_is_in_menu;
 		var fshow_sub_menus=function(){
 			obj.m_show_sub_menus=1
 			UI.Refresh()
 		}
+		var bk_tentative_focus=UI.context_tentative_focus;
 		UI.PushCliprect(obj.x,obj.y+2,obj.w,obj.h-4)
 		W.ListView('list_view',{x:obj.x,y:obj.y+2,w:obj.w,h:obj.h-4,
 			dimension:'x',layout_spacing:8,is_single_click_mode:1,
-			item_template:{object_type:W.TopMenuItem,owner:obj,OnDblClick:fshow_sub_menus},items:desc.$})
+			item_template:{object_type:W.TopMenuItem,owner:obj,OnDblClick:fshow_sub_menus},
+			items:desc.$,
+			OnChange:function(value){
+				this.value=value;
+				this.item_template.owner.owner.SetMenuState(1);
+				UI.Refresh();
+			}
+		})
 		UI.PopCliprect()
-		if(!obj.m_show_sub_menus){
+		UI.context_tentative_focus=bk_tentative_focus;
+		if(!obj.m_show_sub_menus&&obj.owner.m_is_in_menu){
 			W.Hotkey("",{key:"DOWN",action:fshow_sub_menus})
 			W.Hotkey("",{key:"RETURN RETURN2",action:fshow_sub_menus})
 			W.Hotkey("",{key:"ESC",action:(function(obj){obj.owner.SetMenuState(0);UI.Refresh();}).bind(null,obj)})
@@ -1662,7 +1692,9 @@ W.FancyMenu=function(id,attrs){
 		color:obj.shadow_color,
 		border_width:-obj.shadow_size,round:obj.shadow_size})
 	UI.RoundRect(obj)
+	var bk_tentative_focus=UI.context_tentative_focus;
 	W.PureRegion(id,obj);
+	UI.context_tentative_focus=bk_tentative_focus;
 	UI.Begin(obj)
 	var hc=UI.GetCharacterHeight(obj.font)
 	var hc_icon=UI.GetCharacterHeight(UI.icon_font_20)

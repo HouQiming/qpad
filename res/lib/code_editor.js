@@ -6600,11 +6600,11 @@ W.SXS_OptionsPage=function(id,attrs){
 				{special:'theme_button',h_special:4},
 				{special:'tab_width',h_special:4},
 				{name:UI._('Highlight the current line'),stable_name:'show_line_highlight'},
+				{name:UI._('Show the menu bar'),stable_name:'always_show_menu'},
 				{name:UI._('Show horizontal scroll-bar'),stable_name:'show_x_scroll_bar'},
 				{name:UI._('Show outer scope overlays'),stable_name:'show_top_hint'},
 				{name:UI._('Show line numbers'),stable_name:'show_line_numbers'},
 				{name:UI._('Show minimap'),stable_name:'show_minimap'},
-				{name:UI._('Enable sRGB-corrected blending'),stable_name:'enable_srgb'},
 			];
 			plugin_items["Controls"]=[
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
@@ -6629,6 +6629,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				cat_list.push(desc_i);
 			}
 			plugin_items["Display"].push(
+				{name:UI._('Enable sRGB-corrected blending'),stable_name:'enable_srgb'},
 				{special:'customize',h_special:4,text:UI._("Customize the theme script"),file:"conf_theme.js"},
 				{special:'customize',h_special:4,text:UI._("Customize the translation script"),file:"conf_translation.js"}
 			);
