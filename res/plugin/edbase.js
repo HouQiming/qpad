@@ -1827,7 +1827,7 @@ UI.RegisterEditorPlugin(function(){
 			var menu_search=UI.BigMenu("&Search")
 			var doc=this;
 			menu_search.AddSeparator();
-			menu_search.AddButtonRow({text:"Go to point of interest"},[
+			menu_search.AddButtonRow({icon:"地",text:"Go to point of interest"},[
 				{text:"bookmark_up",icon:"上",tooltip:'Prev - SHIFT+F2',action:function(){
 					fnextbm.call(doc,-1)
 				}},{text:"bookmark_down",icon:"下",tooltip:'Next - F2',action:function(){
@@ -2998,11 +2998,11 @@ UI.RegisterEditorPlugin(function(){
 		var menu_convert=UI.BigMenu("Con&vert")
 		var tab_width=UI.GetOption("tab_width",4);
 		var s_tab_space=Array(tab_width+1).join(' ');
-		menu_convert.AddNormalItem({text:"Leading &tabs to spaces",action:
+		menu_convert.AddNormalItem({icon:" ",text:"Leading &tabs to spaces",action:
 			fsmart_replace.bind(this,"^[\t]+",function(smatch){
 				return Array(smatch.length+1).join(s_tab_space);
 			})})
-		menu_convert.AddNormalItem({text:"Leading &spaces to tabs",action:
+		menu_convert.AddNormalItem({icon:"\t",text:"Leading &spaces to tabs",action:
 			fsmart_replace.bind(this,"^("+s_tab_space+")+",function(smatch){
 				return Array(((smatch.length/tab_width)|0)+1).join('\t');
 			})})

@@ -1313,7 +1313,7 @@ W.NotificationItem=function(id,attrs){
 	//shaking
 	if(!obj.x_shake){obj.x_shake=0}
 	if(obj.x_shake||obj.dx_shake){
-		var dt_all=Duktape.__ui_seconds_between_ticks(UI.m_last_frame_tick,UI.m_frame_tick)
+		var dt_all=Math.min(Duktape.__ui_seconds_between_ticks(UI.m_last_frame_tick,UI.m_frame_tick),1/30)
 		if(!obj.dx_shake){obj.dx_shake=0}
 		if(!obj.ddx_shake){obj.ddx_shake=0}
 		for(var dt_i=0;dt_i<dt_all;dt_i+=0.001){
@@ -1364,7 +1364,8 @@ W.NotificationItem=function(id,attrs){
 			border_color:fadein(obj.border_color,obj.alpha),border_width:obj.border_width})
 		UI.PopCliprect()
 	}
-	if(obj.icon){UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,fadein(obj.icon_color,obj.alpha),obj.icon.charCodeAt(0))}
+	//if(obj.icon){UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,fadein(obj.icon_color,obj.alpha),obj.icon.charCodeAt(0))}
+	if(obj.icon){UI.DrawChar(obj.icon_font,obj.x+obj.x_shake+obj.padding,obj.y+obj.padding,obj.icon_color,obj.icon.charCodeAt(0))}
 	//UI.DrawTextControl(tmp,obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding,fadein(obj.text_color,obj.alpha))
 	UI.ED_RenderRichText(obj.m_cached_prt,obj.text,
 		obj.x+obj.x_shake+obj.padding+obj.w_icon,obj.y+obj.padding)
@@ -3079,7 +3080,7 @@ var DetectRepository=function(fname){
 	return ret;
 }
 
-UI.GetEditorProject=function(fn){
+UI.GetEditorProject=function(fn,is_polite){
 	fn=IO.NormalizeFileName(fn);
 	var repos2=g_repo_from_file[fn];
 	if(repos2){
@@ -3089,6 +3090,7 @@ UI.GetEditorProject=function(fn){
 	}
 	var spath_repo=DetectRepository(fn);
 	if(spath_repo){return spath_repo;}
+	if(is_polite){return undefined;}
 	var sdir=UI.GetPathFromFilename(fn);
 	ParseProject(sdir);
 	return sdir;
@@ -5389,7 +5391,7 @@ W.CodeEditor=function(id,attrs){
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_code=W.Button("find_button_code",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"プ",tooltip:"Only search code - ALT+D",
+						font:UI.icon_font,text:"プ",tooltip:"Code only - ALT+D",
 						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CODE_ONLY?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CODE_ONLY)|(value?UI.SEARCH_FLAG_CODE_ONLY:0)

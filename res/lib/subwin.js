@@ -747,10 +747,10 @@ var RenderLayout=function(layout,obj){
 			}
 		}else{
 			//compute undragged layout
-			var tab=windows_to_render[nd.name];
-			if(tab){
-				var h_content=h-(obj.h_caption+obj.h_bar);
-				if(h_content>0){
+			var h_content=h-(obj.h_caption+obj.h_bar);
+			if(h_content>0){
+				var tab=windows_to_render[nd.name];
+				if(tab){
 					rendered_areas.push({name:nd.name,x:x,y:y,w:w,h:h})
 					W.RoundRect("",{
 						x:x,y:y+obj.h_caption,w:w,h:obj.h_bar,
@@ -792,6 +792,10 @@ var RenderLayout=function(layout,obj){
 					W.SaveDialog("savedlg_"+tabid.toString(),{
 						x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content,
 						value:(tab.in_save_dialog||0),tabid:tabid,parent:obj})
+				}else{
+					//just draw tips
+					UI.assert(nd.name=="doc_default");
+					W.TipWindow("tips",{x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content})
 				}
 			}
 		}
@@ -1685,8 +1689,12 @@ W.FancyMenu=function(id,attrs){
 		if(s_type=='text'){
 			W.Text("",{x:obj.x+item_i.x,y:obj.y+item_i.y+(obj.h_menu_line-hc)*0.5,font:obj.font,text:item_i.text,color:selected?item_i.sel_color:item_i.color,flags:8})
 			if(item_i.icon){
-				W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font_20,text:item_i.icon,
-					color:selected?item_i.sel_icon_color:item_i.icon_color})
+				//W.Text("",{x:obj.x+x_icon,y:obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,font:UI.icon_font_20,text:item_i.icon,
+				//	color:selected?item_i.sel_icon_color:item_i.icon_color})
+				UI.DrawChar(UI.icon_font_20,
+					obj.x+x_icon,obj.y+item_i.y+(obj.h_menu_line-hc_icon)*0.5,
+					selected?item_i.sel_icon_color:item_i.icon_color,
+					item_i.icon.charCodeAt(0))
 			}
 		}else if(s_type=='button'){
 			W.Button(item_i.text,{x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:item_i.h,
@@ -1716,7 +1724,94 @@ W.FancyMenu=function(id,attrs){
 	return obj
 }
 
-//coulddo: menu search support
+//coulddo: menu search support - we don't have enough commands to justify it
+W.TipWindow_prototype={
+	OnClick:function(event){
+		UI.top.app.document_area.SetMenuState(0)
+		UI.Refresh()
+	}
+};
+
+var RICHTEXT_COMMAND_RUBBER_SPACE=0x107fff;
+var RICHTEXT_COMMAND_SET_STYLE=0x108000;
+
+var LoadTips=function(){
+	var s_md=IO.UIReadAll("res/misc/tips_"+UI.m_ui_language+".md");
+	if(!s_md){
+		s_md=IO.UIReadAll("res/misc/tips_en_us.md");
+	}
+	var tips=s_md.split("#");
+	UI.m_tips=[];
+	for(var i=0;i<tips.length;i++){
+		var s_i=tips[i];
+		if(!s_i){continue;}
+		if(s_i[0]==' '){
+			s_i=(
+				UI.ED_RichTextCommandChar(RICHTEXT_COMMAND_SET_STYLE+3)+
+				s_i[1]+
+				UI.ED_RichTextCommandChar(RICHTEXT_COMMAND_SET_STYLE+1)+s_i.substr(2));
+		}
+		var code_segs=s_i.split('`');
+		var code_segs2=[];
+		for(var j=0;j<code_segs.length;j++){
+			if(j>0){
+				code_segs2.push(UI.ED_RichTextCommandChar(RICHTEXT_COMMAND_SET_STYLE+(j&1?2:0)))
+			}
+			code_segs2.push(code_segs[j]);
+		}
+		UI.m_tips.push({m_text:code_segs2.join('')});
+	}
+}
+
+W.TipWindow=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"tip_window",W.TipWindow_prototype)
+	W.PureRegion(id,obj);
+	var tip_id=UI.m_ui_metadata["<tip_id>"];
+	if(tip_id==undefined){tip_id=0;}
+	if(!UI.m_tips){
+		LoadTips();
+		//tip_id++;
+		//if(tip_id>=UI.m_tips.length){
+		//	tip_id--;
+		//}
+		UI.m_ui_metadata["<tip_id>"]=tip_id;
+	}
+	UI.Begin(obj)
+		var desc=UI.m_tips[tip_id];
+		if(!desc.m_cached_prt){
+			desc.m_cached_prt=UI.ED_FormatRichText(
+				Language.GetHyphenator(UI.m_ui_language),
+				desc.m_text,4,obj.w_text,obj.styles);
+		}
+		var x0=obj.x+(obj.w-obj.w_text)*0.5;
+		//desc.m_cached_prt.m_h_text
+		UI.ED_RenderRichText(desc.m_cached_prt,desc.m_text,
+			x0,obj.y+(obj.h-obj.h_text)*0.5);
+		W.Button("prev",{
+			x:x0-obj.button_style.w-24,y:obj.y+(obj.h-obj.button_style.h)*0.5,
+			w:obj.button_style.w,h:obj.button_style.h,
+			style:obj.button_style,text:"<",
+			OnClick:function(){
+				tip_id--;
+				if(tip_id<0){tip_id=UI.m_tips.length-1;}
+				UI.m_ui_metadata["<tip_id>"]=tip_id;
+				UI.Refresh()
+			}
+		})
+		W.Button("next",{
+			x:x0+obj.w_text+24,y:obj.y+(obj.h-obj.button_style.h)*0.5,
+			w:obj.button_style.w,h:obj.button_style.h,
+			style:obj.button_style,text:">",
+			OnClick:function(){
+				tip_id++;
+				if(tip_id>=UI.m_tips.length){tip_id=0;}
+				UI.m_ui_metadata["<tip_id>"]=tip_id;
+				UI.Refresh()
+			}
+		})
+	UI.End()
+	return obj
+}
 
 ///////////////////////
 UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");

@@ -481,7 +481,7 @@ UI.Application=function(id,attrs){
 			}
 			var obj_active_tab=UI.GetFrontMostEditorTab();
 			if(obj_active_tab&&obj_active_tab.file_name){
-				var spath_repo=UI.GetEditorProject(obj_active_tab.file_name);
+				var spath_repo=UI.GetEditorProject(obj_active_tab.file_name,"polite");
 				if(spath_repo){
 					var obj_real_active_tab=app.document_area.active_tab;
 					var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");
@@ -493,7 +493,7 @@ UI.Application=function(id,attrs){
 								obj_active_tab.__global_tab_id),
 						})
 					}else{
-						menu_file.AddNormalItem({text:"Open notebook...",
+						menu_file.AddNormalItem({icon:"本",text:"Open notebook...",
 							enable_hotkey:1,key:"ALT+N",
 							action:UI.OpenNoteBookTab.bind(undefined,fn_notebook),
 						})
@@ -563,7 +563,7 @@ UI.Application=function(id,attrs){
 		UI.NewOptionsTab();
 		UI.m_ui_metadata["<has_opened_us_before>"]=1;
 	}
-	if(!g_all_document_windows.length){
+	/*if(!g_all_document_windows.length){
 		if(app.quit_on_zero_tab){
 			if(!app.OnClose()){UI.DestroyWindow(app)}
 			return;
@@ -585,7 +585,7 @@ UI.Application=function(id,attrs){
 		UI.InvalidateCurrentFrame()
 		UI.Refresh()
 		app.quit_on_zero_tab=1;
-	}
+	}*/
 	if(UI.Platform.BUILD=="debug"){
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){

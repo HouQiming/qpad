@@ -3845,6 +3845,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		TRenderJob[] m_rjobs
 		CStyleHolder m_styles
 		float m_h_text
+		float m_scale0,m_scale_cur
+		TFont[] m_emboldened_fonts
 		__JS_prototype=function(JSObject proto){
 			proto.ExportProperty(this,"m_h_text")
 		};
@@ -3863,8 +3865,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			js_style_i=js_styles[i].as(JSObject)
 			style_i.color=js_style_i["color"].as(int)
 			fnt=js_style_i["font"].as(TFont)
-			if g_renderer.m_srgb_supported:
-				fnt.SmartEmbolden(style_i.color)
 			style_i.font=fnt
 			style_i.flags=js_style_i["flags"].or(0)
 			style_i.line_space=int(double2fixed(js_style_i["line_space"].or(0.0)))
@@ -3873,6 +3873,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		x=0LL
 		y=0LL
 		y_next=0LL
+		hyphen_next=0
 		rjobs=new TRenderJob[]
 		foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 			(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,tab_width,1, styles,CEmbededObject[].NULL)
@@ -3896,32 +3897,59 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					x+=dw
 				},
 				inline(i64 h_up,i64 h_line,int aflag_ccnt){
+					if hyphen_next:
+						rjobs.push(TRenderJob(){
+							x:fixed2float(x),
+							y:fixed2float(y-styles.m_styles[tail_style_id].raise_height),
+							style_id:tail_style_id,ccnt0:-1,ccnt1:-1})
 					x=0LL
 					y=y_next
 					y_next=y+h_line
+					hyphen_next=!!(aflag_ccnt&ATOM_FLAG_HYPHEN)
 					y+=h_up
 				},
 				inline(int oid, int ccnt){
 					//object
 					//do nothing
 				})
-		return JS.Return(new CPreprocessedRichText(){m_rjobs:rjobs,m_styles:styles,m_h_text:fixed2float(y)})
+		auto ret=new CPreprocessedRichText(){
+			m_rjobs:rjobs,m_styles:styles,
+			m_h_text:fixed2float(y),
+			m_scale0:g_renderer.m_pixels_per_unit,
+		}
+		return JS.Return(ret)
 	}
 	JS_UI["ED_RenderRichText"]=function(JSContext JS){
 		auto prt=JS.Param(0).as(CPreprocessedRichText)
 		auto sblock=JS.Param(1).as(string)
-		auto x=JS.Param(2).as(float)
-		auto y=JS.Param(3).as(float)
+		auto x=JS.Param(2).as(float)*g_renderer.m_pixels_per_unit
+		auto y=JS.Param(3).as(float)*g_renderer.m_pixels_per_unit
+		if prt.m_scale_cur!=g_renderer.m_pixels_per_unit:
+			prt.m_emboldened_fonts=TFont[].NULL
+		if !prt.m_emboldened_fonts:
+			auto p_styles=prt.m_styles.m_styles
+			prt.m_emboldened_fonts=new TFont[p_styles.n]
+			for style_i,I in p_styles
+				fnt=style_i.font
+				fnt.h*=g_renderer.m_pixels_per_unit/prt.m_scale0
+				if g_renderer.m_srgb_supported:
+					fnt.SmartEmbolden(style_i.color)
+				prt.m_emboldened_fonts[I]=fnt
+			prt.m_scale_cur=g_renderer.m_pixels_per_unit
+		dist_scale=g_renderer.m_pixels_per_unit/prt.m_scale0
 		foreach rj in prt.m_rjobs
-			auto xi=x+rj.x
-			auto yi=y+rj.y
+			auto xi=x+rj.x*dist_scale
+			auto yi=y+rj.y*dist_scale
 			auto style_i=prt.m_styles.m_styles[rj.style_id]
 			auto C=style_i.color
-			auto fnt=style_i.font
-			for ch in Utf8Chars(sblock[rj.ccnt0:rj.ccnt1-1])
-				//coulddo: UNDERLINED,STRIKED_OUT... or strikeout-y
-				dx=g_renderer.DrawChar(fnt,xi,yi,C,ch)
-				xi+=dx
+			auto fnt=prt.m_emboldened_fonts[rj.style_id]
+			if rj.ccnt0<0:
+				g_renderer.DrawChar(fnt,xi,yi,C,int('-'))
+			else
+				for ch in Utf8Chars(sblock[rj.ccnt0:rj.ccnt1-1])
+					//coulddo: UNDERLINED,STRIKED_OUT... or strikeout-y
+					dx=g_renderer.DrawChar(fnt,xi,yi,C,ch)
+					xi+=dx
 		return 0
 	}
 	JS_UI["ED_RichTextCommandChar"]=function(JSContext JS){

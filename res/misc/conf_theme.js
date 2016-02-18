@@ -579,17 +579,17 @@ UI.CustomTheme=function(){
 			border_width:0,
 			round:4,
 			styles:[
-				{font:UI.Font(UI.font_name,20,0),color:L?0xff000000:0xffe8e8e8},
-				{font:UI.Font(UI.font_name,20,50),color:L?0xffb4771f:0xffe3cea6},
-				{font:UI.Font(UI.font_name,20,50),color:L?0xff2ca033:0xff8adfb2},
-				{font:UI.Font(UI.font_name,20,50),color:L?0xff1c1ae3:0xff999afb},
-				{font:UI.Font(UI.font_name,20,50),color:L?0xff007fff:0xff6fbffd},
-				{font:UI.Font(UI.font_name,20,50),color:L?0xff9a3d6a:0xffd6b2ca},
-				{font:UI.Font(UI.font_name,20,100),color:L?0xffb4771f:0xffe3cea6},
-				{font:UI.Font(UI.font_name,20,100),color:L?0xff2ca033:0xff8adfb2},
-				{font:UI.Font(UI.font_name,20,100),color:L?0xff1c1ae3:0xff999afb},
-				{font:UI.Font(UI.font_name,20,100),color:L?0xff007fff:0xff6fbffd},
-				{font:UI.Font(UI.font_name,20,100),color:L?0xff9a3d6a:0xffd6b2ca},
+				{font:UI.Font(UI.font_name,20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8},
+				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xffb4771f:0xffe3cea6},
+				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff2ca033:0xff8adfb2},
+				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff1c1ae3:0xff999afb},
+				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff007fff:0xff6fbffd},
+				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff9a3d6a:0xffd6b2ca},
+				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xffb4771f:0xffe3cea6},
+				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff2ca033:0xff8adfb2},
+				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff1c1ae3:0xff999afb},
+				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff007fff:0xff6fbffd},
+				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff9a3d6a:0xffd6b2ca},
 			],
 			progress_color:C_sel,
 			text_color:L?0xff000000:0xffe8e8e8,
@@ -644,30 +644,43 @@ UI.CustomTheme=function(){
 				}
 			},
 		},
-		sxs_build_output:{
-			border_width:0,
-			color:L?0xffffffff:0xff444444,
-			editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",16,-50),
-				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,100),
-				scroll_transition_dt:0.1,
-				bgcolor_selection:C_sel,
-				/////////////
-				caret_width:UI.IS_MOBILE?1:2,
-				caret_color:L?0xff000000:0xffe8e8e8,
-				caret_flicker:500,
-				color:L?0xff000000:0xffe8e8e8,
-				state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
-				read_only:1,
+		tip_window:{
+			w_text:512,
+			h_text:512,
+			button_style:{
+				w:48,
+				h:64,
+				transition_dt:0.1,
+				round:0,
+				font:UI.Font("res/fonts/inconsolata.ttf,!",48),border_width:2,padding:8,
 				$:{
-					focus:{
-						bgcolor_selection:C_sel,
+					out:{
+						border_color:0x00444444,color:0,
+						icon_color:L?0x7f444444:0x7fcccccc,
+						text_color:L?0x7f444444:0x7fcccccc,
 					},
-					blur:{
-						bgcolor_selection:L?0xffcccccc:0xff666666,
+					over:{
+						border_color:0xff444444,color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
+						icon_color:L?0xff444444:0xffcccccc,
+						text_color:L?0xff444444:0xffcccccc,
+					},
+					down:{
+						border_color:0xff7f7f7f,color:[{x:0,y:0,color:0xff7f7f7f},{x:0,y:1,color:0xff7f7f7f}],
+						icon_color:L?0xff444444:0xffcccccc,
+						text_color:L?0xff444444:0xffcccccc,
 					},
 				}
 			},
+			styles:[
+				//text
+				{font:UI.Font(UI.font_name,32,-50),line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
+				//caption
+				{font:UI.Font(UI.font_name,48,-100),line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
+				//code
+				{font:UI.Font("res/fonts/inconsolata.ttf,!",24),line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
+				//icon
+				{font:UI.Font(UI.icon_font_name,36),raise_height:-6,line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
+			],
 		},
 		sxs_new_page:{
 			color:L?0xffffffff:0xff444444,

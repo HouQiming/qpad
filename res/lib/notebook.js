@@ -666,6 +666,8 @@ W.notebook_prototype={
 		if(s_text){doc_in.ed.Edit([0,0,s_text],1);}
 		doc_in.saved_point=(need_save?-1:doc_in.ed.GetUndoQueueLength());
 		cell_i.m_text_in=doc_in;
+		this.need_save|=2;
+		UI.SetFocus(doc_in)
 		UI.Refresh()
 	},
 	ScrollShowRange:function(y0,h0, y1,h1){
