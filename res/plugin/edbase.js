@@ -710,10 +710,6 @@ UI.RegisterOutputParser('(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([
 	if(matches[6]){
 		colb=parseInt(matches[6]);
 	}
-	if(lineb>=linea+1){
-		lineb=linea+1;
-		colb=1;
-	}
 	var message=matches[7]
 	var category=matches[8]
 	var err={
@@ -722,6 +718,10 @@ UI.RegisterOutputParser('(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([
 		message:message,
 		line0:linea-1,col0:cola-1,
 		line1:lineb-1,col1:colb-1,
+	}
+	if(lineb>=linea+1){
+		err.line1=undefined;
+		err.col1=undefined;
 	}
 	return err;
 });
@@ -1411,7 +1411,7 @@ UI.RegisterEditorPlugin(function(){
 		if(!lang.line_comment){
 			return 1
 		}
-		if(this.SeekLC(line1,0)<sel[1]){line1++;}
+		if(line0==line1||this.SeekLC(line1,0)<sel[1]){line1++;}
 		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
 		var line_ccnts_new=[];
 		var ops=[];
@@ -1424,7 +1424,7 @@ UI.RegisterEditorPlugin(function(){
 			var ccnt_eh=ed.MoveToBoundary(ccnt0,1,"space")
 			if(ed.GetUtf8CharNeighborhood(ccnt0)[0]==10&&ed.GetUtf8CharNeighborhood(ccnt_eh)[1]==10){
 				//skip empty lines
-				continue
+				continue;
 			}
 			if(min_n_spaces==undefined||min_n_spaces>(ccnt_eh-ccnt0)){
 				min_n_spaces=ccnt_eh-ccnt0;
@@ -1435,7 +1435,7 @@ UI.RegisterEditorPlugin(function(){
 				is_decomment=0
 			}
 		}
-		for(var i=0;i<line_ccnts_new.length-1;i++){
+		for(var i=0;i<line_ccnts_new.length;i++){
 			var ccnt0=line_ccnts_new[i];
 			if(is_decomment){
 				ops.push(ccnt0,lg0,undefined)

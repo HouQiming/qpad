@@ -469,18 +469,18 @@ W.notebook_prototype={
 			UI.OpenEditorWindow(err.file_name,function(){
 				var go_prev_line=0
 				if(err.is_in_active_doc==undefined){return;}
-				if(!err.line1){
+				if(err.line1==undefined){
 					err.line1=err.line0
 				}
-				if(!err.col0){
+				if(err.col0==undefined){
 					err.col0=0;
 					err.col1=0;
 					if(err.line0==err.line1){
 						err.line1++
 						go_prev_line=1
 					}
-				}else if(!err.col1){
-					err.col1=err.col0;
+				}else if(err.col1==undefined){
+					err.col1=1e9;
 				}
 				//if(err.col0==err.col1&&err.line0==err.line1){
 				//	err.col1++;
@@ -645,6 +645,7 @@ W.notebook_prototype={
 					cell_i.m_proc=undefined;
 					cell_i.m_completion_time=JsifyBuffer(IO.WallClockTime());
 					IO.DeleteFile(fn_script)
+					UI.OnApplicationSwitch()
 					UI.Refresh();
 				}
 			}).bind(this,cell_i)
