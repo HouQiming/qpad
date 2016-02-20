@@ -6460,6 +6460,10 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	//doesn't make sense to disable this right now
+	this.AddEventHandler('change',function(){
+		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
+		renderer.HunspellClearContext();
+	})
 	this.AddEventHandler('selectionChange',function(){
 		this.CancelAutoCompletion()
 		this.m_fhint_ctx=undefined;

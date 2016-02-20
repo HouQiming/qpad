@@ -168,6 +168,7 @@ UI.GetDefaultBuildEnv=function(s_lang){
 	return s_name_default;
 }
 
+var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 W.notebook_prototype={
 	Save:function(){
 		var docs=[];
@@ -453,11 +454,18 @@ W.notebook_prototype={
 	},
 	CreateCompilerError:function(id,err,ccnt_lh,ccnt_next){
 		//we could afford to discard dangling highlights - give discard responsibility to the cell
+		var cell_i=this.m_cells[id];
 		var edstyle=UI.default_styles.code_editor.editor_style;
 		err.is_in_active_doc=0;//the callback may end up getting called later than error clearing
 		err.color=((err.category||'error')=='error'?edstyle.color_tilde_compiler_error:edstyle.color_tilde_compiler_warning);
 		err.cell_id=id;
-		if(!err.is_quiet){
+		var fn_raw=err.file_name;
+		if(cell_i.m_current_path&&!(err.file_name.search(g_regexp_abspath)>=0)&&!IO.FileExists(err.file_name)){
+			err.file_name=cell_i.m_current_path+'/'+err.file_name;
+		}
+		err.file_name=IO.NormalizeFileName(err.file_name);
+		//coulddo: UI.ED_SearchIncludeFile, but shouldn't need it
+		if(!err.is_quiet&&IO.FileExists(err.file_name)){
 			UI.OpenEditorWindow(err.file_name,function(){
 				var go_prev_line=0
 				if(err.is_in_active_doc==undefined){return;}
@@ -509,7 +517,6 @@ W.notebook_prototype={
 			}
 			this.SetSelection(ccnt_lh,ccnt_next)
 		}
-		var cell_i=this.m_cells[id];
 		var doc=cell_i.m_text_out;
 		cell_i.m_has_any_error=1;
 		var loc0=doc.ed.CreateLocator(ccnt_lh,1)
@@ -584,7 +591,8 @@ W.notebook_prototype={
 		//coulddo: manual interpreter setup
 		var sext=(desc&&desc.extensions&&desc.extensions[0]||(cell_i.m_language=='Unix Shell Script'?"sh":"bat"));
 		var fn_script=IO.GetNewDocumentName("qnb",sext,"temp")
-		IO.CreateFile(fn_script,cell_i.m_text_in.ed.GetText())
+		var s_code=cell_i.m_text_in.ed.GetText();
+		IO.CreateFile(fn_script,s_code)
 		var args=obj_buildenv.CreateInterpreterCall(fn_script,undefined);
 		if(typeof(args)=='string'){
 			//qpad js
@@ -598,7 +606,20 @@ W.notebook_prototype={
 			UI.Refresh()
 			return;
 		}
-		var proc=IO.RunToolRedirected(args,UI.GetPathFromFilename(this.file_name),0)
+		var spath=UI.GetPathFromFilename(this.file_name);
+		var s_prj_mark="build script for '"
+		var p_prj_fn=s_code.indexOf(s_prj_mark);
+		if(p_prj_fn>=0){
+			var s_file_name=s_code.substr(p_prj_fn+s_prj_mark.length);
+			var p_other_quote=s_file_name.indexOf("'")
+			if(p_other_quote>=0){
+				s_file_name=s_file_name.substr(0,p_other_quote);
+				if(IO.FileExists(s_file_name)){
+					spath=UI.GetPathFromFilename(s_file_name)
+				}
+			}
+		}
+		var proc=IO.RunToolRedirected(args,spath,0)
 		var idle_wait=100;
 		for(var i=0;i<this.m_cells.length;i++){
 			this.m_cells[i].m_cell_id=i;
@@ -633,6 +654,7 @@ W.notebook_prototype={
 		}
 		this.need_save|=2;
 		cell_i.m_proc={proc:proc,fn_script:fn_script};
+		cell_i.m_current_path=spath;
 		this.need_auto_scroll=1;
 		UI.Refresh()
 	},

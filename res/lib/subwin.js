@@ -393,7 +393,7 @@ W.TabbedDocument_prototype={
 			}
 			//window splitting check - cross-split
 			var box=area_i.content_box;
-			if(box.w>0&&box.h>0&&!layout.m_is_maximized){
+			if(box.w>0&&box.h>0&&!layout.m_is_maximized&&!(area_i.has_dragging_src&&area_i.tabs.length==1)){
 				var dist=segDist(box.x,box.x+box.w,event.x)+segDist(box.y,box.y+box.h,event.y)+this.split_penalty;
 				if(target_position==undefined||target_position.score>dist){
 					//source area / other area
@@ -755,8 +755,8 @@ var RenderLayout=function(layout,obj,y_base){
 			var h_content=h-(obj.h_caption+obj.h_bar);
 			if(h_content>0){
 				var tab=windows_to_render[nd.name];
+				rendered_areas.push({name:nd.name,x:x,y:y,w:w,h:h})
 				if(tab){
-					rendered_areas.push({name:nd.name,x:x,y:y,w:w,h:h})
 					W.RoundRect("",{
 						x:x,y:y+obj.h_caption,w:w,h:obj.h_bar,
 						color:tab==obj.active_tab?obj.border_color_active:obj.border_color})

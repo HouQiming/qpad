@@ -1174,6 +1174,10 @@ class CLayouter_programmer
 				return JS.Return(ret)
 		return 0
 	}
+	JS_ClearContext=function(JSContext JS){
+		m_current_frame_spell_errors=long2[].NULL
+		return 0
+	}
 	JS_ResetSpellChecker=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)
 		sname=obj["m_spell_checker"].as(string)
@@ -1678,6 +1682,7 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"HunspellSuggest",JS_Suggest)
 		proto.ExportProperty(this,"m_temporarily_disable_spell_check")
 		proto.ExportMethod(this,"ResetSpellChecker",JS_ResetSpellChecker)
+		proto.ExportMethod(this,"HunspellClearContext",JS_ClearContext)
 		////////////////////
 		proto.ExportProperty(this,"m_hidden_ranges_prepared")
 		proto.ExportProperty(this,"m_enable_hidden")

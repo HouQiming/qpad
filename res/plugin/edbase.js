@@ -1413,6 +1413,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		if(this.SeekLC(line1,0)<sel[1]){line1++;}
 		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
+		var line_ccnts_new=[];
 		var ops=[];
 		var is_decomment=1
 		var s0=lang.line_comment
@@ -1421,17 +1422,21 @@ UI.RegisterEditorPlugin(function(){
 		for(var i=0;i<line_ccnts.length-1;i++){
 			var ccnt0=line_ccnts[i];
 			var ccnt_eh=ed.MoveToBoundary(ccnt0,1,"space")
+			if(ed.GetUtf8CharNeighborhood(ccnt0)[0]==10&&ed.GetUtf8CharNeighborhood(ccnt_eh)[1]==10){
+				//skip empty lines
+				continue
+			}
 			if(min_n_spaces==undefined||min_n_spaces>(ccnt_eh-ccnt0)){
 				min_n_spaces=ccnt_eh-ccnt0;
 			}
 			ccnt_eh=Math.min(ccnt_eh,ccnt0+min_n_spaces);
-			line_ccnts[i]=ccnt_eh
+			line_ccnts_new.push(ccnt_eh)
 			if(is_decomment&&ed.GetText(ccnt_eh,lg0)!=s0){
 				is_decomment=0
 			}
 		}
-		for(var i=0;i<line_ccnts.length-1;i++){
-			var ccnt0=line_ccnts[i];
+		for(var i=0;i<line_ccnts_new.length-1;i++){
+			var ccnt0=line_ccnts_new[i];
 			if(is_decomment){
 				ops.push(ccnt0,lg0,undefined)
 			}else{
