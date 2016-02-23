@@ -987,7 +987,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 		title:UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(file_name)),"Notebook"),
 		tooltip:file_name,
 		document_type:"notebook",
-		area_name:"h_tools",
+		area_name:"v_tools",
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
