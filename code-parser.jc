@@ -636,10 +636,15 @@ auto tokenize(string sdata,int g_ignore_indents)
 		case '#':
 			//# as comment for Python, shell and C/C++
 			pword=-1L
+			in_slash=0
 			efeed0=ptr
 			for(;;)
 				ch=int(feed[ptr])
-				if ch==0||ch=='\n':break
+				if ch==0||!in_slash&&ch=='\n':break
+				if in_slash:
+					in_slash=0
+				else if ch=='\\':
+					in_slash=1
 				if pword<0&&ch!=' '&&ch!='\t':
 					pword=ptr
 				ptr++
@@ -929,6 +934,14 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	inline cite_raw(iptr epos0,iptr epos1)
 		assert(epos1>0)
 		return sdataz[epos0:epos1-1]
+	inline debug_cite_line(iptr epos0)
+		auto p0=epos0
+		auto p1=epos0
+		while p0>0&&int(sdataz[p0-1])!=10:
+			p0--
+		while p1<sdataz.n&&int(sdataz[p1])!=10:
+			p1++
+		return sdataz[p0:epos0-1]+"\u2192"+sdataz[epos0:p1-1]
 	///////////////////
 	just_ids=new int[]
 	name_dot_entries=new int2[] //name, member
@@ -1092,7 +1105,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							if is_function:
 								tok0=int(';')
 						//((tok1&TOK_TYPE_MASK)==TOK_ID||tok1=='*'||tok1=='['||tok1=='('||tok1=='&')
-						if !(tok0==';'&&tok1!='=')&&tok1!='['&&tok0!='.'&&tok1!='.'&&!keyword_map[id]:
+						if !(tok0==';'&&tok1!='=')&&(tok1!='['||(tok0&TOK_TYPE_MASK)==TOK_ID)&&tok0!='.'&&tok1!='.'&&!keyword_map[id]:
 							//declaration
 							sc_decls.push(int2(id,int(i)))
 							//important-ish check
@@ -1181,10 +1194,13 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					//process the decls - sort, unique
 					popScope()
 					if scopes.n:
-						//removes if impact
+						//removes 'if' impact
 						scopes[scopes.n-1].in_assignment&=~i8(2)
 			else
 				scopes[scopes.n-1].blevel--
+				if scopes[scopes.n-1].blevel<0:
+					scopes[scopes.n-1].blevel=0
+					//Writeln('negative blevel: ',debug_cite_line(toks[i].epos0))
 			break
 		case ',':
 			if function_id:
@@ -1212,6 +1228,16 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	n_before_top=all_decls.n
 	popScope()
 	toplevel_ids=[all_decls[i].id for i=n_before_top:all_decls.n-1]
+	kd_toplevels=new int[int]
+	for kd in all_key_decls
+		id=kd.id_type&~KEY_DECL_MASK
+		kd_toplevels[id]=1
+	for id,I in toplevel_ids
+		if !kd_toplevels[id]:
+			kd_toplevels[id]=1
+			all_key_decls.push(TKeyDeclItem(){
+				id_type:id+KEY_DECL_MACRO,
+				epos0:all_decls[n_before_top+I].epos0})
 	///////////
 	just_ids.push(keywords)
 	unique_ids=ComputeIDOrderingMaps(just_ids)

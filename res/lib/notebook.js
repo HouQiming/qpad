@@ -4,12 +4,12 @@ var Language=require("res/lib/langdef");
 require("res/lib/global_doc");
 require("res/lib/code_editor");
 
-var MeasureEditorSize=function(doc,dlines,w_content){
+var MeasureEditorSize=function(doc,max_lines,w_content){
 	var ed=doc.ed;
 	var ccnt_tot=ed.GetTextSize();
 	var hc=ed.GetCharacterHeightAt(ccnt_tot);
-	var ytot=ed.XYFromCcnt(ccnt_tot).y+hc*(dlines+1);
-	var h_max=UI.default_styles.notebook_view.max_lines*hc;
+	var ytot=ed.XYFromCcnt(ccnt_tot).y+hc;
+	var h_max=max_lines*hc;
 	if(ytot<h_max){
 		if(doc.NeedXScrollAtWidth(w_content)){
 			ytot+=UI.default_styles.code_editor.w_scroll_bar;
@@ -560,6 +560,7 @@ W.notebook_prototype={
 			line++;
 		}
 		//}
+		this.need_auto_scroll=1;
 		UI.Refresh()
 	},
 	ClearCellOutput:function(id){
@@ -706,7 +707,7 @@ W.notebook_prototype={
 		this.scroll_y=Math.max(Math.min(this.scroll_y,(this.m_ytot_all_notes||0)-h_scrolling_area),0)
 		this.need_auto_scroll=0;
 		if(this.scroll_y!=scroll_y0){
-			UI.InvalidateCurrentFrame();
+			//UI.InvalidateCurrentFrame();
 			UI.Refresh();
 		}
 	},
@@ -723,6 +724,10 @@ W.NotebookView=function(id,attrs){
 		obj.Load();
 	}
 	var scroll_y=(obj.scroll_y||0);obj.scroll_y=scroll_y;
+	var anim=W.AnimationNode("scrolling_animation",{
+		transition_dt:obj.scroll_transition_dt,
+		scroll_y:scroll_y})
+	scroll_y=anim.scroll_y;
 	var current_y=0;
 	var widget_style=UI.default_styles.code_editor;
 	var edstyle=widget_style.editor_style;
@@ -733,30 +738,39 @@ W.NotebookView=function(id,attrs){
 	var is_tab_active=(UI.top.app.document_area.active_tab&&UI.top.app.document_area.active_tab.main_widget==obj);
 	var caption_color=(is_tab_active?obj.caption_color:obj.inactive_caption_color);
 	var caption_text_color=(is_tab_active?obj.caption_text_color:obj.inactive_caption_text_color);
+	var scroll_range=undefined;
 	for(var i=0;i<obj.m_cells.length;i++){
 		var cell_i=obj.m_cells[i];
 		var doc_in=cell_i.m_text_in;
 		var doc_out=cell_i.m_text_out;
-		var h_in=MeasureEditorSize(doc_in,0,w_content-obj.padding*2);
-		var h_out=MeasureEditorSize(doc_out,0,w_content-obj.padding*2);
+		var is_text_note=(cell_i.m_language=="Markdown"&&!doc_out.ed.GetTextSize());
+		var h_in=MeasureEditorSize(doc_in,is_text_note?obj.max_lines*2:obj.max_lines,w_content-obj.padding*2);
+		var h_out=MeasureEditorSize(doc_out,obj.max_lines,w_content-obj.padding*2);
+		if(is_text_note){
+			h_out=-obj.h_caption;
+		}
 		current_y+=obj.padding;
+		var anim=W.AnimationNode("scrolling_animation_cell_"+i.toString(),{
+			transition_dt:obj.scroll_transition_dt,
+			current_y:current_y})
+		var delta_y=anim.current_y-current_y;
 		UI.RoundRect({
-			x:obj.x+obj.padding-obj.shadow_size*0.5,y:obj.y+current_y-scroll_y-obj.shadow_size*0.5,
+			x:obj.x+obj.padding-obj.shadow_size*0.5,y:obj.y+delta_y+current_y-scroll_y-obj.shadow_size*0.5,
 			w:w_content-obj.padding*2+obj.shadow_size*1.5,h:h_in+obj.h_caption*2+h_out+obj.shadow_size*1.5,
 			round:obj.shadow_size,
 			border_width:-obj.shadow_size,
 			color:obj.shadow_color,
 		})
 		if(obj.need_auto_scroll){
-			if(UI.nd_focus==doc_in){
-				obj.ScrollShowRange(current_y,h_in+obj.h_caption*2+h_out,current_y,h_in+obj.h_caption)
-			}else if(UI.nd_focus==doc_out){
-				obj.ScrollShowRange(current_y,h_in+obj.h_caption*2+h_out,current_y+h_in+obj.h_caption,h_out+obj.h_caption)
+			if(UI.nd_focus==doc_in||obj.m_last_focus_cell_id==i*2+0){
+				scroll_range=[current_y-4,h_in+obj.h_caption*2+h_out+8,current_y,h_in+obj.h_caption];
+			}else if(UI.nd_focus==doc_out||obj.m_last_focus_cell_id==i*2+1){
+				scroll_range=[current_y-4,h_in+obj.h_caption*2+h_out+8,current_y+h_in+obj.h_caption,h_out+obj.h_caption]
 			}
 		}
 		var is_focused=(i*2==(obj.m_last_focus_cell_id||0)||UI.nd_focus&&UI.nd_focus==doc_in);
 		var rect_bar=UI.RoundRect({
-			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
+			x:obj.x+obj.padding,y:obj.y+delta_y+current_y-scroll_y,
 			w:w_content-obj.padding*2,h:obj.h_caption,
 			color:is_focused?caption_color:widget_style.line_number_bgcolor,
 		})
@@ -837,15 +851,15 @@ W.NotebookView=function(id,attrs){
 			s_caption=s_caption+' - '+cell_i.m_compiler_name;
 		}
 		W.Text("",{
-			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
+			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+delta_y+current_y-scroll_y,
 			font:obj.caption_font,text:s_caption,
 			color:cur_caption_text_color,
 		})
 		current_y+=obj.h_caption;
-		if(UI.nd_focus==doc_in||current_y-scroll_y<obj.h&&current_y-scroll_y+h_in+hc>0||Math.abs(obj.m_last_focus_cell_id-(i*2))<=1){
+		if(UI.nd_focus==doc_in||delta_y+current_y-scroll_y<obj.h&&delta_y+current_y-scroll_y+h_in+hc>0||Math.abs(obj.m_last_focus_cell_id-(i*2))<=1){
 			W.CodeEditor("doc_in_"+i.toString(),{
 				doc:doc_in,
-				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in,
+				x:obj.x+obj.padding,y:obj.y+delta_y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in,
 			})
 		}
 		doc_in.sub_cell_id=i*2+0;
@@ -853,52 +867,56 @@ W.NotebookView=function(id,attrs){
 		//var w_line_numbers=doc_in.m_rendering_w_line_numbers+UI.default_styles.code_editor.padding;
 		//doc_in.RenderWithLineNumbers(
 		//	doc_in.scroll_x||0,doc_in.scroll_y||0,
-		//	obj.x,obj.y+current_y,w_content,h_in,
+		//	obj.x,obj.y+delta_y+current_y,w_content,h_in,
 		//	"doc_in_"+i.toString())
 		current_y+=h_in;
 		is_focused=(i*2+1==(obj.m_last_focus_cell_id||0)||UI.nd_focus&&UI.nd_focus==doc_out);
-		rect_bar=UI.RoundRect({
-			x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,
-			w:w_content-obj.padding*2,h:obj.h_caption,
-			color:is_focused?caption_color:widget_style.line_number_bgcolor,
-		})
-		var cur_caption_text_color=(is_focused?caption_text_color:widget_style.line_number_color);
-		obj.button_style["$"].out.text_color=cur_caption_text_color;
-		W.Text("",{
-			x:obj.x+obj.padding+obj.caption_padding,y:obj.y+current_y-scroll_y,
-			font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":(cell_i.m_completion_time?UI.Format("Output - @1",UI.FormatRelativeTime(cell_i.m_completion_time,now)):"Output"),
-			color:cur_caption_text_color,
-		})
-		btn_last=W.Button("clear_btn_"+i.toString(),{
-			style:obj.button_style,
-			text:"清",
-			tooltip:"Clear output",
-			x:obj.caption_button_padding,y:0,anchor:rect_bar,anchor_align:'right',anchor_valign:'center',
-			OnClick:function(i){
-				this.ClearCellOutput(i)
-				UI.Refresh()
-			}.bind(obj,i),
-		});
+		if(h_out>0){
+			rect_bar=UI.RoundRect({
+				x:obj.x+obj.padding,y:obj.y+delta_y+current_y-scroll_y,
+				w:w_content-obj.padding*2,h:obj.h_caption,
+				color:is_focused?caption_color:widget_style.line_number_bgcolor,
+			})
+			var cur_caption_text_color=(is_focused?caption_text_color:widget_style.line_number_color);
+			obj.button_style["$"].out.text_color=cur_caption_text_color;
+			W.Text("",{
+				x:obj.x+obj.padding+obj.caption_padding,y:obj.y+delta_y+current_y-scroll_y,
+				font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":(cell_i.m_completion_time?UI.Format("Output - @1",UI.FormatRelativeTime(cell_i.m_completion_time,now)):"Output"),
+				color:cur_caption_text_color,
+			})
+			btn_last=W.Button("clear_btn_"+i.toString(),{
+				style:obj.button_style,
+				text:"清",
+				tooltip:"Clear output",
+				x:obj.caption_button_padding,y:0,anchor:rect_bar,anchor_align:'right',anchor_valign:'center',
+				OnClick:function(i){
+					this.ClearCellOutput(i)
+					UI.Refresh()
+				}.bind(obj,i),
+			});
+		}
 		current_y+=obj.h_caption;
 		//UI.RoundRect({
-		//	x:obj.x+obj.padding,y:obj.y+current_y,w:w_content-obj.padding*2,h:h_out,
+		//	x:obj.x+obj.padding,y:obj.y+delta_y+current_y,w:w_content-obj.padding*2,h:h_out,
 		//	color:UI.default_styles.code_editor.bgcolor,
 		//})
 		//doc_out.RenderAsWidget("doc_out_"+i.toString(),
-		//	obj.x+obj.padding+w_line_numbers,obj.y+current_y,w_content-w_line_numbers,h_out);
-		if(UI.nd_focus==doc_out||current_y-scroll_y<obj.h&&current_y-scroll_y+h_out>0||Math.abs(obj.m_last_focus_cell_id-(i*2+1))<=1){
-			W.CodeEditor("doc_out_"+i.toString(),{
-				doc:doc_out,
-				read_only:doc_out.read_only,
-				//x:obj.x+obj.padding,y:obj.y+current_y,w:w_content-obj.padding*2,h:h_in+hc,
-				x:obj.x+obj.padding,y:obj.y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_out,
-			})
+		//	obj.x+obj.padding+w_line_numbers,obj.y+delta_y+current_y,w_content-w_line_numbers,h_out);
+		if(h_out>0){
+			if(UI.nd_focus==doc_out||delta_y+current_y-scroll_y<obj.h&&delta_y+current_y-scroll_y+h_out>0||Math.abs(obj.m_last_focus_cell_id-(i*2+1))<=1){
+				W.CodeEditor("doc_out_"+i.toString(),{
+					doc:doc_out,
+					read_only:doc_out.read_only,
+					//x:obj.x+obj.padding,y:obj.y+delta_y+current_y,w:w_content-obj.padding*2,h:h_in+hc,
+					x:obj.x+obj.padding,y:obj.y+delta_y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_out,
+				})
+			}
 		}
 		doc_out.sub_cell_id=i*2+1;
 		doc_out.default_focus=(obj.m_last_focus_cell_id==doc_out.sub_cell_id?2:1)
 		//doc_out.RenderWithLineNumbers(
 		//	doc_out.scroll_x||0,doc_out.scroll_y||0,
-		//	obj.x,obj.y+current_y,w_content,h_out,
+		//	obj.x,obj.y+delta_y+current_y,w_content,h_out,
 		//	"doc_out_"+i.toString())
 		doc_in.AutoScroll("bound")
 		doc_out.AutoScroll("bound")
@@ -911,7 +929,12 @@ W.NotebookView=function(id,attrs){
 		doc_in.m_cell_id=i;
 		cell_i.m_cell_id=i;
 	}
-	var ytot_all_notes=current_y-obj.h_separation;
+	var ytot_all_notes=current_y;
+	obj.m_ytot_all_notes=ytot_all_notes;
+	if(scroll_range){
+		//gotta do it after updating m_ytot_all_notes
+		obj.ScrollShowRange(scroll_range[0],scroll_range[1],scroll_range[2],scroll_range[3]);
+	}
 	//coulddo: tool bar
 	var focus_cell_id=undefined;
 	for(var i=0;i<obj.m_cells.length;i++){
@@ -952,12 +975,12 @@ W.NotebookView=function(id,attrs){
 	//scroll bar - obj.w_scroll_bar
 	var h_scrolling_area=obj.h/obj.scale;
 	var sbar_value=Math.max(Math.min(scroll_y/(ytot_all_notes-h_scrolling_area),1),0);
-	obj.m_ytot_all_notes=ytot_all_notes;
 	if(h_scrolling_area<ytot_all_notes){
 		W.ScrollBar("sbar",{
 			x:obj.x+obj.w-obj.w_scroll_bar, y:obj.y, w:obj.w_scroll_bar, h:obj.h, dimension:'y',
 			page_size:h_scrolling_area, total_size:ytot_all_notes, value:sbar_value,
 			OnChange:function(value){
+				obj.scrolling_animation=undefined;
 				obj.scroll_y=value*(this.total_size-this.page_size)
 				UI.Refresh()
 			},
@@ -968,6 +991,8 @@ W.NotebookView=function(id,attrs){
 }
 
 UI.OpenNoteBookTab=function(file_name,is_quiet){
+	var layout=UI.m_ui_metadata["<layout>"];
+	layout.m_is_maximized=0;
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab_i=UI.g_all_document_windows[i];

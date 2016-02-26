@@ -727,7 +727,7 @@ UI.RegisterOutputParser('(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([
 });
 
 //vc
-UI.RegisterOutputParser('[ \t]*(.*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.*?)',7,function(matches){
+UI.RegisterOutputParser('[ \t]*(.*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.+)',7,function(matches){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	var message=matches[7]
@@ -808,7 +808,7 @@ UI.RegisterEditorPlugin(function(){
 				s_mark="#!/bin/sh\n#build script for "+s_name_in_script+"\n";
 				s_language='Unix Shell Script';
 			}
-			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,1,'non_quiet');
+			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,1,'input');
 			if(result_cell){
 				var obj_notebook=result_cell.obj_notebook;
 				var cell_i=obj_notebook.m_cells[result_cell.cell_id];
@@ -818,10 +818,8 @@ UI.RegisterEditorPlugin(function(){
 				UI.Refresh()
 			}
 		}; 
-		menu_run.AddNormalItem({text:"Make notebook cell",enable_hotkey:0,action:fgencell})
-		menu_run.AddNormalItem({text:"Make project cell",enable_hotkey:0,action:function(){
-			fgencell.call(this,1);
-		}})
+		menu_run.AddNormalItem({text:"Make notebook cell",enable_hotkey:0,action:fgencell.bind(this,0)})
+		menu_run.AddNormalItem({text:"Make project cell",enable_hotkey:0,action:fgencell.bind(this,1)})
 		menu_run.AddSeparator()
 		/////////////////
 		var fruncell=function(is_project){
@@ -839,7 +837,7 @@ UI.RegisterEditorPlugin(function(){
 				s_language='Unix Shell Script';
 			}
 			//"non_quiet"
-			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,'non_quiet');
+			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,'output');
 			if(result_cell){
 				var obj_notebook=result_cell.obj_notebook;
 				//var cell_i=obj_notebook.m_cells[result_cell.cell_id];
@@ -849,7 +847,7 @@ UI.RegisterEditorPlugin(function(){
 			}else{
 				//create cell and focus it
 				fgencell.call(this,is_project)
-				result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,'non_quiet');
+				result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,'output');
 				if(result_cell){
 					var obj_notebook=result_cell.obj_notebook;
 					//var cell_i=obj_notebook.m_cells[result_cell.cell_id];

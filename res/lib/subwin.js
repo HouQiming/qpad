@@ -829,9 +829,9 @@ var RenderLayout=function(layout,obj,y_base){
 			type:"doc",
 			name:tab_maximized.area_name||"doc_default",
 			temp_is_there:2,temp_has_active:1,temp_z_order:UI.g_current_z_value-1,
-		},obj.x,obj.y+y_base,obj.w,obj.h)
+		},obj.x,obj.y+y_base,obj.w,obj.h-y_base)
 	}else{
-		dfsRender(layout,obj.x,obj.y+y_base,obj.w,obj.h)
+		dfsRender(layout,obj.x,obj.y+y_base,obj.w,obj.h-y_base)
 	}
 	return [rendered_areas,windows_to_render,all_shadows];
 }
@@ -1850,8 +1850,10 @@ UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"documen
 UI.m_previous_document=undefined
 UI.UpdateNewDocumentSearchPath=function(){
 	if(!UI.m_the_document_area){return;}
-	//var active_document=UI.m_the_document_area.active_tab
-	var active_document=UI.GetFrontMostEditorTab();
+	var active_document=UI.m_the_document_area.active_tab
+	if(active_document&&!active_document.file_name){
+		active_document=UI.GetFrontMostEditorTab();
+	}
 	var ret=undefined;
 	if(active_document&&active_document.file_name){
 		ret=UI.GetPathFromFilename(active_document.file_name)
