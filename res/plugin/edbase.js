@@ -771,7 +771,7 @@ UI.RegisterOutputParser('[ \t]*at[ \t]*.*[ \t]*\\((.*):([0-9]+):([0-9]+)\\).*',3
 //todo: ipython
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
-	this.AddEventHandler('menu',function(){
+	this.AddEventHandler('global_menu',function(){
 		var desc=this.plugin_language_desc;
 		if(!desc.m_buildenv_by_name){return 1;}
 		var s_name_default=UI.GetDefaultBuildEnv(desc.name);
@@ -894,6 +894,21 @@ UI.RegisterEditorPlugin(function(){
 			}
 			fruncell(1)
 		}.bind(this)})
+		menu_run.AddNormalItem({text:"&Stop all cells",enable_hotkey:0,action:function(){
+			for(var i=0;i<UI.g_all_document_windows.length;i++){
+				var obj_tab_i=UI.g_all_document_windows[i];
+				if(obj_tab_i.document_type=="notebook"){
+					if(obj_tab_i.main_widget){
+						var obj_notebook=obj_tab_i.main_widget;
+						if(obj_notebook.m_cells){
+							for(var j=0;j<obj_notebook.m_cells.length;j++){
+								obj_notebook.KillCell(j);
+							}
+						}
+					}
+				}
+			}
+		}})
 		if(desc.m_buildenvs.length>1){
 			menu_run.AddSeparator()
 			for(var i=0;i<desc.m_buildenvs.length;i++){

@@ -114,6 +114,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks['close']=[]
 		this.m_event_hooks['parse']=[]
 		this.m_event_hooks['menu']=[]
+		this.m_event_hooks['global_menu']=[]
 		this.m_event_hooks['beforeEdit']=[]
 		this.m_event_hooks['autoComplete']=[]
 		this.m_event_hooks['explicitAutoComplete']=[]
@@ -2300,6 +2301,10 @@ UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found
 		//UI.SetFocus(obj_notebook.m_cells[cell_id].m_text_in);
 		obj_notebook.m_last_focus_cell_id=cell_id*2+(is_non_quiet=="output"?1:0);
 		obj_notebook.need_auto_scroll=1;
+		var cell_i=(obj_notebook.m_cells&&obj_notebook.m_cells[cell_id]);
+		if(cell_i){
+			UI.SetFocus(is_non_quiet=="output"?cell_i.m_text_out:cell_i.m_text_in)
+		}
 		UI.Refresh()
 	}
 	return {obj_notebook:obj_notebook,cell_id:cell_id};
@@ -6140,9 +6145,9 @@ UI.NewCodeEditorTab=function(fname0){
 			fn=IO.NormalizeFileName(fn);
 			var doc=this.main_widget.doc;
 			if(doc){
-				if(g_editor_from_file[doc.m_file_name]==doc){
-					g_editor_from_file[doc.m_file_name]=undefined;
-					g_editor_from_file[fn]=doc;
+				if(UI.g_editor_from_file[doc.m_file_name]==doc){
+					UI.g_editor_from_file[doc.m_file_name]=undefined;
+					UI.g_editor_from_file[fn]=doc;
 				}
 			}
 			this.file_name=fn

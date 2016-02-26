@@ -397,21 +397,26 @@ var CreateMenus=function(){
 						obj_active_tab.__global_tab_id),
 				})
 			}else{
-				var doc=obj_real_active_tab.main_widget&&obj_real_active_tab.main_widget.doc;
-				menu_file.AddNormalItem({icon:"本",text:"Open notebook...",
-					enable_hotkey:1,key:"ALT+N",
-					action:(function(){
-						var result_cell=UI.OpenNotebookCellFromEditor(this,"# TODO LIST\n","Markdown",1,'input');
-						UI.OpenNoteBookTab(fn_notebook)
-						if(result_cell){
-							UI.SetFocus(result_cell.obj_notebook.m_cells[result_cell.cell_id].m_text_in);
-						}
-						UI.Refresh()
-					}).bind(doc)
-				})
+				var doc=obj_active_tab.main_widget&&obj_active_tab.main_widget.doc;
+				if(doc){
+					menu_file.AddNormalItem({icon:"本",text:"Open notebook...",
+						enable_hotkey:1,key:"ALT+N",
+						action:(function(){
+							var result_cell=UI.OpenNotebookCellFromEditor(this,"# TODO LIST\n","Markdown",1,'input');
+							UI.OpenNoteBookTab(fn_notebook)
+							if(result_cell){
+								UI.SetFocus(result_cell.obj_notebook.m_cells[result_cell.cell_id].m_text_in);
+							}
+							UI.Refresh()
+						}).bind(doc)
+					})
+				}
 				doc=undefined;
 			}
 		}
+	}
+	if(obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc){
+		obj_active_tab.main_widget.doc.CallHooks("global_menu")
 	}
 	obj_active_tab=undefined;
 	menu_file.AddSeparator();

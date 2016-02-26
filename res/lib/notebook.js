@@ -660,6 +660,15 @@ W.notebook_prototype={
 		this.need_auto_scroll=1;
 		UI.Refresh()
 	},
+	KillCell:function(id){
+		var cell_i=this.m_cells[id];
+		if(cell_i.m_proc&&!cell_i.m_proc.is_terminated){
+			this.WriteCellOutput(cell_i.m_cell_id,"Stopped...\n")
+			cell_i.m_proc.is_terminated=1;
+			cell_i.m_proc.proc.Terminate()
+			UI.Refresh()
+		}
+	},
 	OnDestroy:function(){
 		for(var i=0;i<this.m_cells.length;i++){
 			this.ClearCellOutput(i)
@@ -826,13 +835,9 @@ W.NotebookView=function(id,attrs){
 				text:"停",
 				tooltip:'Stop',
 				x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
-				OnClick:function(cell_i){
-					if(cell_i.m_proc){
-						this.WriteCellOutput(cell_i.m_cell_id,"Stopped...\n")
-						cell_i.m_proc.proc.Terminate()
-						UI.Refresh()
-					}
-				}.bind(obj,cell_i),
+				OnClick:function(i){
+					this.KillCell(i);
+				}.bind(obj,i),
 			})
 		}else{
 			W.Button("play_btn_"+i.toString(),{
