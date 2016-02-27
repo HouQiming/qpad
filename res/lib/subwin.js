@@ -1465,7 +1465,7 @@ W.TopMenuItem=function(id,attrs){
 			//hotkey - listview selection setting
 			W.Hotkey("",{key:attrs.text.substr(p_and+1,1).toUpperCase(),action:function(){
 				parent.OnChange(parseInt(obj.id.substr(1)))
-				owner.m_show_sub_menus=1;
+				owner.m_show_sub_menus=!owner.m_show_sub_menus;
 				UI.Refresh()
 			}})
 		}
@@ -1505,11 +1505,15 @@ W.TopMenuBar=function(id,attrs){
 			obj.m_show_sub_menus=1
 			UI.Refresh()
 		}
+		var ftoggle_sub_menus=function(){
+			obj.m_show_sub_menus=!obj.m_show_sub_menus;
+			UI.Refresh()
+		}
 		var bk_tentative_focus=UI.context_tentative_focus;
 		UI.PushCliprect(obj.x,obj.y+2,obj.w,obj.h-4)
 		W.ListView('list_view',{x:obj.x,y:obj.y+2,w:obj.w,h:obj.h-4,
 			dimension:'x',layout_spacing:8,is_single_click_mode:1,
-			item_template:{object_type:W.TopMenuItem,owner:obj,OnDblClick:fshow_sub_menus},
+			item_template:{object_type:W.TopMenuItem,owner:obj,OnDblClick:ftoggle_sub_menus},
 			items:desc.$,
 			OnChange:function(value){
 				this.value=value;
@@ -1521,7 +1525,7 @@ W.TopMenuBar=function(id,attrs){
 		UI.context_tentative_focus=bk_tentative_focus;
 		if(!obj.m_show_sub_menus&&obj.owner.m_is_in_menu){
 			W.Hotkey("",{key:"DOWN",action:fshow_sub_menus})
-			W.Hotkey("",{key:"RETURN RETURN2",action:fshow_sub_menus})
+			W.Hotkey("",{key:"RETURN RETURN2",action:ftoggle_sub_menus})
 			W.Hotkey("",{key:"ESC",action:(function(obj){obj.owner.SetMenuState(0);UI.Refresh();}).bind(null,obj)})
 			if(is_first&&!obj.m_show_sub_menus){
 				UI.SetFocus(obj.list_view);

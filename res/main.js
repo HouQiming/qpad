@@ -289,13 +289,12 @@ if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 		a_sh_installer.push("mkdir -p /usr/share/qpad\n")
 		a_sh_installer.push("mv ",fn_svg," /usr/share/qpad/icon.svg\n")
 		a_sh_installer.push("mv ",fn_desktop," /usr/share/applications/qpad.desktop\n")
+		a_sh_installer.push('rm -- "$0"\n')
 		var fn_sh=IO.GetNewDocumentName("a","sh","temp")
 		IO.CreateFile(fn_sh,a_sh_installer.join(""))
 		var s_terminal="xterm";
-		if(IO.FileExists("/usr/bin/gnome-terminal")){
-			s_terminal="gnome-terminal";
-		}else if(IO.FileExists("/usr/bin/konsole")){
-			s_terminal="konsole";
+		if(IO.FileExists("/usr/bin/x-terminal-emulator")){
+			s_terminal="x-terminal-emulator";
 		}
 		IO.Shell([s_terminal,
 			"-e",'sudo /bin/sh '+fn_sh])
@@ -407,13 +406,12 @@ var CreateMenus=function(){
 				IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
 			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 				var s_terminal="xterm";
-				if(IO.FileExists("/usr/bin/gnome-terminal")){
-					s_terminal="gnome-terminal";
-				}else if(IO.FileExists("/usr/bin/konsole")){
-					s_terminal="konsole";
+				if(IO.FileExists("/usr/bin/x-terminal-emulator")){
+					s_terminal="x-terminal-emulator";
 				}
-				IO.Shell([s_terminal,
-					"-e",'cd '+UI.m_new_document_search_path+'; $SHELL'])
+				var fn_sh=IO.GetNewDocumentName("a","sh","temp")
+				IO.CreateFile(fn_sh,'#!/bin/sh\ncd '+UI.m_new_document_search_path+'\nrm -- "$0"\nexec "$SHELL"\n')
+				IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh])
 			}else{
 				//mac
 				//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
