@@ -20,17 +20,19 @@ __generate_json("js_units","gui2d/dockbar.js")
 __generate_json("icon_file","icon256.png")
 //__generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
-if Platform.BUILD!="debug"&&Platform.IS_WINDOWS:
-	__generate_json("subsystem","windows")
-	__generate_json("c_files","jc_winmain.c")
 if Platform.IS_WINDOWS:
 	__generate_json("lib_files","shell32.lib")
 	__generate_json("lib_files","kernel32.lib")
 	__generate_json("lib_files","user32.lib")
 	__generate_json("lib_files","gdi32.lib")
+	if Platform.BUILD!="debug":
+		__generate_json("subsystem","windows")
+		__generate_json("c_files","jc_winmain.c")
 if Platform.ARCH=="win32":
 	//use VC2008 for XP support
 	__generate_json("vc_versions","9")
+if Platform.IS_UNIX&&Platform.BUILD!="debug":
+	__generate_json("ldflags","-s")
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -89,7 +91,7 @@ if Platform.BUILD=="debug":
 	})
 
 (function(){
-	Gui2D.ProvideGLFunctions()
+	//Gui2D.ProvideGLFunctions()
 	JS=new JSContext
 	JS_script_sandbox=new JSContext
 	sbox=setupModuleSystem(JS,1)

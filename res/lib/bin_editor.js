@@ -123,8 +123,15 @@ W.BinaryEditor_prototype={
 			this.Redo()
 			return;
 		}else if(IsHotkey(event,"CTRL+G")){
+			UI.OpenUtilTab("binary_tools");
 			if(this.goto_bar_edit){
 				UI.SetFocus(this.goto_bar_edit)
+			}else{
+				UI.NextTick(function(){
+					if(this.goto_bar_edit){
+						UI.SetFocus(this.goto_bar_edit)
+					}
+				}.bind(this))
 			}
 			UI.Refresh()
 			return;
@@ -437,7 +444,7 @@ W.BinaryEditor=function(id,attrs){
 			}
 			obj.m_data=Buffer(Duktape.Buffer(obj.m_data_raw));
 			if(!loaded_metadata.ranges){
-				//todo: default parsing script
+				//coulddo: default parsing script
 			}
 			obj.m_ranges=(loaded_metadata.ranges||[]);
 			obj.m_native_view=UI.BIN_CreateView(obj.m_ranges);
@@ -519,8 +526,9 @@ W.BinaryEditor=function(id,attrs){
 			var x_minimap_min=obj.x+obj.m_w_addr+dx_text+w_text_char*obj.m_w_bytes;
 			//var x_minimap=x_minimap_min;
 			var w_minimap=obj.m_w_bytes/UI.pixels_per_unit;
-			var x_panel=obj.x+obj.w-(obj.is_preview?0:obj.w_panel);
-			var x_minimap=x_panel-(w_minimap+obj.minimap_padding*1.5+obj.sxs_shadow_size*0.5);
+			//var x_panel=obj.x+obj.w-(obj.is_preview?0:obj.w_panel);
+			//var x_minimap=x_panel-(w_minimap+obj.minimap_padding*1.5+obj.sxs_shadow_size*0.5);
+			var x_minimap=obj.x+obj.w-(w_minimap+obj.minimap_padding*1.5+obj.sxs_shadow_size*0.5);
 			var main_area_scale_factor=1;
 			if(x_minimap_min>x_minimap){
 				main_area_scale_factor=x_minimap/x_minimap_min;
@@ -825,7 +833,8 @@ W.BinaryEditor=function(id,attrs){
 					undefined,obj.h,obj,scroll_minimap,obj.m_ramp)
 			});
 			//var x_panel=x_minimap+w_minimap
-			var w_minimap_bars=x_panel-(x_minimap+obj.minimap_padding*0.5);
+			//var w_minimap_bars=x_panel-(x_minimap+obj.minimap_padding*0.5);
+			var w_minimap_bars=obj.x+obj.w-(x_minimap+obj.minimap_padding*0.5);
 			UI.RoundRect({x:x_minimap+obj.minimap_padding*0.5,y:obj.y,w:1,h:obj.h,color:obj.separator_color})
 			var minimap_page_y0=Math.max(obj.m_scroll-scroll_minimap,0)/obj.m_w_bytes/UI.pixels_per_unit;
 			var minimap_page_y1=Math.max(obj.m_scroll+n_lines_disp*obj.m_w_bytes-scroll_minimap,0)/obj.m_w_bytes/UI.pixels_per_unit;
@@ -840,138 +849,17 @@ W.BinaryEditor=function(id,attrs){
 				color:obj.minimap_page_border_color})
 			///////////////
 			//panel
+			obj.goto_bar_edit=undefined;
 			if(!obj.is_preview){
-				var w_shadow=obj.sxs_shadow_size;
-				UI.RoundRect({
-					x:x_panel-w_shadow,y:obj.y-w_shadow,w:w_shadow*2,h:obj.h+w_shadow*2,
-					color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
-				})
-				UI.RoundRect({
-					x:x_panel,y:obj.y,w:obj.x+obj.w-x_panel,h:obj.h,
-					color:obj.sxs_bgcolor,
-				})
-				var y_current=obj.y+8;
-				//go-to bar
-				var ss_addr=["0x"];
-				var addr_value=obj.m_sel1;
-				for(var j=0;j<obj.m_lg_addr;j++){
-					var addr2=Math.floor(addr_value/16)
-					var ch=addr_value-addr2*16;
-					if(ch>=10){
-						ch+=65-10;
-					}else{
-						ch+=48;
-					}
-					addr_value=addr2;
-					ss_addr[obj.m_lg_addr-j]=String.fromCharCode(ch);
+				var tab_tools=UI.OpenUtilTab("binary_tools","quiet");
+				if(tab_tools){
+					obj.goto_bar_edit=(tab_tools&&tab_tools.util_widget&&tab_tools.util_widget.goto_bar_edit);
 				}
-				W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Go to",color:obj.text_color_panel})
-				var got_edit_before=!!(obj.goto_bar_edit&&obj.goto_bar_edit.edit)
-				W.EditBox("goto_bar_edit",{
-					x:x_panel+64,w:144,y:y_current+2,h:24,
-					is_single_line:1,
-					value:ss_addr.join(""),
-					font:obj.font_goto,
-					OnChange:function(value){
-						var ret=obj.m_sel1;
-						try{
-							ret=JSON.parse(Duktape.__eval_expr_sandbox(value));
-						}catch(e){
-							return;
-						}
-						if(typeof(ret)=='number'){
-							obj.m_sel1=ret;
-							obj.ValidateSelection(0,-1);
-						}
-						UI.Refresh()
-					},
-				});
-				if(!got_edit_before&&obj.goto_bar_edit.edit){
-					var doc_goto=obj.goto_bar_edit.edit;
-					doc_goto.SetSelection(2,doc_goto.ed.GetTextSize())
-				}
-				y_current+=32;
-				//width buttons
-				W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display width",color:obj.text_color_panel})
-				var x_buttons=x_panel+128;
-				W.Button("btn_w16",{
-					style:UI.default_styles.check_button,
-					x:x_buttons,y:y_current,w:24,h:24,
-					value:obj.m_w_bytes==16,OnClick:function(){obj.ResetWBytes(16)},
-					font:obj.font_panel_fixed,text:"16"});x_buttons+=28;
-				W.Button("btn_w32",{
-					style:UI.default_styles.check_button,
-					x:x_buttons,y:y_current,w:24,h:24,
-					value:obj.m_w_bytes==32,OnClick:function(){obj.ResetWBytes(32)},
-					font:obj.font_panel_fixed,text:"32"});x_buttons+=28;
-				W.Button("btn_w48",{
-					style:UI.default_styles.check_button,
-					x:x_buttons,y:y_current,w:24,h:24,
-					value:obj.m_w_bytes==48,OnClick:function(){obj.ResetWBytes(48)},
-					font:obj.font_panel_fixed,text:"48"});x_buttons+=28;
-				//W.Button("btn_w64",{
-				//	style:UI.default_styles.check_button,
-				//	x:x_buttons,y:y_current,w:24,h:24,
-				//	value:obj.m_w_bytes==64,OnClick:function(){obj.ResetWBytes(64)},
-				//	font:obj.font_panel_fixed,text:"64"});x_buttons+=28;
-				y_current+=32;
-				W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display type",color:obj.text_color_panel})
-				y_current+=28;
-				//type buttons
-				for(var i=0;i<4;i++){
-					for(var j=0;j<4;j++){
-						var tid=i*4+j;
-						//if(tid==12){continue;}
-						var btn=W.Button("btn_t"+tid,{
-							style:UI.default_styles.check_button,
-							x:x_panel+24+48*i,y:y_current+28*j,w:48,h:28,
-							value:tid==12?((rg.tid&16)!=0):(tid==(rg.tid&15)),
-							OnClick:(function(tid){
-								var sel=obj.GetRangeFromSelection();
-								var sel0=sel[0],sel1=sel[1];
-								if(Math.floor((sel1-sel0)/(1<<(tid&3)))*(1<<(tid&3))==sel1-sel0&&sel1-sel0>0){
-									obj.SetRange(sel0,sel1,{tid:tid});
-								}
-								UI.Refresh()
-							}).bind(undefined,tid==12?rg.tid^16:tid+(rg.tid&16)),
-							font:obj.font_panel_fixed,
-							text:tid==12?"BE":g_types[i]+g_sizes[j]});
-						if(tid==12){
-							btn.tooltip='Big endian';
-						}
-					}
-				}
-				y_current+=28*4+4;
-				W.Text("",{x:x_panel+12,y:y_current,font:obj.font_panel,text:"Display color",color:obj.text_color_panel})
-				y_current+=28;
-				var g_colors=obj.color_choices;
-				for(var i=0;i<2;i++){
-					for(var j=0;j<5;j++){
-						var C=(g_colors[i*5+j]|0);
-						W.Button("btn_C"+C,{
-							style:UI.default_styles.check_button,
-							x:x_panel+24+28*j,y:y_current+28*i,w:28,h:28,
-							value:(rg.color==C),
-							OnClick:(function(C){
-								var sel=obj.GetRangeFromSelection();
-								var sel0=sel[0],sel1=sel[1];
-								obj.SetRange(sel0,sel1,{color:C});
-								UI.Refresh()
-							}).bind(undefined,C),
-							font:obj.font_panel_icon,
-							text_color:C,
-							text:'黑'});
-					}
-				}
-				y_current+=3*28+4;
-				//region list
-				//todo
-				//parsing script
-				//todo
 			}
 			///////////////
 			//minimap mouse region
-			W.Region("rgn_minimap",{owner:obj,x:x_minimap,y:obj.y,w:x_panel-x_minimap,h:obj.h},W.SlaveRegion_prototype)
+			//W.Region("rgn_minimap",{owner:obj,x:x_minimap,y:obj.y,w:x_panel-x_minimap,h:obj.h},W.SlaveRegion_prototype)
+			W.Region("rgn_minimap",{owner:obj,x:x_minimap,y:obj.y,w:obj.x+obj.w-x_minimap,h:obj.h},W.SlaveRegion_prototype)
 			obj.m_minimap_page_y0=obj.y+minimap_page_y0;
 			obj.m_minimap_page_y1=obj.y+minimap_page_y1;
 			obj.m_scroll_max=scroll_max;
@@ -1013,6 +901,7 @@ UI.NewBinaryEditorTab=function(fname0){
 		file_name:file_name,
 		title:UI.RemovePath(file_name),
 		tooltip:file_name,
+		document_type:'binary',
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
@@ -1070,3 +959,173 @@ UI.NewBinaryEditorTab=function(fname0){
 		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
 };
+
+W.BinaryToolsPage=function(id,attrs){
+	//share the style
+	var obj=UI.StdWidget(id,attrs,"binary_editor");
+	UI.Begin(obj)
+	//var w_shadow=obj.sxs_shadow_size;
+	//UI.RoundRect({
+	//	x:x_panel-w_shadow,y:obj.y-w_shadow,w:w_shadow*2,h:obj.h+w_shadow*2,
+	//	color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
+	//})
+	UI.RoundRect({
+		x:obj.x,y:obj.y,w:obj.w,h:obj.h,
+		color:obj.sxs_bgcolor,
+	})
+	var obj_real=obj.editor_widget;
+	if(!obj_real){
+		UI.End()
+		return obj
+	}
+	var y_current=obj.y+8;
+	//go-to bar
+	var ss_addr=["0x"];
+	var addr_value=obj_real.m_sel1;
+	for(var j=0;j<obj_real.m_lg_addr;j++){
+		var addr2=Math.floor(addr_value/16)
+		var ch=addr_value-addr2*16;
+		if(ch>=10){
+			ch+=65-10;
+		}else{
+			ch+=48;
+		}
+		addr_value=addr2;
+		ss_addr[obj_real.m_lg_addr-j]=String.fromCharCode(ch);
+	}
+	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Go to",color:obj.text_color_panel})
+	var got_edit_before=!!(obj.goto_bar_edit&&obj.goto_bar_edit.edit)
+	W.EditBox("goto_bar_edit",{
+		x:obj.x+64,w:144,y:y_current+2,h:24,
+		is_single_line:1,
+		value:ss_addr.join(""),
+		font:obj.font_goto,
+		OnChange:function(value){
+			var ret=obj_real.m_sel1;
+			try{
+				ret=JSON.parse(Duktape.__eval_expr_sandbox(value));
+			}catch(e){
+				UI.SetFocus(obj_real)
+				UI.Refresh()
+				return;
+			}
+			if(typeof(ret)=='number'){
+				obj_real.m_sel1=ret;
+				obj_real.ValidateSelection(0,-1);
+			}
+			UI.SetFocus(obj_real)
+			UI.Refresh()
+		},
+	});
+	if(!got_edit_before&&obj.goto_bar_edit.edit){
+		var doc_goto=obj.goto_bar_edit.edit;
+		doc_goto.SetSelection(2,doc_goto.ed.GetTextSize())
+	}
+	y_current+=32;
+	//width buttons
+	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Display width",color:obj.text_color_panel})
+	var x_buttons=obj.x+128;
+	W.Button("btn_w16",{
+		style:UI.default_styles.check_button,
+		x:x_buttons,y:y_current,w:24,h:24,
+		value:obj_real.m_w_bytes==16,OnClick:function(){obj_real.ResetWBytes(16)},
+		font:obj.font_panel_fixed,text:"16"});x_buttons+=28;
+	W.Button("btn_w32",{
+		style:UI.default_styles.check_button,
+		x:x_buttons,y:y_current,w:24,h:24,
+		value:obj_real.m_w_bytes==32,OnClick:function(){obj_real.ResetWBytes(32)},
+		font:obj.font_panel_fixed,text:"32"});x_buttons+=28;
+	W.Button("btn_w48",{
+		style:UI.default_styles.check_button,
+		x:x_buttons,y:y_current,w:24,h:24,
+		value:obj_real.m_w_bytes==48,OnClick:function(){obj_real.ResetWBytes(48)},
+		font:obj.font_panel_fixed,text:"48"});x_buttons+=28;
+	//W.Button("btn_w64",{
+	//	style:UI.default_styles.check_button,
+	//	x:x_buttons,y:y_current,w:24,h:24,
+	//	value:obj.m_w_bytes==64,OnClick:function(){obj.ResetWBytes(64)},
+	//	font:obj.font_panel_fixed,text:"64"});x_buttons+=28;
+	y_current+=32;
+	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Display type",color:obj.text_color_panel})
+	y_current+=28;
+	//type buttons
+	var rg=UI.BIN_GetRangeAt(obj_real,Math.min(obj_real.m_sel0,obj_real.m_sel1));
+	for(var i=0;i<4;i++){
+		for(var j=0;j<4;j++){
+			var tid=i*4+j;
+			//if(tid==12){continue;}
+			var btn=W.Button("btn_t"+tid,{
+				style:UI.default_styles.check_button,
+				x:obj.x+24+48*i,y:y_current+28*j,w:48,h:28,
+				value:tid==12?((rg.tid&16)!=0):(tid==(rg.tid&15)),
+				OnClick:(function(tid){
+					var sel=obj_real.GetRangeFromSelection();
+					var sel0=sel[0],sel1=sel[1];
+					if(Math.floor((sel1-sel0)/(1<<(tid&3)))*(1<<(tid&3))==sel1-sel0&&sel1-sel0>0){
+						obj_real.SetRange(sel0,sel1,{tid:tid});
+					}
+					UI.Refresh()
+				}).bind(undefined,tid==12?rg.tid^16:tid+(rg.tid&16)),
+				font:obj.font_panel_fixed,
+				text:tid==12?"BE":g_types[i]+g_sizes[j]});
+			if(tid==12){
+				btn.tooltip='Big endian';
+			}
+		}
+	}
+	y_current+=28*4+4;
+	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Display color",color:obj.text_color_panel})
+	y_current+=28;
+	var g_colors=obj.color_choices;
+	for(var i=0;i<2;i++){
+		for(var j=0;j<5;j++){
+			var C=(g_colors[i*5+j]|0);
+			W.Button("btn_C"+C,{
+				style:UI.default_styles.check_button,
+				x:obj.x+24+28*j,y:y_current+28*i,w:28,h:28,
+				value:(rg.color==C),
+				OnClick:(function(C){
+					var sel=obj_real.GetRangeFromSelection();
+					var sel0=sel[0],sel1=sel[1];
+					obj_real.SetRange(sel0,sel1,{color:C});
+					UI.Refresh()
+				}).bind(undefined,C),
+				font:obj.font_panel_icon,
+				text_color:C,
+				text:'黑'});
+		}
+	}
+	y_current+=3*28+4;
+	//quick numbers
+	//todo
+	//region list
+	//todo
+	//parsing script
+	//todo
+	UI.End()
+	return obj
+};
+
+UI.RegisterUtilType("binary_tools",function(){return UI.NewTab({
+	title:"Binary Tools",
+	area_name:"h_tools",
+	body:function(){
+		//frontmost doc
+		UI.context_parent.body=this.util_widget;
+		var tab_frontmost=UI.GetFrontMostEditorTab();
+		var obj_real=(tab_frontmost&&tab_frontmost.document_type=="binary"&&tab_frontmost.main_widget);
+		var body=W.BinaryToolsPage('body',{
+			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
+			'editor_widget':obj_real,
+			'activated':this==UI.top.app.document_area.active_tab,
+			'x':0,'y':0});
+		this.util_widget=body;
+		//if(!obj_real){
+		//	UI.top.app.document_area.CloseTab(this.__global_tab_id);
+		//}
+		return body;
+	},
+	Save:function(){},
+	SaveMetaData:function(){},
+	OnDestroy:function(){},
+})});

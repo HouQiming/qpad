@@ -526,6 +526,11 @@ UI.CustomTheme=function(){
 			//w_accands:512,
 			h_accands:32,
 			///////
+			auto_minimap_starting_interval:1.0,
+			auto_minimap_ending_interval:2.5,
+			auto_minimap_starting_threshold:5,
+			auto_minimap_ending_threshold:1,
+			auto_minimap_transition_dt:0.1,
 			w_scroll_bar:20,
 			scroll_bar_style:{
 				transition_dt:0.1,
@@ -741,8 +746,8 @@ UI.CustomTheme=function(){
 			minimap_page_shadow:L?0x55000000:0x3faaaaaa,
 			minimap_page_border_width:L?2:1,
 			minimap_page_border_color:L?0xffaaaaaa:0xff000000,
-			sxs_shadow_size:6,
-			sxs_shadow_color:L?0xaa000000:0xff000000,
+			//sxs_shadow_size:6,
+			//sxs_shadow_color:L?0xaa000000:0xff000000,
 			sxs_bgcolor:L?0xffffffff:0xff444444,
 			font_panel:UI.Font(UI.font_name,24),
 			font_panel_icon:UI.Font(UI.icon_font_name,22),
