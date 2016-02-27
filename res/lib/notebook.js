@@ -351,9 +351,9 @@ W.notebook_prototype={
 			var cell_i=this.m_cells[i];
 			this.ProcessCell(cell_i);
 		}
-		if(!this.m_cells.length){
-			this.NewCell();
-		}
+		//if(!this.m_cells.length){
+		//	this.NewCell();
+		//}
 	},
 	Reload:function(){
 		for(var i=0;i<this.m_cells.length;i++){

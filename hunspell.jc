@@ -41,6 +41,9 @@ __generate_json("h_files","hunspell/config.h");
 __generate_json("h_files","hunspell/hunvisapi.h");
 __generate_json("h_files","hunspell/utf_info.cxx");
 
+if Platform.IS_UNIX
+	__generate_json("ldflags","-lstdc++")
+
 //coulddo: do we call hunspell_free_list?
 Hunspell_create=__c_function(HSPELLER,"hunspell_initialize","hunspell/hunspelldll.h")
 Hunspell_add=__c_function(int,"hunspell_add","hunspell/hunspelldll.h")

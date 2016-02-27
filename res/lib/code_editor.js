@@ -1204,8 +1204,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.ed.Edit(ops);
 	},
 	OnMouseDown:function(event){
-		if(this.m_is_preview){return;}
+		if(this.m_is_preview||!this.ed){return;}
 		W.Edit_prototype.OnMouseDown.call(this,event)
+	},
+	OnMouseMove:function(event){
+		this.m_last_mousemove=event;
+		W.Edit_prototype.OnMouseMove.call(this,event)
+		if(UI.TestOption("show_minimap")&&UI.TestOption("auto_hide_minimap")){
+			UI.Refresh()
+		}
 	},
 	OnClick:function(event){
 		if(event.button==UI.SDL_BUTTON_RIGHT){
@@ -4604,7 +4611,23 @@ W.CodeEditor=function(id,attrs){
 		var ytot=undefined;
 		var y_bottom_shadow=undefined;
 		var desc_x_scroll_bar=undefined;
-		var show_minimap=(UI.TestOption("show_minimap")&&!(doc&&doc.notebook_owner));
+		//&&!(doc&&doc.notebook_owner)
+		var show_minimap=(UI.TestOption("show_minimap"));
+		var w_minimap=obj.w_minimap;
+		if(show_minimap){
+			show_minimap=1;
+			if(UI.TestOption("auto_hide_minimap")&&doc){
+				var show_minimap_target=0;
+				if(doc.m_last_mousemove&&doc.m_last_mousemove.x>w_obj_area-(obj.w_scroll_bar+w_minimap+obj.padding)){
+					show_minimap_target=1;
+				}
+				var anim_minimap=W.AnimationNode("minimap_animation",{
+					transition_dt:doc.scroll_transition_dt,
+					show_minimap:show_minimap_target})
+				show_minimap=anim_minimap.show_minimap;
+			}
+		}
+		w_minimap*=show_minimap;
 		if(doc){
 			//scrolling and stuff
 			var ccnt_tot=doc.ed.GetTextSize()
@@ -4612,7 +4635,7 @@ W.CodeEditor=function(id,attrs){
 			if(h_obj_area<ytot&&!obj.m_is_preview){
 				w_scrolling_area=obj.w_scroll_bar
 				if(show_minimap){
-					w_scrolling_area+=obj.w_minimap+obj.padding
+					w_scrolling_area+=w_minimap+obj.padding
 				}
 			}
 			if(w_obj_area<=w_line_numbers+w_scrolling_area){
@@ -5877,27 +5900,27 @@ W.CodeEditor=function(id,attrs){
 				var minimap_scale=obj.minimap_font_height/UI.GetFontHeight(editor_style.font)
 				var h_minimap=h_scrolling_area/minimap_scale
 				var scroll_y_minimap=sbar_value*Math.max(ytot-h_minimap,0)
-				UI.PushSubWindow(x_minimap,y_scrolling_area,obj.w_minimap,h_scrolling_area,minimap_scale)
+				UI.PushSubWindow(x_minimap,y_scrolling_area,w_minimap,h_scrolling_area,minimap_scale)
 					var renderer=doc.GetRenderer();
 					renderer.m_temporarily_disable_spell_check=1
-					doc.ed.Render({x:0,y:scroll_y_minimap,w:obj.w_minimap/minimap_scale,h:h_minimap,
+					doc.ed.Render({x:0,y:scroll_y_minimap,w:w_minimap/minimap_scale,h:h_minimap,
 						scr_x:0,scr_y:0, scale:UI.pixels_per_unit, obj:doc});
 					renderer.m_temporarily_disable_spell_check=0
 				UI.PopSubWindow()
 				var minimap_page_y0=(effective_scroll_y-scroll_y_minimap)*minimap_scale
 				var minimap_page_y1=(effective_scroll_y+h_scrolling_area-scroll_y_minimap)*minimap_scale
 				UI.RoundRect({
-					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
+					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
 					color:obj.minimap_page_shadow})
 				UI.RoundRect({
-					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
+					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:w_minimap+obj.padding, h:obj.minimap_page_border_width,
 					color:obj.minimap_page_border_color})
 				UI.RoundRect({
-					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y1-obj.minimap_page_border_width, w:obj.w_minimap+obj.padding, h:obj.minimap_page_border_width,
+					x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y1-obj.minimap_page_border_width, w:w_minimap+obj.padding, h:obj.minimap_page_border_width,
 					color:obj.minimap_page_border_color})
 				if((minimap_page_y1-minimap_page_y0)<h_minimap){
 					W.Region('minimap_page',{
-						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:obj.w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
+						x:x_minimap-obj.padding*0.5, y:y_scrolling_area+minimap_page_y0, w:w_minimap+obj.padding, h:minimap_page_y1-minimap_page_y0,
 						value:sbar_value,
 						factor:Math.min(h_scrolling_area,ytot*minimap_scale)-(minimap_page_y1-minimap_page_y0),
 						OnChange:function(value){
@@ -6628,6 +6651,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{name:UI._('Show outer scope overlays'),stable_name:'show_top_hint'},
 				{name:UI._('Show line numbers'),stable_name:'show_line_numbers'},
 				{name:UI._('Show minimap'),stable_name:'show_minimap'},
+				{name:UI._('Auto-hide minimap'),stable_name:'auto_hide_minimap'},
 			];
 			plugin_items["Controls"]=[
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},

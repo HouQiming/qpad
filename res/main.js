@@ -262,6 +262,45 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Uninstall QPad"));
 	}
 }
+if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+	UI.InstallQPad=function(){
+		//windows installation, generate .reg and run it
+		if(UI.Platform.BUILD=="debug"){
+			print("*** WARNING: INSTALLING A DEBUG VERSION! ***")
+		}
+		var a_desktop_file=[
+			"[Desktop Entry]\n",
+			"Name=QPad\n",
+			"Type=Application\n",
+			"Terminal=false\n",
+			"Exec=/usr/bin/qpad\n",
+			"Icon=/usr/share/qpad/icon.svg\n",
+			"Comment=QPad Text Editor\n",
+			"NoDisplay=false\n",
+			"Categories=Development;IDE\n",
+			"Name[en]=QPad Text Editor\n",
+			];
+		var fn_desktop=IO.GetNewDocumentName("a","desktop","temp")
+		IO.CreateFile(fn_desktop,a_desktop_file.join(""))
+		var fn_svg=IO.GetNewDocumentName("a","svg","temp")
+		IO.CreateFile(fn_svg,IO.UIReadAll("res/misc/icon_linux.svg"))
+		var a_sh_installer=["#!/bin/sh\n"];
+		a_sh_installer.push("cp ",IO.m_my_name," /usr/bin/qpad\n")
+		a_sh_installer.push("mkdir -p /usr/share/qpad\n")
+		a_sh_installer.push("mv ",fn_svg," /usr/share/qpad/icon.svg\n")
+		a_sh_installer.push("mv ",fn_desktop," /usr/share/applications/qpad.desktop\n")
+		var fn_sh=IO.GetNewDocumentName("a","sh","temp")
+		IO.CreateFile(fn_sh,a_sh_installer.join(""))
+		var s_terminal="xterm";
+		if(IO.FileExists("/usr/bin/gnome-terminal")){
+			s_terminal="gnome-terminal";
+		}else if(IO.FileExists("/usr/bin/konsole")){
+			s_terminal="konsole";
+		}
+		IO.Shell([s_terminal,
+			"-e",'sudo /bin/sh '+fn_sh])
+	}
+}
 //UI.InstallQPad()
 
 UI.g_app_inited=0;
@@ -367,8 +406,14 @@ var CreateMenus=function(){
 			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 				IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
 			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
-				IO.Shell(["xterm",
-					"-e",'cd '+UI.m_new_document_search_path+'; bash'])
+				var s_terminal="xterm";
+				if(IO.FileExists("/usr/bin/gnome-terminal")){
+					s_terminal="gnome-terminal";
+				}else if(IO.FileExists("/usr/bin/konsole")){
+					s_terminal="konsole";
+				}
+				IO.Shell([s_terminal,
+					"-e",'cd '+UI.m_new_document_search_path+'; $SHELL'])
 			}else{
 				//mac
 				//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
@@ -445,7 +490,7 @@ UI.Application=function(id,attrs){
 		///////////////////
 		var app=UI.Begin(W.Window('app',{
 				title:'QPad',w:1280,h:720,bgcolor:UI.default_styles.tabbed_document.color,
-				icon:"res/icon256.png",
+				icon:"res/misc/icon_win.png",
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1,
 				OnWindowBlur:function(){
@@ -620,8 +665,14 @@ UI.OpenFile=function(fn){
 	var argv=IO.m_argv;
 	if(argv.length>0){argv.shift();}
 	if(argv.length>=2&&argv[0]=='--internal-tool'){
-		if(argv[1]=="--uninstall"&&UI.UninstallQPad){
-			UI.UninstallQPad();
+		if(argv[1]=="--uninstall"){
+			if(UI.UninstallQPad){
+				UI.UninstallQPad();
+			}
+		}else if(argv[1]=="--install"){
+			if(UI.InstallQPad){
+				UI.InstallQPad();
+			}
 		}
 		return;
 	}
