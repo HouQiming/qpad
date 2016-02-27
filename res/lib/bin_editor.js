@@ -528,7 +528,7 @@ W.BinaryEditor=function(id,attrs){
 			var w_minimap=obj.m_w_bytes/UI.pixels_per_unit;
 			//var x_panel=obj.x+obj.w-(obj.is_preview?0:obj.w_panel);
 			//var x_minimap=x_panel-(w_minimap+obj.minimap_padding*1.5+obj.sxs_shadow_size*0.5);
-			var x_minimap=obj.x+obj.w-(w_minimap+obj.minimap_padding*1.5+obj.sxs_shadow_size*0.5);
+			var x_minimap=obj.x+obj.w-(w_minimap+obj.minimap_padding*1.5);
 			var main_area_scale_factor=1;
 			if(x_minimap_min>x_minimap){
 				main_area_scale_factor=x_minimap/x_minimap_min;
