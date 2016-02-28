@@ -755,7 +755,9 @@ UI.CustomTheme=function(){
 			font_panel_fixed:UI.Font("res/fonts/inconsolata.ttf",22),
 			text_color_panel:L?0xff000000:0xffe8e8e8,
 			//w_panel:232,
-			h_notification_area:28,
+			w_edit:128,
+			h_notification_area:32,
+			find_bar_font:UI.Font("res/fonts/inconsolata.ttf",20),
 			notification_bgcolor:L?0xffffffff:0xff000000,
 			notification_icon_font:UI.Font(UI.icon_font_name,20,0),
 			notification_text_color:L?0xff000000:0xffe8e8e8,
@@ -765,6 +767,7 @@ UI.CustomTheme=function(){
 			notification_styles:[
 				{font:UI.Font(UI.font_name,20,0),color:L?0xff000000:0xffe8e8e8},
 				{font:UI.Font(UI.font_name,20,150),color:L?0xff000000:0xffe8e8e8},
+				{font:UI.Font(UI.font_name,20,0),color:L?0xff1c1ae3:0xff999afb},
 			],
 			color_choices:[
 				0xffb4771f,0xff2ca033,0xff1c1ae3,0xff007fff,0xff9a3d6a,

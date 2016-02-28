@@ -403,6 +403,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		f=JS.Param(0).as(float)
 		return JS.Return(float2half(f))
 	}
+	JS_UI["BIN_isBuffer"]=function(JSContext JS){
+		ret=JS.Param(0).as(u8[])
+		return JS.Return(!!ret)
+	}
+	JS_UI["BIN_BufToString"]=function(JSContext JS){
+		buf=JS.Param(0).as(u8[])
+		ret=new string
+		ret.push('[')
+		foreach ch in buf
+			SWrite(ret,ch)
+			ret.push(',')
+		if buf.n:
+			ret.pop()
+		ret.push(']')
+		return JS.Return(ret)
+	}
 	JS_UI["BIN_write64"]=function(JSContext JS){
 		data=JS.Param(0).as(u8[])
 		stext=JS.Param(1).as(string)
@@ -445,6 +461,122 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				buf8[7-i]=tmp
 		copy(data[ptr:],buf8)
 		return 0
+	}
+	auto maxSuf(u8[] x,int mask)
+		ms = -1L;
+		j = 0L;
+		k = 1L;
+		p = 1L;
+		m=x.n
+		while (j + k < m)
+			a = int(x[j + k])^mask;
+			b = int(x[ms + k])^mask;
+			if (a < b)
+				j += k;
+				k = 1L;
+				p = j - ms;
+			else
+				if (a == b)
+					if (k != p)
+						++k;
+					else
+						j += p;
+						k = 1L;
+				else
+					ms = j;
+					j = ms + 1;
+					k = 1L
+					p = 1L;
+		return (ms,p)
+	JS_UI["BIN_PreprocessNeedle"]=function(JSContext JS){
+		//UI.BIN_PreprocessNeedle(buf_needle,dir)
+		buf_needle=JS.Param(0).as(u8[])
+		dir=JS.Param(1).as(int)
+		if dir<0:
+			buf_needle=[ch foreach ch in buf_needle.ReverseOrder()]
+		(i,p) = maxSuf(buf_needle, 0);
+		(j,q) = maxSuf(buf_needle, -1);
+		if (i > j)
+			ell = i;
+			per = p;
+		else
+			ell = j;
+			per = q;
+		/* Searching */
+		mode=(__basic_api.memcmp(__pointer(buf_needle.d), __pointer(buf_needle.d+per), ell + 1) == 0)
+		ctx=[ell,per,mode]
+		return JS.Return(ctx.ConvertToAsBinary(u8))
+	}
+	JS_UI["BIN_SearchBuffer"]=function(JSContext JS){
+		buf_tar=JS.Param(0).as(u8[])
+		j=JS.Param(1).as(iptr)
+		dir=JS.Param(2).as(int)
+		buf_needle=JS.Param(3).as(u8[])
+		ctx=JS.Param(4).as(u8[]).ConvertToAsBinary(iptr)
+		budget=JS.Param(5).as(iptr)
+		ell=ctx[0]
+		per=ctx[1]
+		mode=ctx[2]
+		n=buf_tar.n
+		m=buf_needle.n
+		if dir<0:
+			j=n-j
+			adder=n
+			adder2=m
+			xorer=-1L
+		else
+			adder=0L
+			adder2=0L
+			xorer=0L
+		//Writeln(buf_needle,' ',m,' ',ell,' ',per)
+		y=inline(p){return buf_tar[(p^xorer)+adder]}
+		x=inline(p){return buf_needle[(p^xorer)+adder2]}
+		ret_obj=JS.New()
+		j_final=min(j+budget,n - m)
+		if mode:
+			memory = -1L;
+			while (j <= j_final)
+				i = max(ell, memory) + 1;
+				while (i < m && x(i) == y(i + j))
+					++i;
+				if (i >= m)
+					i = ell;
+					while (i > memory && x(i) == y(i + j))
+						--i;
+					if (i <= memory)
+						//found
+						ret_obj["addr"]=(dir<0?n-j:j)
+						ret_obj["found"]=1
+						return JS.Return(ret_obj);
+					j += per;
+					memory = m - per - 1L;
+				else
+					j += (i - ell);
+					memory = -1L;
+			//memory can be safely ignored on reentry
+		else
+			per = max(ell + 1, m - ell - 1) + 1;
+			while (j <= j_final)
+				i = ell + 1;
+				while (i < m && x(i) == y(i + j))
+					++i;
+				if (i >= m)
+					i = ell;
+					while (i >= 0 && x(i) == y(i + j))
+						--i;
+					if (i < 0)
+						//found
+						ret_obj["addr"]=(dir<0?n-j:j)
+						ret_obj["found"]=1
+						return JS.Return(ret_obj);
+					j += per;
+				else
+					j += (i - ell);
+		if j>n-m:
+			return 0
+		else
+			ret_obj["addr"]=(dir<0?n-j:j)
+			return JS.Return(ret_obj)
 	}
 	JS_UI["BIN_Save"]=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)

@@ -1397,9 +1397,10 @@ UI.SHOW_FIND=UI.SEARCH_FLAG_SHOW;
 UI.SHOW_GOTO=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GOTO_MODE;
 UI.SHOW_GLOBAL_FIND=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GLOBAL;
 UI.SHOW_GLOBAL_GOTO=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GLOBAL+UI.SEARCH_FLAG_GOTO_MODE;
-if(!UI.m_ui_metadata.find_state){
-	UI.m_ui_metadata.find_state={
+if(!UI.m_ui_metadata["<find_state>"]){
+	UI.m_ui_metadata["<find_state>"]={
 		m_current_needle:"",
+		m_binary_needle:"",
 		m_find_flags:UI.SEARCH_FLAG_HIDDEN,
 	}
 }
@@ -2494,11 +2495,11 @@ W.CodeEditorWidget_prototype={
 		}
 		if(!sneedle.length&&!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
 			//this.m_current_needle=undefined
-			UI.m_ui_metadata.find_state.m_current_needle=""
+			UI.m_ui_metadata["<find_state>"].m_current_needle=""
 			return;
 		}
 		if(!(flags&UI.SEARCH_FLAG_GOTO_MODE)){
-			UI.m_ui_metadata.find_state.m_current_needle=sneedle
+			UI.m_ui_metadata["<find_state>"].m_current_needle=sneedle
 		}
 		var renderer=doc.GetRenderer()
 		var bk_m_enable_hidden=renderer.m_enable_hidden;
@@ -2594,9 +2595,9 @@ W.CodeEditorWidget_prototype={
 		}
 		if(sel[0]<sel[1]){
 			this.DestroyFindingContext()
-			UI.m_ui_metadata.find_state.m_current_needle=this.doc.ed.GetText(sel[0],sel[1]-sel[0])
-			if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
-				UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
+			UI.m_ui_metadata["<find_state>"].m_current_needle=this.doc.ed.GetText(sel[0],sel[1]-sel[0])
+			if(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_REGEXP){
+				UI.m_ui_metadata["<find_state>"].m_current_needle=RegexpEscape(UI.m_ui_metadata["<find_state>"].m_current_needle)
 			}
 			return 1;
 		}
@@ -2778,7 +2779,7 @@ W.CodeEditorWidget_prototype={
 	////////////////////
 	FindNext:function(direction){
 		UI.assert(!this.m_find_next_context,"panic: FindNext when there is another context")
-		if(!UI.m_ui_metadata.find_state.m_current_needle){
+		if(!UI.m_ui_metadata["<find_state>"].m_current_needle){
 			//no needle, no find
 			return;
 		}
@@ -2790,8 +2791,8 @@ W.CodeEditorWidget_prototype={
 		var ctx={
 			m_frontier:ccnt,
 			m_owner:this,
-			m_needle:UI.m_ui_metadata.find_state.m_current_needle,
-			m_flags:UI.m_ui_metadata.find_state.m_find_flags,
+			m_needle:UI.m_ui_metadata["<find_state>"].m_current_needle,
+			m_flags:UI.m_ui_metadata["<find_state>"].m_find_flags,
 			m_match_reported:0,
 			ReportMatch:function(ccnt0,ccnt1){
 				if(direction>0){
@@ -2863,7 +2864,7 @@ var ffindbar_plugin=function(){
 		}
 		obj.DestroyReplacingContext();
 		var find_flag_mode=(obj.show_find_bar&~UI.SEARCH_FLAG_SHOW)
-		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags|find_flag_mode)
+		obj.ResetFindingContext(this.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags|find_flag_mode)
 	})
 	//skip zero
 	this.AddEventHandler('UP',function(){
@@ -4519,13 +4520,13 @@ var finvoke_find=function(mode,s_force_needle){
 	//obj.m_sel0_before_find=obj.doc.sel0.ccnt
 	//obj.m_sel1_before_find=obj.doc.sel1.ccnt
 	if(s_force_needle!=undefined){
-		UI.m_ui_metadata.find_state.m_current_needle=s_force_needle;
+		UI.m_ui_metadata["<find_state>"].m_current_needle=s_force_needle;
 	}else{
 		var sel=obj.doc.GetSelection()
 		if(sel[0]<sel[1]&&obj.doc.GetLC(sel[0])[0]==obj.doc.GetLC(sel[1])[0]){
-			UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
-			if(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP){
-				UI.m_ui_metadata.find_state.m_current_needle=RegexpEscape(UI.m_ui_metadata.find_state.m_current_needle)
+			UI.m_ui_metadata["<find_state>"].m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+			if(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_REGEXP){
+				UI.m_ui_metadata["<find_state>"].m_current_needle=RegexpEscape(UI.m_ui_metadata["<find_state>"].m_current_needle)
 			}
 		}
 	}
@@ -4540,9 +4541,9 @@ var finvoke_goto=function(mode){
 	//obj.m_sel0_before_find=obj.doc.sel0.ccnt
 	//obj.m_sel1_before_find=obj.doc.sel1.ccnt
 	//if(sel[0]<sel[1]){
-	//	UI.m_ui_metadata.find_state.m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
+	//	UI.m_ui_metadata["<find_state>"].m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
 	//}
-	//UI.m_ui_metadata.find_state.m_current_needle=""
+	//UI.m_ui_metadata["<find_state>"].m_current_needle=""
 	UI.Refresh()
 }
 W.CodeEditor=function(id,attrs){
@@ -4807,7 +4808,7 @@ W.CodeEditor=function(id,attrs){
 			}
 			var s_autofind_needle=undefined;
 			if(!obj.show_find_bar){
-				s_autofind_needle=UI.m_ui_metadata.find_state.m_current_needle;
+				s_autofind_needle=UI.m_ui_metadata["<find_state>"].m_current_needle;
 				var sel=doc.GetSelection();
 				if(sel[1]-sel[0]<=GRACEFUL_WORD_SIZE){
 					var sel0x=doc.ed.MoveToBoundary(sel[1],-1,"word_boundary_left");
@@ -4846,9 +4847,9 @@ W.CodeEditor=function(id,attrs){
 				}
 				var rendering_ccnt0=doc.SeekXY(scroll_x,y0_rendering)
 				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,y1_rendering)
-				var s_bk=UI.m_ui_metadata.find_state.m_current_needle;
-				obj.ResetFindingContext(s_autofind_needle,UI.m_ui_metadata.find_state.m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
-				UI.m_ui_metadata.find_state.m_current_needle=s_bk;
+				var s_bk=UI.m_ui_metadata["<find_state>"].m_current_needle;
+				obj.ResetFindingContext(s_autofind_needle,UI.m_ui_metadata["<find_state>"].m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
+				UI.m_ui_metadata["<find_state>"].m_current_needle=s_bk;
 				current_find_context=obj.m_current_find_context
 				//print(UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier),UI.GetSearchFrontierCcnt(current_find_context.m_forward_frontier),current_find_context.m_backward_frontier,current_find_context.m_forward_frontier,current_find_context.m_flags)
 				if(current_find_context){
@@ -5417,65 +5418,65 @@ W.CodeEditor=function(id,attrs){
 					var btn_case=W.Button("find_button_case",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 						font:UI.icon_font,text:"写",tooltip:"Case sensitive - ALT+C",
-						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
+						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
 						OnChange:function(value){
-							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
 							if(ctx){ctx.RestoreSel();}
-							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+C",action:function(){btn_case.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_word=W.Button("find_button_word",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 						font:UI.icon_font,text:"字",tooltip:"Whole word - ALT+H",
-						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
+						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 						OnChange:function(value){
-							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
 							if(ctx){ctx.RestoreSel();}
-							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+H",action:function(){btn_word.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_regexp=W.Button("find_button_regexp",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 						font:UI.icon_font,text:"正",tooltip:"Regular expression - ALT+E",
-						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
+						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 						OnChange:function(value){
-							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
 							if(ctx){ctx.RestoreSel();}
-							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_code=W.Button("find_button_code",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 						font:UI.icon_font,text:"プ",tooltip:"Code only - ALT+D",
-						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_CODE_ONLY?1:0),
+						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_CODE_ONLY?1:0),
 						OnChange:function(value){
-							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_CODE_ONLY)|(value?UI.SEARCH_FLAG_CODE_ONLY:0)
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_CODE_ONLY)|(value?UI.SEARCH_FLAG_CODE_ONLY:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
 							if(ctx){ctx.RestoreSel();}
-							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+D",action:function(){btn_code.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_hidden=W.Button("find_button_hidden",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 						font:UI.icon_font,text:"藏",tooltip:"Search hidden text - ALT+T",
-						value:(UI.m_ui_metadata.find_state.m_find_flags&UI.SEARCH_FLAG_HIDDEN?1:0),
+						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_HIDDEN?1:0),
 						OnChange:function(value){
-							UI.m_ui_metadata.find_state.m_find_flags=(UI.m_ui_metadata.find_state.m_find_flags&~UI.SEARCH_FLAG_HIDDEN)|(value?UI.SEARCH_FLAG_HIDDEN:0)
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_HIDDEN)|(value?UI.SEARCH_FLAG_HIDDEN:0)
 							obj.DestroyReplacingContext();
 							var ctx=obj.m_current_find_context;
 							if(ctx){ctx.RestoreSel();}
-							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags)
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
 						}})
 					W.Hotkey("",{key:"ALT+T",action:function(){btn_hidden.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
@@ -5515,14 +5516,14 @@ W.CodeEditor=function(id,attrs){
 				if(!previous_find_bar_edit){
 					//the darn buttons do make sense in ctrl+g mode!
 					var find_flag_mode=(obj.show_find_bar&~UI.SEARCH_FLAG_SHOW)
-					if(UI.m_ui_metadata.find_state.m_current_needle||(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)){
-						if(UI.m_ui_metadata.find_state.m_current_needle&&!(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)){
-							obj.find_bar_edit.HookedEdit([0,0,UI.m_ui_metadata.find_state.m_current_needle],1)
+					if(UI.m_ui_metadata["<find_state>"].m_current_needle||(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)){
+						if(UI.m_ui_metadata["<find_state>"].m_current_needle&&!(obj.show_find_bar&UI.SEARCH_FLAG_GOTO_MODE)){
+							obj.find_bar_edit.HookedEdit([0,0,UI.m_ui_metadata["<find_state>"].m_current_needle],1)
 							obj.find_bar_edit.AutoScroll('center')
 						}
 						obj.find_bar_edit.sel0.ccnt=0
 						obj.find_bar_edit.sel1.ccnt=obj.find_bar_edit.ed.GetTextSize()
-						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata.find_state.m_find_flags|find_flag_mode)
+						obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags|find_flag_mode)
 					}
 					UI.SetFocus(obj.find_bar_edit);
 					UI.InvalidateCurrentFrame();
@@ -5892,7 +5893,7 @@ W.CodeEditor=function(id,attrs){
 						sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
 						if(sel[0]<sel[1]){
 							var id=ed.GetText(sel[0],sel[1]-sel[0])
-							UI.m_ui_metadata.find_state.m_find_flags=(UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_WHOLE_WORD|UI.SEARCH_FLAG_HIDDEN);
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_WHOLE_WORD|UI.SEARCH_FLAG_HIDDEN);
 							finvoke_find.call(obj,UI.SHOW_GLOBAL_FIND,id)
 						}
 					}.bind(obj)})

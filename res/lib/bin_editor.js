@@ -96,7 +96,7 @@ W.BinaryEditor_prototype={
 	},
 	GetNLinesDisp:function(){
 		var hc=UI.GetCharacterHeight(this.font);
-		return Math.max((this.h/(this.m_main_area_scale_factor||1)-this.m_h_addr)/hc,1)|0;
+		return Math.max(((this.h-this.h_notification_area)/(this.m_main_area_scale_factor||1)-this.m_h_addr)/hc,1)|0;
 	},
 	StartEdit:function(s,event){
 		if(this.m_sel1>=this.m_data.length){return;}
@@ -105,6 +105,11 @@ W.BinaryEditor_prototype={
 		this.m_show_edit=1
 		this.m_edit_event=[s,event];
 		UI.Refresh();
+	},
+	GetSelectionAsBuffer:function(){
+		var addr0=Math.min(this.m_sel0,this.m_sel1);
+		var addr1=Math.max(this.m_sel0,this.m_sel1);
+		return this.m_data.slice(addr0,addr1)
 	},
 	OnTextEdit:function(event){
 		this.StartEdit("OnTextEdit",event);
@@ -184,9 +189,25 @@ W.BinaryEditor_prototype={
 			}
 			UI.Refresh()
 			return;
+		}else if(IsHotkey(event,"CTRL+C")){
+			this.Copy()
+			return;
+		}else if(IsHotkey(event,"CTRL+F")){
+			this.m_show_find=!this.m_show_find;
+			UI.Refresh()
+			return;
+		}else if(this.m_last_needle&&IsHotkey(event,"F3")){
+			this.FindNext(this.m_sel1,1,this.m_last_needle)
+		}else if(this.m_last_needle&&IsHotkey(event,"SHIFT+F3")){
+			this.FindNext(this.m_sel1,-1,this.m_last_needle)
+		}else if(IsHotkey(event,"CTRL+F3")){
+			this.FindNext(this.m_sel1,1,new Uint8Array(this.GetSelectionAsBuffer()))
+		}else if(IsHotkey(event,"SHIFT+CTRL+F3")){
+			this.FindNext(this.m_sel1,-1,new Uint8Array(this.GetSelectionAsBuffer()))
 		}else if(IsHotkey(event,"CTRL+V")){
 			this.StartEdit("OnKeyDown",event);
 		}else if(IsHotkey(event,"ESC")){
+			this.m_last_needle=undefined;
 			this.DismissNotification()
 		}else{
 			return;
@@ -351,6 +372,13 @@ W.BinaryEditor_prototype={
 	Redo:function(){
 		return this.UndoImpl(this.m_redo_queue,this.m_undo_queue)
 	},
+	Copy:function(){
+		var addr0=Math.min(this.m_sel0,this.m_sel1);
+		var addr1=Math.max(this.m_sel0,this.m_sel1);
+		if(addr0<addr1){
+			UI.SDL_SetClipboardText(UI.BIN_BufToString(this.m_data.slice(addr0,addr1)))
+		}
+	},
 	Save:function(){
 		if(this.m_file_name_mapped=="<failed>"){return;}
 		var arr=[];
@@ -452,6 +480,16 @@ W.BinaryEditor_prototype={
 		this.m_notification=undefined;
 		UI.Refresh()
 	},
+	FindNext:function(addr,dir,buf_needle){
+		this.m_find_context={
+			m_needle:buf_needle,
+			m_needle_prt:UI.BIN_PreprocessNeedle(buf_needle,dir),
+			m_addr:addr,
+			m_dir:dir,
+		};
+		this.m_last_needle=buf_needle;
+		UI.Refresh()
+	},
 };
 
 W.SlaveRegion_prototype={
@@ -492,14 +530,108 @@ W.BinaryEditor=function(id,attrs){
 	var h_main_area=obj.h;
 	y_main_area+=obj.h_notification_area;
 	h_main_area-=obj.h_notification_area;
-	W.PureRegion(id,obj)
+	if(!obj.m_find_context){
+		W.PureRegion(id,obj);
+	}
 	UI.Begin(obj)
 	//draw the notification
 	UI.RoundRect({
 		x:obj.x,y:obj.y,w:obj.w,h:obj.h_notification_area,
 		color:obj.notification_bgcolor,
 	})
-	if(obj.m_notification){
+	if(obj.m_find_context){
+		W.Text("",{
+			x:obj.x+4,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_icon_font))*0.5,
+			font:obj.notification_icon_font,text:'s',color:obj.notification_text_color,
+		})
+		W.Text("",{
+			x:obj.x+28,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_styles[0].font))*0.5,
+			font:obj.notification_styles[0].font,text:UI._("Searching..."),color:obj.notification_styles[0].color,
+		})
+		var ctx=obj.m_find_context;
+		//1048576 is the budget
+		var ret=UI.BIN_SearchBuffer(obj.m_data,ctx.m_addr,ctx.m_dir, ctx.m_needle,ctx.m_needle_prt, 1048576);
+		if(ret==undefined||ret.found){
+			obj.m_find_context=undefined;
+			if(ret&&ret.found){
+				obj.m_sel0=ret.addr;
+				obj.m_sel1=ret.addr+ctx.m_dir*ctx.m_needle.length;
+				obj.ValidateSelection(1,-1)
+				obj.AutoScroll()
+				obj.CreateNotification('s','Found one')
+			}else{
+				obj.CreateNotification('s',(ctx.m_dir<0?'No more matches above':'No more matches below'))
+			}
+		}else{
+			ctx.m_addr=ret.addr;
+		}
+	}else if(obj.m_show_find){
+		W.Text("",{
+			x:obj.x+4,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_icon_font))*0.5,
+			font:obj.notification_icon_font,text:'s',color:obj.notification_text_color,
+		})
+		var hc_fb_editing=UI.GetCharacterHeight(obj.find_bar_font);
+		var had_edit=!!obj.findbar_edit;
+		W.Edit("findbar_edit",{
+			x:obj.x+28,y:obj.y+(obj.h_notification_area-hc_fb_editing)*0.5,
+			w:obj.w-32,h:hc_fb_editing,
+			font:obj.find_bar_font, text:UI.m_ui_metadata["<find_state>"].m_binary_needle||"",
+			is_single_line:1,right_side_autoscroll_margin:0.5,
+			precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+			same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
+			owner:obj,
+			additional_hotkeys:[{key:"ESCAPE",action:function(){
+				//cancel the change
+				var obj=this.owner
+				obj.m_show_find=0;
+				UI.Refresh()
+			}}],
+			OnBlur:function(){
+				var obj=this.owner
+				obj.m_show_find=0;
+				UI.Refresh()
+			},
+			OnEnter:function(){
+				//apply the change - binary patch / undo queue
+				var obj=this.owner
+				obj.m_show_find=0;
+				var ret;
+				var stext_raw=this.ed.GetText();
+				UI.m_ui_metadata["<find_state>"].m_binary_needle=stext_raw;
+				obj.DismissNotification()
+				try{
+					ret=JSON.parse(Duktape.__eval_expr_sandbox(stext_raw))
+				}catch(e){
+					obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"Bad search expression: "+e.message)
+					UI.Refresh()
+					return;
+				}
+				if(Array.isArray(ret)){
+					ret=new Uint8Array(ret);
+				}
+				if(!(UI.BIN_isBuffer(ret)||!this.tid&&(typeof ret)=='string')){
+					obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"The search expression has to be a string or a buffer")
+					UI.Refresh()
+					return;
+				}
+				var buf_str=new Buffer(ret);
+				obj.FindNext(obj.m_sel1,1,buf_str)
+				UI.SetFocus(obj)
+				UI.Refresh()
+			},
+		});
+		if(!obj.findbar_edit.ed.GetTextSize()){
+			W.Text("",{
+				x:obj.x+28,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_styles[0].font))*0.5,
+				font:obj.notification_styles[0].font,text:UI._("Search a JS expression, e.g. 'MZ' or [0x4d,0x5a]"),color:obj.notification_styles[0].color&0x7fffffff,
+			})
+		}
+		if(!had_edit){
+			UI.SetFocus(obj.findbar_edit)
+			obj.findbar_edit.SetSelection(0,obj.findbar_edit.ed.GetTextSize())
+			UI.Refresh()
+		}
+	}else if(obj.m_notification){
 		W.Text("",{
 			x:obj.x+4,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_icon_font))*0.5,
 			font:obj.notification_icon_font,text:obj.m_notification.icon,color:obj.notification_text_color,
@@ -771,18 +903,18 @@ W.BinaryEditor=function(id,attrs){
 				}
 				UI.RoundRect({
 					x:x_caret-obj.edit_padding-obj.edit_shadow_size-obj.edit_border_width,y:y_caret,
-					w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_shadow_size+obj.edit_border_width)*2,h:hc+obj.edit_shadow_size,
+					w:Math.max(x_caret_r-x_caret,obj.w_edit)+(obj.edit_padding+obj.edit_shadow_size+obj.edit_border_width)*2,h:hc+obj.edit_shadow_size,
 					color:obj.edit_shadow_color,border_width:-obj.edit_shadow_size,
 					round:obj.edit_shadow_size,
 				})
 				UI.RoundRect({
-					x:x_caret-obj.edit_padding-obj.edit_border_width,y:y_caret,w:x_caret_r-x_caret+(obj.edit_padding+obj.edit_border_width)*2,h:hc,
+					x:x_caret-obj.edit_padding-obj.edit_border_width,y:y_caret,w:Math.max(x_caret_r-x_caret,obj.w_edit)+(obj.edit_padding+obj.edit_border_width)*2,h:hc,
 					color:obj.edit_bgcolor,border_width:obj.edit_border_width,border_color:obj.edit_border_color,
 					round:obj.edit_round,
 				})
 				var hc_editing=UI.GetCharacterHeight(obj.font_edit);
 				W.Edit("value_edit",{
-					x:x_caret-obj.edit_padding,y:y_caret+(hc-hc_editing)*0.5,w:x_caret_r-x_caret+obj.edit_padding*2,h:hc_editing,
+					x:x_caret-obj.edit_padding,y:y_caret+(hc-hc_editing)*0.5,w:Math.max(x_caret_r-x_caret,obj.w_edit)+obj.edit_padding*2,h:hc_editing,
 					font:obj.font_edit, tid:rg.tid, color:rg.color, text:s_text,
 					is_single_line:1,right_side_autoscroll_margin:0.5,
 					precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
@@ -809,11 +941,14 @@ W.BinaryEditor=function(id,attrs){
 						try{
 							ret=JSON.parse(Duktape.__eval_expr_sandbox(stext_raw))
 						}catch(e){
-							obj.CreateNotification('错',"Bad expression: "+e.message)
+							obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"Bad value expression: "+e.message)
 							UI.Refresh()
 							return;
 						}
-						if(!this.tid&&(typeof ret)=='string'){
+						if(Array.isArray(ret)){
+							ret=new Uint8Array(ret);
+						}
+						if(UI.BIN_isBuffer(ret)||!this.tid&&(typeof ret)=='string'){
 							//string case
 							var buf_str=new Buffer(ret);
 							obj.PushUndo(obj.m_sel1,buf_str.length)
@@ -1111,7 +1246,7 @@ W.BinaryToolsPage=function(id,attrs){
 			try{
 				ret=JSON.parse(Duktape.__eval_expr_sandbox(value));
 			}catch(e){
-				obj_real.CreateNotification('错',"Bad address: "+e.message)
+				obj_real.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"Bad address: "+e.message)
 				UI.SetFocus(obj_real)
 				UI.Refresh()
 				return;
