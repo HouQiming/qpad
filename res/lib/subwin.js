@@ -1,5 +1,7 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
+UI.RICHTEXT_COMMAND_RUBBER_SPACE=0x107fff;
+UI.RICHTEXT_COMMAND_SET_STYLE=0x108000;
 
 ///////////////////////
 UI.interpolators["tabid"]=function(a,b,t){return b;}
@@ -1768,9 +1770,6 @@ W.TipWindow_prototype={
 	}
 };
 
-var RICHTEXT_COMMAND_RUBBER_SPACE=0x107fff;
-var RICHTEXT_COMMAND_SET_STYLE=0x108000;
-
 var LoadTips=function(){
 	var s_md=IO.UIReadAll("res/misc/tips_"+UI.m_ui_language+".md");
 	if(!s_md){
@@ -1783,15 +1782,15 @@ var LoadTips=function(){
 		if(!s_i){continue;}
 		if(s_i[0]==' '){
 			s_i=(
-				UI.ED_RichTextCommandChar(RICHTEXT_COMMAND_SET_STYLE+3)+
+				UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+3)+
 				s_i[1]+
-				UI.ED_RichTextCommandChar(RICHTEXT_COMMAND_SET_STYLE+1)+s_i.substr(2));
+				UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1)+s_i.substr(2));
 		}
 		var code_segs=s_i.split('`');
 		var code_segs2=[];
 		for(var j=0;j<code_segs.length;j++){
 			if(j>0){
-				code_segs2.push(UI.ED_RichTextCommandChar(RICHTEXT_COMMAND_SET_STYLE+(j&1?2:0)))
+				code_segs2.push(UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+(j&1?2:0)))
 			}
 			code_segs2.push(code_segs[j]);
 		}

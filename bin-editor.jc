@@ -331,13 +331,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["BIN_ReadToString"]=function(JSContext JS){
 		obj=JS.Param(0).as(JSObject)
 		addr=JS.Param(1).as(i64)
-		ranges=obj["m_native_view"].as(CBinaryView).ranges
-		p=searchRanges(ranges,addr)
-		rg=ranges[p]
-		if addr>=rg.ofs0&&addr<rg.ofs1:
-			tid=rg.tid
+		rg_override=JS.Param(2).as(JSObject)
+		if rg_override:
+			tid=rg_override["tid"].as(int)
 		else
-			tid=makeType(TYPE_BYTE,0)
+			ranges=obj["m_native_view"].as(CBinaryView).ranges
+			p=searchRanges(ranges,addr)
+			rg=ranges[p]
+			if addr>=rg.ofs0&&addr<rg.ofs1:
+				tid=rg.tid
+			else
+				tid=makeType(TYPE_BYTE,0)
 		data=obj["m_data"].as(u8[])
 		(s_disp,fntid_a)=readToStringAt(JS,data,addr,tid)
 		return JS.Return(s_disp)

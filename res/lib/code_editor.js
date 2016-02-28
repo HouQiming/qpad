@@ -4512,9 +4512,6 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 	return ''
 }
 
-var RICHTEXT_COMMAND_RUBBER_SPACE=0x107fff;
-var RICHTEXT_COMMAND_SET_STYLE=0x108000;
-
 var MAX_PARSABLE_FCALL=4096
 var finvoke_find=function(mode,s_force_needle){
 	var obj=this;
@@ -5260,7 +5257,7 @@ W.CodeEditor=function(id,attrs){
 								stk.pop()
 							}
 							a_rich.push(UI.ED_RichTextCommandChar(
-								RICHTEXT_COMMAND_SET_STYLE+stk[stk.length-1]))
+								UI.RICHTEXT_COMMAND_SET_STYLE+stk[stk.length-1]))
 						}
 						if(p_last<s_text.length){
 							a_rich.push(s_text.substr(p_last))
