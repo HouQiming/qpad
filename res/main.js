@@ -411,7 +411,7 @@ var CreateMenus=function(){
 				}
 				var fn_sh=IO.GetNewDocumentName("a","sh","temp")
 				IO.CreateFile(fn_sh,'#!/bin/sh\ncd '+UI.m_new_document_search_path+'\nrm -- "$0"\nexec "$SHELL"\n')
-				IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh])
+				IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh,"&"])
 			}else{
 				//mac
 				//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
