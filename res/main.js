@@ -317,10 +317,8 @@ var CreateMenus=function(){
 		UI.Refresh()
 	}})
 	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
-		//var fn=IO.DoFileDialog(["Text documents (*.text)","*.text","All File","*.*"]);
-		//if(!fn){return;}
 		UI.UpdateNewDocumentSearchPath()
-		var fn=IO.DoFileDialog(["All File","*.*"],UI.m_new_document_search_path+"/*");
+		var fn=IO.DoFileDialog(0,undefined,UI.m_new_document_search_path);
 		if(!fn){return;}
 		var active_document=UI.m_the_document_area.active_tab
 		if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){

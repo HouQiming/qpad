@@ -6203,11 +6203,10 @@ UI.NewCodeEditorTab=function(fname0){
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}
-			var fn=IO.DoFileDialog(["All File","*.*"],
+			var fn=IO.DoFileDialog(1,undefined,
 				this.main_widget.file_name.indexOf('<')>=0?
-					UI.m_new_document_search_path+"/*":
-					this.main_widget.file_name,
-				"",1);
+					UI.m_new_document_search_path:
+					UI.GetPathFromFilename(this.main_widget.file_name));
 			if(!fn){return;}
 			fn=IO.NormalizeFileName(fn);
 			var doc=this.main_widget.doc;
