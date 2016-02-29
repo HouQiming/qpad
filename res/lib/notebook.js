@@ -263,7 +263,13 @@ W.notebook_prototype={
 			if(y>0){return 1;}
 			var sub_cell_id=this.sub_cell_id;
 			if(sub_cell_id>0){
-				this.notebook_owner.GotoSubCell(sub_cell_id-1,1);
+				var tar_id=sub_cell_id-1;
+				while(tar_id>=0){
+					if(this.notebook_owner.GotoSubCell(tar_id-1,1)){
+						break;
+					}
+					tar_id++;
+				}
 				return 0;
 			}
 			return 1;
@@ -276,7 +282,13 @@ W.notebook_prototype={
 			if(y<this.ed.XYFromCcnt(size).y){return 1;}
 			var sub_cell_id=this.sub_cell_id;
 			if(sub_cell_id<this.notebook_owner.m_cells.length*2-1){
-				this.notebook_owner.GotoSubCell(sub_cell_id+1,0);
+				var tar_id=sub_cell_id+1;
+				while(tar_id<this.notebook_owner.m_cells.length*2){
+					if(this.notebook_owner.GotoSubCell(tar_id,0)){
+						break;
+					}
+					tar_id++;
+				}
 				return 0;
 			}
 			return 1;
@@ -450,7 +462,9 @@ W.notebook_prototype={
 			doc.SetSelection(ccnt,ccnt)
 			this.need_auto_scroll=1;
 			UI.Refresh()
+			return 1;
 		}
+		return 0;
 	},
 	CreateCompilerError:function(id,err,ccnt_lh,ccnt_next){
 		//we could afford to discard dangling highlights - give discard responsibility to the cell

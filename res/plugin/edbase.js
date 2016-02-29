@@ -984,7 +984,7 @@ UI.RegisterBuildEnv("Jacy",{
 	name:"jc",
 	CreateBuildScript:function(fname,doc){
 		return [
-			'cd /d ',UI.GetPathFromFilename(fname),'\n',
+			UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?'cd /d ':'cd ',UI.GetPathFromFilename(fname),'\n',
 			'jc ',fname,' --run\n',
 		].join("");
 	}
@@ -1021,7 +1021,7 @@ UI.RegisterBuildEnv("Windows BAT",{
 UI.RegisterBuildEnv("Unix Shell Script",{
 	name:"exec",
 	CreateInterpreterCall:function(fname,doc){
-		return [fname];
+		return ["/bin/sh",fname];
 	}
 });
 
