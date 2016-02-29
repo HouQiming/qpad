@@ -69,17 +69,21 @@ W.BinaryEditor_prototype={
 				var addr=Math.min(this.m_sel0,this.m_sel1);
 				var final_text=[];
 				sz={1:0,2:1,4:2,8:3}[sz];
+				var s_i_prev=undefined;
 				for(var isbe=0;isbe<2;isbe++){
 					final_text.push('"',UI.BIN_ReadToString(this,addr,{tid:isbe*16+sz}),'" is ');
 					for(var ttype=1;ttype<4;ttype++){
 						var tid=isbe*16+ttype*4+sz;
 						var s_i=UI.BIN_ReadToString(this,addr,{tid:tid});
-						if(s_i){
+						if(s_i&&(s_i!=s_i_prev||ttype!=2)){
+							if(ttype==3){final_text.push("or ")}
 							final_text.push(
 								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
 								s_i,
-								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0),' in ',g_types[(tid>>2)&3],g_sizes[tid&3].toString(),', ')
+								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0),' in ',g_types[(tid>>2)&3],g_sizes[tid&3].toString(),
+								', ')
 						}
+						s_i_prev=s_i;
 					}
 					final_text.pop()
 					final_text.push('. ')

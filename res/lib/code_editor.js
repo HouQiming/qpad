@@ -3729,6 +3729,7 @@ W.FileItem=function(id,attrs){
 						obj.selected?obj.sel_name_color:(git_icon_color||name_color),s_git_icon.charCodeAt(0))
 				}
 				var dims_misc=UI.MeasureText(obj.misc_font,s_misc_text);
+				var dims_misc_w0=dims_misc.w;
 				/////////////////////////
 				//forget button
 				if(UI.g_is_dir_a_project[obj.name]=='permanent'){
@@ -3763,9 +3764,14 @@ W.FileItem=function(id,attrs){
 				if(obj.owner.m_is_fs_view||obj.is_tree_view){
 					var dims=UI.MeasureText(name_font,sname);
 					if(dims.w>w_name){
-						var size=obj.name_font_size*(w_name/dims.w);
-						name_font=UI.Font(UI.font_name,size,-50);
-						name_font_bold=UI.Font(UI.font_name,size,100);
+						s_misc_text='';
+						dims_misc.w-=dims_misc_w0;
+						w_name=Math.max(obj.w-20-w_icon-dims_misc.w-4,64);
+						if(dims.w>w_name){
+							var size=obj.name_font_size*(w_name/dims.w);
+							name_font=UI.Font(UI.font_name,size,-50);
+							name_font_bold=UI.Font(UI.font_name,size,100);
+						}
 					}
 					W.Text("",{x:obj.x+w_icon+2,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
 						font:name_font,text:sname,
@@ -3775,9 +3781,14 @@ W.FileItem=function(id,attrs){
 					if(obj.name_to_create){sname="";}
 					var dims=UI.MeasureText(name_font,obj.name);
 					if(dims.w>w_name){
-						var size=obj.name_font_size*(w_name/dims.w);
-						name_font=UI.Font(UI.font_name,size,-50);
-						name_font_bold=UI.Font(UI.font_name,size,100);
+						s_misc_text='';
+						dims_misc.w-=dims_misc_w0;
+						w_name=Math.max(obj.w-20-w_icon-dims_misc.w-4,64);
+						if(dims.w>w_name){
+							var size=obj.name_font_size*(w_name/dims.w);
+							name_font=UI.Font(UI.font_name,size,-50);
+							name_font_bold=UI.Font(UI.font_name,size,100);
+						}
 					}
 					var lg_basepath=obj.name.length-sname.length
 					if(lg_basepath>0){

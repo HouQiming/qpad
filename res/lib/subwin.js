@@ -746,7 +746,7 @@ var RenderLayout=function(layout,obj,y_base){
 					sizing_rect.nd=nd;
 					sizing_rect.area_size={x:x,y:y,w:w,h:h};
 					sizing_rect.mouse_cursor=(nd.type=="hsplit"?"sizewe":"sizens"),
-					W.Region("sizing_"+id_sizing_rect,sizing_rect,g_sizing_rect_prototype)
+					sizing_rect.__id="sizing_"+id_sizing_rect;
 					id_sizing_rect++;
 				}
 			}else{
@@ -1149,6 +1149,7 @@ W.TabbedDocument=function(id,attrs){
 			var shadow_rect=all_shadows[i+1];
 			UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h);
 			UI.RoundRect(shadow_rect);
+			W.Region(sizing_rect.__id,sizing_rect,g_sizing_rect_prototype)
 			UI.PopCliprect();
 		}
 		//restore button

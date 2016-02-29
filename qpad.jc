@@ -162,6 +162,9 @@ if Platform.BUILD=="debug":
 		if Platform.IS_UNIX:
 			if fn0.StartsWith("~"):
 				fn0="${HOME}"+fn0[1:]
+		else if Platform.IS_WINDOWS:
+			if fn0.StartsWith("~"):
+				fn0="%UserProfile%"+fn0[1:]
 		return JS.Return(System.Env.ExpandEnvironmentStrings(fn0))
 	}
 	jsio["NormalizeFileName"]=function(JSContext JS){
