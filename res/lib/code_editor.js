@@ -2296,7 +2296,7 @@ var find_context_prototype={
 UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found,is_non_quiet){
 	var spath_repo=UI.GetEditorProject(doc.m_file_name);
 	var obj_notebook_tab=UI.OpenNoteBookTab(spath_repo+"/notebook.json",'quiet')
-	if(is_non_quiet){
+	if(is_non_quiet!="output"){
 		UI.top.app.document_area.BringUpTab(obj_notebook_tab.__global_tab_id)
 	}
 	if(!obj_notebook_tab.main_widget){
@@ -2310,7 +2310,7 @@ UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found
 		obj_notebook.m_last_focus_cell_id=cell_id*2+(is_non_quiet=="output"?1:0);
 		obj_notebook.need_auto_scroll=1;
 		var cell_i=(obj_notebook.m_cells&&obj_notebook.m_cells[cell_id]);
-		if(cell_i){
+		if(cell_i&&is_non_quiet!="output"){
 			UI.SetFocus(is_non_quiet=="output"?cell_i.m_text_out:cell_i.m_text_in)
 		}
 		UI.Refresh()
@@ -3987,7 +3987,13 @@ var fnewpage_findbar_plugin=function(){
 	this.AddEventHandler('ALT+UP',function(key,event){
 		if(!this.owner.m_is_fs_view){return 1;}
 		var ccnt_end=this.ed.GetTextSize();
-		var s=IO.NormalizeFileName(this.ed.GetText());
+		var spath=this.ed.GetText();
+		if(spath.search(g_regexp_abspath)>=0){
+			//do nothing: it's absolute
+		}else{
+			spath=UI.m_new_document_search_path+"/"+spath
+		}
+		var s=IO.NormalizeFileName(spath);
 		var s2=UI.GetPathFromFilename(UI.GetPathFromFilename(s));
 		if(s2=='.'){return 1;}
 		var n_removed=Duktape.__byte_length(s)-Duktape.__byte_length(s2);

@@ -401,7 +401,11 @@ var CreateMenus=function(){
 		menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:function(){
 			UI.UpdateNewDocumentSearchPath()
 			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-				IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
+				if(IO.FileExists(IO.GetStoragePath()+"/plugins/shell.bat")){
+					IO.Shell(["start"," ","cmd","/c",IO.GetStoragePath()+"/plugins/shell.bat",UI.m_new_document_search_path])
+				}else{
+					IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
+				}
 			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 				var s_terminal="xterm";
 				if(IO.FileExists("/usr/bin/x-terminal-emulator")){

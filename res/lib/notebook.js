@@ -767,7 +767,7 @@ W.NotebookView=function(id,attrs){
 		var doc_in=cell_i.m_text_in;
 		var doc_out=cell_i.m_text_out;
 		var is_text_note=(cell_i.m_language=="Markdown"&&!doc_out.ed.GetTextSize());
-		var h_in=MeasureEditorSize(doc_in,is_text_note?obj.max_lines*2:obj.max_lines,w_content-obj.padding*2);
+		var h_in=MeasureEditorSize(doc_in,is_text_note?((obj.max_lines*1.5)|0):obj.max_lines,w_content-obj.padding*2);
 		var h_out=MeasureEditorSize(doc_out,obj.max_lines,w_content-obj.padding*2);
 		if(is_text_note){
 			h_out=-obj.h_caption;

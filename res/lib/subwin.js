@@ -1866,6 +1866,6 @@ UI.UpdateNewDocumentSearchPath=function(){
 		ret=IO.GetNewDocumentName(undefined,undefined,"document");
 		UI.m_previous_document=undefined
 	}
-	UI.m_new_document_search_path=ret
+	UI.m_new_document_search_path=ret;
 	return ret
 }

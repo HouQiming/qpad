@@ -773,27 +773,35 @@ UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
 	this.AddEventHandler('global_menu',function(){
 		var desc=this.plugin_language_desc;
-		if(!desc.m_buildenv_by_name){return 1;}
-		var s_name_default=UI.GetDefaultBuildEnv(desc.name);
-		var obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
-		if(!obj_buildenv&&this.m_compiler_name){
-			this.m_compiler_name=undefined;
-			obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
+		//if(!desc.m_buildenv_by_name){return 1;}
+		var obj_buildenv=undefined;
+		var s_name_default=undefined;
+		if(desc.m_buildenv_by_name){
+			s_name_default=UI.GetDefaultBuildEnv(desc.name);
+			desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
+			if(!obj_buildenv&&this.m_compiler_name){
+				this.m_compiler_name=undefined;
+				obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
+			}
 		}
-		if(!obj_buildenv){return 1;}
+		//if(!obj_buildenv){return 1;}
 		var menu_run=UI.BigMenu("&Run")
 		var fgencell=function(is_project){
 			var s_script=undefined;
-			if(obj_buildenv.CreateInterpreterCall){
-				var args=obj_buildenv.CreateInterpreterCall(this.m_file_name,this);
-				if(typeof(args)=='string'){
-					//qpad js
-					s_script='eval(IO.ReadAll('+this.m_file_name,'));';
+			if(obj_buildenv){
+				if(obj_buildenv.CreateInterpreterCall){
+					var args=obj_buildenv.CreateInterpreterCall(this.m_file_name,this);
+					if(typeof(args)=='string'){
+						//qpad js
+						s_script='eval(IO.ReadAll('+this.m_file_name,'));';
+					}else{
+						s_script=IO.ShellCmd(args);
+					}
 				}else{
-					s_script=IO.ShellCmd(args);
+					s_script=obj_buildenv.CreateBuildScript(this.m_file_name,this)
 				}
 			}else{
-				s_script=obj_buildenv.CreateBuildScript(this.m_file_name,this)
+				s_script="";
 			}
 			var s_mark=undefined;
 			var s_language=undefined;
@@ -837,6 +845,7 @@ UI.RegisterEditorPlugin(function(){
 				s_language='Unix Shell Script';
 			}
 			//"non_quiet"
+			var bk_active_tab=UI.top.app.document_area.active_tab;
 			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,'output');
 			if(result_cell){
 				var obj_notebook=result_cell.obj_notebook;
@@ -855,6 +864,9 @@ UI.RegisterEditorPlugin(function(){
 					//UI.SetFocus(doc_in)
 					obj_notebook.RunCell(result_cell.cell_id)
 				}
+			}
+			if(bk_active_tab!=undefined){
+				UI.top.app.document_area.BringUpTab(bk_active_tab.__global_tab_id)
 			}
 			UI.Refresh()
 		}.bind(this);
@@ -909,7 +921,7 @@ UI.RegisterEditorPlugin(function(){
 				}
 			}
 		}})
-		if(desc.m_buildenvs.length>1){
+		if(desc.m_buildenvs&&desc.m_buildenvs.length>1){
 			menu_run.AddSeparator()
 			for(var i=0;i<desc.m_buildenvs.length;i++){
 				var s_name_i=desc.m_buildenvs[i].name;
