@@ -2296,7 +2296,7 @@ var find_context_prototype={
 UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found,is_non_quiet){
 	var spath_repo=UI.GetEditorProject(doc.m_file_name);
 	var obj_notebook_tab=UI.OpenNoteBookTab(spath_repo+"/notebook.json",'quiet')
-	if(is_non_quiet!="output"){
+	if(is_non_quiet){
 		UI.top.app.document_area.BringUpTab(obj_notebook_tab.__global_tab_id)
 	}
 	if(!obj_notebook_tab.main_widget){

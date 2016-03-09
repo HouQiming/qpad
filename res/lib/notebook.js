@@ -265,10 +265,10 @@ W.notebook_prototype={
 			if(sub_cell_id>0){
 				var tar_id=sub_cell_id-1;
 				while(tar_id>=0){
-					if(this.notebook_owner.GotoSubCell(tar_id-1,1)){
+					if(this.notebook_owner.GotoSubCell(tar_id,1)){
 						break;
 					}
-					tar_id++;
+					tar_id--;
 				}
 				return 0;
 			}
@@ -746,6 +746,22 @@ W.NotebookView=function(id,attrs){
 	if(!obj.m_cells){
 		obj.Load();
 	}
+	var focus_cell_id=undefined;
+	for(var i=0;i<obj.m_cells.length;i++){
+		var cell_i=obj.m_cells[i];
+		if(cell_i.m_text_in==UI.nd_focus){
+			focus_cell_id=i*2;
+			break;
+		}
+		if(cell_i.m_text_out==UI.nd_focus){
+			focus_cell_id=i*2+1;
+			break;
+		}
+	}
+	if(focus_cell_id!=undefined&&obj.m_last_focus_cell_id!=focus_cell_id){
+		obj.m_last_focus_cell_id=focus_cell_id;
+		obj.need_auto_scroll=1;
+	}
 	var scroll_y=(obj.scroll_y||0);obj.scroll_y=scroll_y;
 	var anim=W.AnimationNode("scrolling_animation",{
 		transition_dt:obj.scroll_transition_dt,
@@ -955,18 +971,6 @@ W.NotebookView=function(id,attrs){
 		obj.ScrollShowRange(scroll_range[0],scroll_range[1],scroll_range[2],scroll_range[3]);
 	}
 	//coulddo: tool bar
-	var focus_cell_id=undefined;
-	for(var i=0;i<obj.m_cells.length;i++){
-		var cell_i=obj.m_cells[i];
-		if(cell_i.m_text_in==UI.nd_focus){
-			focus_cell_id=i*2;
-			break;
-		}
-		if(cell_i.m_text_out==UI.nd_focus){
-			focus_cell_id=i*2+1;
-			break;
-		}
-	}
 	var menu_notebook=undefined;
 	if(focus_cell_id!=undefined){
 		menu_notebook=UI.BigMenu("Note&book");

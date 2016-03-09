@@ -342,6 +342,9 @@ W.TabbedDocument_prototype={
 		this.m_dragging_tab_y_offset=event.y-y_label;
 		this.m_dragging_tab_src_tabid=tabid
 		this.m_dragging_tab_target=undefined;
+		this.m_dragging_mouse_moved=0;
+		this.m_dragging_mouse_x=event.x;
+		this.m_dragging_mouse_y=event.y;
 		/////////////
 		var caption_areas=this.m_dragging_caption_areas;
 		for(var i=0;i<caption_areas.length;i++){
@@ -357,7 +360,12 @@ W.TabbedDocument_prototype={
 	OnTabMove:function(tabid,event){
 		var caption_areas=this.m_dragging_caption_areas;
 		if(caption_areas==undefined){return;}
+		if(!this.m_dragging_mouse_moved&&Math.abs(this.m_dragging_mouse_x-event.x)<4&&Math.abs(this.m_dragging_mouse_y-event.y)<4){
+			//prevent auto-scroll false drag
+			return;
+		}
 		var target_position=undefined;
+		this.m_dragging_mouse_moved=1;
 		this.m_dragging_mouse_x=event.x;
 		this.m_dragging_mouse_y=event.y;
 		var layout=UI.m_ui_metadata["<layout>"];
@@ -1045,7 +1053,7 @@ W.TabbedDocument=function(id,attrs){
 			var scroll_x=(UI.g_caption_scroll_by_name[area_autoscroll_target.name]||0);
 			x_reveal_target-=area_autoscroll_target.x;
 			var scroll_x0=scroll_x;
-			scroll_x=Math.min(Math.max(scroll_x,x_reveal_target+w_active_tab-area_autoscroll_target.w),x_reveal_target);
+			scroll_x=Math.min(Math.max(scroll_x,x_reveal_target+w_active_tab-area_autoscroll_target.w+tab_label_style.padding*2),x_reveal_target-tab_label_style.padding*2);
 			scroll_x=Math.max(Math.min(scroll_x,area_autoscroll_target.wtot-area_autoscroll_target.w),0);
 			if(scroll_x!=scroll_x0){
 				UI.g_caption_scroll_by_name[area_autoscroll_target.name]=scroll_x;
@@ -1055,7 +1063,6 @@ W.TabbedDocument=function(id,attrs){
 		}
 		if(obj.m_dragging_rendering_caption_areas){
 			var rendering_caption_areas=obj.m_dragging_rendering_caption_areas;
-			//tar-area after, src-area after potential split shade
 			for(var i=0;i<rendering_caption_areas.length;i++){
 				var area_i=rendering_caption_areas[i];
 				if(!(area_i.w>0)){continue;}
@@ -1134,6 +1141,13 @@ W.TabbedDocument=function(id,attrs){
 								tabid:tab_j.__global_tab_id,owner:obj})
 						}
 					}
+					//if(pass_i==1){
+					//	//scrolling regions
+					//	if(scroll_x>0){
+					//	}
+					//	if(area_i.wtot>area_i.w&&scroll_x<area_i.wtot-area_i.w){
+					//	}
+					//}
 					UI.PopCliprect();
 				}
 			}
