@@ -6081,12 +6081,14 @@ W.CodeEditor=function(id,attrs){
 		if(obj.m_notifications&&!obj.show_find_bar){
 			//&&!UI.m_frame_is_invalid
 			//we need to keep it alive
+			UI.PushCliprect(obj.x,obj.y,w_obj_area,h_obj_area)
 			W.ListView('notification_list',{
 				x:obj.x+w_obj_area-w_scrolling_area-obj.w_notification-8,y:obj.y+4,w:obj.w_notification,h:h_obj_area-8,
 				dimension:'y',layout_spacing:8,layout_align:'left',is_single_click_mode:1,no_region:1,no_clipping:1,
 				item_template:{
 					object_type:W.NotificationItem,
 				},items:obj.m_notifications})
+			UI.PopCliprect()
 		}
 		///////////////////////////////////////
 		if(sxs_visualizer){

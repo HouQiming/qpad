@@ -852,7 +852,10 @@ UI.RegisterEditorPlugin(function(){
 				//var cell_i=obj_notebook.m_cells[result_cell.cell_id];
 				//var doc_in=cell_i.m_text_in;
 				//UI.SetFocus(doc_in)
-				obj_notebook.RunCell(result_cell.cell_id)
+				if(obj_notebook.RunCell(result_cell.cell_id)=="focus"){
+					//if we got a cancel notification...
+					bk_active_tab=undefined;
+				}
 			}else{
 				//create cell and focus it
 				fgencell.call(this,is_project)
