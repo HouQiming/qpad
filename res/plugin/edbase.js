@@ -262,7 +262,7 @@ Language.Register({
 		var tok_regexp_escape2=lang.DefineToken("\\]");
 		var kwset=lang.DefineKeywordSet("color_symbol");
 		var keywords={
-			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined'],
+			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined','yield','await'],
 			'type':['typeof','var','void','boolean','byte','int','short','char','double','long','float'],
 		};
 		for(var k in keywords){

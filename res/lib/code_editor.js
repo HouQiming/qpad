@@ -1015,7 +1015,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}).bind(this);
 		ffind_next();
 	},
-	RenderWithLineNumbers:function(scroll_x,scroll_y, area_x,area_y,area_w,area_h,enable_interaction){
+	RenderWithLineNumbers:function(scroll_x,scroll_y, area_x,area_y,area_w,area_h,enable_interaction,drop_bg){
 		this.PrepareForRendering();
 		var w_line_numbers=this.m_rendering_w_line_numbers;
 		var bm_ccnts=this.m_rendering_bm_ccnts;
@@ -1024,7 +1024,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//bg
 		var edstyle=UI.default_styles.code_editor;
 		UI.RoundRect({color:edstyle.line_number_bgcolor,x:area_x,y:area_y,w:Math.min(w_line_numbers,area_w),h:area_h})
-		UI.RoundRect({color:this.read_only?edstyle.line_number_bgcolor:edstyle.bgcolor,x:area_x+w_line_numbers,y:area_y,w:area_w-w_line_numbers,h:area_h})
+		if(!drop_bg){
+			UI.RoundRect({color:this.read_only?edstyle.line_number_bgcolor:edstyle.bgcolor,x:area_x+w_line_numbers,y:area_y,w:area_w-w_line_numbers,h:area_h})
+		}
 		//main editor
 		if(enable_interaction){
 			this.RenderAsWidget(enable_interaction,
@@ -4683,6 +4685,7 @@ W.CodeEditor=function(id,attrs){
 		var current_find_context=obj.m_current_find_context
 		var ytot=undefined;
 		var w_right_shadow=undefined;
+		var right_overlay_drawn=0;
 		var y_bottom_shadow=undefined;
 		var desc_x_scroll_bar=undefined;
 		//&&!(doc&&doc.notebook_owner)
@@ -4963,6 +4966,23 @@ W.CodeEditor=function(id,attrs){
 			var renderer=doc.GetRenderer();
 			renderer.m_virtual_diffs=undefined;
 		}
+		if(doc&&doc.m_enable_wrapping&&!obj.m_is_preview){
+			var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+12;
+			if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
+				w_right_shadow=x_wrap_bar;
+			}
+		}
+		UI.RoundRect({color:obj.read_only?UI.default_styles.code_editor.line_number_bgcolor:UI.default_styles.code_editor.bgcolor,
+			x:obj.x+w_line_numbers,
+			y:obj.y,
+			w:w_obj_area-w_line_numbers-w_scrolling_area,
+			h:h_obj_area});
+		if(w_right_shadow!=undefined){
+			//try to draw the right "overlay" early
+			var h_right_shadow=doc.h;
+			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:doc.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:doc.h})
+			right_overlay_drawn=1;
+		}
 		if(doc&&obj.m_edit_lock){
 			obj.__children.push(doc)
 			UI.Begin(doc)
@@ -4977,13 +4997,7 @@ W.CodeEditor=function(id,attrs){
 			doc.y=obj.y
 			doc.w=w_obj_area-w_line_numbers-obj.padding-w_scrolling_area
 			doc.h=h_obj_area
-			doc.RenderWithLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,obj.x,obj.y,w_obj_area-w_scrolling_area,h_obj_area,0)
-			if(obj.doc.m_enable_wrapping&&!obj.m_is_preview){
-				var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+12;
-				if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
-					w_right_shadow=x_wrap_bar;
-				}
-			}
+			doc.RenderWithLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,obj.x,obj.y,w_obj_area-w_scrolling_area,h_obj_area,0,1)
 		}else if(obj.m_is_preview&&!doc&&(obj.bin_preview||UI.ED_GetFileLanguage(obj.file_name).is_binary)){
 			W.BinaryEditor("bin_preview",{
 				x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,
@@ -5153,7 +5167,7 @@ W.CodeEditor=function(id,attrs){
 				doc.RenderWithLineNumbers(doc.scroll_x,doc.scroll_y,
 					obj.x,obj.y+h_top_find,
 					w_obj_area-w_scrolling_area,
-					h_editor,"doc");
+					h_editor,"doc",1);
 				if(was_bound_elsewhere){
 					doc.scroll_x=(doc.scroll_x||0);
 					doc.scroll_y=(doc.scroll_y||0);
@@ -5391,7 +5405,7 @@ W.CodeEditor=function(id,attrs){
 							//print('draw',y0,(obj.y+y_top_hint)*UI.pixels_per_unit,doc.ed.SeekXY(0,y0))
 							var renderer=doc.GetRenderer();
 							renderer.m_temporarily_disable_spell_check=1
-							doc.RenderWithLineNumbers(0,y0,obj.x,obj.y+y_top_hint,w_obj_area-w_scrolling_area,hh,0)
+							doc.RenderWithLineNumbers(0,y0,obj.x,obj.y+y_top_hint,w_obj_area-w_scrolling_area,hh,0,1)
 							renderer.m_temporarily_disable_spell_check=0
 							//also draw the line numbers
 						}
@@ -5983,7 +5997,9 @@ W.CodeEditor=function(id,attrs){
 			if(y_bottom_shadow!=undefined){
 				h_right_shadow=y_bottom_shadow;
 			}
-			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:doc.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:doc.h})
+			if(!right_overlay_drawn){
+				UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:doc.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:doc.h})
+			}
 			UI.PushCliprect(obj.x+w_right_shadow,doc.y,w_obj_area-w_scrolling_area-w_right_shadow,h_right_shadow)
 				UI.RoundRect({
 					x:obj.x+w_right_shadow-obj.find_item_shadow_size,y:doc.y-obj.find_item_shadow_size,
