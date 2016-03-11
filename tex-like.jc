@@ -574,7 +574,7 @@ inline pushUTF8(string ret,chi)
 	else
 		ret.push(char(chi))
 
-auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_chars, CStyleHolder styles,CEmbededObject[] m_objects)
+auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int enable_meta_chars, CStyleHolder styles,CEmbededObject[] m_objects)
 	//a font should be all we need
 	//we need caching, even map-based is faster than the bsearch
 	//create the "words"
@@ -705,10 +705,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_c
 			hc=styles.charHeight(style_id)
 			y_baseline=styles.GetFontBaseline(style_id)
 		if word_i.z<s.n:
-			ch_next=0
-			foreach ch in Utf8Chars(s[word_i.z:])
-				ch_next=ch
-				break
+			ch_next=Utf8CodeAt(s,word_i.z)
 			tail_kerning=styles.GetKerning(style_id,ch_prev,ch_next)
 		else
 			tail_kerning=0LL
@@ -724,11 +721,35 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,int enable_meta_c
 			eol_badness+=HYPHEN_BADNESS(style_id)
 		if flags&FLAG_BAD_EOL:
 			eol_badness+=BAD_BOLEOL_BADNESS(style_id)
-		atoms.push(TLayoutAtom(){
-			flags:flags, w:w_word,h:hc, y_baseline:y_baseline,
-			tail_kerning:tail_kerning,bol_badness:bol_badness,eol_badness:eol_badness,w_extra_eol:w_extra_eol,
-			style_id:style_id, pword0:word_i.y,pword1:word_i.z
-		})
+		if w_word>=w_line:
+			//big bad word, split it by char
+			foreach ch,I,I_next in Utf8Chars(s[word_i.y:word_i.z-1])
+				if word_i.y+I_next<s.n:
+					ch_next=Utf8CodeAt(s,word_i.y+I_next)
+				tail_kerning=styles.GetKerning(style_id,ch,ch_next)
+				w_word=styles.charWidth(style_id,ch)
+				flags_I=flags
+				if I_next<word_i.z-word_i.y:
+					flags_I|=FLAG_HYPHENATE_AFTER
+				eol_badness=0LL
+				w_extra_eol=0LL
+				if flags_I&FLAG_HYPHENATE_AFTER:
+					w_extra_eol=styles.charWidth(style_id,int('-'))
+					eol_badness+=HYPHEN_BADNESS(style_id)
+				atoms.push(TLayoutAtom(){
+					flags:flags_I, w:w_word,h:hc, y_baseline:y_baseline,
+					tail_kerning:tail_kerning,
+					bol_badness:I==0?bol_badness:0LL,
+					eol_badness:eol_badness,
+					w_extra_eol:w_extra_eol,
+					style_id:style_id, pword0:int(word_i.y+I),pword1:int(word_i.y+I_next)
+				})
+		else
+			atoms.push(TLayoutAtom(){
+				flags:flags, w:w_word,h:hc, y_baseline:y_baseline,
+				tail_kerning:tail_kerning,bol_badness:bol_badness,eol_badness:eol_badness,w_extra_eol:w_extra_eol,
+				style_id:style_id, pword0:word_i.y,pword1:word_i.z
+			})
 	return (atoms,tail_style_id)
 
 inline GenerateTextLayout(

@@ -778,7 +778,7 @@ UI.RegisterEditorPlugin(function(){
 		var s_name_default=undefined;
 		if(desc.m_buildenv_by_name){
 			s_name_default=UI.GetDefaultBuildEnv(desc.name);
-			desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
+			obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
 			if(!obj_buildenv&&this.m_compiler_name){
 				this.m_compiler_name=undefined;
 				obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];

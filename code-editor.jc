@@ -28,7 +28,7 @@ auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line, int m_
 	ret=new i64[]
 	foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 		n0=ret.n
-		(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,m_tab_width,0,styles,CEmbededObject[].NULL)
+		(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,m_tab_width,w_line,0,styles,CEmbededObject[].NULL)
 		line_breaks=GreedyLayoutGeneral(atoms,w_line)
 		GenerateTextLayout(
 			styles,
@@ -1407,6 +1407,7 @@ class CLayouter_programmer
 					//if p_last<spart.n:
 					//	TranslateArabic(value0+p_last,spart[p_last:])
 					//TranslateArabic(value0,spart)
+					//flatx_next_line=(flat_x/wrap_width+1LL)*wrap_width;
 					foreach ch32,I in Utf8Chars(spart)
 						//ch32
 						//if ch32=='\t':ch32=int(' ')
@@ -1429,6 +1430,10 @@ class CLayouter_programmer
 							dx_temp=charWidth(ch32)
 						x+=dx_temp
 						flat_x+=dx_temp
+						//if flat_x>=flatx_next_line:
+						//	y++
+						//	x=flat_x-y*wrap_width
+						//	flatx_next_line+=wrap_width
 						ch32_prev=ch32
 						SeekCheck(value0+I)
 		NewlineCheck()
@@ -3901,7 +3906,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		hyphen_next=0
 		rjobs=new TRenderJob[]
 		foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
-			(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,tab_width,1, styles,CEmbededObject[].NULL)
+			(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,tab_width,w_line,1, styles,CEmbededObject[].NULL)
 			line_breaks=GreedyLayoutGeneral(atoms,w_line)
 			GenerateTextLayout(
 				styles,

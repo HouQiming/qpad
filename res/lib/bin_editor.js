@@ -1157,9 +1157,19 @@ UI.NewBinaryEditorTab=function(fname0){
 	UI.top.app.quit_on_zero_tab=0;
 	return UI.NewTab({
 		file_name:file_name,
-		title:UI.RemovePath(file_name),
+		title:UI.GetSmartTabName(file_name),
 		tooltip:file_name,
 		document_type:'binary',
+		UpdateTitle:function(){
+			var fn_display=(this.main_widget&&this.main_widget.file_name||this.file_name)
+			this.title=UI.GetSmartTabName(fn_display);
+			this.tooltip=fn_display;
+			this.need_save=0
+			if(this.main_widget&&(this.main_widget.saved_point||0)!=this.main_widget.m_undo_queue.length){
+				this.title=this.title+'*';
+				this.need_save=1;
+			}
+		},
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
@@ -1173,7 +1183,7 @@ UI.NewBinaryEditorTab=function(fname0){
 			if(!this.main_widget){
 				this.main_widget=body;
 			}
-			body.title=UI.RemovePath(body.file_name)
+			body.title=UI.GetSmartTabName(body.file_name)
 			body.tooltip=body.file_name
 			this.need_save=0
 			if((body.saved_point||0)!=body.m_undo_queue.length){

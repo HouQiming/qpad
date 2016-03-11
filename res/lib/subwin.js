@@ -644,6 +644,9 @@ var RenderLayout=function(layout,obj,y_base){
 		var area_name=(items[i].area_name||"doc_default");
 		var z_i=(items[i].z_order||0);
 		//print(items[i].title,z_i)
+		if(items[i].UpdateTitle){
+			items[i].UpdateTitle();
+		}
 		if(!windows_to_render[area_name]||windows_to_render[area_name].z_order<=z_i){
 			windows_to_render[area_name]=items[i];
 		}

@@ -391,7 +391,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				}
 				return
 			}
-			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?131072:4194304))
+			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?262144:4194304))
 			//this.ResetSaveDiff()
 			if(is_preview){
 				var rendering_ccnt1=this.SeekXY(0,this.h)
@@ -594,7 +594,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	GetHorizontalSpan:function(){
 		if(!this.ed){return 1;}
 		if(this.m_enable_wrapping){
-			return this.displayed_wrap_width;
+			return this.displayed_wrap_width+16;
 		}
 		var ed=this.ed;
 		var x_max=ed.GetStateAt(ed.m_handler_registration["renderer"],ed.GetTextSize(),"ddddd")[4];
@@ -3004,42 +3004,35 @@ var ffindbar_plugin=function(){
 
 var g_repo_from_file={}
 var g_repo_list={}
+//we only put not-yet-run parsing functions in there
+var g_repo_parsing_context={queue:[]};
+var ResumeProjectParsing=function(g_repo_parsing_context){
+	if(g_repo_parsing_context.canceled){return;}
+	if(g_repo_parsing_context.queue.length){
+		g_repo_parsing_context.is_parsing=1;
+		(g_repo_parsing_context.queue.shift())();
+	}else{
+		g_repo_parsing_context.is_parsing=0;
+	}
+};
+var QueueProjectParser=function(f){
+	if(g_repo_parsing_context.is_parsing){
+		g_repo_parsing_context.queue.push(f);
+	}else{
+		g_repo_parsing_context.is_parsing=1;
+		f();
+	}
+};
 var ParseGit=function(spath){
 	if(g_repo_list[spath]){return;}
 	var my_repo={name:spath,is_parsing:1,files:[]}
-	g_repo_list[spath]=my_repo
-	IO.RunTool(["git","ls-files"],spath, ".*",function(g_repo_from_file,match){
-		if(match[0].indexOf(':')>=0){
-			return;
-		}
-		var fname=IO.NormalizeFileName(spath+"/"+match[0])
-		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-			fname=fname.toLowerCase()
-		}
-		var repos=g_repo_from_file[fname]
-		if(!repos){
-			repos={};
-			g_repo_from_file[fname]=repos
-		}
-		//repo -> status map
-		repos[spath]="  ";
-		my_repo.files.push(fname)
-	}.bind(undefined,g_repo_from_file),function(){
-		//some dangling dependencies may have been resolved
-		if(UI.ED_ReparseDanglingDeps()){
-			CallParseMore()
-		}
-		//"git status --short --ignored"
-		//IO.RunTool(["git","ls-files","--modified"],spath, ".*",function(match){
-		IO.RunTool(["git","status","--porcelain","--ignored"],spath, "(..) (([^>]+) -> )?([^>]+)",function(g_repo_from_file,match){
-			//if(match[0].indexOf(':')>=0){
-			//	return;
-			//}
-			var s_name=match[4];
-			if(s_name&&s_name[s_name.length-1]=='/'){
-				s_name=s_name.substr(0,s_name.length-1);
+	g_repo_list[spath]=my_repo;
+	QueueProjectParser(function(){
+		IO.RunTool(["git","ls-files"],spath, ".*",function(g_repo_from_file,match){
+			if(match[0].indexOf(':')>=0){
+				return;
 			}
-			var fname=IO.NormalizeFileName(spath+"/"+s_name);
+			var fname=IO.NormalizeFileName(spath+"/"+match[0])
 			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 				fname=fname.toLowerCase()
 			}
@@ -3049,17 +3042,46 @@ var ParseGit=function(spath){
 				g_repo_from_file[fname]=repos
 			}
 			//repo -> status map
-			if(UI.m_ui_metadata[fname]&&!repos[spath]){
-				//count in ignored files if editted in qpad
-				my_repo.files.push(fname)
-			}
-			repos[spath]=match[1]
+			repos[spath]="  ";
+			my_repo.files.push(fname)
 		}.bind(undefined,g_repo_from_file),function(){
-			UI.ED_8bitStringSort(my_repo.files)
-			my_repo.is_parsing=0
-			UI.Refresh()
+			//some dangling dependencies may have been resolved
+			if(UI.ED_ReparseDanglingDeps()){
+				CallParseMore()
+			}
+			//"git status --short --ignored"
+			//IO.RunTool(["git","ls-files","--modified"],spath, ".*",function(match){
+			IO.RunTool(["git","status","--porcelain","--ignored"],spath, "(..) (([^>]+) -> )?([^>]+)",function(g_repo_from_file,match){
+				//if(match[0].indexOf(':')>=0){
+				//	return;
+				//}
+				var s_name=match[4];
+				if(s_name&&s_name[s_name.length-1]=='/'){
+					s_name=s_name.substr(0,s_name.length-1);
+				}
+				var fname=IO.NormalizeFileName(spath+"/"+s_name);
+				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+					fname=fname.toLowerCase()
+				}
+				var repos=g_repo_from_file[fname]
+				if(!repos){
+					repos={};
+					g_repo_from_file[fname]=repos
+				}
+				//repo -> status map
+				if(UI.m_ui_metadata[fname]&&!repos[spath]){
+					//count in ignored files if editted in qpad
+					my_repo.files.push(fname)
+				}
+				repos[spath]=match[1]
+			}.bind(undefined,g_repo_from_file),function(g_repo_parsing_context){
+				UI.ED_8bitStringSort(my_repo.files)
+				my_repo.is_parsing=0
+				ResumeProjectParsing(g_repo_parsing_context);
+				UI.Refresh()
+			}.bind(undefined,g_repo_parsing_context), 30)
 		}, 30)
-	}, 30)
+	})
 	return my_repo
 }
 
@@ -3115,6 +3137,8 @@ UI.ClearFileListingCache=function(){
 	g_repo_from_file={}
 	g_repo_list={}
 	g_is_repo_detected={}
+	g_repo_parsing_context.canceled=1;
+	g_repo_parsing_context={queue:[]};
 }
 
 //var FILE_LISTING_BUDGET=100
@@ -3354,7 +3378,7 @@ var ParseProject=function(spath){
 		//file-only, recursive
 		var find_context=IO.CreateEnumFileContext(spath+"/*",5);
 		var fparse_batch=undefined;
-		fparse_batch=function(){
+		fparse_batch=function(g_repo_parsing_context){
 			for(var i=0;i<FILE_LISTING_BUDGET_PARSE_PROJECT;i++){
 				var fnext=find_context()
 				if(!fnext){
@@ -3375,9 +3399,10 @@ var ParseProject=function(spath){
 			}else{
 				UI.ED_8bitStringSort(my_repo.files)
 				my_repo.is_parsing=0
+				ResumeProjectParsing(g_repo_parsing_context);
 			}
-		};
-		fparse_batch();
+		}.bind(undefined,g_repo_parsing_context);
+		QueueProjectParser(fparse_batch);
 		return my_repo
 	}
 }
@@ -3397,7 +3422,7 @@ W.FileItemOnDemandSort=function(obj){
 	}
 }
 
-var GetSmartFileName=function(obj_param){
+var GetSmartFileName=function(arv,obj_param){
 	if(!obj_param.display_name){
 		var redo_queue=[]
 		redo_queue.push(obj_param)
@@ -3405,7 +3430,6 @@ var GetSmartFileName=function(obj_param){
 			var obj=redo_queue.pop()
 			var ret=obj.display_name
 			if(ret){return ret;}
-			var arv=UI.m_current_file_list.m_appeared_names
 			var name=obj.name
 			var name_s=name
 			for(;;){
@@ -3777,7 +3801,7 @@ W.FileItem=function(id,attrs){
 						font:name_font,text:sname,
 						color:obj.selected?obj.sel_name_color:name_color})
 				}else{
-					var sname=GetSmartFileName(obj)
+					var sname=GetSmartFileName(UI.m_current_file_list.m_appeared_names,obj)
 					if(obj.name_to_create){sname="";}
 					var dims=UI.MeasureText(name_font,obj.name);
 					if(dims.w>w_name){
@@ -4633,6 +4657,7 @@ W.CodeEditor=function(id,attrs){
 		var top_hint_bbs=[]
 		var current_find_context=obj.m_current_find_context
 		var ytot=undefined;
+		var w_right_shadow=undefined;
 		var y_bottom_shadow=undefined;
 		var desc_x_scroll_bar=undefined;
 		//&&!(doc&&doc.notebook_owner)
@@ -4928,6 +4953,12 @@ W.CodeEditor=function(id,attrs){
 			doc.w=w_obj_area-w_line_numbers-obj.padding-w_scrolling_area
 			doc.h=h_obj_area
 			doc.RenderWithLineNumbers(doc.visible_scroll_x,doc.visible_scroll_y,obj.x,obj.y,w_obj_area-w_scrolling_area,h_obj_area,0)
+			if(obj.doc.m_enable_wrapping&&!obj.m_is_preview){
+				var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+12;
+				if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
+					w_right_shadow=x_wrap_bar;
+				}
+			}
 		}else if(obj.m_is_preview&&!doc&&(obj.bin_preview||UI.ED_GetFileLanguage(obj.file_name).is_binary)){
 			W.BinaryEditor("bin_preview",{
 				x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,
@@ -5114,14 +5145,15 @@ W.CodeEditor=function(id,attrs){
 				//doc.same_line_only_left_right=!UI.TestOption("left_right_line_wrap");
 				//wrap width widget
 				if(obj.doc.m_enable_wrapping&&!obj.m_is_preview){
-					var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+8;
+					var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+12;
 					if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
-						UI.RoundRect({
-							x:obj.x+x_wrap_bar,
-							y:doc.y,
-							w:obj.wrap_bar_size,
-							h:doc.h,
-							color:obj.wrap_bar_color})
+						//UI.RoundRect({
+						//	x:obj.x+x_wrap_bar,
+						//	y:doc.y,
+						//	w:obj.wrap_bar_size,
+						//	h:doc.h,
+						//	color:obj.wrap_bar_color})
+						w_right_shadow=x_wrap_bar;
 						//the mouse interaction
 						W.Region('wrapbar_widget',{
 							x:obj.x+x_wrap_bar+(obj.wrap_bar_size-obj.wrap_bar_region_size)*0.5,
@@ -5208,7 +5240,7 @@ W.CodeEditor=function(id,attrs){
 					}
 					var status_dims=UI.MeasureText(obj.status_bar_font,s_status)
 					var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot)
-					var status_x=obj.x+w_obj_area-w_scrolling_area-status_dims.w-obj.status_bar_padding*2;
+					var status_x=obj.x+(w_right_shadow==undefined?w_obj_area-w_scrolling_area:w_right_shadow)-status_dims.w-obj.status_bar_padding*2;
 					var status_y=obj.y+(y_bottom_shadow==undefined?h_editor:y_bottom_shadow)+h_top_find-status_dims.h-obj.status_bar_padding*2;
 					UI.RoundRect({
 						color:obj.status_bar_bgcolor,
@@ -5592,21 +5624,6 @@ W.CodeEditor=function(id,attrs){
 					//	x:sbar.x, y:sbar.y+sbar.h-1, w:sbar.w, h:1,
 					//	color:obj.separator_color})
 				}
-				if(y_bottom_shadow!=undefined){
-					if(obj.doc.notebook_owner){
-						//nothing for now
-						UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_obj_area,h:h_obj_area-y_bottom_shadow})
-					}else{
-						UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_obj_area,h:h_obj_area-y_bottom_shadow})
-						UI.PushCliprect(obj.x,obj.y+y_bottom_shadow,w_obj_area,h_obj_area-y_bottom_shadow)
-							UI.RoundRect({x:0-obj.find_item_shadow_size,y:obj.y+y_bottom_shadow-obj.find_item_shadow_size,
-								w:w_obj_area+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
-								color:obj.find_item_shadow_color,
-								round:obj.find_item_shadow_size,
-								border_width:-obj.find_item_shadow_size})
-						UI.PopCliprect()
-					}
-				}
 			}
 			//UI.RoundRect({
 			//	x:obj.x+w_line_numbers-1, y:obj.y, w:1, h:h_obj_area,
@@ -5936,6 +5953,39 @@ W.CodeEditor=function(id,attrs){
 				obj.context_menu=undefined;
 			}
 		}
+		if(w_right_shadow!=undefined){
+			var h_right_shadow=doc.h;
+			if(y_bottom_shadow!=undefined){
+				h_right_shadow=y_bottom_shadow;
+			}
+			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:doc.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:doc.h})
+			UI.PushCliprect(obj.x+w_right_shadow,doc.y,w_obj_area-w_scrolling_area-w_right_shadow,h_right_shadow)
+				UI.RoundRect({
+					x:obj.x+w_right_shadow-obj.find_item_shadow_size,y:doc.y-obj.find_item_shadow_size,
+					w:obj.find_item_shadow_size*2,h:h_right_shadow+obj.find_item_shadow_size*2,
+					color:obj.find_item_shadow_color,
+					round:obj.find_item_shadow_size,
+					border_width:-obj.find_item_shadow_size})
+			UI.PopCliprect()
+		}
+		if(y_bottom_shadow!=undefined){
+			if(w_right_shadow==undefined){
+				w_right_shadow=w_obj_area;
+			}
+			if(obj.doc.notebook_owner){
+				//nothing for now
+				UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_right_shadow,h:h_obj_area-y_bottom_shadow})
+			}else{
+				UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_right_shadow,h:h_obj_area-y_bottom_shadow})
+				UI.PushCliprect(obj.x,obj.y+y_bottom_shadow,w_right_shadow,h_obj_area-y_bottom_shadow)
+					UI.RoundRect({x:obj.x-obj.find_item_shadow_size,y:obj.y+y_bottom_shadow-obj.find_item_shadow_size,
+						w:w_right_shadow+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
+						color:obj.find_item_shadow_color,
+						round:obj.find_item_shadow_size,
+						border_width:-obj.find_item_shadow_size})
+				UI.PopCliprect()
+			}
+		}
 		if(UI.enable_timing){
 			print('before minimap=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
 		}
@@ -6120,7 +6170,16 @@ W.CodeEditor=function(id,attrs){
 }
 
 //UI.DetectRepository=DetectRepository;
-var g_new_id=0
+var g_new_id=0;
+var g_tab_appeared_names={arv:{},objs:{}};
+UI.GetSmartTabName=function(fn){
+	var obj=g_tab_appeared_names.objs[fn];
+	if(!obj){
+		obj={name:fn};
+		g_tab_appeared_names.objs[fn]=obj;
+	}
+	return GetSmartFileName(g_tab_appeared_names.arv,obj);
+}
 UI.NewCodeEditorTab=function(fname0){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
 	var file_name=fname0||("<New #"+(g_new_id++).toString()+">")
@@ -6128,10 +6187,21 @@ UI.NewCodeEditorTab=function(fname0){
 	UI.top.app.quit_on_zero_tab=0;
 	return UI.NewTab({
 		file_name:file_name,
-		title:UI.RemovePath(file_name),
+		title:UI.GetSmartTabName(file_name),
 		document_type:'text',
 		tooltip:file_name,
 		opening_callbacks:[],
+		UpdateTitle:function(){
+			var doc=(this.main_widget&&this.main_widget.doc);
+			var fn_display=(doc&&doc.m_file_name||this.file_name)
+			this.title=UI.GetSmartTabName(fn_display);
+			this.tooltip=fn_display;
+			this.need_save=0
+			if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
+				this.title=this.title+'*'
+				this.need_save=1
+			}
+		},
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
@@ -6180,7 +6250,7 @@ UI.NewCodeEditorTab=function(fname0){
 						fn_display=special_file_desc.display_name;
 					}
 				}
-				body.title=UI.RemovePath(fn_display);
+				body.title=UI.GetSmartTabName(fn_display);
 				body.tooltip=fn_display;
 				this.need_save=0
 				if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
@@ -6842,6 +6912,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview){
 		wrap_width:wrap_width,
 		m_ed_refcnt:!is_preview,
 		///////////////
+		m_enable_wrapping:loaded_metadata.m_enable_wrapping,//for correct rendering
 		m_is_preview:is_preview,
 		m_file_name:fn,
 		m_is_main_editor:1,

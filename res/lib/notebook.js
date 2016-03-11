@@ -809,7 +809,7 @@ W.NotebookView=function(id,attrs){
 		var cell_i=obj.m_cells[i];
 		var doc_in=cell_i.m_text_in;
 		var doc_out=cell_i.m_text_out;
-		var is_text_note=(cell_i.m_language=="Markdown"&&!doc_out.ed.GetTextSize());
+		var is_text_note=((cell_i.m_language=="Markdown"||cell_i.m_language=="Plain text")&&!doc_out.ed.GetTextSize());
 		var h_in=MeasureEditorSize(doc_in,is_text_note?((obj.max_lines*1.5)|0):obj.max_lines,w_content-obj.padding*2);
 		var h_out=MeasureEditorSize(doc_out,obj.max_lines,w_content-obj.padding*2);
 		if(is_text_note){
@@ -1066,6 +1066,25 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 		tooltip:file_name,
 		document_type:"notebook",
 		area_name:"v_tools",
+		UpdateTitle:function(){
+			if(this.main_widget){
+				var body=this.main_widget;
+				var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
+				var is_running=0;
+				for(var i=0;i<body.m_cells.length;i++){
+					if(body.m_cells[i].m_proc){
+						is_running=1;
+						break
+					}
+				}
+				if(is_running){
+					this.title=UI.Format("@1 (running)",s_name)+(this.need_save?'*':'');
+				}else{
+					this.title=UI.Format("@1 - Notebook",s_name)+(this.need_save?'*':'');
+				}
+				this.tooltip=this.file_name;
+			}
+		},
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
