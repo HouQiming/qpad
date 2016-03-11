@@ -4520,11 +4520,36 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		fn_include=fn_include.toLowerCase().replace("\\","/")
 	}
+	if(fn_include.indexOf('js_module@')==0){
+		fn_include=fn_include.substr(10);
+		//npm module search
+		DetectRepository(fn_base)
+		var repos=g_repo_from_file[fn_base]
+		if(repos){
+			for(var spath in repos){
+				var fn=spath+"/node_modules/"+fn_include+"/index.js";
+				if(IO.FileExists(fn)){
+					return fn;
+				}
+			}
+		}
+		var spath=undefined;
+		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			spath=IO.ProcessUnixFileName("%appdata%/npm");
+		}else{
+			spath="/usr/lib";
+		}
+		var fn=spath+"/node_modules/"+fn_include+"/index.js";
+		if(IO.FileExists(fn)){
+			return fn;
+		}
+		return '';
+	}
 	var fn_include_length=fn_include.length
 	//base path
 	var spath=UI.GetPathFromFilename(fn_base)
 	var fn=(spath+"/"+fn_include);
-	if(IO.FileExists(fn)){return fn}
+	if(IO.FileExists(fn)){return fn;}
 	//git
 	DetectRepository(fn_base)
 	var repos=g_repo_from_file[fn_base]
@@ -6508,6 +6533,7 @@ UI.FillLanguageMenu=function(s_ext,language_id,f_set_language_id){
 		return a>b?1:(a<b?-1:0);
 	})
 	var default_language_id=Language.GetNameByExt(s_ext)
+	if(language_id==undefined){language_id=default_language_id;}
 	for(var i=0;i<langs.length;i++){
 		if(!got_separator&&!langs[i].name_sort_hack){
 			menu_lang.AddSeparator()

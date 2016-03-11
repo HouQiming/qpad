@@ -1067,7 +1067,10 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					if tok1=='(':
 						tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
 						if (tok2&TOK_TYPE_MASK)==TOK_STRING:
-							idfn_require=getid(cite_raw(iptr(toks[i+2].epos0+1),iptr(toks[i+2].epos1-1))+".js")
+							s_require=cite_raw(iptr(toks[i+2].epos0+1),iptr(toks[i+2].epos1-1))
+							idfn_require=getid(s_require+".js")
+							searchDepFile(idfn_require,int(i+2))
+							idfn_require=getid("js_module@"+s_require)
 							searchDepFile(idfn_require,int(i+2))
 				else if tok_i==TOK_ID+g_id_import:
 					//JC import
