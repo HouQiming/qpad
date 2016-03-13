@@ -547,7 +547,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var ccnt_bracket=this.FindOuterBracket_SizeFriendly(ccnt,-1);
 		var ccnt_indent=this.FindOuterIndentation(ccnt);
 		if(ccnt_bracket>=0&&ccnt_indent>=0){
-			if(this.GetIndentLevel(ccnt_indent)<=this.GetIndentLevel(ccnt_bracket)){
+			if(this.GetIndentLevel(ccnt_indent)<=this.GetIndentLevel(ccnt_bracket)&&
+			!(this.plugin_language_desc&&this.plugin_language_desc.indent_as_parenthesis)){
 				//#endif and stuff in C, ignore it
 				ccnt_indent=ccnt_bracket;
 			}
@@ -4689,7 +4690,7 @@ W.CodeEditor=function(id,attrs){
 		var y_bottom_shadow=undefined;
 		var desc_x_scroll_bar=undefined;
 		//&&!(doc&&doc.notebook_owner)
-		var show_minimap=(UI.TestOption("show_minimap"));
+		var show_minimap=(UI.TestOption("show_minimap")&&!obj.disable_minimap);
 		var w_minimap=obj.w_minimap;
 		if(show_minimap){
 			show_minimap=1;
@@ -4940,9 +4941,12 @@ W.CodeEditor=function(id,attrs){
 			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(obj.line_number_font,56);
 		}
+		var is_find_mode_rendering=(!obj.m_edit_lock&&obj.show_find_bar);
 		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4
 		w_line_numbers+=obj.padding+w_bookmark;
-		UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
+		if(is_find_mode_rendering){
+			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
+		}
 		UI.RoundRect({color:obj.bgcolor,x:obj.x+w_obj_area-w_scrolling_area,y:obj.y,w:w_scrolling_area,h:h_obj_area})
 		//if(obj.show_find_bar&&current_find_context){
 		//	UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
@@ -4972,16 +4976,18 @@ W.CodeEditor=function(id,attrs){
 				w_right_shadow=x_wrap_bar;
 			}
 		}
-		UI.RoundRect({color:obj.read_only?UI.default_styles.code_editor.line_number_bgcolor:UI.default_styles.code_editor.bgcolor,
-			x:obj.x+w_line_numbers,
-			y:obj.y,
-			w:w_obj_area-w_line_numbers-w_scrolling_area,
-			h:h_obj_area});
-		if(w_right_shadow!=undefined){
-			//try to draw the right "overlay" early
-			var h_right_shadow=doc.h;
-			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:doc.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:doc.h})
-			right_overlay_drawn=1;
+		if(!is_find_mode_rendering){
+			UI.RoundRect({color:obj.read_only?UI.default_styles.code_editor.line_number_bgcolor:UI.default_styles.code_editor.bgcolor,
+				x:obj.x+w_line_numbers,
+				y:obj.y,
+				w:w_obj_area-w_line_numbers-w_scrolling_area,
+				h:h_obj_area});
+			if(w_right_shadow!=undefined){
+				//try to draw the right "overlay" early
+				var h_right_shadow=doc.h;
+				UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:obj.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:obj.h})
+				right_overlay_drawn=1;
+			}
 		}
 		if(doc&&obj.m_edit_lock){
 			obj.__children.push(doc)
@@ -5992,39 +5998,41 @@ W.CodeEditor=function(id,attrs){
 				obj.context_menu=undefined;
 			}
 		}
-		if(w_right_shadow!=undefined){
-			var h_right_shadow=doc.h;
-			if(y_bottom_shadow!=undefined){
-				h_right_shadow=y_bottom_shadow;
-			}
-			if(!right_overlay_drawn){
-				UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:doc.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:doc.h})
-			}
-			UI.PushCliprect(obj.x+w_right_shadow,doc.y,w_obj_area-w_scrolling_area-w_right_shadow,h_right_shadow)
-				UI.RoundRect({
-					x:obj.x+w_right_shadow-obj.find_item_shadow_size,y:doc.y-obj.find_item_shadow_size,
-					w:obj.find_item_shadow_size*2,h:h_right_shadow+obj.find_item_shadow_size*2,
-					color:obj.find_item_shadow_color,
-					round:obj.find_item_shadow_size,
-					border_width:-obj.find_item_shadow_size})
-			UI.PopCliprect()
-		}
-		if(y_bottom_shadow!=undefined){
-			if(w_right_shadow==undefined){
-				w_right_shadow=w_obj_area;
-			}
-			if(obj.doc.notebook_owner){
-				//nothing for now
-				UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_right_shadow,h:h_obj_area-y_bottom_shadow})
-			}else{
-				UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_right_shadow,h:h_obj_area-y_bottom_shadow})
-				UI.PushCliprect(obj.x,obj.y+y_bottom_shadow,w_right_shadow,h_obj_area-y_bottom_shadow)
-					UI.RoundRect({x:obj.x-obj.find_item_shadow_size,y:obj.y+y_bottom_shadow-obj.find_item_shadow_size,
-						w:w_right_shadow+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
+		if(!is_find_mode_rendering){
+			if(w_right_shadow!=undefined){
+				var h_right_shadow=doc.h;
+				if(y_bottom_shadow!=undefined){
+					h_right_shadow=y_bottom_shadow;
+				}
+				if(!right_overlay_drawn){
+					UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:doc.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:doc.h})
+				}
+				UI.PushCliprect(obj.x+w_right_shadow,doc.y,w_obj_area-w_scrolling_area-w_right_shadow,h_right_shadow)
+					UI.RoundRect({
+						x:obj.x+w_right_shadow-obj.find_item_shadow_size,y:doc.y-obj.find_item_shadow_size,
+						w:obj.find_item_shadow_size*2,h:h_right_shadow+obj.find_item_shadow_size*2,
 						color:obj.find_item_shadow_color,
 						round:obj.find_item_shadow_size,
 						border_width:-obj.find_item_shadow_size})
 				UI.PopCliprect()
+			}
+			if(y_bottom_shadow!=undefined){
+				if(w_right_shadow==undefined){
+					w_right_shadow=w_obj_area;
+				}
+				if(obj.doc.notebook_owner){
+					//nothing for now
+					UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_right_shadow,h:h_obj_area-y_bottom_shadow})
+				}else{
+					UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y+y_bottom_shadow,w:w_right_shadow,h:h_obj_area-y_bottom_shadow})
+					UI.PushCliprect(obj.x,obj.y+y_bottom_shadow,w_right_shadow,h_obj_area-y_bottom_shadow)
+						UI.RoundRect({x:obj.x-obj.find_item_shadow_size,y:obj.y+y_bottom_shadow-obj.find_item_shadow_size,
+							w:w_right_shadow+obj.find_item_shadow_size*2,h:obj.find_item_shadow_size*2,
+							color:obj.find_item_shadow_color,
+							round:obj.find_item_shadow_size,
+							border_width:-obj.find_item_shadow_size})
+					UI.PopCliprect()
+				}
 			}
 		}
 		if(UI.enable_timing){

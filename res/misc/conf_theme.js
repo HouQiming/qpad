@@ -715,6 +715,36 @@ UI.CustomTheme=function(){
 				caret_flicker:500,
 			},
 		},
+		help_page:{
+			color:L?0xffffffff:0xff444444,
+			border_color:0xff000000,
+			border_width:0,
+			round:0,
+			padding:8,
+			w_scroll_bar:20,
+			///////////////
+			hr_h:16,
+			hr_h_fill:2,
+			hr_color:L?0xffd0d0d0:0xff666666,
+			w_max_img_width_percentage:0.875,
+			w_code_box_percentage:0.875,
+			styles:[
+				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//normal
+				{font:UI.Font("res/fonts/opensansi.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//emph
+				{font:UI.Font("res/fonts/opensans.ttf",24,150),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
+				{
+					font:UI.Font("res/fonts/inconsolata.ttf",21,0),
+					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",21,150),
+					paragraph_space:20,color:L?0xff000000:0xffe8e8e8
+				},//code
+				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//list
+				{font:UI.Font("res/fonts/opensansi.ttf",24,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa,},//quote
+				{font:UI.Font("res/fonts/opensans.ttf",44,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
+				{font:UI.Font("res/fonts/opensans.ttf",36,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
+				{font:UI.Font("res/fonts/opensans.ttf",32,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
+				{font:UI.Font("res/fonts/opensans.ttf",28,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
+			],
+		},
 		binary_editor:{
 			font:UI.Font("res/fonts/inconsolata.ttf",24),
 			font_edit:UI.Font("res/fonts/inconsolata.ttf",16),

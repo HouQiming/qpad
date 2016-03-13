@@ -990,6 +990,9 @@ class CLayouter_programmer
 					C_virtual_diff_bold,
 					scroll_x,scroll_y,clip_w,clip_h,screen_x,screen_y,scale)
 	}
+	GetWrapWidth=function(){
+		return m_wrap_width_in_fp
+	}
 	EndRender=function(JSObject obj,CEditableText ed, i64 scroll_x,i64 scroll_y,i64 clip_w,i64 clip_h,float screen_x,float screen_y,float scale){
 		if !m_temporarily_disable_spell_check:
 			if m_current_frame_spell_errors:
@@ -3359,6 +3362,88 @@ auto AutoEdit_Evaluate(TEditop[] ops,i64 ccnt_base, CReplaceContext ctx, TProgra
 class CDiffBitmap
 	u8[] data
 
+class CRichTextImage
+	GLuint texid
+	int[] cpu_data
+	int w,h
+	auto GetTexture()
+		if !texid:
+			texid=glCreateTexture(GL_RGBA8,w,h, GL_LINEAR,GL_CLAMP_TO_EDGE,GL_CLAMP_TO_EDGE,__pointer(cpu_data.d))
+			glBindTexture(GL_TEXTURE_2D,texid)
+			glGenerateMipmap(GL_TEXTURE_2D)
+			glBindTexture(GL_TEXTURE_2D,0u)
+			cpu_data.discard()
+			cpu_data=int[].NULL
+		return texid
+	auto __done__()
+		if texid:
+			ptexid=[texid]
+			glDeleteTextures(1,__pointer(ptexid.d))
+			texid=0u
+
+g_richtext_img_tech=GLTechnique.NULL
+auto RenderRichTextObject(JSContext JS,float x,float y,float w,JSObject objs,int oid)
+	auto obj_help_page=JS["UI"]["default_styles"]["help_page"].as(JSObject)
+	obj_i=objs[oid].as(CEmbededObject).content
+	stype=obj_i["m_type"].as(string)
+	if stype=="hr":
+		auto h_hr=obj_help_page["hr_h"].as(float)
+		auto h_hr_fill=obj_help_page["hr_h_fill"].as(float)
+		auto C_hr_fill=obj_help_page["hr_color"].as(int)
+		g_renderer.DrawRectangle(x,y+(h_hr-h_hr_fill)*0.5f,w,h_hr_fill,C_hr_fill)
+	else if stype=="img":
+		img=obj_i["m_tex"].as(CRichTextImage)
+		ui_scale=g_renderer.m_pixels_per_unit
+		w_render=min(float(img.w),obj_help_page["w_max_img_width_percentage"].as(float)*w)*ui_scale
+		h_render=float(img.h)/float(img.w)*w_render
+		g_renderer.InsertNativeDrawCall(function(){
+			auto texid=img.GetTexture()
+			if !g_richtext_img_tech:
+				g_richtext_img_tech=new GLTechnique
+				g_richtext_img_tech.SetVarying("vec2 uv")
+				g_richtext_img_tech.SetVertexShader("
+					void main(){
+						vec2 P_scr=P*scale;
+						uv=uv_vert;
+						gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
+					}")
+				if g_renderer.m_srgb_supported:
+					g_richtext_img_tech.SetFragmentShader("void main(){
+						vec4 C=texture2D(tex0,uv);
+						C=vec4(pow(C.xyz,vec3("+formatNumber(g_renderer.m_gamma,{frac:7})+")),C.w);
+						gl_FragColor=C;
+					}")
+				else
+					g_richtext_img_tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
+			mini_vbo=[
+				__float_as_int((x)),__float_as_int((y)),
+				__float_as_int((x+w_render)),__float_as_int((y)),
+				__float_as_int((x+w_render)),__float_as_int((y+h_render)),
+				__float_as_int((x)),__float_as_int((y+h_render)),
+				0,0,
+				0x3f800000,0,
+				0x3f800000,0x3f800000,
+				0,0x3f800000]
+			g_richtext_img_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(int),mini_vbo.d)
+			g_richtext_img_tech.SetVertexPointer("uv_vert", 2,GL_FLOAT,0, 2*sizeof(int),mini_vbo.d+8*sizeof(float))
+			prev_viewport=new int[4]
+			glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
+			//Writeln('render: ',x,' ',y,' ',w_render,' ',h_render)
+			g_richtext_img_tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
+			g_richtext_img_tech.SetTexture2D("tex0",texid);
+			g_richtext_img_tech.Draw(0u,GL_QUADS,4)
+		})
+	else if stype=="pre":
+		JS["UI"].CallMethod(int,"RenderEmbededCodeBox",
+			x/g_renderer.m_pixels_per_unit,
+			y/g_renderer.m_pixels_per_unit,
+			obj_i)
+
+isWesternLetter=inline(ch){
+	chi=int(u8(ch))
+	return chi>=0x80||isWordChar(chi)
+}
+
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
 		//initial read, which is a raw edit
@@ -3874,11 +3959,253 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		TRenderJob[] m_rjobs
 		CStyleHolder m_styles
 		float m_h_text
-		float m_scale0,m_scale_cur
+		float m_scale0,m_scale_cur,m_w_line
 		TFont[] m_emboldened_fonts
 		__JS_prototype=function(JSObject proto){
 			proto.ExportProperty(this,"m_h_text")
+			proto.ExportProperty(this,"m_w_line")
 		};
+	JS_UI["ED_ProcessHelp"]=function(JSContext JS){
+		//do it in native for speed, maybe we could have a highlighter like this
+		auto sblock=JS.Param(0).as(string)
+		auto js_styles=JS.Param(1).as(JSObject)
+		auto fsearchImage=JS.Param(2).as(JSObject)
+		auto w_linef=JS.Param(3).as(float)
+		auto STYLE_ID_NORMAL=0
+		auto STYLE_ID_EMPH=1
+		auto STYLE_ID_BOLD=2
+		auto STYLE_ID_CODE=3
+		auto STYLE_ID_LIST=4
+		auto STYLE_ID_QUOTE=5
+		auto STYLE_ID_HEADINGS=6
+		auto STYLE_ID_N_HEADINGS=4
+		auto CODE_MAX_LINES=8
+		auto sret=new string
+		auto is_in_code=JSObject.NULL
+		auto scode=string.NULL
+		auto nlines_code=0LL
+		auto objs=new CEmbededObject[]
+		auto hc_code=float2fixed(g_renderer.GetCharacterHeight(js_styles[STYLE_ID_CODE]["font"].as(TFont)))
+		auto h_hr=double2fixed(JS["UI"]["default_styles"]["help_page"]["hr_h"].as(double))
+		auto heading_seq=new int[]
+		auto ops=JS.NewArray()
+		auto ops_length=0
+		auto w_image_max=JS["UI"]["default_styles"]["help_page"]["w_max_img_width_percentage"].as(float)*w_linef
+		auto w_code_box=JS["UI"]["default_styles"]["help_page"]["w_code_box_percentage"].as(float)*w_linef
+		if !sblock.back()=='\n':
+			sblock=new(sblock)
+			sblock.push('\n')
+		FormatNormalText=function(string stext,int style0){
+			auto in_emph=0
+			auto in_code=0
+			auto last_star=stext.LastIndexOf('*')
+			for(auto i=0L;i<stext.n;i++)
+				ch=stext[i]
+				if !in_code:
+					if ch=='\'':
+						if !i||!isWesternLetter(stext[i-1]):
+							sret.PushUnicode(0x2018)
+						else if i==stext.n-1||!isWesternLetter(stext[i+1]):
+							sret.PushUnicode(0x2019)
+						else
+							sret.push(ch)
+						continue
+					else if ch=='"':
+						if !i||!isWesternLetter(stext[i-1]):
+							sret.PushUnicode(0x201C)
+						else if i==stext.n-1||!isWesternLetter(stext[i+1]):
+							sret.PushUnicode(0x201D)
+						else
+							sret.push(ch)
+						continue
+					else if ch=='*':
+						n_stars=1
+						if i<=stext.n-1&&stext[i+1]=='*':
+							i++
+							n_stars++
+						if in_emph==n_stars:
+							in_emph=0
+							sret.PushUnicode(COMMAND_SET_STYLE+style0)
+						else if i==last_star:
+							sret.push('*')
+							if n_stars>1:sret.push('*')
+						else
+							in_emph=n_stars
+							sret.PushUnicode(COMMAND_SET_STYLE+(n_stars==1?STYLE_ID_EMPH:STYLE_ID_BOLD))
+						continue
+				if !in_emph&&ch=='`':
+					if in_code:
+						sret.PushUnicode(COMMAND_SET_STYLE+style0)
+						in_code=0
+					else
+						sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_CODE)
+						in_code=1
+					continue
+				sret.push(ch)
+		}
+		code_box_id=0
+		foreach sline,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
+			if sline.StartsWith('```'):
+				//code
+				if !is_in_code:
+					s_language=sline[3:sline.n-2]
+					if !s_language.n:
+						s_language="txt"
+					scode=new string
+					nlines_code=1LL//leave 1 empty line there...
+					//coulddo: alternative names for each language, use extension for now
+					is_in_code=JS.New()
+					is_in_code["m_type"]="pre"
+					is_in_code["m_language"]=s_language
+					is_in_code["m_id"]=code_box_id
+					code_box_id++
+				else
+					is_in_code["m_code"]=scode
+					is_in_code["m_width"]=w_code_box
+					is_in_code["m_height"]=fixed2float(min(nlines_code,CODE_MAX_LINES)*hc_code)
+					if sret.n&&sret.back()!='\n':sret.push('\n')
+					sret.PushUnicode(COMMAND_RUBBER_SPACE)
+					sret.PushUnicode(COMMAND_INSERT_OBJECT+int(objs.n))
+					sret.PushUnicode(COMMAND_RUBBER_SPACE)
+					sret.push('\n')
+					objs.push(new CEmbededObject(){
+						content:is_in_code,
+						w:float2fixed(w_code_box),
+						h:min(nlines_code,CODE_MAX_LINES)*hc_code,
+						y_baseline:0LL,
+					})
+					is_in_code=JSObject.NULL
+				continue
+			if is_in_code:
+				scode.push(sline)
+				nlines_code++
+				continue
+			////////////
+			if sline.StartsWith("#"):
+				//heading
+				level=0L
+				for j=1:sline.n-2
+					if sline[j]!='#':
+						level=j
+						break
+				//resize resets the lower levels
+				heading_seq.resize(level)
+				heading_seq[level-1]++
+				seq_id=heading_seq[level-1]
+				//if level==1L:
+				//	//do not number the top level heading
+				//	//center it
+				//	sret.PushUnicode(COMMAND_RUBBER_SPACE)
+				sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_HEADINGS+min(int(level)-1,STYLE_ID_N_HEADINGS))
+				for j=1:level-1
+					if j>1L:sret.push('.')
+					SWrite(sret,heading_seq[j])
+				if level>1L:
+					sret.push(' ')
+					sret.push(' ')
+				sret.push(sline[(sline[level]==' '?level+1:level):sline.n-2])
+				//if level==1L:
+				//	//center it
+				//	sret.PushUnicode(COMMAND_RUBBER_SPACE)
+				//sret.push('\n')
+				continue
+			if sline.StartsWith("\t")||sline.StartsWith("    "):
+				//inactive code-like
+				sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_CODE)
+				sret.push(sline)
+				continue
+			if sline.StartsWith("* ")||sline.StartsWith("- ")||sline.StartsWith("+ "):
+				//lists
+				//todo: left padding in style
+				if sret.n&&sret.back()!='\n':sret.push('\n')
+				sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_LIST)
+				sret.PushUnicode(0x2022)
+				sret.PushUnicode(0x00a0)
+				FormatNormalText(sline[2:],STYLE_ID_LIST)
+				continue
+			if sline.StartsWith("> ")
+				//quotes
+				//todo: left padding in style
+				if sret.n&&sret.back()!='\n':sret.push('\n')
+				if sline.n==3:
+					sret.push('\n')
+				else
+					sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_QUOTE)
+					FormatNormalText(sline[2:sline.n-2],STYLE_ID_QUOTE)
+				continue
+			if sline.StartsWith("!["):
+				pbracket=sline.IndexOf(']')
+				if pbracket+1<sline.n&&sline[pbracket+1]=='(':
+					sline=sline[pbracket+2:]
+					pspace=sline.IndexOf(' ')
+					if pspace>=0:
+						sline.n=pspace
+					else
+						sline.n--
+						if sline.n>0&&sline[sline.n-1]==')':
+							sline.n--
+					fn_image=sline
+					if fsearchImage:
+						fn_image=fsearchImage.Call(string,fn_image)
+					sdata_image=System.IO.ReadAll(fn_image)
+					//Writeln('img:',fn_image,' ',!!sdata_image)
+					if sdata_image:
+						(img,wimg,himg)=g_renderer.LoadImage(sdata_image)
+						//Writeln('img:',fn_image,' ',wimg,' ',himg)
+						if img:
+							obj=JS.New()
+							obj["m_type"]="img"
+							obj["m_tex"]=new CRichTextImage(){
+								cpu_data:img,
+								w:wimg,
+								h:himg,
+							}
+							if sret.n&&sret.back()!='\n':sret.push('\n')
+							sret.PushUnicode(COMMAND_RUBBER_SPACE)
+							sret.PushUnicode(COMMAND_INSERT_OBJECT+int(objs.n))
+							sret.PushUnicode(COMMAND_RUBBER_SPACE)
+							sret.push('\n')
+							scale_img=min(float(wimg),w_image_max)/float(wimg)
+							objs.push(new CEmbededObject(){
+								content:obj,
+								w:float2fixed(float(wimg)*scale_img),
+								h:float2fixed(float(himg)*scale_img),
+								y_baseline:0LL,
+							})
+				continue
+			is_hr=0
+			if sline.n>=4&&(sline[0]=='*'||sline[0]=='-'||sline[0]=='_'):
+				is_hr=1
+				for j=1:sline.n-2
+					if sline[j]!=sline[0]:
+						is_hr=0
+						break
+			if is_hr:
+				obj=JS.New()
+				obj["m_type"]="hr"
+				if sret.n&&sret.back()!='\n':sret.push('\n')
+				sret.PushUnicode(COMMAND_INSERT_OBJECT+int(objs.n))
+				sret.push('\n')
+				objs.push(new CEmbededObject(){
+					content:obj,
+					w:1LL,
+					h:h_hr,
+					y_baseline:0LL,
+				})
+				continue
+			//todo: detect action descriptions - ops
+			if sline.n==1:
+				if sret.n&&sret.back()!='\n':sret.push('\n')
+				sret.push('\n')
+			else
+				FormatNormalText(sline[:sline.n-2],STYLE_ID_NORMAL)
+		obj_ret=JS.New()
+		obj_ret["m_text"]=sret
+		obj_ret["m_objs"]=objs
+		obj_ret["m_ops"]=ops
+		obj_ret["m_n_code_boxes"]=code_box_id
+		return JS.Return(obj_ret)
+	}
 	JS_UI["ED_FormatRichText"]=function(JSContext JS){
 		//leave objects for later
 		auto hyp=JS.Param(0).as(CHyphenator)
@@ -3886,6 +4213,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto tab_width=JS.Param(2).or(4)
 		auto w_line=double2fixed(JS.Param(3).as(double))
 		auto js_styles=JS.Param(4).as(JSObject)
+		auto objs=JS.Param(5).as(JSObject)
+		auto w_linef=fixed2float(w_line)
 		n=js_styles["length"].as(iptr)
 		styles=new CStyleHolder(){m_styles:new CStyle[n],m_enable_ligatures:1}
 		for i=0:n-1
@@ -3900,13 +4229,19 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			style_i.line_space=int(double2fixed(js_style_i["line_space"].or(0.0)))
 			style_i.paragraph_space=int(double2fixed(js_style_i["paragraph_space"].or(0.0)))
 			style_i.raise_height=int(float2fixed(g_renderer.GetFontBaseline(fnt))+double2fixed(js_style_i["raise_height"].or(0.0)))
+		if objs:
+			n_objs=objs["length"].as(iptr)
+			objs_native=[objs[i].as(CEmbededObject) for i=0:n_objs-1]
+		else
+			objs_native=CEmbededObject[].NULL
 		x=0LL
 		y=0LL
 		y_next=0LL
 		hyphen_next=0
+		prev_style_id=0
 		rjobs=new TRenderJob[]
 		foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
-			(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,tab_width,w_line,1, styles,CEmbededObject[].NULL)
+			(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,tab_width,w_line,1, styles,objs_native)
 			line_breaks=GreedyLayoutGeneral(atoms,w_line)
 			GenerateTextLayout(
 				styles,
@@ -3921,6 +4256,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						style_id:style_id,ccnt0:ccnt0,ccnt1:ccnt1})
 					for ch in Utf8Chars(sblock[ccnt0:ccnt1-1])
 						x+=styles.charWidth(style_id,ch)
+					prev_style_id=style_id
 				},
 				inline(i64 dw,int ccnt){
 					//space
@@ -3931,7 +4267,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						rjobs.push(TRenderJob(){
 							x:fixed2float(x),
 							y:fixed2float(y-styles.m_styles[tail_style_id].raise_height),
-							style_id:tail_style_id,ccnt0:-1,ccnt1:-1})
+							style_id:prev_style_id,ccnt0:-1,ccnt1:-1})
 					x=0LL
 					y=y_next
 					y_next=y+h_line
@@ -3939,12 +4275,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					y+=h_up
 				},
 				inline(int oid, int ccnt){
-					//object
-					//do nothing
+					auto obj_i=objs[oid].as(CEmbededObject)
+					rjobs.push(TRenderJob(){
+						x:fixed2float(x),
+						y:fixed2float(y),
+						style_id:prev_style_id,ccnt0:-2,ccnt1:oid})
+					x+=obj_i.w
 				})
 		auto ret=new CPreprocessedRichText(){
 			m_rjobs:rjobs,m_styles:styles,
 			m_h_text:fixed2float(y),
+			m_w_line:w_linef,
 			m_scale0:1.f,
 		}
 		return JS.Return(ret)
@@ -3954,6 +4295,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto sblock=JS.Param(1).as(string)
 		auto x=JS.Param(2).as(float)*g_renderer.m_pixels_per_unit
 		auto y=JS.Param(3).as(float)*g_renderer.m_pixels_per_unit
+		auto objs=JS.Param(4).as(JSObject)
 		if prt.m_scale_cur!=g_renderer.m_pixels_per_unit:
 			prt.m_emboldened_fonts=TFont[].NULL
 		if !prt.m_emboldened_fonts:
@@ -3974,7 +4316,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			auto C=style_i.color
 			auto fnt=prt.m_emboldened_fonts[rj.style_id]
 			if rj.ccnt0<0:
-				g_renderer.DrawChar(fnt,xi,yi,C,int('-'))
+				if rj.ccnt0==-1:
+					g_renderer.DrawChar(fnt,xi,yi,C,int('-'))
+				else if rj.ccnt0==-2:
+					//object
+					RenderRichTextObject(JS,xi,yi,prt.m_w_line,objs,rj.ccnt1)
 			else
 				for ch in Utf8Chars(sblock[rj.ccnt0:rj.ccnt1-1])
 					//coulddo: UNDERLINED,STRIKED_OUT... or strikeout-y

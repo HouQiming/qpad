@@ -5,6 +5,7 @@ require("res/lib/code_editor");
 require("res/lib/bin_editor");
 require("res/lib/subwin");
 require("res/lib/notebook");
+require("res/lib/help_page");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
 
@@ -482,6 +483,8 @@ var CreateMenus=function(){
 	}});
 	menu_edit=undefined;
 	doc_area=undefined;
+	//todo
+	W.Hotkey("",{key:"F1",action:function(){UI.OpenUtilTab('help_page')}});
 }
 
 UI.Application=function(id,attrs){

@@ -955,16 +955,15 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	///////////////////
 	dep_files=new int[]
 	dep_file_name_tokens=new int3[]
-	inline addDepFile(int idfn_include)
-		dep_files.push(idfn_include)
-		g_c_like_parse_queue.push(idfn_include)
 	auto searchDepFile(int idfn_include,int ptok)
-		fn_found=JS.GetGlobal()["UI"].CallMethod(string,"ED_SearchIncludeFile",fn_base,getIdString(idfn_include),options)
+		auto fn_found=JS.GetGlobal()["UI"].CallMethod(string,"ED_SearchIncludeFile",fn_base,getIdString(idfn_include),options)
 		if !fn_found||!fn_found.n:
 			has_dangling_deps=1
 			return
+		fn_found=System.Env.NormalizeFileName(fn_found)
 		idfn_found=getid(fn_found)
-		addDepFile(idfn_found)
+		dep_files.push(idfn_found)
+		g_c_like_parse_queue.push(idfn_found)
 		dep_file_name_tokens.push(int3(toks[ptok].epos0,toks[ptok].epos1,idfn_found))
 	///////////////////
 	struct TStkEntry
@@ -1060,7 +1059,6 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
 						idfn_include=tok1-TOK_STRING
 						searchDepFile(idfn_include,int(i+1))
-						//addDepFile(idfn_include)
 				else if tok_i==TOK_ID+g_id_require:
 					//JS require
 					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
@@ -1267,6 +1265,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	all_key_decls.Sortby(byMember("epos0"))
 	if has_dangling_deps:
 		g_dangling_deps_queue.push(idfn_base)
+	dep_files.Sort()
+	dep_files.Unique()
 	return new CFileIndex(){
 		m_ids:unique_ids,
 		m_ppm_pool:ppm_pool,
@@ -1482,7 +1482,9 @@ auto BuildColorTable(CFileIndex fidx)
 		fidx.m_temp_color_table=temp_color_table
 		fidx.m_temp_color_table_time=g_color_table_time
 		////
-		temp_p_prototypes.Sortby(byMember("id"))
+		temp_p_prototypes.Sort(inline(a,b){
+			return a.id<b.id||a.id==b.id&&a.ptr_prototype<b.ptr_prototype
+		})
 		fidx.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
 		fidx.m_temp_p_prototypes=temp_p_prototypes
 
@@ -1490,6 +1492,8 @@ MAX_PARSABLE_SIZE=1LL<<24
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_ParserQueueFile"]=function(JSContext JS){
 		fn=JS.Param(0).as(string)
+		if !(fn.n&&fn[0]=='*'):
+			fn=System.Env.NormalizeFileName(fn)
 		if fn.n&&fn[0]=='*'||System.IO.FileExists(fn)&&System.IO.GetFileSize(fn)<MAX_PARSABLE_SIZE:
 			g_c_like_parse_queue.push(getid(fn))
 		return 1
@@ -1846,8 +1850,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if !s_id||!s_id.n:return 0
 		BuildColorTable(fidx)
 		id=getid(s_id)
-		p=fidx.m_temp_p_prototypes.InlineBisect(inline(pproto){return pproto.id<=id})-1
-		if p>=0L:
+		p=fidx.m_temp_p_prototypes.InlineBisect(inline(pproto){return pproto.id<id})
+		if uptr(p)<uptr(fidx.m_temp_p_prototypes.n):
 			pproto=fidx.m_temp_p_prototypes[p]
 			if pproto.id==id:
 				id_unknown=getid("?")

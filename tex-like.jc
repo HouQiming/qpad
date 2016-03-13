@@ -537,7 +537,7 @@ class CStyle
 				ligatures.push(g_utf8_ligatures[i+1])
 
 class CEmbededObject
-	int obj_id
+	JSObject content
 	i64 w,h,y_baseline
 	///////////
 	JS_get_w=function(JSContext JS){return JS.Return(fixed2double(w))}
@@ -547,7 +547,7 @@ class CEmbededObject
 	JS_set_h=function(JSContext JS){h=double2fixed(JS.Param(0).as(double));return 0}
 	JS_set_y_baseline=function(JSContext JS){y_baseline=double2fixed(JS.Param(0).as(double));return 0}
 	__JS_prototype=function(JSObject proto){
-		proto.ExportProperty(this,"obj_id")
+		proto.ExportProperty(this,"content")
 		proto.ExportGetterSetter(this,"w",JS_get_w,JS_set_w)
 		proto.ExportGetterSetter(this,"h",JS_get_h,JS_set_h)
 		proto.ExportGetterSetter(this,"y_baseline",JS_get_y_baseline,JS_set_y_baseline)
@@ -632,7 +632,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int en
 			pobj=m_objects[obj_id]
 			atoms.push(TLayoutAtom(){
 				flags:FLAG_CAN_PAD_AFTER_WEAK, w:pobj.w,h:pobj.h, y_baseline:pobj.y_baseline,
-				style_id:word_i.x,pword0:obj_id, pword1:word_i.z
+				style_id:-1,pword0:obj_id, pword1:word_i.z
 			})
 			continue
 		if word_i.x==-2:
@@ -746,7 +746,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int en
 				})
 		else
 			atoms.push(TLayoutAtom(){
-				flags:flags, w:w_word,h:hc, y_baseline:y_baseline,
+				flags:flags, w:w_word,h:ch_prev=='\n'?0:hc, y_baseline:ch_prev=='\n'?0:y_baseline,
 				tail_kerning:tail_kerning,bol_badness:bol_badness,eol_badness:eol_badness,w_extra_eol:w_extra_eol,
 				style_id:style_id, pword0:word_i.y,pword1:word_i.z
 			})
@@ -782,8 +782,10 @@ generateObject)
 		h_up=0LL
 		h_down=0LL
 		h_lspace=0LL
+		w_trailing_space_allowed=0LL
 		//h_pspace=0LL
 		w_trailing=0LL
+		last_style_id=0
 		for i=line_breaks[li]:p_last
 			w+=atoms[i].w
 			if i<p_last:
@@ -812,12 +814,13 @@ generateObject)
 			h_up=max(h_up,atoms[i].y_baseline)
 			h_down=max(h_down,atoms[i].h-atoms[i].y_baseline)
 			if atoms[i].style_id>=0:
-				h_lspace=max(h_lspace,styles.m_styles[atoms[i].style_id].line_space)
+				last_style_id=atoms[i].style_id
+		h_lspace=max(h_lspace,styles.m_styles[last_style_id].line_space)
+		w_trailing_space_allowed=styles.charWidth(last_style_id,int(' '))
 		//we HAVE FLAG_HYPHENATE_AFTER in the text mode
 		w-=w_trailing
 		if atoms[p_last].flags&FLAG_HYPHENATE_AFTER:
 			w+=styles.charWidth(atoms[p_last].style_id,int('-'))
-		w_trailing_space_allowed=styles.charWidth(atoms[p_last].style_id,int(' '))
 		n_paddables-=n_trailing_paddables
 		w_tail=max(w_line-w,0LL)
 		if li==line_breaks.n-2&&n_paddables.x==0:w_tail=0LL
