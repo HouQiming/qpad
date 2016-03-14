@@ -728,6 +728,25 @@ UI.CustomTheme=function(){
 			top_hint_border_width:2,
 			top_hint_border_color:L?0xffaaaaaa:0xff222222,
 			///////////////
+			h_find_bar:32,
+			find_bar_bgcolor:L?0xffffffff:0xff555555,
+			find_bar_color:L?0xffe8e8e8:0xff333333,
+			find_bar_round:8,
+			find_bar_padding:4,
+			find_bar_hint_color:L?0xff7f7f7f:0xffaaaaaa,
+			find_bar_shadow_color:0x7f000000,
+			find_bar_shadow_size:8,
+			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
+			find_bar_button_size:28,
+			find_bar_editor_style:{
+				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				color:L?0xff000000:0xffe8e8e8,
+				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x22ffffff),
+				caret_width:UI.IS_MOBILE?1:2,
+				caret_color:L?0xff000000:0xffe8e8e8,
+				caret_flicker:500,
+			},
+			///////////////
 			ophl:{
 				focus_color:L?0xff00ffff:0xffaaaa55,
 				color:L?0x5500ffff:0x55aaaa55,blur:4,
@@ -749,11 +768,20 @@ UI.CustomTheme=function(){
 				},//code
 				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//list
 				{font:UI.Font("res/fonts/opensansi.ttf",24,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa,},//quote
-				{font:UI.Font("res/fonts/opensans.ttf",44,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
-				{font:UI.Font("res/fonts/opensans.ttf",36,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
-				{font:UI.Font("res/fonts/opensans.ttf",32,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
-				{font:UI.Font("res/fonts/opensans.ttf",28,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
+				{font:UI.Font("res/fonts/opensans.ttf",32,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
+				{font:UI.Font("res/fonts/opensans.ttf",28,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
+				{font:UI.Font("res/fonts/opensans.ttf",26,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
+				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
 			],
+		},
+		help_item:{
+			h:32,
+			sel_bgcolor:C,
+			sel_bgcolor_deactivated:L?0xff7f7f7f:0xff7f7f7f,
+			name_font:UI.Font(UI.font_name,24,-50),
+			name_font_bold:UI.Font(UI.font_name,24,100),
+			name_color:L?0xff000000:0xffe8e8e8,
+			sel_name_color:L?0xffffffff:0xffe8e8e8,
 		},
 		binary_editor:{
 			font:UI.Font("res/fonts/inconsolata.ttf",24),

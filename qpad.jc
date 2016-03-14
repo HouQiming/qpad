@@ -121,6 +121,18 @@ if Platform.BUILD=="debug":
 		else
 			return JS.Return(ret)
 	}
+	jsio["ReadLimited"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		sz=JS.Param(1).as(iptr)
+		if !fn||!(sz>0):return 0
+		auto f=System.IO.OpenFile(fn)
+		if f:
+			auto s=f.Read(sz)
+			f.Close()
+			return JS.Return(s)
+		else
+			return 0
+	}
 	jsio["CreateFile"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
 		if !fn:return 0

@@ -3995,7 +3995,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto has_dangling_op=0
 		auto w_image_max=JS["UI"]["default_styles"]["help_page"]["w_max_img_width_percentage"].as(float)*w_linef
 		auto w_code_box=JS["UI"]["default_styles"]["help_page"]["w_code_box_percentage"].as(float)*w_linef
-		if !sblock.back()=='\n':
+		if !sblock.n||sblock.back()!='\n':
 			sblock=new(sblock)
 			sblock.push('\n')
 		FormatNormalText=function(string stext,int style0){
@@ -4213,6 +4213,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						obj_op["ccnt"]=sret.n
 						obj_op["action"]="run"
 						obj_op["machine"]="localhost"
+						has_dangling_op=1
+					else if sline.StartsWith('Run in editor'):
+						if has_dangling_op:ops_length--
+						obj_op=JS.New()
+						ops[ops_length]=obj_op;ops_length++
+						obj_op["ccnt"]=sret.n
+						obj_op["action"]="run"
+						obj_op["machine"]="<editor>"
 						has_dangling_op=1
 					else if sline.StartsWith('Run on '):
 						pend=sline.IndexOf(':')

@@ -31,3 +31,9 @@ You can also type in a path like `./` to browse files like in a file manager.
 You can press ESC to maximize an editor tab.
 
 Press ESC again to restore it.
+
+# 去 Finding Function / Class
+
+You can use “Search” - “Go to...” to call up a list of functions and classes.
+
+You can also type a line number to go to a certain line. The line number can be an expression like `10000-9000+234`.

@@ -3135,6 +3135,7 @@ var ParseGit=function(spath){
 			}.bind(undefined,g_repo_parsing_context), 30)
 		}, 30)
 	})
+	QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
 	return my_repo
 }
 
@@ -3186,6 +3187,7 @@ UI.GetEditorProject=function(fn,is_polite){
 	return sdir;
 }
 
+UI.GetRepoByPath=function(spath){return g_repo_list[spath];}
 UI.ClearFileListingCache=function(){
 	g_repo_from_file={}
 	g_repo_list={}
@@ -3198,6 +3200,8 @@ UI.ClearFileListingCache=function(){
 var FILE_LISTING_BUDGET=16
 var FILE_LISTING_BUDGET_FS_VIEW=32;
 var FILE_LISTING_BUDGET_PARSE_PROJECT=256;
+var FILE_LISTING_BUDGET_HELP_INDEXING=16;//note that we read the *first line* of each file...
+var HELP_FIRST_LINE_LENGTH_LIMIT=512;//keep it to the smallest definition of a disk sector
 UI.g_file_listing_budget=FILE_LISTING_BUDGET;
 W.FileItemOnDemand=function(){
 	if(this.git_repo_to_list){
@@ -3416,6 +3420,47 @@ var GenerateGitRepoTreeView=function(repo){
 	return ret;
 };*/
 
+var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context){
+	if(!IO.DirExists(spath+"/doc")){
+		if(g_repo_parsing_context){
+			ResumeProjectParsing(g_repo_parsing_context);
+		}
+		return;
+	}
+	if(my_repo.m_helps==undefined){
+		my_repo.m_helps=[];
+	}
+	//file-only, recursive
+	var find_context=IO.CreateEnumFileContext(spath+"/doc/*.md",5);
+	for(var i=0;i<FILE_LISTING_BUDGET_HELP_INDEXING;i++){
+		var fnext=find_context()
+		if(!fnext){
+			find_context=undefined
+			break
+		}
+		var sname=fnext.name;
+		var s_preview=IO.ReadLimited(sname,HELP_FIRST_LINE_LENGTH_LIMIT);
+		if(s_preview){
+			var pnewline=s_preview.indexOf('\n');
+			if(pnewline>=0){
+				s_preview=s_preview.substr(0,pnewline);
+			}
+			if(s_preview.length&&s_preview[0]=='#'){
+				var pspace=s_preview.indexOf(' ');
+				if(pspace>=0){
+					s_preview=s_preview.substr(pspace+1);
+				}
+			}
+			my_repo.m_helps.push({title:s_preview,title_search:s_preview.toLowerCase(),file_name:sname});
+		}
+	}
+	if(find_context){
+		UI.NextTick(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
+	}else{
+		ResumeProjectParsing(g_repo_parsing_context);
+	}
+};
+
 var ParseProject=function(spath){
 	if(g_repo_list[spath]){return;}
 	if(IO.DirExists(spath+"/.git")){
@@ -3456,7 +3501,7 @@ var ParseProject=function(spath){
 			}
 		}.bind(undefined,g_repo_parsing_context);
 		QueueProjectParser(fparse_batch);
-		return my_repo
+		QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
 	}
 }
 
@@ -6272,6 +6317,9 @@ W.CodeEditor=function(id,attrs){
 var g_new_id=0;
 var g_tab_appeared_names={arv:{},objs:{}};
 UI.GetSmartTabName=function(fn){
+	if(fn.length&&fn[0]=='*'){
+		return UI.RemovePath(fn);
+	}
 	var obj=g_tab_appeared_names.objs[fn];
 	if(!obj){
 		obj={name:fn};
