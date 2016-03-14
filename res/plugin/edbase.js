@@ -1036,7 +1036,7 @@ UI.RegisterBuildEnv("Windows BAT",{
 UI.RegisterBuildEnv("Unix Shell Script",{
 	name:"exec",
 	CreateInterpreterCall:function(fname,doc){
-		return ["/bin/sh",fname];
+		return [UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?"sh.exe":"/bin/sh",fname];
 	}
 });
 
@@ -1266,53 +1266,7 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit.$=menu_edit_children.slice(0,menu_edit.p_paste);
 			menu_edit_children=undefined;
 			menu_edit.AddNormalItem({text:"Smart paste",icon:"粘",context_menu_group:"edit",enable_hotkey:1,key:"SHIFT+CTRL+V",action:function(){
-				var sel=this.GetSelection();
-				var ed=this.ed;
-				/*
-				indent handling
-				line head: nothing/less (tell from the last line), good
-					if it's nothing / less, compensate to the correct ind first: move last line to first
-				match minimal indent with current line
-					ignore paste location as long as it's inside the indent
-				*/
-				var ccnt_corrected=ed.MoveToBoundary(sel[1],1,"space");
-				if(sel[1]>sel[0]&&ed.MoveToBoundary(sel[0],-1,"space")<sel[0]){
-					//line overwrite mode, use sel[0]
-					ccnt_corrected=sel[0];
-				}else if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]==10){
-					var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
-					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_corrected){
-						//empty line: simply paste before this line, do nothing
-					}else{
-						//paste to the next line if called on at eoln
-						ccnt_corrected++;
-						ccnt_corrected=ed.MoveToBoundary(ccnt_corrected,1,"space")
-					}
-				}else{
-					ccnt_corrected=sel[0];
-				}
-				var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
-				var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
-				if(s_target_indent==undefined){
-					this.Paste()
-					return;
-				}
-				var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
-				if(sinsert==undefined){
-					this.Paste()
-					return;
-				}
-				var ccnt_new=ccnt_lh;
-				if(ccnt_corrected<=sel[0]){
-					this.HookedEdit([ccnt_corrected,0,sinsert,sel[0],sel[1]-sel[0],undefined])
-				}else{
-					this.HookedEdit([sel[0],sel[1]-sel[0],undefined,ccnt_corrected,0,sinsert])
-					ccnt_new-=(sel[1]-sel[0])
-				}
-				this.CallOnChange()
-				ccnt_new=ed.MoveToBoundary(ccnt_new+Duktape.__byte_length(sinsert),1,"space")
-				this.SetCaretTo(ccnt_new)
-				UI.Refresh()
+				this.SmartPaste()
 			}.bind(this)})
 			menu_edit.$=menu_edit.$.concat(bk_children)
 			menu_edit=undefined;

@@ -224,7 +224,10 @@ if Platform.BUILD=="debug":
 			s_userdir=System.Env.ExpandEnvironmentStrings("${HOME}")
 		if !fn_base||!s_ext:
 			return JS.Return(s_userdir)
-		fn_base=s_userdir+"/"+fn_base
+		if s_userdir.n&&s_userdir.back()=='/':
+			fn_base=s_userdir+fn_base
+		else
+			fn_base=s_userdir+"/"+fn_base
 		for(;;)
 			fn=FormatAsText(fn_base,formatNumber(dname_base,{base:16,align:4}),".",s_ext)
 			dname_base++
@@ -378,8 +381,12 @@ if Platform.BUILD=="debug":
 		auto shell_args=JS.Param(0).as(JSObject)
 		auto spath=JS.Param(1).or(".")
 		auto show=JS.Param(2).or(1)
-		n=shell_args.length()
-		pproc=System.Processes.Run([shell_args[i].as(string) for i=0:n-1],spath,show,"new_job,new_console")
+		n=shell_args["length"].as(iptr)
+		args=[shell_args[i].as(string) for i=0:n-1]
+		pproc=System.Processes.Run(args,spath,show,"new_job,new_console")
+		if !pproc:
+			//job object creation may fail
+			pproc=System.Processes.Run(args,spath,show,"new_console")
 		if !pproc:
 			return 0
 		return JS.Return(new CProcessWrapper(){proc:pproc})

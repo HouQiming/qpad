@@ -633,7 +633,7 @@ W.notebook_prototype={
 		if(typeof(args)=='string'){
 			//qpad js
 			try{
-				eval(cell_i.m_text_in.ed.GetText());
+				eval(s_code);
 			}catch(e){
 				this.WriteCellOutput(id,e.stack);
 			}
@@ -761,11 +761,26 @@ W.notebook_prototype={
 			UI.Refresh();
 		}
 	},
+	//////////////////////////////
+	OnMouseWheel:function(event){
+		var edstyle=UI.default_styles.code_editor.editor_style;
+		var hc=UI.GetCharacterHeight(edstyle.font)/this.scale;
+		var scroll_y0=this.scroll_y;
+		var h_scrolling_area=this.h/this.scale;
+		this.scroll_y+=-hc*event.y;
+		this.scroll_y=Math.max(Math.min(this.scroll_y,(this.m_ytot_all_notes||0)-h_scrolling_area),0)
+		this.need_auto_scroll=0;
+		if(this.scroll_y!=scroll_y0){
+			//UI.InvalidateCurrentFrame();
+			UI.Refresh();
+		}
+	},
 };
 W.NotebookView=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"notebook_view",W.notebook_prototype);
 	UI.Begin(obj)
 	UI.RoundRect(obj)
+	W.PureRegion(id,obj)
 	UI.PushSubWindow(obj.x,obj.y,obj.w-obj.w_scroll_bar+obj.padding*0.5*obj.scale,obj.h,obj.scale)
 	var n0_topmost=UI.RecordTopMostContext()
 	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
@@ -1037,6 +1052,7 @@ W.NotebookView=function(id,attrs){
 				obj.scroll_y=value*(this.total_size-this.page_size)
 				UI.Refresh()
 			},
+			OnMouseWheel:obj.OnMouseWheel.bind(obj),
 		})
 	}
 	UI.End()

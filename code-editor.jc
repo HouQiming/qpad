@@ -3642,9 +3642,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	//smart paste - it's slow, do it natively
 	JS_UI["ED_GetClipboardTextSmart"]=function(JSContext JS){
 		MAX_INDENT=256
-		s_pchar=__pointer(SDL.detail.SDL_GetClipboardText())
-		if !s_pchar:return 0
-		str=System.detail.pcharToString(s_pchar)
+		str=JS.Param(1).as(string)
+		if !str:
+			s_pchar=__pointer(SDL.detail.SDL_GetClipboardText())
+			if !s_pchar:return 0
+			str=System.detail.pcharToString(s_pchar)
 		if str.IndexOf('\n')<0L:return 0
 		s_target_indent=JS.Param(0).or("")
 		p_trailing_space=str.n
@@ -3990,6 +3992,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto heading_seq=new int[]
 		auto ops=JS.NewArray()
 		auto ops_length=0
+		auto has_dangling_op=0
 		auto w_image_max=JS["UI"]["default_styles"]["help_page"]["w_max_img_width_percentage"].as(float)*w_linef
 		auto w_code_box=JS["UI"]["default_styles"]["help_page"]["w_code_box_percentage"].as(float)*w_linef
 		if !sblock.back()=='\n':
@@ -4058,6 +4061,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					is_in_code["m_type"]="pre"
 					is_in_code["m_language"]=s_language
 					is_in_code["m_id"]=code_box_id
+					if has_dangling_op:
+						has_dangling_op=0
+						ops[ops_length-1]["obj_code"]=is_in_code
 					code_box_id++
 				else
 					is_in_code["m_code"]=scode
@@ -4193,11 +4199,49 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					y_baseline:0LL,
 				})
 				continue
-			//todo: detect action descriptions - ops
 			if sline.n==1:
 				if sret.n&&sret.back()!='\n':sret.push('\n')
 				sret.push('\n')
 			else
+				if !sret.n||sret.back()=='\n':
+					//detect action descriptions - ops
+					//use bgcolor to highlight this line later
+					if sline.StartsWith('Run:'):
+						if has_dangling_op:ops_length--
+						obj_op=JS.New()
+						ops[ops_length]=obj_op;ops_length++
+						obj_op["ccnt"]=sret.n
+						obj_op["action"]="run"
+						obj_op["machine"]="localhost"
+						has_dangling_op=1
+					else if sline.StartsWith('Run on '):
+						pend=sline.IndexOf(':')
+						if pend<0:
+							pend=sline.IndexOf('\n')
+						if has_dangling_op:ops_length--
+						obj_op=JS.New()
+						ops[ops_length]=obj_op;ops_length++
+						obj_op["ccnt"]=sret.n
+						obj_op["action"]="run"
+						obj_op["machine"]=sline[7:pend-1]
+						has_dangling_op=1
+					else if sline.StartsWith('Insert code'):
+						//a location tracking system won't work anyway
+						//just follow the cursor
+						if has_dangling_op:ops_length--
+						obj_op=JS.New()
+						ops[ops_length]=obj_op;ops_length++
+						obj_op["ccnt"]=sret.n
+						obj_op["action"]="code"
+						has_dangling_op=1
+					else if sline.StartsWith('Make sure '):
+						//it's a manual check
+						if has_dangling_op:ops_length--
+						obj_op=JS.New()
+						ops[ops_length]=obj_op;ops_length++
+						obj_op["ccnt"]=sret.n
+						obj_op["action"]="check"
+						has_dangling_op=0
 				FormatNormalText(sline[:sline.n-2],STYLE_ID_NORMAL)
 		obj_ret=JS.New()
 		obj_ret["m_text"]=sret
@@ -4252,7 +4296,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					assert(ccnt0>=0&&ccnt1>ccnt0)
 					rjobs.push(TRenderJob(){
 						x:fixed2float(x),
-						y:fixed2float(y-styles.m_styles[style_id].raise_height),
+						y:fixed2float(y-(ccnt1==ccnt0+1&&sblock[ccnt0]=='\n'?0:styles.m_styles[style_id].raise_height)),
 						style_id:style_id,ccnt0:ccnt0,ccnt1:ccnt1})
 					for ch in Utf8Chars(sblock[ccnt0:ccnt1-1])
 						x+=styles.charWidth(style_id,ch)
@@ -4284,11 +4328,42 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				})
 		auto ret=new CPreprocessedRichText(){
 			m_rjobs:rjobs,m_styles:styles,
-			m_h_text:fixed2float(y),
+			m_h_text:fixed2float(y_next),
 			m_w_line:w_linef,
 			m_scale0:1.f,
 		}
 		return JS.Return(ret)
+	}
+	JS_UI["ED_CreateOpHighlights"]=function(JSContext JS){
+		ops=JS.Param(0).as(JSObject)
+		prt=JS.Param(1).as(CPreprocessedRichText)
+		sblock=JS.Param(2).as(string)
+		ops_length=ops["length"].as(iptr)
+		ccnts=new iptr[ops_length*2]
+		for i=0:ops_length-1
+			ops_i=ops[i].as(JSObject)
+			ccnt0=ops_i["ccnt"].as(iptr)
+			ccnt1=ccnt0+sblock[ccnt0:].IndexOf('\n')+1
+			if ccnt1<=ccnt0:
+				ccnt1=sblock.n
+			ccnts[i*2+0]=ccnt0
+			ccnts[i*2+1]=ccnt1
+		if Platform.BUILD=="debug":
+			for i=1:ccnts.n-1
+				assert(ccnts[i]>=ccnts[i-1])
+		//ignore x
+		pccnts=0L
+		foreach rj in prt.m_rjobs
+			if rj.ccnt0<0:continue
+			while pccnts<ccnts.n&&rj.ccnt0>=ccnts[pccnts]:
+				//ops[(pccnts>>1)][(pccnts&1)?"x1":"x0"]=rj.x
+				ops[(pccnts>>1)][(pccnts&1)?"y1":"y0"]=rj.y
+				pccnts++
+		while pccnts<ccnts.n:
+			//ops[(pccnts>>1)][(pccnts&1)?"x1":"x0"]=0.f
+			ops[(pccnts>>1)][(pccnts&1)?"y1":"y0"]=prt.m_h_text
+			pccnts++
+		return 0
 	}
 	JS_UI["ED_RenderRichText"]=function(JSContext JS){
 		auto prt=JS.Param(0).as(CPreprocessedRichText)

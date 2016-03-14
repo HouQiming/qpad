@@ -16,6 +16,7 @@ if(!UI.TestOption('enable_srgb')){
 }
 UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.SetFontSharpening(1);
+UI.wheel_message_mode="over";
 (function(){
 	UI.pixels_per_unit_base=UI.pixels_per_unit
 	UI.pixels_per_unit*=(UI.m_ui_metadata.zoom||1)

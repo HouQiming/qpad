@@ -722,6 +722,16 @@ UI.CustomTheme=function(){
 			round:0,
 			padding:8,
 			w_scroll_bar:20,
+			mouse_wheel_speed:2,
+			top_hint_shadow_color:0x7f000000,
+			top_hint_shadow_size:8,
+			top_hint_border_width:2,
+			top_hint_border_color:L?0xffaaaaaa:0xff222222,
+			///////////////
+			ophl:{
+				focus_color:L?0xff00ffff:0xffaaaa55,
+				color:L?0x5500ffff:0x55aaaa55,blur:4,
+			},
 			///////////////
 			hr_h:16,
 			hr_h_fill:2,
