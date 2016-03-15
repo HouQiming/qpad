@@ -778,6 +778,7 @@ UI.CustomTheme=function(){
 			h:32,
 			sel_bgcolor:C,
 			sel_bgcolor_deactivated:L?0xff7f7f7f:0xff7f7f7f,
+			icon_font:UI.Font(UI.icon_font_name,28),
 			name_font:UI.Font(UI.font_name,24,-50),
 			name_font_bold:UI.Font(UI.font_name,24,100),
 			name_color:L?0xff000000:0xffe8e8e8,

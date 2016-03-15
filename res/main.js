@@ -304,6 +304,37 @@ if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 }
 //UI.InstallQPad()
 
+var SetHelpText=function(doc_code){
+	var tab_help=UI.OpenUtilTab('help_page');
+	var doc_help_edit=(tab_help&&tab_help.util_widget&&tab_help.util_widget.find_bar_edit);
+	if(doc_help_edit){
+		doc_help_edit.SetSelection(0,doc_help_edit.ed.GetTextSize())
+		tab_help.util_widget.InvalidateContent();
+		if(doc_code){
+			//sel-to-help
+			var sel=doc_code.GetSelection();
+			if(!(sel[0]<sel[1])){
+				var ccnt=doc_code.sel1.ccnt;
+				var ed=doc_code.ed;
+				var neib=ed.GetUtf8CharNeighborhood(ccnt);;
+				if(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1])){
+					sel[0]=doc_code.SkipInvisibles(ccnt,-1);
+					sel[0]=doc_code.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[0],-1),-1,"word_boundary_left"),-1);
+					sel[1]=doc_code.SkipInvisibles(ccnt,1);
+					sel[1]=doc_code.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[1],1),1,"word_boundary_right"),1);
+				}
+			}
+			if(sel[0]<sel[1]){
+				//auto-search
+				doc_help_edit.ed.Edit([
+					0,doc_help_edit.ed.GetTextSize(),doc_code.ed.GetText(sel[0],sel[1]-sel[0])])
+				doc_help_edit.SetSelection(0,doc_help_edit.ed.GetTextSize())
+				doc_help_edit.CallOnChange()
+			}
+		}
+	}
+};
+
 UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
 var CreateMenus=function(){
@@ -468,32 +499,13 @@ var CreateMenus=function(){
 		action:function(doc_code){
 			var tab_help=UI.OpenUtilTab('help_page');
 			var doc_help_edit=(tab_help&&tab_help.util_widget&&tab_help.util_widget.find_bar_edit);
-			if(doc_help_edit){
-				doc_help_edit.SetSelection(0,doc_help_edit.ed.GetTextSize())
-				tab_help.util_widget.InvalidateContent();
+			if(!doc_help_edit){
 				if(doc_code){
-					//sel-to-help
-					var sel=doc_code.GetSelection();
-					if(!(sel[0]<sel[1])){
-						var ccnt=doc_code.sel1.ccnt;
-						var ed=doc_code.ed;
-						var neib=ed.GetUtf8CharNeighborhood(ccnt);;
-						if(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1])){
-							sel[0]=this.doc.SkipInvisibles(ccnt,-1);
-							sel[0]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[0],-1),-1,"word_boundary_left"),-1);
-							sel[1]=this.doc.SkipInvisibles(ccnt,1);
-							sel[1]=this.doc.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[1],1),1,"word_boundary_right"),1);
-						}
-					}
-					if(sel[0]<sel[1]){
-						//auto-search
-						doc_help_edit.ed.Edit([
-							0,doc_help_edit.ed.GetTextSize(),doc_code.ed.GetText(sel[0],sel[1]-sel[0])])
-						doc_help_edit.SetSelection(0,doc_help_edit.ed.GetTextSize())
-						doc_help_edit.CallOnChange()
-					}
+					UI.InvalidateCurrentFrame()
+					UI.NextTick(SetHelpText.bind(undefined,doc_code));
 				}
 			}
+			SetHelpText(doc_code);
 		}.bind(undefined,obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc)
 	});
 	if(obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc){

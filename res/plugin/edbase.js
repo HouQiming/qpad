@@ -536,6 +536,7 @@ var f_tex_like=function(lang){
 Language.Register({
 	name:'TeX/LaTeX',extensions:['tex','cls'],
 	curly_bracket_is_not_special:1,is_tex_like:1,
+	enable_dictionary:1,
 	default_hyphenator_name:"en_us",
 	spell_checker:"en_us",
 	file_icon_color:0xffb4771f,
@@ -546,6 +547,7 @@ Language.Register({
 Language.Register({
 	name:'TeX bibliography',extensions:['bib'],
 	curly_bracket_is_not_special:1,is_tex_like:1,
+	enable_dictionary:1,
 	default_hyphenator_name:"en_us",
 	spell_checker:"en_us",
 	file_icon_color:0xff2ca033,
@@ -556,6 +558,7 @@ Language.Register({
 Language.Register({
 	name_sort_hack:" Markdown",name:'Markdown',extensions:['md','markdown'],
 	curly_bracket_is_not_special:1,
+	enable_dictionary:1,
 	default_hyphenator_name:"en_us",
 	spell_checker:"en_us",
 	file_icon_color:0xff444444,
@@ -765,6 +768,66 @@ UI.RegisterOutputParser('[ \t]*at[ \t]*.*[ \t]*\\((.*):([0-9]+):([0-9]+)\\).*',3
 	}
 	return err
 });
+
+/////////////////////////////////////////////
+//search engine hooks
+var SearchEngineHook=function(items,ssearch, icon,stitle_template,url_template){
+	var stitle=UI.Format(stitle_template,ssearch);
+	var pssearch=stitle_template.indexOf('@1');
+	items.push({
+		icon:icon,
+		title:stitle,
+		hl_ranges:pssearch<0?[]:[pssearch,pssearch+ssearch.length],
+		url:url_template.replace('文',encodeURIComponent(ssearch)),
+	})
+};
+
+//default dictionaries
+UI.RegisterHelpHook(function(items,ssearch){
+	if(!ssearch){return;}
+	var tab_frontmost=UI.GetFrontMostEditorTab();
+	var fn=(tab_frontmost&&tab_frontmost.main_widget&&tab_frontmost.main_widget.file_name);
+	var lang=(fn&&UI.ED_GetFileLanguage(fn));
+	if(!lang){
+		return;
+	}
+	if(lang.enable_dictionary){
+		SearchEngineHook(items,'define '+ssearch,'写',"Google “@1”","https://www.google.com/search?sourceid=navclient&q=文");
+		SearchEngineHook(items,ssearch.toLowerCase(),'写',"Wiktionary entry for “@1”","https://en.wiktionary.org/wiki/文");
+	}
+})
+
+//language-specific sites
+var g_node_modules={"assert":1,"buffer":1,"child_process":1,"cluster":1,"console":1,"constants":1,"crypto":1,"dgram":1,"dns":1,"domain":1,"events":1,"fs":1,"http":1,"https":1,"module":1,"net":1,"os":1,"path":1,"process":1,"punycode":1,"querystring":1,"readline":1,"repl":1,"stream":1,"string_decoder":1,"timers":1,"tls":1,"tty":1,"url":1,"util":1,"v8":1,"vm":1,"zlib":1};
+UI.RegisterHelpHook(function(items,ssearch){
+	if(!ssearch){return;}
+	var tab_frontmost=UI.GetFrontMostEditorTab();
+	var fn=(tab_frontmost&&tab_frontmost.main_widget&&tab_frontmost.main_widget.file_name);
+	var lang=(fn&&UI.ED_GetFileLanguage(fn));
+	if(!lang){return;}
+	var sext=UI.GetFileNameExtension(fn).toLowerCase();
+	if(lang.name=="C/C++"){
+		if(sext=='m'||sext=='mm'){
+			SearchEngineHook(items,ssearch,'プ',"“@1” for Apple developers","https://developer.apple.com/search/?q=文");
+		}
+		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			SearchEngineHook(items,ssearch,'プ',"“@1” on MSDN","https://social.msdn.microsoft.com/Search/en-US?query=文&pgArea=header&emptyWatermark=true&ac=4");
+		}
+	}
+	if(lang.name=="Java"){
+		SearchEngineHook(items,ssearch,'プ',"Android class “@1”","http://developer.android.com/reference/classes.html#q=文");
+	}
+	if(lang.name=="Javascript"&&g_node_modules[ssearch.toLowerCase()]){
+		SearchEngineHook(items,ssearch.toLowerCase(),'プ','Node.js package “@1”',"https://nodejs.org/api/文.html");
+	}
+})
+
+
+//general Googling - put it in the end
+UI.RegisterHelpHook(function(items,ssearch){
+	if(!ssearch){return;}
+	SearchEngineHook(items,ssearch,'s',"Google for “@1”","https://www.google.com/search?sourceid=navclient&q=文");
+})
 
 /////////////////////////////////////////////
 //interpreters / notebook cell generators

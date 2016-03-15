@@ -3421,7 +3421,7 @@ var GenerateGitRepoTreeView=function(repo){
 };*/
 
 var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context){
-	if(!IO.DirExists(spath+"/doc")){
+	if(!IO.DirExists(spath+"/doc")||my_repo.m_helps_parsed){
 		if(g_repo_parsing_context){
 			ResumeProjectParsing(g_repo_parsing_context);
 		}
@@ -3457,9 +3457,18 @@ var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context){
 	if(find_context){
 		UI.NextTick(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
 	}else{
+		my_repo.m_helps_parsed=1;
 		ResumeProjectParsing(g_repo_parsing_context);
 	}
 };
+
+UI.ReindexHelp=function(spath){
+	var my_repo=g_repo_list[spath];
+	if(!my_repo){return;}
+	my_repo.m_helps_parsed=0;
+	my_repo.m_helps=undefined;
+	QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
+}
 
 var ParseProject=function(spath){
 	if(g_repo_list[spath]){return;}
@@ -3501,7 +3510,7 @@ var ParseProject=function(spath){
 			}
 		}.bind(undefined,g_repo_parsing_context);
 		QueueProjectParser(fparse_batch);
-		QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
+		UI.ReindexHelp(spath);
 	}
 }
 
@@ -6679,6 +6688,7 @@ UI.FillLanguageMenu=function(s_ext,language_id,f_set_language_id){
 
 Language.Register({
 	name_sort_hack:" Plain Text",name:"Plain text",parser:"text",
+	enable_dictionary:1,
 	rules:function(lang){
 		lang.DefineDefaultColor("color")
 		return function(){}

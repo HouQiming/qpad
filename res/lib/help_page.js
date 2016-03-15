@@ -10,6 +10,7 @@ W.HelpPage_prototype={
 		this.text=undefined;
 		this.help_ctx=undefined;
 		this.found_items=undefined;
+		this.help_list=undefined;
 		UI.Refresh();
 	},
 	OpenFile:function(fn){
@@ -98,6 +99,7 @@ var fhelppage_findbar_plugin=function(){
 		if(tab_frontmost){
 			UI.top.app.document_area.SetTab(tab_frontmost.__global_tab_id)
 		}
+		UI.top.app.document_area.CloseTab(obj.owner_tab.__global_tab_id)
 		UI.Refresh()
 	})
 	this.OnMouseWheel=function(event){
@@ -131,6 +133,11 @@ var fhelppage_findbar_plugin=function(){
 	this.AddEventHandler('PGDN',fpassthrough)
 }
 
+var g_help_hooks=[];
+UI.RegisterHelpHook=function(f){
+	g_help_hooks.push(f);
+};
+
 W.HelpPage=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"help_page",W.HelpPage_prototype);
 	UI.Begin(obj)
@@ -147,7 +154,10 @@ W.HelpPage=function(id,attrs){
 		tooltip:obj.text?"Back":"Refresh",// - F5
 		anchor:'parent',anchor_align:'right',anchor_valign:'up',
 		OnClick:function(){
-			obj.InvalidateContent();
+			this.InvalidateContent();
+			if(this.current_repo){
+				UI.ReindexHelp(this.current_repo);
+			}
 			UI.Refresh()
 		}.bind(obj)
 	})
@@ -187,10 +197,11 @@ W.HelpPage=function(id,attrs){
 	}
 	if(!obj.text){
 		if(!obj.found_items){
+			var s_search_text=obj.find_bar_edit.ed.GetText();
 			var repo=UI.GetRepoByPath(spath_repo);
 			var items=[];
 			obj.found_items=items;
-			var s_searches=obj.find_bar_edit.ed.GetText().toLowerCase().split(' ');
+			var s_searches=s_search_text.toLowerCase().split(' ');
 			var fsearchHelpIndex=function(idx){
 				if(!idx){return;}
 				for(var i=0;i<idx.length;i++){
@@ -207,12 +218,21 @@ W.HelpPage=function(id,attrs){
 						hl_ranges.push(p,p+s_searches[j].length);
 					}
 					if(!is_bad){
-						items.push({title:help_item_i.title,file_name:help_item_i.file_name,hl_ranges:hl_ranges})
+						items.push({
+							icon:"问",
+							title:help_item_i.title,
+							file_name:help_item_i.file_name,
+							hl_ranges:hl_ranges,
+						})
 					}
 				}
 			};
 			fsearchHelpIndex(repo&&repo.m_helps);
 			fsearchHelpIndex([{title:"Using the Help System",title_search:"using the help system",file_name:"*res/misc/metahelp.md"}]);
+			//we should always have something with the search engine hooks
+			for(var i=0;i<g_help_hooks.length;i++){
+				g_help_hooks[i](items,s_search_text);
+			}
 		}
 		//just show a list of candidates, with keyboard browsing -- listview
 		UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
@@ -334,7 +354,18 @@ W.HelpPage=function(id,attrs){
 
 W.HelpItem_prototype={
 	OnDblClick:function(){
-		this.owner.OpenFile(this.file_name);
+		if(this.url){
+			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				IO.Shell(["start"," ",this.url])
+			}else if(UI.Platform.ARCH=="mac"){
+				IO.Shell(["open",this.url])
+			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+				IO.Shell(["xdg-open",this.url])
+			}
+			//coulddo: support mobile
+		}else if(this.file_name){
+			this.owner.OpenFile(this.file_name);
+		}
 	},
 };
 W.HelpItem=function(id,attrs){
@@ -348,17 +379,22 @@ W.HelpItem=function(id,attrs){
 		}
 		var name_font=obj.name_font;
 		var name_font_bold=obj.name_font_bold;
-		W.Text("",{x:obj.x+4,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
+		var h_icon=UI.GetCharacterHeight(obj.icon_font);
+		var w_icon=h_icon+4
+		UI.DrawChar(obj.icon_font,obj.x+2,obj.y+(obj.h-h_icon)*0.5,obj.selected?obj.sel_name_color:obj.name_color,obj.icon.charCodeAt(0))
+		W.Text("",{x:obj.x+2+w_icon,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
 			font:name_font,text:obj.title,
 			color:obj.selected?obj.sel_name_color:obj.name_color})
-		for(var i=0;i<obj.hl_ranges.length;i+=2){
-			var p0=obj.hl_ranges[i+0];
-			var p1=obj.hl_ranges[i+1];
-			if(p0<p1){
-				var x=obj.x+4+UI.MeasureText(name_font,obj.title.substr(0,p0)).w
-				W.Text("",{x:x,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
-					font:name_font_bold,text:obj.title.substr(p0,p1-p0),
-					color:obj.selected?obj.sel_name_color:obj.name_color})
+		if(obj.hl_ranges){
+			for(var i=0;i<obj.hl_ranges.length;i+=2){
+				var p0=obj.hl_ranges[i+0];
+				var p1=obj.hl_ranges[i+1];
+				if(p0<p1){
+					var x=obj.x+2+w_icon+UI.MeasureText(name_font,obj.title.substr(0,p0)).w
+					W.Text("",{x:x,y:obj.y+(obj.h-UI.GetFontHeight(name_font))*0.5-2,
+						font:name_font_bold,text:obj.title.substr(p0,p1-p0),
+						color:obj.selected?obj.sel_name_color:obj.name_color})
+				}
 			}
 		}
 	UI.End()
@@ -408,6 +444,7 @@ UI.RegisterUtilType("help_page",function(){return UI.NewTab({
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'editor_widget':tab_frontmost&&tab_frontmost.main_widget,
 			'activated':this==UI.top.app.document_area.active_tab,
+			'owner_tab':this,
 			'x':0,'y':0});
 		this.util_widget=body;
 		return body;
