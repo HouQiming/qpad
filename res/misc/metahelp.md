@@ -6,7 +6,9 @@ QPad's help system is mainly designed for per-project *private* documentations. 
 
 ## Quick Start
 
-Each embedded script is a code block followed by a specially-formatted text command. The "command" lines will be highlighted. You can double-click the highlighted region to run a specific script, or press `CTRL+E` to run them one-by-one. The script below opens the source code of this document in the editor. You can use it as an example when creating your own help documents.
+Each embedded script is a code block following a specially-formatted text command. The "command" lines will be highlighted. You can double-click the highlighted region to run a specific script, or press `CTRL+E` to run them one-by-one. 
+
+The script below opens the source code of this document in the editor. You can use it as an example when creating your own help documents.
 
 Run in editor:
 ```js
@@ -24,7 +26,13 @@ Make sure you have a file from your favorite project open in the editor.
 Run in editor:
 ```js
 var spath=UI.GetCurrentProjectPath();
-IO.Shell(['mkdir',spath+'/doc']);
+if(!IO.DirExists(spath+'/doc')){
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		IO.Shell(['md',(spath+'/doc').replace(/\//g,'\\')]);
+	}else{
+		IO.Shell(['mkdir','-p',spath+'/doc']);
+	}
+}
 UI.OpenEditorWindow(spath+'/doc/metahelp.md',function(){
 	if(!(this.ed.GetTextSize()>0)){
 		this.ed.Edit([0,0,IO.UIReadAll('res/misc/metahelp.md')]);

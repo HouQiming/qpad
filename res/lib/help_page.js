@@ -14,7 +14,11 @@ W.HelpPage_prototype={
 	},
 	OpenFile:function(fn){
 		this.m_file_name=fn;
-		this.text=IO.ReadAll(fn)
+		if(fn.length&&fn[0]=='*'){
+			this.text=IO.UIReadAll(fn.substr(1));
+		}else{
+			this.text=IO.ReadAll(fn);
+		}
 		UI.Refresh();
 	},
 	SetSelection:function(id){
@@ -112,7 +116,15 @@ var fhelppage_findbar_plugin=function(){
 			obj.help_list.OnKeyDown(event)
 		}
 	}
-	this.AddEventHandler('RETURN RETURN2',fpassthrough)
+	this.AddEventHandler('RETURN RETURN2',function(key,event){
+		var obj=this.owner
+		if(obj.text){
+			obj.InvalidateContent();
+			UI.Refresh()
+		}else if(obj.help_list){
+			obj.help_list.OnKeyDown(event)
+		}
+	})
 	this.AddEventHandler('UP',fpassthrough)
 	this.AddEventHandler('DOWN',fpassthrough)
 	this.AddEventHandler('PGUP',fpassthrough)
@@ -127,6 +139,19 @@ W.HelpPage=function(id,attrs){
 	//top bar for searching - repo.m_helps
 	//coulddo: show current project
 	var w_buttons=0;
+	W.Button("refresh_button",{
+		x:w_buttons,y:0,h:obj.h_find_bar,
+		value:obj.selected,padding:8,
+		font:UI.icon_font_20,
+		text:obj.text?"撤":"刷",
+		tooltip:obj.text?"Back":"Refresh",// - F5
+		anchor:'parent',anchor_align:'right',anchor_valign:'up',
+		OnClick:function(){
+			obj.InvalidateContent();
+			UI.Refresh()
+		}.bind(obj)
+	})
+	w_buttons+=obj.refresh_button.w
 	var rect_bar=UI.RoundRect({
 		x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
 		w:obj.w-w_buttons-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
@@ -165,10 +190,11 @@ W.HelpPage=function(id,attrs){
 			var repo=UI.GetRepoByPath(spath_repo);
 			var items=[];
 			obj.found_items=items;
-			if(repo&&repo.m_helps){
-				var s_searches=obj.find_bar_edit.ed.GetText().toLowerCase().split(' ');
-				for(var i=0;i<repo.m_helps.length;i++){
-					var help_item_i=repo.m_helps[i];
+			var s_searches=obj.find_bar_edit.ed.GetText().toLowerCase().split(' ');
+			var fsearchHelpIndex=function(idx){
+				if(!idx){return;}
+				for(var i=0;i<idx.length;i++){
+					var help_item_i=idx[i];
 					var s_i=help_item_i.title_search;
 					var is_bad=0;
 					var hl_ranges=[];
@@ -184,7 +210,9 @@ W.HelpPage=function(id,attrs){
 						items.push({title:help_item_i.title,file_name:help_item_i.file_name,hl_ranges:hl_ranges})
 					}
 				}
-			}
+			};
+			fsearchHelpIndex(repo&&repo.m_helps);
+			fsearchHelpIndex([{title:"Using the Help System",title_search:"using the help system",file_name:"*res/misc/metahelp.md"}]);
 		}
 		//just show a list of candidates, with keyboard browsing -- listview
 		UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
@@ -205,10 +233,11 @@ W.HelpPage=function(id,attrs){
 			color:obj.top_hint_shadow_color})
 		UI.PopCliprect()
 	}
-	if(obj.text||!obj.found_items.length){
-		if(!obj.found_items.length&&!obj.text){
-			obj.text=IO.UIReadAll("res/misc/metahelp.md");
-		}
+	if(obj.text){
+		//||!obj.found_items.length
+		//if(!obj.found_items.length&&!obj.text){
+		//	obj.text=IO.UIReadAll("res/misc/metahelp.md");
+		//}
 		var w_main_area=obj.w-obj.padding*2-obj.w_scroll_bar;
 		var h_main_area=obj.h-obj.h_find_bar
 		obj.h_main_area=h_main_area;

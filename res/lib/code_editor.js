@@ -4188,7 +4188,7 @@ W.FileBrowserPage=function(id,attrs){
 		value:obj.selected,padding:8,
 		font:UI.icon_font_20,
 		text:"刷",
-		tooltip:"Refresh - F5",
+		tooltip:"Refresh",// - F5
 		anchor:'parent',anchor_align:'right',anchor_valign:'up',
 		OnClick:function(){
 			UI.ClearFileListingCache();
@@ -6341,6 +6341,7 @@ UI.NewCodeEditorTab=function(fname0){
 		UpdateTitle:function(){
 			var doc=(this.main_widget&&this.main_widget.doc);
 			var fn_display=(doc&&doc.m_file_name||this.file_name)
+			var fn_display=IO.NormalizeFileName(fn_display,1);
 			this.title=UI.GetSmartTabName(fn_display);
 			this.tooltip=fn_display;
 			this.need_save=0
