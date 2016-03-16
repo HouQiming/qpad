@@ -817,8 +817,12 @@ UI.RegisterHelpHook(function(items,ssearch){
 	if(lang.name=="Java"){
 		SearchEngineHook(items,ssearch,'プ',"Android class “@1”","http://developer.android.com/reference/classes.html#q=文");
 	}
-	if(lang.name=="Javascript"&&g_node_modules[ssearch.toLowerCase()]){
-		SearchEngineHook(items,ssearch.toLowerCase(),'プ','Node.js package “@1”',"https://nodejs.org/api/文.html");
+	if(lang.name=="Javascript"){
+		if(g_node_modules[ssearch.toLowerCase()]){
+			SearchEngineHook(items,ssearch.toLowerCase(),'プ','Node.js package “@1”',"https://nodejs.org/api/文.html");
+		}else{
+			SearchEngineHook(items,ssearch.toLowerCase(),'プ','Node.js package “@1”',"https://www.npmjs.com/search?q=文");
+		}
 	}
 })
 

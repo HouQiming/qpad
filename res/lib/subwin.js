@@ -152,8 +152,10 @@ W.TabbedDocument_prototype={
 		}
 		///////
 		var fntab=GetTabFileName(tab);
-		UI.m_closed_windows=UI.m_closed_windows.filter(UI.HackCallback(function(fn){return fn!=fntab}))
-		UI.m_closed_windows.push(fntab);
+		if(fntab){
+			UI.m_closed_windows=UI.m_closed_windows.filter(UI.HackCallback(function(fn){return fn!=fntab}))
+			UI.m_closed_windows.push(fntab);
+		}
 		//close it
 		if(!tab.need_save){
 			tab.SaveMetaData();
@@ -165,6 +167,7 @@ W.TabbedDocument_prototype={
 			window_list[n2]=window_list[i]
 			this[n2]=this[i];
 			n2++;
+			window_list[n2].__global_tab_id=n2;
 		}
 		this[window_list.length-1]=undefined;
 		window_list.pop()

@@ -370,9 +370,13 @@ auto tokenize(string sdata,int g_ignore_indents)
 			s=ptr
 			ptr++
 			skipchars(CharSet.idbody)
-			if ptr-s>=8&&cite_raw(ptr-8,ptr)=="operator":
-				//operator state machine
-				parseOperator()
+			if ptr-s>=8:
+				if cite_raw(ptr-8,ptr)=="operator":
+					//operator state machine
+					parseOperator()
+				else if ptr-s==8&&cite_raw(ptr-8,ptr)=="function"&&int(feed[ptr])==int('*'):
+					//ES6 function*
+					ptr++
 			id=getid(cite_raw(s,ptr))
 			push_token(TOK_ID+id,int(s),int(ptr))
 			continue
@@ -917,7 +921,7 @@ inline IDToOrder(id)
 	return g_symbols[id].user_slot
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
-g_function_ids=[getid("function"),getid("inline")]
+g_function_ids=[getid("function"),getid("function*"),getid("inline")]
 g_id_if=getid("if")
 g_id_while=getid("while")
 g_c_like_parse_queue=new int[]

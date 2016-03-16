@@ -31,48 +31,7 @@ W.HelpPage_prototype={
 	},
 	RunOp:function(id){
 		var op_active=this.help_ctx.m_ops[id];
-		if(op_active.action=="run"){
-			var doc=op_active.obj_code.doc;
-			if(!doc){return;}
-			if(op_active.machine=="<editor>"){
-				var s_code=doc.ed.GetText();
-				try{
-					eval("(function(){"+s_code+"})()");
-				}catch(e){
-					//todo: some form of failure notification
-					print(e.stack)
-				}
-				return;
-			}
-			var lname=Language.GetNameByExt(op_active.obj_code.m_language.toLowerCase());
-			var ldesc=Language.GetDescObjectByName(lname);
-			if(!ldesc.m_buildenv_by_name){return;}
-			var obj_buildenv=ldesc.m_buildenv_by_name[UI.GetDefaultBuildEnv(lname)];
-			if(!obj_buildenv||!obj_buildenv.CreateInterpreterCall){return;}
-			var sext=(ldesc&&ldesc.extensions&&ldesc.extensions[0]||op_active.obj_code.m_language);
-			//todo: op_active.machine
-			var fn_script=IO.GetNewDocumentName("qnb",sext,"temp")
-			var s_code=doc.ed.GetText();
-			IO.CreateFile(fn_script,s_code)
-			var args=obj_buildenv.CreateInterpreterCall(fn_script,undefined);
-			if(typeof(args)=='string'){return;}
-			var spath=UI.GetPathFromFilename(this.m_file_name);
-			if(!IO.RunProcess(args,spath,1)){
-				//todo: some form of failure notification
-				IO.DeleteFile(fn_script);
-			}
-		}else if(op_active.action=="code"){
-			var doc=op_active.obj_code.doc;
-			if(!doc){return;}
-			//copy-paste, it's useful to leave the stuff in clipboard
-			doc.SetSelection(0,doc.ed.GetTextSize())
-			doc.Copy()
-			if(this.editor_widget){
-				this.editor_widget.doc.SmartPaste()
-			}
-		}else if(op_active.action=="check"){
-			//do nothing, it's a manual step
-		}
+		return op_active.action.call(this,op_active);
 	},
 	ValidateScroll:function(){
 		var ytot=this.help_ctx.prt.m_h_text+this.padding;
@@ -89,6 +48,10 @@ W.HelpPage_prototype={
 		if(this.scroll_y!=scroll_y0){
 			UI.Refresh();
 		}
+	},
+	ShowError:function(s){
+		print(s)
+		//todo: dialog box
 	},
 };
 
@@ -192,13 +155,13 @@ W.HelpPage=function(id,attrs){
 	}
 	if(spath_repo!=obj.current_repo){
 		//repo changed, invalidate all
-		obj.InvalidateContent()
+		obj.InvalidateContent();
 		obj.current_repo=spath_repo;
 	}
 	if(!obj.text){
+		var repo=UI.GetRepoByPath(spath_repo);
 		if(!obj.found_items){
 			var s_search_text=obj.find_bar_edit.ed.GetText();
-			var repo=UI.GetRepoByPath(spath_repo);
 			var items=[];
 			obj.found_items=items;
 			var s_searches=s_search_text.toLowerCase().split(' ');
@@ -252,6 +215,10 @@ W.HelpPage=function(id,attrs){
 			border_width:-obj.top_hint_shadow_size,
 			color:obj.top_hint_shadow_color})
 		UI.PopCliprect()
+		if(!repo||!repo.m_helps_parsed){
+			//set up for a re-find
+			obj.found_items=undefined;
+		}
 	}
 	if(obj.text){
 		//||!obj.found_items.length
@@ -326,12 +293,13 @@ W.HelpPage=function(id,attrs){
 		if(cur_op<obj.help_ctx.m_ops.length){
 			W.Hotkey("",{key:"CTRL+E",action:(function(){
 				var cur_op=(this.cur_op||0);
-				this.RunOp(cur_op);
-				cur_op++;
-				if(!(cur_op<this.help_ctx.m_ops.length)){
-					cur_op=0;
+				if(this.RunOp(cur_op)){
+					cur_op++;
+					if(!(cur_op<this.help_ctx.m_ops.length)){
+						cur_op=0;
+					}
+					this.SetSelection(cur_op);
 				}
-				this.SetSelection(cur_op);
 				UI.Refresh();
 			}).bind(obj)})
 		}
@@ -361,8 +329,14 @@ W.HelpItem_prototype={
 				IO.Shell(["open",this.url])
 			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 				IO.Shell(["xdg-open",this.url])
+			}else{
+				//coulddo: support mobile
 			}
-			//coulddo: support mobile
+			var tab_frontmost=UI.GetFrontMostEditorTab();
+			if(tab_frontmost){
+				UI.top.app.document_area.SetTab(tab_frontmost.__global_tab_id)
+			}
+			UI.top.app.document_area.CloseTab(this.owner.owner_tab.__global_tab_id)
 		}else if(this.file_name){
 			this.owner.OpenFile(this.file_name);
 		}
@@ -432,6 +406,134 @@ UI.GetCurrentProjectPath=function(){
 	var obj=(tab_frontmost&&tab_frontmost.main_widget);
 	return obj&&UI.GetEditorProject(obj.file_name);
 };
+
+var g_help_commands=[];
+var g_help_commands_match_poses=[1];
+var g_help_command_regex=undefined;
+UI.RegisterHelpCommand=function(strigger,f_action,need_code){
+	var count=(strigger.match(/[(]/g)||[]).length+1;
+	g_help_command_regex=undefined;
+	g_help_commands.push(strigger,f_action,need_code);
+	g_help_commands_match_poses.push(g_help_commands_match_poses[g_help_commands_match_poses.length-1]+count);
+};
+
+UI.PrecomputeHelpCommands=function(){
+	if(!g_help_command_regex){
+		var sregex=['^('];
+		for(var i=0;i<g_help_commands.length;i+=3){
+			if(i){sregex.push(')|(');}
+			sregex.push(g_help_commands[i])
+		}
+		sregex.push(')');
+		g_help_command_regex=new RegExp(sregex.join(''));
+	}
+};
+
+UI.ParseHelpCommand=function(sline){
+	var match=sline.match(g_help_command_regex);
+	if(match){
+		for(var i=0;i<g_help_commands_match_poses.length-1;i++){
+			var pos_i=g_help_commands_match_poses[i];
+			if(match[pos_i]){
+				var ret={
+					match:pos_i+1<g_help_commands_match_poses[i+1]?match.slice(pos_i+1,g_help_commands_match_poses[i+1]):undefined,
+					action:g_help_commands[i*3+1],
+					need_code:g_help_commands[i*3+2],
+				}
+				return ret;
+			}
+		}
+	}
+	return undefined;
+}
+
+var fhelp_run=function(op_active){
+	var doc=op_active.obj_code.doc;
+	if(!doc){return 0;}
+	var machine=(op_active.match?op_active.match[0]:'localhost');
+	if(machine=="editor"){
+		var s_code=doc.ed.GetText();
+		try{
+			eval("(function(){"+s_code+"})()");
+		}catch(e){
+			this.ShowError(e.stack)
+			return 0;
+		}
+		return 1;
+	}
+	if(machine=="notebook"){
+		//todo
+	}
+	var lname=Language.GetNameByExt(op_active.obj_code.m_language.toLowerCase());
+	var ldesc=Language.GetDescObjectByName(lname);
+	if(!ldesc.m_buildenv_by_name){return;}
+	var obj_buildenv=ldesc.m_buildenv_by_name[UI.GetDefaultBuildEnv(lname)];
+	if(!obj_buildenv||!obj_buildenv.CreateInterpreterCall){return;}
+	var sext=(ldesc&&ldesc.extensions&&ldesc.extensions[0]||op_active.obj_code.m_language);
+	//todo: machine
+	var fn_script=IO.GetNewDocumentName("qnb",sext,"temp")
+	var s_code=doc.ed.GetText();
+	IO.CreateFile(fn_script,s_code)
+	var args=obj_buildenv.CreateInterpreterCall(fn_script,undefined);
+	if(typeof(args)=='string'){return;}
+	var spath=UI.GetCurrentProjectPath();
+	if(!spath){spath=UI.GetPathFromFilename(this.m_file_name);}
+	if(!IO.RunProcess(args,spath,1)){
+		this.ShowError(UI._('the code failed to run'));
+		IO.DeleteFile(fn_script);
+		return 0;
+	}
+	return 1;
+}
+
+UI.RegisterHelpCommand('Run:',fhelp_run,1);
+
+UI.RegisterHelpCommand('Run in ([^:]+):',fhelp_run,1);
+
+UI.RegisterHelpCommand('Insert code',function(op_active){
+	var doc=op_active.obj_code.doc;
+	if(!doc){return 0;}
+	//copy-paste, it's useful to leave the stuff in clipboard
+	doc.SetSelection(0,doc.ed.GetTextSize())
+	doc.Copy()
+	if(this.editor_widget){
+		this.editor_widget.doc.SmartPaste();
+		return 1;
+	}else{
+		this.ShowError(UI._("code copied to clipboard"));
+		return 0;
+	}
+},1);
+
+UI.RegisterHelpCommand('Make sure ',function(){return 1;},0);
+
+var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
+UI.RegisterHelpCommand('Open `([^`]+)`',function(op_active){
+	var file_name=op_active.match[0];
+	if(file_name.search(g_regexp_abspath)<0){
+		var spath=UI.GetCurrentProjectPath();
+		file_name=spath+'/'+file_name;
+	}
+	if(IO.FileExists(file_name)){
+		UI.OpenEditorWindow(file_name);
+		return 1;
+	}else{
+		this.ShowError(UI._("the file doesn't exist"));
+		return 0;
+	}
+},0);
+
+UI.RegisterHelpCommand('Find (regex) `([^`]+)`',function(op_active){
+	var isregex=op_active.match[0];
+	var sneedle=op_active.match[1];
+	if(!this.editor_widget||!this.editor_widget.doc){
+		this.ShowError(UI._("you need a window open for find to work"));
+		return 0;
+	}
+	var doc=this.editor_widget.doc;
+	this.editor_widget.FindNext(1,sneedle,isregex?UI.SEARCH_FLAG_REGEXP:0);
+	return 1;
+},0);
 
 UI.RegisterUtilType("help_page",function(){return UI.NewTab({
 	title:"Help",

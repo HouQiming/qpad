@@ -3995,6 +3995,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto has_dangling_op=0
 		auto w_image_max=JS["UI"]["default_styles"]["help_page"]["w_max_img_width_percentage"].as(float)*w_linef
 		auto w_code_box=JS["UI"]["default_styles"]["help_page"]["w_code_box_percentage"].as(float)*w_linef
+		auto fparseop=JS["UI"]["ParseHelpCommand"].as(JSObject)
+		JS["UI"]["PrecomputeHelpCommands"].Call(int)
 		if !sblock.n||sblock.back()!='\n':
 			sblock=new(sblock)
 			sblock.push('\n')
@@ -4206,50 +4208,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				if !sret.n||sret.back()=='\n':
 					//detect action descriptions - ops
 					//use bgcolor to highlight this line later
-					if sline.StartsWith('Run:'):
+					obj_op=fparseop.Call(JSObject,sline)
+					if obj_op:
 						if has_dangling_op:ops_length--
-						obj_op=JS.New()
 						ops[ops_length]=obj_op;ops_length++
 						obj_op["ccnt"]=sret.n
-						obj_op["action"]="run"
-						obj_op["machine"]="localhost"
-						has_dangling_op=1
-					else if sline.StartsWith('Run in editor'):
-						if has_dangling_op:ops_length--
-						obj_op=JS.New()
-						ops[ops_length]=obj_op;ops_length++
-						obj_op["ccnt"]=sret.n
-						obj_op["action"]="run"
-						obj_op["machine"]="<editor>"
-						has_dangling_op=1
-					else if sline.StartsWith('Run on '):
-						pend=sline.IndexOf(':')
-						if pend<0:
-							pend=sline.IndexOf('\n')
-						if has_dangling_op:ops_length--
-						obj_op=JS.New()
-						ops[ops_length]=obj_op;ops_length++
-						obj_op["ccnt"]=sret.n
-						obj_op["action"]="run"
-						obj_op["machine"]=sline[7:pend-1]
-						has_dangling_op=1
-					else if sline.StartsWith('Insert code'):
-						//a location tracking system won't work anyway
-						//just follow the cursor
-						if has_dangling_op:ops_length--
-						obj_op=JS.New()
-						ops[ops_length]=obj_op;ops_length++
-						obj_op["ccnt"]=sret.n
-						obj_op["action"]="code"
-						has_dangling_op=1
-					else if sline.StartsWith('Make sure '):
-						//it's a manual check
-						if has_dangling_op:ops_length--
-						obj_op=JS.New()
-						ops[ops_length]=obj_op;ops_length++
-						obj_op["ccnt"]=sret.n
-						obj_op["action"]="check"
-						has_dangling_op=0
+						has_dangling_op=obj_op["need_code"].as(int)
 				FormatNormalText(sline[:sline.n-2],STYLE_ID_NORMAL)
 		obj_ret=JS.New()
 		obj_ret["m_text"]=sret
