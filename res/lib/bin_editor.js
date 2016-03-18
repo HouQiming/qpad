@@ -735,9 +735,9 @@ W.BinaryEditor=function(id,attrs){
 			var y_linenumber0;
 			var hc_linenumber=UI.GetCharacterHeight(obj.m_line_number_font);
 			if(lg<=8){
-				y_linenumber0=y_main_area+(hc-hc_linenumber)*0.5
+				y_linenumber0=(hc-hc_linenumber)*0.5
 			}else{
-				y_linenumber0=y_main_area+(hc*0.5)
+				y_linenumber0=(hc*0.5)
 			}
 			var rg=UI.BIN_GetRangeAt(obj,Math.min(obj.m_sel0,obj.m_sel1));
 			//line numbers
@@ -763,6 +763,7 @@ W.BinaryEditor=function(id,attrs){
 			}
 			UI.RoundRect({x:obj.x,y:y_main_area,w:obj.m_w_addr-4,h:h_main_area,color:obj.line_number_bgcolor})
 			UI.RoundRect({x:obj.x,y:y_main_area,w:(x_minimap+obj.minimap_padding*0.5-obj.x)/main_area_scale_factor,h:obj.m_h_addr,color:obj.line_number_bgcolor})
+			y_linenumber0+=y_main_area;
 			var daddr=obj.m_sel1-obj.m_scroll;
 			var daddr_y=(daddr/obj.m_w_bytes)|0;
 			var daddr_x=daddr-daddr_y*obj.m_w_bytes;

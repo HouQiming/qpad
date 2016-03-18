@@ -9,6 +9,7 @@ var KEY_DECL_FUNCTION=TOK_TYPE*0
 var CALL_GC_DOC_SIZE_THRESHOLD=4194304;
 var GRACEFUL_WORD_SIZE=256;
 var MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT=256;
+var MAX_ALLOWED_INDENTATION=20;//has to match the similarly-named const in code-editor.jc
 
 UI.m_code_editor_persistent_members_doc=[
 	"m_language_id",
@@ -520,7 +521,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var ed=this.ed;
 		var id_indent=ed.m_handler_registration["seeker_indentation"]
 		var my_level=this.GetIndentLevel(ccnt);
-		return ed.FindNearest(id_indent,[my_level-1],"l",ccnt,-1);
+		return ed.FindNearest(id_indent,[Math.min(my_level,MAX_ALLOWED_INDENTATION)-1],"l",ccnt,-1);
 	},
 	///////////////////////////////
 	BracketSizeAt:function(ccnt,side){
@@ -958,7 +959,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}else{
 			var id_indent=this.ed.m_handler_registration["seeker_indentation"]
 			var my_level=this.GetIndentLevel(this.ed.MoveToBoundary(ccnt,1,"space"));
-			var ccnt_new=this.ed.FindNearest(id_indent,[my_level],"l",ccnt_l1,1);
+			var ccnt_new=this.ed.FindNearest(id_indent,[Math.min(my_level,MAX_ALLOWED_INDENTATION)],"l",ccnt_l1,1);
 			if(ccnt_new>ccnt_l1){
 				ccnt_new=this.SeekLC(this.GetLC(ccnt_new)[0],0)-1
 				if(ccnt_new>ccnt_l1){
@@ -4485,7 +4486,6 @@ UI.FindUtilTab=function(util_type,do_settab){
 UI.OpenUtilTab=function(util_type,is_quiet){
 	var layout=UI.m_ui_metadata["<layout>"];
 	layout.m_is_maximized=0;
-	UI.Refresh();
 	var ret=UI.FindUtilTab(util_type,is_quiet?0:1);
 	if(ret){
 		return ret;
@@ -4503,6 +4503,7 @@ UI.OpenUtilTab=function(util_type,is_quiet){
 				UI.top.app.document_area.SetTab(tab0.__global_tab_id)
 			}
 		}
+		UI.Refresh();
 		return ret;
 	}else{
 		return undefined;
@@ -4720,7 +4721,7 @@ var finvoke_goto=function(mode){
 	//UI.m_ui_metadata["<find_state>"].m_current_needle=""
 	UI.Refresh()
 }
-var g_regexp_folding_templates=['[0-9]+','[.0-9efEF+-]+','[0-9A-Za-z$_]+','["][^"]*["]',"['][^'']*[']"].map(
+var g_regexp_folding_templates=['[ \t]+','[0-9]+','[.0-9efEF+-]+','[0-9A-Za-z$_]+','["][^"]*["]',"['][^'']*[']"].map(
 	function(a){
 		return {regexp:new RegExp("^"+a+"$"),starget:"("+a+")"};
 	}
