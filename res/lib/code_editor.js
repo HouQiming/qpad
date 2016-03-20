@@ -998,7 +998,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					this.owner.ReleaseEditLock();
 				}
 				if(rctx.m_current_replace_job){
+					this.sel1.side=1;
 					var n_replaced=UI.ED_ApplyReplaceOps(this.ed,rctx.m_current_replace_job)
+					this.sel1.side=-1;
 					if(n_replaced){
 						this.CallOnChange();
 					}

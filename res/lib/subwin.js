@@ -34,9 +34,10 @@ W.TabLabel_prototype={
 			this.tabid=undefined;
 		}
 		UI.ReleaseMouse(this);
+		UI.Refresh()
 	},
 	OnClick:function(event){
-		if(event.clicks==2&&this.tabid!=undefined){
+		if(event.clicks>=2&&this.tabid!=undefined){
 			this.owner.ArrangeTabs(this.tabid)
 		}
 	},
@@ -568,7 +569,7 @@ W.TabbedDocument_prototype={
 		}
 	},
 	CancelTabDragging:function(){
-		if(this.m_dragging_caption_areas==undefined){
+		if(this.m_dragging_caption_areas!=undefined){
 			this.m_dragging_caption_areas=undefined
 			if(UI.nd_captured){UI.ReleaseMouse(UI.nd_captured)}
 		}
@@ -1536,11 +1537,12 @@ W.TopMenuBar=function(id,attrs){
 		UI.PushCliprect(obj.x,obj.y+2,obj.w,obj.h-4)
 		W.ListView('list_view',{x:obj.x,y:obj.y+2,w:obj.w,h:obj.h-4,
 			dimension:'x',layout_spacing:8,is_single_click_mode:1,
-			item_template:{object_type:W.TopMenuItem,owner:obj,OnDblClick:ftoggle_sub_menus},
+			item_template:{object_type:W.TopMenuItem,owner:obj,OnDblClick:fshow_sub_menus},
 			items:desc.$,
 			OnChange:function(value){
 				this.value=value;
 				this.item_template.owner.owner.SetMenuState(1);
+				//fshow_sub_menus()
 				UI.Refresh();
 			}
 		})

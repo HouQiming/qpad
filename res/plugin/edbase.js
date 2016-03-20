@@ -3076,6 +3076,16 @@ UI.RegisterEditorPlugin(function(){
 			fsmart_replace.bind(this,"\r?\n",function(smatch){
 				return "\n";
 			})})
+		menu_convert.AddSeparator();
+		menu_convert.AddNormalItem({text:"Escape C string",action:
+			fsmart_replace.bind(this,"[\\x00-\\xff]*",function(smatch){
+				var sret=JSON.stringify(smatch);
+				return sret.substr(1,sret.length-2);
+			})})
+		menu_convert.AddNormalItem({text:"Escape URL query string",action:
+			fsmart_replace.bind(this,"[\\x00-\\xff]*",function(smatch){
+				return encodeURIComponent(smatch);
+			})})
 		menu_convert=undefined;
 	})
 })

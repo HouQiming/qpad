@@ -258,10 +258,18 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		var sregfile=[
 			"\ufeffWindows Registry Editor Version 5.00\n",
 			"\n[-HKEY_CLASSES_ROOT\\*\\shell\\edit_with_qpad]\n",
+			"\n[-HKEY_CLASSES_ROOT\\qpad3_file]\n",
 			"\n[-HKEY_CLASSES_ROOT\\Applications\\@1]\n".replace("@1",sshortname),
 			"\n[-HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@1]\n".replace("@1",sshortname),
 		];
 		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Uninstall QPad"));
+	}
+	UI.SetFileAssoc=function(sext){
+		var sregfile=["\ufeffWindows Registry Editor Version 5.00\n"];
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\."+sext,["","qpad3_file"])
+		var sexe=IO.m_my_name.replace(/[/]/g,"\\");
+		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\qpad3_file\\shell\\open\\command",["","\""+sexe+"\" \"%1\""])
+		return UI.WIN_ApplyRegistryFile(sregfile,UI.Format("Set .@1 association",sext));
 	}
 }
 if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
@@ -509,7 +517,18 @@ var CreateMenus=function(){
 		}.bind(undefined,obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc)
 	});
 	if(obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc){
+		////////////
 		obj_active_tab.main_widget.doc.CallHooks("global_menu")
+		////////////
+		if(UI.SetFileAssoc){
+			var sext=UI.GetFileNameExtension(obj_active_tab.main_widget.file_name);
+			menu_file.AddSeparator();
+			menu_file.AddNormalItem({
+				icon:"盾",
+				text:UI.Format("Use QPad to open *.@1",sext),
+				action:UI.SetFileAssoc.bind(undefined,sext),
+			})
+		}
 	}
 	obj_active_tab=undefined;
 	menu_file.AddSeparator();
