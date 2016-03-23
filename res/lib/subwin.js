@@ -574,6 +574,30 @@ W.TabbedDocument_prototype={
 			if(UI.nd_captured){UI.ReleaseMouse(UI.nd_captured)}
 		}
 	},
+	MoveToFront:function(tabid_tar,tabid){
+		if(!(tabid>tabid_tar+1)){return;}
+		var bk_ui_item=[];
+		for(var i=0;i<this.items.length;i++){
+			var item_i=this.items[i];
+			item_i.m_id_original=i;
+			bk_ui_item[i]=this[i];
+		}
+		var tab_in_question=this.items[tabid];
+		for(var i=tabid;i>tabid_tar+1;i--){
+			this.items[i]=this.items[i-1];
+		}
+		this.items[tabid_tar+1]=tab_in_question;
+		//reshuffle UI items
+		for(var i=0;i<this.items.length;i++){
+			var item_i=this.items[i];
+			this[i]=bk_ui_item[item_i.m_id_original];
+			item_i.m_id_original=undefined;
+			item_i.__global_tab_id=i;
+		}
+		this.just_created_a_tab=1;
+		this.current_tab_id=tabid_tar+1;
+		UI.Refresh()
+	},
 	ArrangeTabs:function(tabid){
 		if(tabid==undefined){tabid=this.current_tab_id;}
 		if(!(tabid>=0&&tabid<this.items.length)){return;}

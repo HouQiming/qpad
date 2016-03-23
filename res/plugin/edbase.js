@@ -2666,6 +2666,7 @@ UI.RegisterEditorPlugin(function(){
 		var locs=this.m_autoedit_locators
 		var ed=this.ed
 		var line_id=this.m_autoedit_example_line_id
+		if(locs[line_id+1].ccnt-locs[line_id].ccnt>4096){return 1;}
 		if(!UI.ED_AutoEdit_SetExample(ctx,line_id>>1,ed.GetText(locs[line_id].ccnt,locs[line_id+1].ccnt-locs[line_id].ccnt))){
 			return 1;
 		}

@@ -3624,6 +3624,7 @@ UI.FormatRelativeTime=function(then,now){
 
 var OpenInPlace=function(obj,name){
 	var fn=IO.NormalizeFileName(name)
+	/*
 	var editor_widget=obj.editor_widget
 	var my_tabid=undefined
 	if(editor_widget&&!editor_widget.m_is_special_document){editor_widget=undefined;}
@@ -3635,12 +3636,13 @@ var OpenInPlace=function(obj,name){
 			}
 		}
 	}
+	*/
 	//alt+q searched switch should count BIG toward the switching history
 	if(UI.m_previous_document){
 		var counts=UI.m_ui_metadata[UI.m_previous_document]
 		if(counts){counts=counts.m_tabswitch_count;}
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
-			if(i==my_tabid){continue;}
+			//if(i==my_tabid){continue;}
 			if(!UI.g_all_document_windows[i].main_widget){continue;}
 			var counts_i=UI.g_all_document_windows[i].main_widget.m_tabswitch_count
 			if(counts_i){
@@ -3653,7 +3655,8 @@ var OpenInPlace=function(obj,name){
 		}
 	}
 	//search for existing windows
-	for(var i=0;i<UI.g_all_document_windows.length;i++){
+	//my_tabid refers to the preview tab
+	/*for(var i=0;i<UI.g_all_document_windows.length;i++){
 		if(i!=my_tabid&&UI.g_all_document_windows[i].file_name==fn){
 			UI.top.app.document_area.SetTab(i)
 			if(my_tabid!=undefined){UI.top.app.document_area.CloseTab(my_tabid);}
@@ -3676,8 +3679,20 @@ var OpenInPlace=function(obj,name){
 		UI.top.app.document_area.SetTab(my_tabid)
 	}else{
 		UI.OpenEditorWindow(fn)
-	}
+	}*/
 	//UI.ClearFileListingCache();
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		if(UI.g_all_document_windows[i].file_name==fn){
+			if(UI.TestOption("explicit_open_mtf")){
+				var tab_frontmost=UI.GetFrontMostEditorTab();
+				if(tab_frontmost&&i>tab_frontmost.__global_tab_id+1){
+					UI.top.app.document_area.MoveToFront(tab_frontmost.__global_tab_id,i);
+					return;
+				}
+			}
+		}
+	}
+	UI.OpenEditorWindow(fn);
 	UI.Refresh()
 }
 
@@ -5512,9 +5527,10 @@ W.CodeEditor=function(id,attrs){
 				////////////////
 				//the top hint, do it after since its Render screws the spell checks
 				if(top_hint_bbs.length){
+					var w_top_hint=(w_right_shadow==undefined?w_obj_area-w_scrolling_area:w_right_shadow);
 					var y_top_hint=y_top_hint_scroll;
 					UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:h_top_hint})
-					UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_obj_area-w_line_numbers,h:h_top_hint})
+					UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_top_hint-w_line_numbers,h:h_top_hint})
 					var renderer=doc.GetRenderer();
 					renderer.m_enable_hidden=0
 					for(var bbi=0;bbi<top_hint_bbs.length;bbi+=2){
@@ -5525,7 +5541,7 @@ W.CodeEditor=function(id,attrs){
 							//print('draw',y0,(obj.y+y_top_hint)*UI.pixels_per_unit,doc.ed.SeekXY(0,y0))
 							var renderer=doc.GetRenderer();
 							renderer.m_temporarily_disable_spell_check=1
-							doc.RenderWithLineNumbers(0,y0,obj.x,obj.y+y_top_hint,w_obj_area-w_scrolling_area,hh,0,1)
+							doc.RenderWithLineNumbers(0,y0,obj.x,obj.y+y_top_hint,w_top_hint,hh,0,1)
 							renderer.m_temporarily_disable_spell_check=0
 							//also draw the line numbers
 						}
@@ -5534,7 +5550,8 @@ W.CodeEditor=function(id,attrs){
 					renderer.m_enable_hidden=1
 				}
 				if(top_hint_bbs.length||doc.visible_scroll_y>0){
-					UI.PushCliprect(obj.x,obj.y+h_top_hint,w_obj_area-w_scrolling_area,h_obj_area-h_top_hint)
+					var w_top_hint=(w_right_shadow==undefined||!top_hint_bbs.length?w_obj_area-w_scrolling_area:w_right_shadow);
+					UI.PushCliprect(obj.x,obj.y+h_top_hint,w_top_hint,h_obj_area-h_top_hint)
 					var top_hint_shadow_size=obj.top_hint_shadow_size;
 					var hc=UI.GetCharacterHeight(doc.font);
 					if(!top_hint_bbs.length){
@@ -5542,13 +5559,13 @@ W.CodeEditor=function(id,attrs){
 					}
 					//a (shadowed) separation bar
 					UI.RoundRect({
-						x:obj.x-top_hint_shadow_size, y:obj.y+h_top_hint-top_hint_shadow_size, w:w_obj_area-w_scrolling_area+2*top_hint_shadow_size, h:top_hint_shadow_size*2,
+						x:obj.x-top_hint_shadow_size, y:obj.y+h_top_hint-top_hint_shadow_size, w:w_top_hint+2*top_hint_shadow_size, h:top_hint_shadow_size*2,
 						round:top_hint_shadow_size,
 						border_width:-top_hint_shadow_size,
 						color:obj.top_hint_shadow_color})
 					if(top_hint_bbs.length){
 						UI.RoundRect({
-							x:obj.x, y:obj.y+h_top_hint, w:w_obj_area-w_scrolling_area, h:obj.top_hint_border_width,
+							x:obj.x, y:obj.y+h_top_hint, w:w_top_hint, h:obj.top_hint_border_width,
 							color:obj.top_hint_border_color})
 					}
 					UI.PopCliprect()
@@ -6986,6 +7003,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
 				{name:UI._('Make @1 stop at both sides').replace("@1",UI.Platform.ARCH=="mac"?"\u2325\u2190/\u2325\u2192":"CTRL+\u2190/\u2192"),stable_name:'precise_ctrl_lr_stop'},
 				{name:UI._('Allow \u2190/\u2192 to cross lines'),stable_name:'left_right_line_wrap'},
+				{name:UI._('Move forward opened old tabs'),stable_name:'explicit_open_mtf'},
 			];
 			if(UI.InstallQPad){
 				plugin_items["Tools"]=[
