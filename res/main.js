@@ -398,7 +398,7 @@ var CreateMenus=function(){
 		if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
 			UI.m_the_document_area.CloseTab();
 		}
-		UI.OpenEditorWindow(fn);
+		UI.OpenFile(fn);
 		UI.Refresh()
 	}});
 	if(doc_area.active_tab&&doc_area.active_tab.Save){
@@ -748,6 +748,8 @@ if(UI.Platform.ARCH=="mac"){
 		        set the frontmost of proc to true
 		    end repeat
 		end tell
+
+		tell application "Finder" to select file "" of folder ""
 	*/
 	IO.IsFirstInstance=function(){
 		//todo
@@ -755,6 +757,9 @@ if(UI.Platform.ARCH=="mac"){
 	IO.SetForegroundProcess=function(pid){
 		//todo
 	};
+	UI.ShowInFolder=function(fn){
+		//todo
+	}
 }
 
 if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
@@ -767,9 +772,21 @@ if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 }
 
 UI.OpenFile=function(fn){
+	var fn=IO.NormalizeFileName(fn);
 	if(IO.DirExists(fn)){
 		UI.AddProjectDir(fn);
 	}else if(IO.FileExists(fn)){
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			if(UI.g_all_document_windows[i].file_name==fn){
+				if(UI.TestOption("explicit_open_mtf")){
+					var tab_frontmost=UI.GetFrontMostEditorTab();
+					if(tab_frontmost&&i>tab_frontmost.__global_tab_id+1){
+						UI.top.app.document_area.MoveToFront(tab_frontmost.__global_tab_id,i);
+						return;
+					}
+				}
+			}
+		}
 		UI.OpenEditorWindow(fn);
 	}
 };

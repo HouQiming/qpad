@@ -2457,7 +2457,11 @@ W.CodeEditorWidget_prototype={
 		this.SaveMetaData();
 		UI.SaveMetaData();
 		this.doc.CallHooks("save")
-		this.doc.ParseFile()
+		if(this.doc.plugin_language_desc!=UI.ED_GetFileLanguage(this.doc.m_file_name)){
+			this.Reload()
+		}else{
+			this.doc.ParseFile()
+		}
 	},
 	Save:function(){
 		var fn=this.file_name;
@@ -3648,18 +3652,7 @@ var OpenInPlace=function(obj,name){
 		UI.OpenEditorWindow(fn)
 	}*/
 	//UI.ClearFileListingCache();
-	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		if(UI.g_all_document_windows[i].file_name==fn){
-			if(UI.TestOption("explicit_open_mtf")){
-				var tab_frontmost=UI.GetFrontMostEditorTab();
-				if(tab_frontmost&&i>tab_frontmost.__global_tab_id+1){
-					UI.top.app.document_area.MoveToFront(tab_frontmost.__global_tab_id,i);
-					return;
-				}
-			}
-		}
-	}
-	UI.OpenEditorWindow(fn);
+	UI.OpenFile(fn);
 	UI.Refresh()
 }
 
@@ -6474,9 +6467,9 @@ UI.NewCodeEditorTab=function(fname0){
 				return
 			}
 			this.main_widget.Save();
-			var doc=this.main_widget.doc;
 			this.need_save=0
-			if((doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
+			var doc=this.main_widget.doc;
+			if(doc&&(doc.saved_point||0)<doc.ed.GetUndoQueueLength()){
 				this.need_save=1
 			}
 		},
@@ -6495,6 +6488,7 @@ UI.NewCodeEditorTab=function(fname0){
 					UI.g_editor_from_file[fn]=doc;
 				}
 				doc.m_file_name=fn;
+				doc.m_language_id=Language.GetNameByExt(UI.GetFileNameExtension(fn));
 			}
 			this.file_name=fn
 			this.main_widget.file_name=fn
@@ -6774,7 +6768,7 @@ UI.RegisterEditorPlugin(function(){
 			//try to reload
 			if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
 				//make a notification
-				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file and reload for the language change to take effect"})
+				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file for the language change to take effect"})
 				this.saved_point=-1;
 			}else{
 				//what is reload? nuke it
@@ -7098,7 +7092,6 @@ UI.OpenCodeEditorDocument=function(fn,is_preview){
 		}
 	}
 	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
-	var language_id=UI.ED_GetFileLanguage(fn);
 	var style=UI.default_styles.code_editor.editor_style;
 	if(style.__proto__!=W.CodeEditor_prototype){
 		style.__proto__=W.CodeEditor_prototype;

@@ -461,16 +461,15 @@ var fhelp_run=function(op_active){
 		}
 		return 1;
 	}
-	if(machine=="notebook"){
-		//todo
-	}
+	//if(machine=="notebook"){
+	//}
 	var lname=Language.GetNameByExt(op_active.obj_code.m_language.toLowerCase());
 	var ldesc=Language.GetDescObjectByName(lname);
 	if(!ldesc.m_buildenv_by_name){return;}
 	var obj_buildenv=ldesc.m_buildenv_by_name[UI.GetDefaultBuildEnv(lname)];
 	if(!obj_buildenv||!obj_buildenv.CreateInterpreterCall){return;}
 	var sext=(ldesc&&ldesc.extensions&&ldesc.extensions[0]||op_active.obj_code.m_language);
-	//todo: machine
+	//coulddo: machine
 	var fn_script=IO.GetNewDocumentName("qnb",sext,"temp")
 	var s_code=doc.ed.GetText();
 	IO.CreateFile(fn_script,s_code)

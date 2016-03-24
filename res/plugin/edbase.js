@@ -962,7 +962,7 @@ UI.RegisterEditorPlugin(function(){
 				}
 			}.bind(this)})
 		}else{*/
-		menu_run.AddNormalItem({text:"Build / &run",enable_hotkey:1,key:"CTRL+F5",action:function(){
+		menu_run.AddNormalItem({text:"Build / &run file",icon:"放",enable_hotkey:1,key:"CTRL+F5",action:function(){
 			if(this.NeedSave()&&this.owner){this.owner.Save();}
 			if(this.NeedSave()){
 				return;
@@ -978,7 +978,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 			fruncell(1)
 		}.bind(this)})
-		menu_run.AddNormalItem({text:"&Stop all cells",enable_hotkey:0,action:function(){
+		menu_run.AddNormalItem({text:"&Stop all cells",icon:"停",enable_hotkey:0,action:function(){
 			for(var i=0;i<UI.g_all_document_windows.length;i++){
 				var obj_tab_i=UI.g_all_document_windows[i];
 				if(obj_tab_i.document_type=="notebook"){
