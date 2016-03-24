@@ -271,6 +271,9 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\qpad3_file\\shell\\open\\command",["","\""+sexe+"\" \"%1\""])
 		return UI.WIN_ApplyRegistryFile(sregfile,UI.Format("Set .@1 association",sext));
 	}
+	UI.ShowInFolder=function(fn){
+		IO.Shell(["explorer","/select,",IO.NormalizeFileName(fn,1).replace(/[/]/g,'\\')])
+	}
 }
 if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 	UI.InstallQPad=function(){
@@ -343,6 +346,36 @@ var SetHelpText=function(doc_code){
 	}
 };
 
+var OpenShell=function(){
+	UI.UpdateNewDocumentSearchPath()
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		if(IO.FileExists(IO.GetStoragePath()+"/plugins/shell.bat")){
+			IO.Shell(["start"," ","cmd","/c",IO.GetStoragePath()+"/plugins/shell.bat",UI.m_new_document_search_path])
+		}else{
+			IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
+		}
+	}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+		var s_terminal="xterm";
+		if(IO.FileExists("/usr/bin/x-terminal-emulator")){
+			s_terminal="x-terminal-emulator";
+		}
+		var fn_sh=IO.GetNewDocumentName("a","sh","temp")
+		IO.CreateFile(fn_sh,'#!/bin/sh\ncd '+UI.m_new_document_search_path+'\nrm -- "$0"\nexec "$SHELL"\n')
+		IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh,"&"])
+	}else{
+		//mac
+		//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
+		IO.Shell(["osascript",
+			"-e",'tell application "Terminal" to activate'])
+		IO.Shell(["osascript",
+			"-e",'tell application "System Events" to delay 0.1'])
+		IO.Shell(["osascript",
+			"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
+		IO.Shell(["osascript",
+			"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
+	}
+};
+
 UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
 var CreateMenus=function(){
@@ -382,14 +415,36 @@ var CreateMenus=function(){
 		UI.top.app.document_area.SaveAll();
 	}});
 	if(UI.top.app.document_area.active_tab){
-		menu_file.AddNormalItem({text:"&Close",key:"CTRL+W",enable_hotkey:0,action:function(){
-			UI.top.app.document_area.CloseTab();
-		}});
+		menu_file.AddNormalItem({
+			text:"&Close",key:"CTRL+W",enable_hotkey:0,
+			tab_menu_group:"close",
+			action:function(){
+				UI.top.app.document_area.CloseTab();
+			}
+		});
+		if(UI.top.app.document_area.items.length>1){
+			menu_file.AddNormalItem({
+				text:"Close all",
+				tab_menu_group:"close",
+				action:function(){
+					UI.top.app.document_area.CloseAll(0)
+				}
+			});
+			menu_file.AddNormalItem({
+				text:"Close all but this",
+				tab_menu_group:"close",
+				action:function(){
+					UI.top.app.document_area.CloseAll(1)
+				}
+			});
+		}
+	}
+	var obj_active_tab=UI.GetFrontMostEditorTab();
+	if(obj_active_tab&&obj_active_tab.Reload){
 		menu_file.AddSeparator();
-		menu_file.AddNormalItem({text:"Revert changes",action:function(){
-			var obj_tab=UI.top.app.document_area.active_tab;
-			if(obj_tab&&obj_tab.Reload){obj_tab.Reload();};
-		}});
+		menu_file.AddNormalItem({text:"Revert changes",action:function(obj_active_tab){
+			obj_active_tab.Reload();
+		}.bind(undefined,obj_active_tab)});
 	}
 	menu_file.AddSeparator();
 	menu_file.AddNormalItem({icon:"时",text:"Recent / projec&t...",
@@ -399,8 +454,6 @@ var CreateMenus=function(){
 	//menu_file.AddNormalItem({text:"&Browse...",
 	//	key:UI.m_ui_metadata.new_page_mode=='fs_view'?"ALT+Q":"ALT+Q,Q",
 	//	enable_hotkey:0,action:UI.OpenUtilTab.bind(undefined,'fs_view')})
-	menu_file.AddNormalItem({text:"Arran&ge tabs",
-		enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
 	//menu_file.AddNormalItem({text:"Manage projects...",
 	//	enable_hotkey:0,action:function(){
 	//		UI.OpenEditorWindow("*project_list")
@@ -424,113 +477,15 @@ var CreateMenus=function(){
 			}
 		}})
 	}
-	menu_file.AddSeparator();
-	W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
-	W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
-	W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
-	menu_file.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
-		{text:"-",tooltip:'CTRL -',action:function(){
-			UI.ZoomRelative(1/ZOOM_RATE)
-		}},{text:"100%",tooltip:'CTRL+0',action:function(){
-			UI.ZoomReset()
-		}},{text:"+",tooltip:'CTRL +',action:function(){
-			UI.ZoomRelative(ZOOM_RATE)
-		}}])
+	//menu_file.AddSeparator();
 	if(!UI.Platform.IS_MOBILE){
 		//OS shell
 		menu_file.AddSeparator();
-		menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:function(){
-			UI.UpdateNewDocumentSearchPath()
-			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-				if(IO.FileExists(IO.GetStoragePath()+"/plugins/shell.bat")){
-					IO.Shell(["start"," ","cmd","/c",IO.GetStoragePath()+"/plugins/shell.bat",UI.m_new_document_search_path])
-				}else{
-					IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
-				}
-			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
-				var s_terminal="xterm";
-				if(IO.FileExists("/usr/bin/x-terminal-emulator")){
-					s_terminal="x-terminal-emulator";
-				}
-				var fn_sh=IO.GetNewDocumentName("a","sh","temp")
-				IO.CreateFile(fn_sh,'#!/bin/sh\ncd '+UI.m_new_document_search_path+'\nrm -- "$0"\nexec "$SHELL"\n')
-				IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh,"&"])
-			}else{
-				//mac
-				//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
-				IO.Shell(["osascript",
-					"-e",'tell application "Terminal" to activate'])
-				IO.Shell(["osascript",
-					"-e",'tell application "System Events" to delay 0.1'])
-				IO.Shell(["osascript",
-					"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
-				IO.Shell(["osascript",
-					"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
-			}
-		}})
+		menu_file.AddNormalItem({text:"Open shell (&D)...",icon:'控',enable_hotkey:0,action:OpenShell})
 	}
-	var obj_active_tab=UI.GetFrontMostEditorTab();
-	if(obj_active_tab&&obj_active_tab.file_name){
-		var spath_repo=UI.GetEditorProject(obj_active_tab.file_name,"polite");
-		if(spath_repo){
-			var obj_real_active_tab=UI.top.app.document_area.active_tab;
-			var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");
-			if(obj_real_active_tab&&obj_real_active_tab.document_type=='notebook'&&obj_real_active_tab.file_name==fn_notebook){
-				menu_file.AddNormalItem({text:"Return to file",
-					enable_hotkey:1,key:"ALT+N",
-					action:UI.top.app.document_area.SetTab.bind(
-						UI.top.app.document_area,
-						obj_active_tab.__global_tab_id),
-				})
-			}else{
-				var doc=obj_active_tab.main_widget&&obj_active_tab.main_widget.doc;
-				if(doc){
-					menu_file.AddNormalItem({icon:"本",text:"Open notebook...",
-						enable_hotkey:1,key:"ALT+N",
-						action:(function(){
-							var result_cell=UI.OpenNotebookCellFromEditor(this,"# TODO LIST\n","Markdown",1,'input');
-							UI.OpenNoteBookTab(fn_notebook)
-							if(result_cell){
-								UI.SetFocus(result_cell.obj_notebook.m_cells[result_cell.cell_id].m_text_in);
-							}
-							UI.Refresh()
-						}).bind(doc)
-					})
-				}
-				doc=undefined;
-			}
-		}
-	}
-	menu_file.AddNormalItem({
-		text:"Open help...",
-		enable_hotkey:1,key:"F1",
-		action:function(doc_code){
-			var tab_help=UI.OpenUtilTab('help_page');
-			var doc_help_edit=(tab_help&&tab_help.util_widget&&tab_help.util_widget.find_bar_edit);
-			if(!doc_help_edit){
-				if(doc_code){
-					UI.InvalidateCurrentFrame()
-					UI.NextTick(SetHelpText.bind(undefined,doc_code));
-				}
-			}
-			SetHelpText(doc_code);
-		}.bind(undefined,obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc)
-	});
 	if(obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc){
-		////////////
 		obj_active_tab.main_widget.doc.CallHooks("global_menu")
-		////////////
-		if(UI.SetFileAssoc){
-			var sext=UI.GetFileNameExtension(obj_active_tab.main_widget.file_name);
-			menu_file.AddSeparator();
-			menu_file.AddNormalItem({
-				icon:"盾",
-				text:UI.Format("Use QPad to open *.@1",sext),
-				action:UI.SetFileAssoc.bind(undefined,sext),
-			})
-		}
 	}
-	obj_active_tab=undefined;
 	menu_file.AddSeparator();
 	menu_file.AddNormalItem({text:"E&xit",action:function(){
 		if(!UI.top.app.OnClose()){UI.DestroyWindow(UI.top.app)}
@@ -548,6 +503,97 @@ var CreateMenus=function(){
 		UI.NewOptionsTab();
 	}});
 	menu_edit=undefined;
+	//////////////////////////
+	var menu_tools=UI.BigMenu("&Tools")
+	var obj_real_active_tab=UI.top.app.document_area.active_tab;
+	if(obj_real_active_tab&&obj_real_active_tab.file_name){
+		menu_tools.AddNormalItem({text:"Copy path",tab_menu_group:'tools',enable_hotkey:0,
+			action:function(fn){UI.SDL_SetClipboardText(IO.NormalizeFileName(fn,1))}.bind(undefined,obj_real_active_tab.file_name)
+		})
+		menu_tools.AddNormalItem({text:"Open shell (&D)...",tab_menu_group:'tools',icon:'控',enable_hotkey:0,action:OpenShell})
+		if(UI.ShowInFolder){
+			menu_tools.AddNormalItem({text:"Show in folder...",tab_menu_group:'tools',icon:'开',enable_hotkey:0,
+				action:UI.ShowInFolder.bind(undefined,obj_real_active_tab.file_name)
+			})
+		}
+		menu_tools.AddSeparator()
+	}
+	if(obj_active_tab&&obj_active_tab.file_name){
+		var spath_repo=UI.GetEditorProject(obj_active_tab.file_name,"polite");
+		if(spath_repo){
+			var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");
+			if(obj_real_active_tab&&obj_real_active_tab.document_type=='notebook'&&obj_real_active_tab.file_name==fn_notebook){
+				menu_tools.AddNormalItem({text:"Return to file",
+					enable_hotkey:1,key:"ALT+N",
+					action:UI.top.app.document_area.SetTab.bind(
+						UI.top.app.document_area,
+						obj_active_tab.__global_tab_id),
+				})
+			}else{
+				var doc=obj_active_tab.main_widget&&obj_active_tab.main_widget.doc;
+				if(doc){
+					menu_tools.AddNormalItem({icon:"本",text:"&Notebook...",
+						enable_hotkey:1,key:"ALT+N",
+						action:(function(){
+							var result_cell=UI.OpenNotebookCellFromEditor(this,"# TODO LIST\n","Markdown",1,'input');
+							UI.OpenNoteBookTab(fn_notebook)
+							if(result_cell){
+								UI.SetFocus(result_cell.obj_notebook.m_cells[result_cell.cell_id].m_text_in);
+							}
+							UI.Refresh()
+						}).bind(doc)
+					})
+				}
+				doc=undefined;
+			}
+		}
+	}
+	menu_tools.AddNormalItem({
+		text:"&Help...",icon:"问",
+		enable_hotkey:1,key:"F1",
+		action:function(doc_code){
+			var tab_help=UI.OpenUtilTab('help_page');
+			var doc_help_edit=(tab_help&&tab_help.util_widget&&tab_help.util_widget.find_bar_edit);
+			if(!doc_help_edit){
+				if(doc_code){
+					UI.InvalidateCurrentFrame()
+					UI.NextTick(SetHelpText.bind(undefined,doc_code));
+				}
+			}
+			SetHelpText(doc_code);
+		}.bind(undefined,obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc)
+	});
+	if(obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc){
+		if(UI.SetFileAssoc){
+			var sext=UI.GetFileNameExtension(obj_active_tab.main_widget.file_name);
+			menu_tools.AddSeparator();
+			menu_tools.AddNormalItem({
+				icon:"盾",
+				text:UI.Format("Use QPad to open *.@1",sext),
+				tab_menu_group:"assoc",
+				action:UI.SetFileAssoc.bind(undefined,sext),
+			})
+		}
+	}
+	menu_tools.AddSeparator()
+	menu_tools.AddNormalItem({text:"Move related tabs to front",tab_menu_group:'mtf',
+		enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
+	menu_tools.AddSeparator()
+	W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
+	W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
+	W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
+	menu_tools.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
+		{text:"-",tooltip:'CTRL -',action:function(){
+			UI.ZoomRelative(1/ZOOM_RATE)
+		}},{text:"100%",tooltip:'CTRL+0',action:function(){
+			UI.ZoomReset()
+		}},{text:"+",tooltip:'CTRL +',action:function(){
+			UI.ZoomRelative(ZOOM_RATE)
+		}}])
+	menu_tools=undefined;
+	obj_active_tab=undefined;
+	obj_real_active_tab=undefined;
+	//////////////////////////
 	doc_area=undefined;
 }
 

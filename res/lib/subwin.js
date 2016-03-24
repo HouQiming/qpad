@@ -37,9 +37,29 @@ W.TabLabel_prototype={
 		UI.Refresh()
 	},
 	OnClick:function(event){
+		if(event.button==UI.SDL_BUTTON_RIGHT){
+			this.OnRightClick(event);
+			//return;
+			event.clicks=1;
+		}else{
+			this.owner.m_menu_context=undefined;
+			UI.Refresh();
+		}
 		if(event.clicks>=2&&this.tabid!=undefined){
 			this.owner.ArrangeTabs(this.tabid)
 		}
+	},
+	OnRightClick:function(event){
+		if(this.owner.m_menu_context){
+			this.owner.m_menu_context.x=event.x;
+			this.owner.m_menu_context.y=event.y;
+			UI.Refresh()
+			return
+		}
+		var menu_context=UI.CreateContextMenu("tab_menu_group");
+		if(!menu_context){return;}
+		this.owner.m_menu_context={x:event.x,y:event.y,menu:menu_context};
+		menu_context=undefined;
 	},
 }
 W.TabLabel=function(id,attrs){
@@ -195,6 +215,30 @@ W.TabbedDocument_prototype={
 		//	Duktape.gc();
 		//	UI.dumpMemoryUsage();
 		//}
+	},
+	CloseAll:function(but_this){
+		var tab=this.items[this.current_tab_id];
+		var type='file';
+		if(tab.util_type){
+			type='util';
+		}
+		for(;;){
+			var did=0;
+			for(var i=0;i<this.items.length;i++){
+				var tab_i=this.items[i];
+				if(but_this&&tab_i==tab){
+					continue;
+				}
+				if(tab_i.util_type&&type=='file'){continue;}
+				if(!tab_i.util_type&&type=='util'){continue;}
+				if(tab_i.in_save_dialog){continue;}
+				this.CloseTab(i);
+				did=1;
+				break;
+			}
+			if(!did){break;}
+		}
+		UI.Refresh();
 	},
 	//bring up a tab *without* focusing it
 	BringUpTab:function(tabid){
@@ -595,7 +639,7 @@ W.TabbedDocument_prototype={
 			item_i.__global_tab_id=i;
 		}
 		this.just_created_a_tab=1;
-		this.current_tab_id=tabid_tar+1;
+		this.SetTab(tabid_tar+1);
 		UI.Refresh()
 	},
 	ArrangeTabs:function(tabid){
@@ -959,7 +1003,6 @@ W.TabbedDocument=function(id,attrs){
 		}
 		var w_menu=w_menu_button;
 		//the big menu
-		var bk_menu=UI.m_global_menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
 		UI.BigMenu("&File");
 		if(obj.m_is_in_menu||!auto_hide_menu){
@@ -990,23 +1033,6 @@ W.TabbedDocument=function(id,attrs){
 		}else{
 			UI.m_frozen_global_menu=undefined
 			obj.m_menu_preselect=undefined
-			if(bk_menu){
-				for(var i=0;i<bk_menu.$.length;i++){
-					var s_text=bk_menu.$[i].text
-					if(s_text){
-						var p_and=s_text.indexOf('&')
-						if(p_and>=0){
-							W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:
-								(function(obj,i){
-									obj.m_menu_preselect=i;
-									obj.SetMenuState(1);
-									UI.InvalidateCurrentFrame()
-									UI.Refresh()
-								}).bind(null,obj,i)})
-						}
-					}
-				}
-			}
 		}
 		if(auto_hide_menu){
 			W.Button("main_menu_button",{
@@ -1254,6 +1280,21 @@ W.TabbedDocument=function(id,attrs){
 					owner:obj})
 			}
 		}
+		///////////////////////////
+		//tab menu context
+		if(obj.m_menu_context){
+			UI.TopMostWidget(function(){
+				var is_first=!obj.context_menu;
+				var obj_submenu=W.FancyMenu("tab_context_menu",{
+					x:obj.m_menu_context.x, y:obj.m_menu_context.y,
+					desc:obj.m_menu_context.menu,
+					HideMenu:function(){obj.m_menu_context=undefined;},
+				})
+				if(is_first){UI.SetFocus(obj_submenu);}
+			})
+		}else{
+			obj.tab_context_menu=undefined;
+		}
 	UI.End()
 	if(!obj.m_is_in_menu){
 		if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
@@ -1295,8 +1336,22 @@ W.TabbedDocument=function(id,attrs){
 				UI.Refresh()
 			}).bind(null,obj,i)})
 		}
+		for(var i=0;i<UI.m_global_menu.$.length;i++){
+			var s_text=UI.m_global_menu.$[i].text
+			if(s_text){
+				var p_and=s_text.indexOf('&')
+				if(p_and>=0){
+					W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:
+						(function(obj,i){
+							obj.m_menu_preselect=i;
+							obj.SetMenuState(1);
+							UI.InvalidateCurrentFrame()
+							UI.Refresh()
+						}).bind(null,obj,i)})
+				}
+			}
+		}
 	}
-	bk_menu=undefined;
 	UI.m_the_document_area=obj
 	return obj
 }
@@ -1406,26 +1461,33 @@ W.CFancyMenuDesc.prototype={
 			color:attrs.action?style.text_color:style.hotkey_color,
 			icon_color:attrs.icon=="■"||attrs.icon=="□"?style.icon_color:style.text_color,
 			context_menu_group:attrs.context_menu_group,
+			tab_menu_group:attrs.tab_menu_group,
 			sel_icon_color:style.text_sel_color,
 			sel_color:style.text_sel_color})
 		if(attrs.action){attrs.action=WrapMenuAction(attrs.action);}
 		var p_and=attrs.text.indexOf('&')
 		if(p_and>=0&&attrs.action){
 			//underlined hotkey
-			children.push({type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),context_menu_group:attrs.context_menu_group,action:attrs.action})
+			children.push({type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),
+				context_menu_group:attrs.context_menu_group,
+				tab_menu_group:attrs.tab_menu_group,
+				action:attrs.action})
 			if(UI.Platform.ARCH!="mac"){
-				children.push({type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),context_menu_group:attrs.context_menu_group,action:attrs.action})
+				children.push({type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),
+					context_menu_group:attrs.context_menu_group,
+					tab_menu_group:attrs.tab_menu_group,
+					action:attrs.action})
 			}
 		}
 		if(attrs.key){
 			children.push(
-				{type:'rubber',context_menu_group:attrs.context_menu_group},
-				{type:'text',context_menu_group:attrs.context_menu_group,
+				{type:'rubber',context_menu_group:attrs.context_menu_group,tab_menu_group:attrs.tab_menu_group},
+				{type:'text',context_menu_group:attrs.context_menu_group,tab_menu_group:attrs.tab_menu_group,
 					text:UI.LocalizeKeyName(UI.TranslateHotkey(attrs.key)),
 					color:style.hotkey_color,sel_color:style.hotkey_sel_color})
 			if(attrs.enable_hotkey&&attrs.action){W.Hotkey("",{key:attrs.key,action:attrs.action})}
 		}
-		children.push({type:'newline',context_menu_group:attrs.context_menu_group,action:attrs.action})
+		children.push({type:'newline',context_menu_group:attrs.context_menu_group,tab_menu_group:attrs.tab_menu_group,action:attrs.action})
 	},
 	AddButtonRow:function(attrs,buttons){
 		var style=UI.default_styles['fancy_menu']
@@ -1807,6 +1869,46 @@ W.FancyMenu=function(id,attrs){
 	}
 	UI.End()
 	return obj
+}
+
+UI.CreateContextMenu=function(group_name){
+	var menu=UI.m_global_menu;
+	if(!menu){return undefined;}
+	var context_menu_groups={};
+	var dfs=function(menu){
+		for(var i=0;i<menu.$.length;i++){
+			var item_i=menu.$[i];
+			if(item_i[group_name]){
+				var group=context_menu_groups[item_i[group_name]];
+				if(!group){
+					group=[];
+					context_menu_groups[item_i[group_name]]=group;
+				}
+				group.push(item_i);
+				continue;
+			}
+			if(item_i.type=='submenu'){
+				dfs(item_i.menu);
+			}
+		}
+	}
+	dfs(menu);
+	menu=undefined;
+	//////////////////////
+	var keys=[];
+	for(var s_key in context_menu_groups){
+		keys.push(s_key)
+	}
+	if(!keys.length){return undefined;}
+	keys.sort();
+	var menu_context=new W.CFancyMenuDesc();
+	for(var i=0;i<keys.length;i++){
+		if(i){
+			menu_context.AddSeparator()
+		}
+		menu_context.$=menu_context.$.concat(context_menu_groups[keys[i]])
+	}
+	return menu_context;
 }
 
 //coulddo: menu search support - we don't have enough commands to justify it

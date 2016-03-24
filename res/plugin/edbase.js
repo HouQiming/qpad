@@ -889,12 +889,14 @@ UI.RegisterEditorPlugin(function(){
 				var cell_i=obj_notebook.m_cells[result_cell.cell_id];
 				var doc_in=cell_i.m_text_in;
 				var size=doc_in.ed.GetTextSize();
-				doc_in.ed.Edit([0,size,s_mark+s_script]);
+				if(size==Duktape.__byte_length(s_mark)){
+					doc_in.ed.Edit([0,size,s_mark+s_script]);
+				}
 				UI.Refresh()
 			}
 		}; 
-		menu_run.AddNormalItem({text:"Make notebook cell",enable_hotkey:0,action:fgencell.bind(this,0)})
-		menu_run.AddNormalItem({text:"Make project cell",enable_hotkey:0,action:fgencell.bind(this,1)})
+		menu_run.AddNormalItem({text:"Create file cell",enable_hotkey:0,action:fgencell.bind(this,0)})
+		menu_run.AddNormalItem({text:"Create project cell",enable_hotkey:0,action:fgencell.bind(this,1)})
 		menu_run.AddSeparator()
 		/////////////////
 		var fruncell=function(is_project){
@@ -3053,11 +3055,11 @@ UI.RegisterEditorPlugin(function(){
 		var menu_convert=UI.BigMenu("Con&vert")
 		var tab_width=UI.GetOption("tab_width",4);
 		var s_tab_space=Array(tab_width+1).join(' ');
-		menu_convert.AddNormalItem({icon:" ",text:"Leading &tabs to spaces",action:
+		menu_convert.AddNormalItem({text:"Leading &tabs to spaces",action:
 			fsmart_replace.bind(this,"^[\t]+",function(smatch){
 				return Array(smatch.length+1).join(s_tab_space);
 			})})
-		menu_convert.AddNormalItem({icon:"\t",text:"Leading &spaces to tabs",action:
+		menu_convert.AddNormalItem({text:"Leading &spaces to tabs",action:
 			fsmart_replace.bind(this,"^("+s_tab_space+")+",function(smatch){
 				return Array(((smatch.length/tab_width)|0)+1).join('\t');
 			})})

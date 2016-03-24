@@ -1278,42 +1278,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	OnRightClick:function(event){
 		if(!this.m_is_main_editor){return;}
 		//generate the menu right here, using current-frame menu entries
-		var menu=UI.m_global_menu;
-		if(!menu){return;}
-		var context_menu_groups={};
-		var dfs=function(menu){
-			for(var i=0;i<menu.$.length;i++){
-				var item_i=menu.$[i];
-				if(item_i.context_menu_group){
-					var group=context_menu_groups[item_i.context_menu_group];
-					if(!group){
-						group=[];
-						context_menu_groups[item_i.context_menu_group]=group;
-					}
-					group.push(item_i);
-					continue;
-				}
-				if(item_i.type=='submenu'){
-					dfs(item_i.menu);
-				}
-			}
-		}
-		dfs(menu);
-		menu=undefined;
-		//////////////////////
-		var keys=[];
-		for(var s_key in context_menu_groups){
-			keys.push(s_key)
-		}
-		if(!keys.length){return;}
-		keys.sort();
-		var menu_context=new W.CFancyMenuDesc();
-		for(var i=0;i<keys.length;i++){
-			if(i){
-				menu_context.AddSeparator()
-			}
-			menu_context.$=menu_context.$.concat(context_menu_groups[keys[i]])
-		}
+		var menu_context=UI.CreateContextMenu("context_menu_group");
+		if(!menu_context){return;}
 		this.m_menu_context={x:event.x,y:event.y,menu:menu_context};
 		menu_context=undefined;
 		UI.Refresh()
@@ -2439,6 +2405,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 W.CodeEditorWidget_prototype={
 	m_tabswitch_count:{},
 	OnDestroy:function(){
+		this.DestroyFindingContext()
 		if(this.doc){
 			UI.CloseCodeEditorDocument(this.doc)
 			this.doc=undefined;
@@ -4187,6 +4154,9 @@ var g_root_items;
 })()
 //var FILE_RELEVANCE_SAME_REPO_NON_HIST=16
 W.FileBrowserPage=function(id,attrs){
+	if(UI.enable_timing){
+		UI.TimingEvent("entering FileBrowserPage");
+	}
 	var obj=UI.StdWidget(id,attrs,"sxs_new_page");
 	UI.Begin(obj)
 	UI.RoundRect(obj)
@@ -4473,6 +4443,9 @@ W.FileBrowserPage=function(id,attrs){
 		color:obj.find_bar_shadow_color})
 	UI.PopCliprect()
 	UI.End()
+	if(UI.enable_timing){
+		UI.TimingEvent("leaving FileBrowserPage");
+	}
 	return obj
 };
 
@@ -4745,9 +4718,8 @@ var g_regexp_folding_templates=['[ \t]+','[0-9]+','[.0-9efEF+-]+','[0-9A-Za-z$_]
 );
 
 W.CodeEditor=function(id,attrs){
-	var tick0
 	if(UI.enable_timing){
-		tick0=Duktape.__ui_get_tick()
+		UI.TimingEvent("enter CodeEditor "+attrs.file_name);
 	}
 	var obj=UI.StdWidget(id,attrs,"code_editor",W.CodeEditorWidget_prototype);
 	if(obj.m_is_special_document&&obj.doc&&UI.HasFocus(obj.doc)){
@@ -5299,10 +5271,16 @@ W.CodeEditor=function(id,attrs){
 						h_editor-=obj.w_scroll_bar;
 					}
 				}
+				if(UI.enable_timing){
+					UI.TimingEvent("starting to RenderWithLineNumbers");
+				}
 				doc.RenderWithLineNumbers(doc.scroll_x,doc.scroll_y,
 					obj.x,obj.y+h_top_find,
 					w_obj_area-w_scrolling_area,
 					h_editor,"doc",1);
+				if(UI.enable_timing){
+					UI.TimingEvent("RenderWithLineNumbers done");
+				}
 				if(was_bound_elsewhere){
 					doc.scroll_x=(doc.scroll_x||0);
 					doc.scroll_y=(doc.scroll_y||0);
@@ -6206,7 +6184,7 @@ W.CodeEditor=function(id,attrs){
 			}
 		}
 		if(UI.enable_timing){
-			print('before minimap=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
+			UI.TimingEvent("starting to draw minimap");
 		}
 		//minimap / scroll bar
 		if(doc&&w_scrolling_area>0&&!UI.m_frame_is_invalid){
@@ -6345,7 +6323,7 @@ W.CodeEditor=function(id,attrs){
 			f_draw_accands=undefined;
 		}
 		if(UI.enable_timing){
-			print('before notifications=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
+			UI.TimingEvent("starting to draw notifications");
 		}
 		if(obj.m_notifications&&!obj.show_find_bar){
 			//&&!UI.m_frame_is_invalid
@@ -6381,7 +6359,7 @@ W.CodeEditor=function(id,attrs){
 		}
 	UI.End()
 	if(UI.enable_timing){
-		print('CodeEditor time=',(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick())*1000).toFixed(2),'ms')
+		UI.TimingEvent("leaving CodeEditor");
 	}
 	//wiping
 	current_find_context=undefined;
@@ -6516,6 +6494,7 @@ UI.NewCodeEditorTab=function(fname0){
 					UI.g_editor_from_file[doc.m_file_name]=undefined;
 					UI.g_editor_from_file[fn]=doc;
 				}
+				doc.m_file_name=fn;
 			}
 			this.file_name=fn
 			this.main_widget.file_name=fn

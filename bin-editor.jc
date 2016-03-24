@@ -505,14 +505,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		/* Searching */
 		mode=(__basic_api.memcmp(__pointer(buf_needle.d), __pointer(buf_needle.d+per), ell + 1) == 0)
 		ctx=[ell,per,mode]
-		return JS.Return(ctx)
+		__force_leak(ctx)
+		return JS.Return(ctx.ConvertToAsBinary(u8))
 	}
 	JS_UI["BIN_SearchBuffer"]=function(JSContext JS){
 		buf_tar=JS.Param(0).as(u8[])
 		j=JS.Param(1).as(iptr)
 		dir=JS.Param(2).as(int)
 		buf_needle=JS.Param(3).as(u8[])
-		ctx=JS.Param(4).as(iptr[])
+		ctx=JS.Param(4).as(u8[]).ConvertToAsBinary(iptr)
 		budget=JS.Param(5).as(iptr)
 		ell=ctx[0]
 		per=ctx[1]
