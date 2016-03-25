@@ -476,15 +476,16 @@ class CStyleHolder
 	CStyle[] m_styles
 	//////////////////
 	int m_enable_ligatures
-	m_char_width_cache=new int[int]
+	//m_char_width_cache=new int[int]
 	m_kerning_cache=new int[int3]
 	charWidth=function(int style_id,int ch){
-		key=(style_id<<21)+ch
-		ret=m_char_width_cache[key]
-		if !ret:
-			ret=int(float2fixed(g_renderer.GetCharacterAdvance(m_styles[style_id].font,int(ch))))+1
-			m_char_width_cache[key]=ret
-		return ret-1
+		//key=(style_id<<21)+ch
+		//ret=m_char_width_cache[key]
+		//if !ret:
+		//	ret=int(float2fixed(g_renderer.GetCharacterAdvance(m_styles[style_id].font,int(ch))))+1
+		//	m_char_width_cache[key]=ret
+		//return ret-1
+		return int(float2fixed(g_renderer.GetCharacterAdvance(m_styles[style_id].font,int(ch))))
 	}
 	charHeight=function(int style_id){
 		return float2fixed(g_renderer.GetCharacterHeight(m_styles[style_id].font))
@@ -525,14 +526,11 @@ class CStyle
 	///////
 	string[] ligatures
 	auto FindLigatures()
-		pfnt=font.pfnt
-		while pfnt.fallbacks:
-			pfnt=pfnt.fallbacks[0]
+		pfnt=font.pfnt.fonts[0].hfnt
 		ligatures=new string[]
 		for i=0:2:g_utf8_ligatures.n-2
 			chlig=Utf8CodeAt(g_utf8_ligatures[i+1],0)
-			(pfnt_glyph,gid)=g_renderer.SearchGlyph(pfnt,chlig)
-			if pfnt_glyph:
+			if pfnt.GetGlyphId(chlig):
 				ligatures.push(g_utf8_ligatures[i])
 				ligatures.push(g_utf8_ligatures[i+1])
 

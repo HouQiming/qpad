@@ -220,8 +220,8 @@ class CLayouter_programmer
 	int m_cached_colors_p_word_part
 	int m_cached_color_virtual_hyphen
 	//////////////
-	int[] m_char_width_cache_ascii
-	int[int] m_char_width_cache
+	//int[] m_char_width_cache_ascii
+	//int[int] m_char_width_cache
 	int[int] m_char_kerning_cache
 	/////////////////
 	m_hidden_ranges=new CLocator[]
@@ -231,17 +231,18 @@ class CLayouter_programmer
 	CFileIndex m_file_index
 	/////////////////
 	charWidth=function(int ch){
-		if u32(ch)<u32(0x80):
-			ret=m_char_width_cache_ascii[ch]
-			if !ret:
-				ret=max(int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))),1)+1
-				m_char_width_cache_ascii[ch]=ret
-		else
-			ret=m_char_width_cache[ch]
-			if !ret:
-				ret=max(int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))),1)+1
-				m_char_width_cache[ch]=ret
-		return ret-1
+		//if u32(ch)<u32(0x80):
+		//	ret=m_char_width_cache_ascii[ch]
+		//	if !ret:
+		//		ret=max(int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))),1)+1
+		//		m_char_width_cache_ascii[ch]=ret
+		//else
+		//	ret=m_char_width_cache[ch]
+		//	if !ret:
+		//		ret=max(int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))),1)+1
+		//		m_char_width_cache[ch]=ret
+		//return ret-1
+		return max(int(float2fixed(g_renderer.GetCharacterAdvance(m_font,int(ch)))),1)
 	}
 	charKerning=function(int ch0,int ch1){
 		if u32(ch0)>=65536u||u32(ch1)>=65536u:return 0
@@ -466,8 +467,8 @@ class CLayouter_programmer
 		m_lang=obj["language"].as(CLanguageDescription)
 		m_font=obj["font"].as(TFont)
 		m_font_emboldened=obj["font_emboldened"].as(TFont)
-		m_char_width_cache_ascii=new int[128]
-		m_char_width_cache=new int[int]
+		//m_char_width_cache_ascii=new int[128]
+		//m_char_width_cache=new int[int]
 		m_char_kerning_cache=new int[int]
 		m_tab_width=obj["tab_width"].or(8)
 		m_wrap_width=obj["wrap_width"].or(0.f)

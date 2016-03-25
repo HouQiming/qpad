@@ -289,15 +289,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			y_top=y+hc*f32(daddr_y)+(hc-hcs[fntid])*0.5f
 			foreach chc,j in s_disp.ReverseOrder()
 				ch=int(u8(chc))
-				citem=g_renderer.GetFastDrawCharCacheItem(ch)
-				if !citem.gcitem:continue
-				x_right-=citem.gcitem.dx
+				//citem=g_renderer.GetFastDrawCharCacheItem(ch)
+				//if !citem.gcitem:continue
+				//x_right-=citem.gcitem.dx
+				w_char=g_renderer.GetCharacterAdvance(fonts[fntid],ch)
+				x_right-=w_char
 				if x_right<x-1.f:
 					daddr_x=w_bytes_i-1
 					x_right=x+w_digit*2.f*f32(daddr_x+1)+w_space1*f32(daddr_x)+w_space4*f32(daddr_x>>2)+w_space8*f32(daddr_x>>3)
 					y_top-=hc
 					if y_top<y:break
-					x_right-=citem.gcitem.dx
+					x_right-=w_char//citem.gcitem.dx
 				g_renderer.FastDrawChar(x_right,y_top,C,ch)
 			////////////////////
 			addr+=sz

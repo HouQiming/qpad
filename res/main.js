@@ -55,7 +55,7 @@ UI.ReadOptionalConfigScript("conf_translation.js");
 UI.icon_font_name='res/fonts/iconfnt.ttf,!'
 UI.icon_font=UI.Font(UI.icon_font_name,24);
 UI.icon_font_20=UI.Font(UI.icon_font_name,20);
-UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
+//UI.SetRetardedWindingOrder(UI.core_font_cache['res/fonts/iconfnt.ttf']);
 (function(){
 	//for theme, we always eval the default theme first in case the custom one is only partially defined
 	eval(IO.UIReadAll("res/misc/conf_theme.js"));

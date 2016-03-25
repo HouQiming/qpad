@@ -126,8 +126,8 @@ UI.CustomTheme=function(){
 		tab_label:{
 			transition_dt:0.1,
 			shadow_size:8,
-			hotkey_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,10,0):UI.Font(UI.font_name,12,0),
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,22,-50):UI.Font(UI.font_name,24,-50), padding:16,
+			hotkey_font:UI.Font(UI.font_name,12,0),
+			font:UI.Font(UI.font_name,24,-50), padding:16,
 			button_style:{
 				transition_dt:0.1,
 				round:0,
@@ -387,13 +387,13 @@ UI.CustomTheme=function(){
 			x_scroll_shadow_size:8,
 			///////
 			//show_line_numbers:1,
-			line_number_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,12,-50):UI.Font(UI.font_name,14,-50),
+			line_number_font:UI.Font(UI.font_name,14,-50),
 			line_number_bgcolor:L?0xffd0d0d0:0xff333333,
 			line_number_color:L?0xff7f7f7f:0xff6a8264,
 			line_number_color_focus:L?0xff000000:0xff8DAC85,
 			color_cur_line_highlight:L?0x55ffffff:0x55666666,
 			///////
-			bookmark_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,10,200):UI.Font(UI.font_name,12,200),
+			bookmark_font:UI.Font(UI.font_name,12,200),
 			bookmark_color:L?[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}]:[{x:0,y:0,color:C_sel},{x:1,y:1,color:0xff3f3f3f}],
 			bookmark_text_color:L?C:0xffbfdfdf,
 			//bookmark_shadow:0xff000000,
@@ -855,10 +855,10 @@ UI.CustomTheme=function(){
 			dir_icon_color:L?0xffb4771f:0xffaceaea,
 			file_icon_color:L?0xff444444:0xffe8e8e8,
 			//caption_font:UI.Font(UI.font_name,20,-50),
-			name_font_size:UI.Platform.ARCH=="mac"?20:24,
-			name_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,24,-50),
-			name_font_bold:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,100):UI.Font(UI.font_name,24,100),
-			misc_font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,16,-50):UI.Font(UI.font_name,18,-50),
+			name_font_size:24,
+			name_font:UI.Font(UI.font_name,24,-50),
+			name_font_bold:UI.Font(UI.font_name,24,100),
+			misc_font:UI.Font(UI.font_name,18,-50),
 			name_color:L?0xff000000:0xffe8e8e8,
 			misc_color:L?0xff7f7f7f:0xff7f7f7f,
 			basepath_color:L?0xffcccccc:0xff666666,
@@ -919,7 +919,7 @@ UI.CustomTheme=function(){
 			//nothing
 		},
 		top_menu_item:{
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
+			font:UI.Font(UI.font_name,22,-50),
 			padding:8,
 			$:{
 				active:{
@@ -939,7 +939,7 @@ UI.CustomTheme=function(){
 			shadow_color:0xaa000000,
 			shadow_size:12,
 			///////////
-			font:UI.Platform.ARCH=="mac"?UI.Font(UI.font_name,20,-50):UI.Font(UI.font_name,22,-50),
+			font:UI.Font(UI.font_name,22,-50),
 			text_color:L?0xff000000:0xffe8e8e8,
 			text_sel_color:L?0xffffffff:0xffe8e8e8,
 			icon_color:L?C:C_raw,
