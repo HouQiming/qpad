@@ -1559,6 +1559,13 @@ var find_item_region_prototype={
 		}
 		UI.Refresh()
 	},
+	OnMouseWheel:function(event){
+		var ctx=this.owner;
+		var obj=ctx.m_owner;
+		if(obj.find_bar_edit){
+			obj.find_bar_edit.OnMouseWheel(event)
+		}
+	}
 };
 
 var QueryKeyDeclList=function(matches,doc,sneedle){
@@ -1688,12 +1695,10 @@ var find_context_prototype={
 		var edstyle=UI.default_styles.code_editor;
 		this.m_current_visual_h=h0/edstyle.find_item_scale-edstyle.find_item_expand_current*this.m_hfont;
 	},
-	AutoScrollFindItems:function(){
-		this.m_owner.m_no_more_replace=0
+	SeekMergedItemByUnmergedID:function(id){
 		var l0=-((this.m_merged_y_windows_backward.length>>2)-1)
 		var l=l0
 		var r=(this.m_merged_y_windows_forward.length>>2)-1
-		var id=this.m_current_point
 		while(l<=r){
 			var m=(l+r)>>1
 			var fitem=this.GetFindItem(m)
@@ -1704,6 +1709,12 @@ var find_context_prototype={
 			}
 		}
 		if(r<l0){r=l0;}
+		return r
+	},
+	UpdateFindItemSelection:function(){
+		this.m_owner.m_no_more_replace=0
+		var id=this.m_current_point
+		var r=this.SeekMergedItemByUnmergedID(id);
 		var doc=this.GetMatchDoc(id);
 		var fitem_current=this.GetFindItem(r)
 		this.m_current_merged_item=r
@@ -1723,10 +1734,28 @@ var find_context_prototype={
 		if(doc.sel0.ccnt!=ccnt_match0||doc.sel1.ccnt!=ccnt_match1){
 			UI.SetSelectionEx(doc,ccnt_match0,ccnt_match1,(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?"goto":"find")
 		}
-		doc.AutoScroll("show")
+		if(this.m_last_auto_scrolled_point!=this.m_current_point){
+			this.m_last_auto_scrolled_point=this.m_current_point;
+			doc.AutoScroll("show")
+			this.AutoScrollFindItems()
+		}else{
+			this.ValidateFindItemScroll()
+		}
+	},
+	AutoScrollFindItems:function(){
+		var fitem_current=this.GetFindItem(this.m_current_merged_item)
+		var find_shared_h=this.m_current_visual_h;
+		var edstyle=UI.default_styles.code_editor
+		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation*2;
 		this.m_find_scroll_visual_y=Math.min(Math.max(this.m_find_scroll_visual_y,
 			this.m_current_visual_y+fitem_current.shared_h+h_bof_eof_message_with_sep-find_shared_h),
 			this.m_current_visual_y-h_bof_eof_message_with_sep-edstyle.find_item_expand_current*this.m_hfont*0.5)
+		this.ValidateFindItemScroll()
+	},
+	ValidateFindItemScroll:function(){
+		var find_shared_h=this.m_current_visual_h;
+		var edstyle=UI.default_styles.code_editor
+		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation*2;
 		this.m_find_scroll_visual_y=Math.max(Math.min(this.m_find_scroll_visual_y,this.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),this.m_y_extent_backward-h_bof_eof_message_with_sep)
 		//print(this.m_find_scroll_visual_y,this.m_current_visual_y,this.m_current_point,r,JSON.stringify(fitem_current));
 	},
@@ -1743,7 +1772,7 @@ var find_context_prototype={
 	RenderVisibleFindItems:function(w_line_numbers,w_find_items,h_rendering){
 		this.SetRenderingHeight(h_rendering);
 		var h_find_items=this.m_current_visual_h;
-		this.AutoScrollFindItems();
+		this.UpdateFindItemSelection();
 		var id=this.m_current_point;
 		var doc_curpoint=this.GetMatchDoc(id);
 		var renderer=doc_curpoint.GetRenderer();
@@ -2554,7 +2583,7 @@ W.CodeEditorWidget_prototype={
 		this.DestroyFindingContext()
 		this.m_current_find_context=ctx
 		if(force_ccnt==undefined){
-			ctx.AutoScrollFindItems();
+			ctx.UpdateFindItemSelection();
 			//UI.InvalidateCurrentFrame();
 			UI.Refresh()
 		}
@@ -3006,24 +3035,24 @@ var ffindbar_plugin=function(){
 			var ctx=obj.m_current_find_context
 			var point0=ctx.m_current_point;
 			ctx.m_find_scroll_visual_y+=dy;
-			ctx.SeekFindItemByVisualY(ctx.m_current_visual_y+dy,0)
-			if(dy<0){
-				if(point0==ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
-					ctx.m_current_point--;
-				}
-				if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
-					ctx.m_current_point--;
-				}
-			}else{
-				if(point0==ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
-					ctx.m_current_point++;
-				}
-				if(!ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
-					ctx.m_current_point++;
-				}
-			}
+			//ctx.SeekFindItemByVisualY(ctx.m_current_visual_y+dy,0)
+			//if(dy<0){
+			//	if(point0==ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
+			//		ctx.m_current_point--;
+			//	}
+			//	if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
+			//		ctx.m_current_point--;
+			//	}
+			//}else{
+			//	if(point0==ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
+			//		ctx.m_current_point++;
+			//	}
+			//	if(!ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
+			//		ctx.m_current_point++;
+			//	}
+			//}
 			ctx.m_home_end=undefined;
-			ctx.AutoScrollFindItems()
+			ctx.ValidateFindItemScroll()
 			UI.Refresh()
 		}
 	}
@@ -6215,6 +6244,14 @@ W.CodeEditor=function(id,attrs){
 						OnChange:function(value){
 							doc.scroll_y=value*(ytot-h_scrolling_area)
 							doc.scrolling_animation=undefined
+							if(is_find_mode_rendering){
+								var ctx=obj.m_current_find_context;
+								if(ctx){
+									var ccnt=doc.ed.SeekXY(0,doc.scroll_y);
+									ctx.m_find_scroll_visual_y=ctx.GetFindItem(ctx.SeekMergedItemByUnmergedID(ctx.BisectMatches(doc,ccnt))).visual_y;
+									ctx.ValidateFindItemScroll();
+								}
+							}
 							UI.Refresh()
 						},
 					},W.MinimapThingy_prototype)
@@ -6280,6 +6317,14 @@ W.CodeEditor=function(id,attrs){
 				OnChange:function(value){
 					doc.scroll_y=value*(this.total_size-this.page_size)
 					doc.scrolling_animation=undefined
+					if(is_find_mode_rendering){
+						var ctx=obj.m_current_find_context;
+						if(ctx){
+							var ccnt=doc.ed.SeekXY(0,doc.scroll_y);
+							ctx.m_find_scroll_visual_y=ctx.GetFindItem(ctx.SeekMergedItemByUnmergedID(ctx.BisectMatches(doc,ccnt))).visual_y;
+							ctx.ValidateFindItemScroll();
+						}
+					}
 					UI.Refresh()
 				},
 				style:obj.scroll_bar_style
