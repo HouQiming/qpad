@@ -625,7 +625,7 @@ UI.CustomTheme=function(){
 			color:L?0xffc0c0c0:0xff333333,
 			shadow_size:8,
 			shadow_color:0xaa000000,
-			scale:1.0/1.25,
+			scale:7/8,
 			//scale:0.75,
 			//scale:0.625,
 			button_style:{

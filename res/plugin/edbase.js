@@ -895,8 +895,8 @@ UI.RegisterEditorPlugin(function(){
 				UI.Refresh()
 			}
 		}; 
-		menu_run.AddNormalItem({text:"Create file cell",enable_hotkey:0,action:fgencell.bind(this,0)})
-		menu_run.AddNormalItem({text:"Create project cell",enable_hotkey:0,action:fgencell.bind(this,1)})
+		menu_run.AddNormalItem({text:"Create file cell",key:"CTRL+F7",enable_hotkey:1,action:fgencell.bind(this,0)})
+		menu_run.AddNormalItem({text:"Create project cell",key:"F7",enable_hotkey:1,action:fgencell.bind(this,1)})
 		menu_run.AddSeparator()
 		/////////////////
 		var fruncell=function(is_project){

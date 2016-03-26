@@ -3248,10 +3248,11 @@ W.FileItemOnDemand=function(){
 		if(this.is_tree_view){
 			var nd_parent=this.parent;
 			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
-			var parent_expanded=(!nd_parent||!nd_parent.is_hidden&&git_treeview_metadata[nd_parent.name]);
-			this.is_hidden=!parent_expanded;
-			this.h=(this.is_hidden?0:UI.default_styles.file_item.h_dense);
-			if(this.is_hidden){
+			var parent_expanded=(!nd_parent||!nd_parent.dropped&&git_treeview_metadata[nd_parent.name]);
+			var is_hidden=!parent_expanded;
+			this.h=(is_hidden?0:UI.default_styles.file_item.h_dense);
+			if(is_hidden){
+				this.dropped=1;
 				return "drop";
 			}
 		}
@@ -3725,8 +3726,8 @@ W.FileItem=function(id,attrs){
 		obj.x+=dx_indent;
 		obj.w-=dx_indent;
 		var s_try_to_focus=(obj.owner.m_try_to_focus);
-		var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 		if(s_try_to_focus){
+			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			var is_me_focus=0;
 			if(obj.name==s_try_to_focus){
 				is_me_focus=1;
@@ -3768,22 +3769,39 @@ W.FileItem=function(id,attrs){
 					font:obj.name_font,text:UI._("Searching @1...").replace("@1",obj.name_to_find),
 					color:obj.misc_color})
 			}else{//normal file
-				var s_ext=UI.GetFileNameExtension(obj.name)
-				var language_id=Language.GetNameByExt(s_ext)
-				var desc=Language.GetDescObjectByName(language_id)
-				var ext_color=obj.file_icon_color;//(desc.file_icon_color||obj.file_icon_color)
-				var icon_code=(Language.g_icon_overrides[s_ext]||desc.file_icon||'档').charCodeAt(0)
-				if(obj.is_dir){
-					ext_color=obj.dir_icon_color;
-					if(obj.is_tree_view&&git_treeview_metadata[obj.name]){
-						icon_code=0x5f00;//'开'.charCodeAt(0)
-					}else{
-						icon_code=0x5939;//'夹'.charCodeAt(0)
+				var icon_code=obj.icon_code;
+				var ext_color=obj.ext_color;
+				var sname=obj.short_name;
+				var s_misc_text=obj.s_misc_text;
+				if(!icon_code){
+					var s_ext=UI.GetFileNameExtension(obj.name)
+					var language_id=Language.GetNameByExt(s_ext)
+					var desc=Language.GetDescObjectByName(language_id)
+					icon_code=(Language.g_icon_overrides[s_ext]||desc.file_icon||'档').charCodeAt(0)
+					ext_color=obj.file_icon_color;//(desc.file_icon_color||obj.file_icon_color)
+					if(obj.is_dir){
+						ext_color=obj.dir_icon_color;
+						if(obj.is_tree_view&&UI.m_ui_metadata["<project-treeview>"][obj.name]){
+							icon_code=0x5f00;//'开'.charCodeAt(0)
+						}else{
+							icon_code=0x5939;//'夹'.charCodeAt(0)
+						}
 					}
-				}
-				if(obj.name_to_create){
-					ext_color=0x55444444
-					icon_code='新'.charCodeAt(0)
+					if(obj.name_to_create){
+						ext_color=0x55444444
+						icon_code='新'.charCodeAt(0)
+					}
+					sname=UI.RemovePath(obj.name);
+					if(obj.is_dir){sname=sname+"/";}
+					var s_time=obj.name_to_create?"":UI.FormatRelativeTime(obj.time,UI.m_current_file_list.m_now);
+					s_misc_text=(
+						obj.name_to_create?
+							UI._("Create new file"):
+							(obj.is_dir?s_time:FormatFileSize(obj.size)+", "+s_time));
+					obj.icon_code=icon_code;
+					obj.ext_color=ext_color;
+					obj.short_name=sname;
+					obj.s_misc_text=s_misc_text;
 				}
 				//var sel_bgcolor=(ext_color|0xff000000)
 				var sel_bgcolor=obj.owner.activated?obj.sel_bgcolor:obj.sel_bgcolor_deactivated;
@@ -3797,14 +3815,7 @@ W.FileItem=function(id,attrs){
 						x:obj.x,y:obj.y+2,w:obj.w-12,h:obj.h-4,
 						color:sel_bgcolor})
 				}
-				var s_time=obj.name_to_create?"":UI.FormatRelativeTime(obj.time,UI.m_current_file_list.m_now);
-				var s_misc_text=(
-					obj.name_to_create?
-						UI._("Create new file"):
-						(obj.is_dir?s_time:FormatFileSize(obj.size)+", "+s_time));
 				var name_color=obj.name_color;
-				var sname=UI.RemovePath(obj.name);
-				if(obj.is_dir){sname=sname+"/";}
 				//var stag=undefined;
 				//(obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!='fs_view')&&
 				if(obj.is_tree_view!=1){
@@ -3953,9 +3964,11 @@ W.FileItem=function(id,attrs){
 						}
 					}
 				}
-				W.Text("",{x:obj.x+obj.w-dims_misc.w-20,y:obj.y+(obj.h-dims_misc.h)*0.5,
-					font:obj.misc_font,text:s_misc_text,
-					color:obj.selected?obj.sel_misc_color:obj.misc_color})
+				if(s_misc_text){
+					W.Text("",{x:obj.x+obj.w-dims_misc.w-20,y:obj.y+(obj.h-dims_misc.h)*0.5,
+						font:obj.misc_font,text:s_misc_text,
+						color:obj.selected?obj.sel_misc_color:obj.misc_color})
+				}
 			}
 		}
 	UI.End()
@@ -5680,7 +5693,7 @@ W.CodeEditor=function(id,attrs){
 							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
 							UI.Refresh()
 						}})
-					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick()}})
+					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick();}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_fold=W.Button("find_button_fold",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
@@ -7061,7 +7074,7 @@ W.SXS_OptionsPage=function(id,attrs){
 			];
 			plugin_items["Font Licenses"]=[
 				{license_line:"OpenSans: Digitized data copyright © 2010-2011, Google Corporation"},
-				{license_line:"Inconsolata: Copyright (c) 2006-2012, Raph Levien (firstname.lastname@gmail.com)"},
+				{license_line:"Inconsolata: Copyright (c) 2006-2012, Raph Levien (Raph.Levien@gmail.com)"},
 				{license_line:"    Copyright (c) 2011-2012, Cyreal (cyreal.org)",h_special:-12},
 				{license_line:"Computer Modern: Copyright (c) Authors of original metafont fonts"},
 				{license_line:"    Copyright (c) 2003-2009, Andrey V. Panov (panov@canopus.iacp.dvo.ru)",h_special:-12},

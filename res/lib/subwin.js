@@ -1336,12 +1336,18 @@ W.TabbedDocument=function(id,attrs){
 				UI.Refresh()
 			}).bind(null,obj,i)})
 		}
+		var cur_hotkeys={};
+		for(var i=0;i<UI.context_hotkeys.length;i++){
+			cur_hotkeys[UI.context_hotkeys[i].key]=1;
+		}
 		for(var i=0;i<UI.m_global_menu.$.length;i++){
 			var s_text=UI.m_global_menu.$[i].text
 			if(s_text){
 				var p_and=s_text.indexOf('&')
 				if(p_and>=0){
-					W.Hotkey("",{key:(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase(),action:
+					var skey=(UI.Platform.ARCH=="mac"?"ALT+WIN+":"ALT+")+s_text.substr(p_and+1,1).toUpperCase();
+					if(cur_hotkeys[skey]){continue;}
+					W.Hotkey("",{key:skey,action:
 						(function(obj,i){
 							obj.m_menu_preselect=i;
 							obj.SetMenuState(1);

@@ -415,6 +415,7 @@ var CreateMenus=function(){
 		UI.top.app.document_area.SaveAll();
 	}});
 	if(UI.top.app.document_area.active_tab){
+		menu_file.AddSeparator();
 		menu_file.AddNormalItem({
 			text:"&Close",key:"CTRL+W",enable_hotkey:0,
 			tab_menu_group:"close",
@@ -510,7 +511,9 @@ var CreateMenus=function(){
 		menu_tools.AddNormalItem({text:"Copy path",tab_menu_group:'tools',enable_hotkey:0,
 			action:function(fn){UI.SDL_SetClipboardText(IO.NormalizeFileName(fn,1))}.bind(undefined,obj_real_active_tab.file_name)
 		})
-		menu_tools.AddNormalItem({text:"Open shell (&D)...",tab_menu_group:'tools',icon:'控',enable_hotkey:0,action:OpenShell})
+		menu_tools.AddNormalItem({text:"Move related tabs to front",tab_menu_group:'tools',
+			enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
+		menu_tools.AddNormalItem({text:"Open shell here (&D)...",tab_menu_group:'tools',icon:'控',enable_hotkey:0,action:OpenShell})
 		if(UI.ShowInFolder){
 			menu_tools.AddNormalItem({text:"Show in folder...",tab_menu_group:'tools',icon:'开',enable_hotkey:0,
 				action:UI.ShowInFolder.bind(undefined,obj_real_active_tab.file_name)
@@ -563,7 +566,7 @@ var CreateMenus=function(){
 			SetHelpText(doc_code);
 		}.bind(undefined,obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc)
 	});
-	if(obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc){
+	if(obj_active_tab&&obj_active_tab.main_widget&&obj_active_tab.main_widget.doc&&obj_active_tab==obj_real_active_tab){
 		if(UI.SetFileAssoc){
 			var sext=UI.GetFileNameExtension(obj_active_tab.main_widget.file_name);
 			menu_tools.AddSeparator();
@@ -575,9 +578,6 @@ var CreateMenus=function(){
 			})
 		}
 	}
-	menu_tools.AddSeparator()
-	menu_tools.AddNormalItem({text:"Move related tabs to front",tab_menu_group:'mtf',
-		enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
 	menu_tools.AddSeparator()
 	W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
 	W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
