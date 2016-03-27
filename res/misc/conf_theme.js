@@ -22,6 +22,9 @@ UI.CustomTheme=function(){
 		var C_sel=UI.lerp_rgba(C,0xff444444,0.66)
 		var C_raw=UI.current_theme_color
 	}
+	//var C_shadow=(UI.TestOption('enable_srgb')?(L?0x7f000000:0xaa000000):(L?0x55000000:0x7f000000));
+	var C_shadow=0xaa000000;
+	var C_shadow_dark_aware=(L?0x7f000000:0xaa000000);
 	var styles={//light
 		tooltip:{
 			font:UI.Font(UI.font_name,24,-50),
@@ -33,7 +36,7 @@ UI.CustomTheme=function(){
 			border_width:1,
 			text_color:L?0xff000000:0xffe8e8e8,
 			shadow_size:6,
-			shadow_color:0xaa000000,
+			shadow_color:C_shadow,
 			triangle_font:UI.Font(UI.icon_font_name,16,0),
 			triangle_font2:UI.Font(UI.icon_font_name,16,500),
 		},
@@ -138,7 +141,7 @@ UI.CustomTheme=function(){
 				active:{
 					text_color:0xffffffff,
 					color:C,
-					shadow_color:0xaa000000,
+					shadow_color:C_shadow,
 				},
 				rendered:{
 					text_color:0xffffffff,
@@ -154,7 +157,7 @@ UI.CustomTheme=function(){
 				active:{
 					text_color:0xffe8e8e8,
 					color:C,
-					shadow_color:0xaa000000,
+					shadow_color:C_shadow,
 				},
 				rendered:{
 					text_color:0xffe8e8e8,
@@ -179,12 +182,12 @@ UI.CustomTheme=function(){
 			caption_drag_tolerance_y:8,
 			split_penalty:16,
 			shadow_size:10,
-			shadow_color:0xaa000000,
+			shadow_color:C_shadow,
 			menu_bar_color:L?[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}]:[{x:0,y:0,color:0xff666666},{x:0,y:1,color:0xff444444}],
 			menu_bar_border_width:0,
 			menu_bar_border_color:L?0xffaaaaaa:0xff444444,
 			menu_bar_shadow_size:8,
-			menu_bar_shadow_color:0xaa000000,
+			menu_bar_shadow_color:C_shadow,
 			menu_bar_caption_text_color:L?0xffaaaaaa:0xff7f7f7f,
 			bgcolor_split_shade:C&0x7fffffff,
 			menu_button_style:{
@@ -464,7 +467,7 @@ UI.CustomTheme=function(){
 			find_bar_round:8,
 			find_bar_padding:4,
 			find_bar_hint_color:L?0xff7f7f7f:0xffaaaaaa,
-			find_bar_shadow_color:L?0x7f000000:0xaa000000,
+			find_bar_shadow_color:C_shadow_dark_aware,
 			find_bar_shadow_size:8,
 			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
 			find_bar_button_size:28,
@@ -498,7 +501,7 @@ UI.CustomTheme=function(){
 			find_item_context_goto:0,
 			find_item_expand_current:4,//in lines
 			find_item_separation:5,
-			find_item_shadow_color:L?0x7f000000:0xaa000000,
+			find_item_shadow_color:C_shadow_dark_aware,
 			find_item_shadow_size:4,
 			find_mode_bgcolor:L?0xffc0c0c0:0xff333333,
 			//find_item_replace_highlight_color:0x55007fff,
@@ -510,7 +513,7 @@ UI.CustomTheme=function(){
 			accands_padding:24,
 			accands_left_padding:14,
 			accands_sel_padding:2,
-			accands_shadow_color:L?0x7f000000:0xaa000000,
+			accands_shadow_color:C_shadow_dark_aware,
 			accands_shadow_size:8,
 			accands_bgcolor:L?0xffffffff:0xff555555,
 			accands_round:4,
@@ -561,7 +564,7 @@ UI.CustomTheme=function(){
 			dx_shake_notification:-300,
 			///////
 			sxs_shadow_size:6,
-			sxs_shadow_color:0xaa000000,
+			sxs_shadow_color:C_shadow,
 			///////
 			status_bar_bgcolor:L?[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffd0d0d0}]:[{x:0,y:0,color:0xff7f7f7f},{x:0,y:1,color:0xff444444}],
 			status_bar_font:UI.Font(UI.font_name,20,-50),
@@ -624,7 +627,7 @@ UI.CustomTheme=function(){
 			inactive_caption_text_color:L?0xffffffff:0xffe8e8e8,
 			color:L?0xffc0c0c0:0xff333333,
 			shadow_size:8,
-			shadow_color:0xaa000000,
+			shadow_color:C_shadow,
 			scale:7/8,
 			//scale:0.75,
 			//scale:0.625,
@@ -831,7 +834,7 @@ UI.CustomTheme=function(){
 			notification_text_color:L?0xff000000:0xffe8e8e8,
 			notification_icon_color:L?0xff000000:0xffe8e8e8,
 			notification_shadow_size:8,
-			notification_shadow_color:0xaa000000,
+			notification_shadow_color:C_shadow,
 			notification_styles:[
 				{font:UI.Font(UI.font_name,20,0),color:L?0xff000000:0xffe8e8e8},
 				{font:UI.Font(UI.font_name,20,150),color:L?0xff000000:0xffe8e8e8},
@@ -936,7 +939,7 @@ UI.CustomTheme=function(){
 			color:L?0xffe8e8e8:0xff444444,
 			border_color:L?0xff444444:0xff000000,
 			border_width:1,round:1,
-			shadow_color:0xaa000000,
+			shadow_color:C_shadow,
 			shadow_size:12,
 			///////////
 			font:UI.Font(UI.font_name,22,-50),
@@ -1073,7 +1076,7 @@ UI.CustomTheme=function(){
 			caption_border_color:0xff000000,
 			caption_border_width:1,
 			caption_shadow_size:6,
-			caption_shadow_color:0xaa000000,
+			caption_shadow_color:C_shadow,
 			caption_text_color:0xff000000,
 			caption_icon_color:L?0xff7f7f7f:0xff444444,
 		},

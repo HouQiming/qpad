@@ -66,7 +66,7 @@ UI.RegisterEditorPlugin(function(){
 							text:err.message,
 							icon_color:color,
 							//text_color:color,
-							color:UI.lerp_rgba(color,0xffffffff,0.95),
+							color:UI.lerp_rgba(color,UI.default_styles.code_editor_notification.color,UI.TestOption("use_light_theme")?0.95:0.75),
 						},"quiet")
 					}
 					error_overlays_new.push(err);

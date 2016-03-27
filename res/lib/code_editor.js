@@ -6445,7 +6445,14 @@ UI.NewCodeEditorTab=function(fname0){
 		UpdateTitle:function(){
 			var doc=(this.main_widget&&this.main_widget.doc);
 			var fn_display=(doc&&doc.m_file_name||this.file_name)
-			var fn_display=IO.NormalizeFileName(fn_display,1);
+			if(fn_display.length&&fn_display[0]=='*'){
+				var special_file_desc=UI.m_special_files[fn_display.substr(1)];
+				if(special_file_desc&&special_file_desc.display_name){
+					fn_display=special_file_desc.display_name;
+				}
+			}else{
+				fn_display=IO.NormalizeFileName(fn_display,1);
+			}
 			this.title=UI.GetSmartTabName(fn_display);
 			this.tooltip=fn_display;
 			this.need_save=0
@@ -7034,7 +7041,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
 				{name:UI._('Make @1 stop at both sides').replace("@1",UI.Platform.ARCH=="mac"?"\u2325\u2190/\u2325\u2192":"CTRL+\u2190/\u2192"),stable_name:'precise_ctrl_lr_stop'},
 				{name:UI._('Allow \u2190/\u2192 to cross lines'),stable_name:'left_right_line_wrap'},
-				{name:UI._('Move forward opened old tabs'),stable_name:'explicit_open_mtf'},
+				{name:UI._('Move forward old tabs when manually opened'),stable_name:'explicit_open_mtf'},
 			];
 			if(UI.InstallQPad){
 				plugin_items["Tools"]=[
@@ -7054,7 +7061,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				cat_list.push(desc_i);
 			}
 			plugin_items["Display"].push(
-				{name:UI._('Enable sRGB-corrected blending'),stable_name:'enable_srgb'},
+				{name:UI._('Create FBO for linear rendering'),stable_name:'software_srgb'},
 				{special:'customize',h_special:4,text:UI._("Customize the theme script"),file:"conf_theme.js"},
 				{special:'customize',h_special:4,text:UI._("Customize the translation script"),file:"conf_translation.js"}
 			);

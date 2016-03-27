@@ -11,8 +11,9 @@ var Language=require("res/lib/langdef");
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 
-if(!UI.TestOption('enable_srgb')){
-	UI.SetSRGBEnabling(0);
+if(UI.TestOption('software_srgb')){
+	//UI.SetSRGBEnabling(0);
+	UI.SetSRGBEnabling(2);
 }
 UI.ChooseScalingFactor({designated_screen_size:1080})
 UI.SetFontSharpening(1);
@@ -350,9 +351,9 @@ var OpenShell=function(){
 	UI.UpdateNewDocumentSearchPath()
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		if(IO.FileExists(IO.GetStoragePath()+"/plugins/shell.bat")){
-			IO.Shell(["start"," ","cmd","/c",IO.GetStoragePath()+"/plugins/shell.bat",UI.m_new_document_search_path])
+			IO.RunProcess(["cmd","/c",IO.GetStoragePath()+"/plugins/shell.bat"],UI.m_new_document_search_path)
 		}else{
-			IO.Shell(["start"," ","cmd","/k","cd","/d",UI.m_new_document_search_path])
+			IO.RunProcess(["cmd"],UI.m_new_document_search_path)
 		}
 	}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 		var s_terminal="xterm";
