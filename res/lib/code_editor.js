@@ -3682,7 +3682,12 @@ var OpenInPlace=function(obj,name){
 		UI.OpenEditorWindow(fn)
 	}*/
 	//UI.ClearFileListingCache();
-	UI.OpenFile(fn);
+	if(IO.FileExists(fn)){
+		UI.OpenFile(fn);
+	}else{
+		//new file
+		UI.OpenEditorWindow(fn)
+	}
 	UI.Refresh()
 }
 

@@ -18,6 +18,7 @@ __generate_json("js_units","gui2d/gl.js")
 __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
 __generate_json("icon_file","icon256.png")
+__generate_json("icon_win","iconwin.ico")
 //__generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
 if Platform.IS_WINDOWS:
