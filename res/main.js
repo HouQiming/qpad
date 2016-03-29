@@ -817,6 +817,9 @@ UI.OpenFile=function(fn){
 	if(!is_first&&IO.FileExists(fn_hack_pipe)&&!IO.FileExists(fn_hack_pipe2)){
 		//in case pid exceeds 32 bits... parseFloat it
 		var pid=parseFloat(IO.ReadAll(fn_hack_pipe))
+		for(var i=0;i<argv.length;i++){
+			argv[i]=IO.NormalizeFileName(argv[i])
+		}
 		IO.CreateFile(fn_hack_pipe2,JSON.stringify(argv))
 		if(IO.SetForegroundProcess(pid)){
 			return;
