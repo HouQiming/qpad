@@ -3445,6 +3445,7 @@ isWesternLetter=inline(ch){
 	return chi>=0x80||isWordChar(chi)
 }
 
+g_rtt_tab_backup=CJSGLRenderToTextureContext.NULL
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
 		//initial read, which is a raw edit
@@ -4379,6 +4380,59 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_RichTextCommandChar"]=function(JSContext JS){
 		ch=JS.Param(0).as(int)
 		return JS.Return(Unicode32ToUtf8([ch]))
+	}
+	/////////////////////////////
+	JS_UI["GL_EnterBackupFBO"]=function(JSContext JS){
+		wnd_w=JS["UI"]["m_gl_curwindow_w"].as(int)
+		wnd_h=JS["UI"]["m_gl_curwindow_h"].as(int)
+		if !g_rtt_tab_backup||g_rtt_tab_backup.w!=wnd_w||g_rtt_tab_backup.h!=wnd_h:
+			fbo_w=wnd_w
+			fbo_h=wnd_h
+			if g_rtt_tab_backup:
+				//fbo_w=max(fbo_w,g_rtt_tab_backup.w)
+				//fbo_h=max(fbo_h,g_rtt_tab_backup.h)
+				g_rtt_tab_backup.discard()
+			g_rtt_tab_backup=glCreateRenderToTextureContext(GL_RGBA8,fbo_w,fbo_h,0)
+		tab_viewport=new int[4]
+		glGetIntegerv(GL_VIEWPORT,__pointer(tab_viewport.d));
+		pdraw_fbo=new u32[1]
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING,__pointer(pdraw_fbo.d))
+		glBindFramebuffer(GL_FRAMEBUFFER,g_rtt_tab_backup.m_fbo)
+		glViewport(tab_viewport[0],tab_viewport[1],tab_viewport[2],tab_viewport[3])
+		JS["UI"]["m_saved_render_fbo"]=pdraw_fbo[0]
+		return 0
+	}
+	JS_UI["GL_LeaveBackupFBO"]=function(JSContext JS){
+		tab_viewport=new int[4]
+		glGetIntegerv(GL_VIEWPORT,__pointer(tab_viewport.d));
+		draw_fbo=JS["UI"]["m_saved_render_fbo"].as(GLuint)
+		///////////////
+		x0=tab_viewport[0]
+		y0=tab_viewport[1]
+		x1=x0+tab_viewport[2]
+		y1=y0+tab_viewport[3]
+		glBindFramebuffer(GL_READ_FRAMEBUFFER,g_rtt_tab_backup.m_fbo)
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER,draw_fbo)
+		glBlitFramebuffer(x0,y0,x1,y1, x0,y0,x1,y1, GL_COLOR_BUFFER_BIT,GL_NEAREST)
+		glBindFramebuffer(GL_FRAMEBUFFER,draw_fbo)
+		return 0;
+	}
+	JS_UI["GL_RestoreFromBackupFBO"]=function(JSContext JS){
+		tab_viewport=new int[4]
+		glGetIntegerv(GL_VIEWPORT,__pointer(tab_viewport.d));
+		draw_fbo=JS["UI"]["m_saved_render_fbo"].as(int)
+		///////////////
+		pdraw_fbo=new u32[1]
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING,__pointer(pdraw_fbo.d))
+		x0=tab_viewport[0]
+		y0=tab_viewport[1]
+		x1=x0+tab_viewport[2]
+		y1=y0+tab_viewport[3]
+		glBindFramebuffer(GL_READ_FRAMEBUFFER,g_rtt_tab_backup.m_fbo)
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER,pdraw_fbo[0])
+		glBlitFramebuffer(x0,y0,x1,y1, x0,y0,x1,y1, GL_COLOR_BUFFER_BIT,GL_NEAREST)
+		glBindFramebuffer(GL_FRAMEBUFFER,pdraw_fbo[0])
+		return 0;
 	}
 	/////////////////////////////
 	g_model_cn=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_cn.bin").ConvertToAsBinary(u32))

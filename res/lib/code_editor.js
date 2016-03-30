@@ -393,6 +393,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				return
 			}
 			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?262144:4194304))
+			if(this.m_owner){
+				this.m_owner.m_is_rendering_good=0;
+			}
 			//this.ResetSaveDiff()
 			if(is_preview){
 				var rendering_ccnt1=this.SeekXY(0,this.h)
@@ -1462,7 +1465,7 @@ var CallParseMore=function(){
 				var doc=UI.g_editor_from_file[ret.file_name];
 				if(doc){
 					doc.m_file_index=ret.file_index;
-					UI.Refresh()
+					UI.RefreshAllTabs()
 				}
 				//var obj_tab=undefined;
 				//for(var i=0;i<UI.g_all_document_windows.length;i++){
@@ -1482,7 +1485,7 @@ var CallParseMore=function(){
 				//}
 			}else{
 				g_is_parse_more_running=0;
-				UI.Refresh();
+				UI.RefreshAllTabs();
 				break;
 			}
 			var tick1=Duktape.__ui_get_tick()
@@ -2794,6 +2797,9 @@ W.CodeEditorWidget_prototype={
 					this.notification_list[item.id].dx_shake=this.dx_shake_notification
 				}
 				//}
+				if(this.m_owner){
+					this.m_owner.m_is_rendering_good=0;
+				}
 				return
 			}
 		}
@@ -2819,17 +2825,32 @@ W.CodeEditorWidget_prototype={
 		attrs.alpha=1
 		//if(!is_quiet){attrs.dx_shake=this.dx_shake_notification}
 		ns.push(attrs)
+		if(this.m_owner){
+			this.m_owner.m_is_rendering_good=0;
+		}
 		UI.Refresh()
 		return attrs;
 	},
 	DismissNotification:function(id){
 		if(this.m_notifications){
+			var n0=this.m_notifications.length;
 			this.m_notifications=this.m_notifications.filter(function(a){return a.id!=id})
+			if(n0!=this.m_notifications.length){
+				if(this.m_owner){
+					this.m_owner.m_is_rendering_good=0;
+				}
+			}
 		}
 	},
 	DismissNotificationsByRegexp:function(re){
 		if(this.m_notifications){
+			var n0=this.m_notifications.length;
 			this.m_notifications=this.m_notifications.filter(function(a){return !(a.id.search(re)>=0)})
+			if(n0!=this.m_notifications.length){
+				if(this.m_owner){
+					this.m_owner.m_is_rendering_good=0;
+				}
+			}
 		}
 	},
 	////////////////////
@@ -3070,6 +3091,7 @@ var ResumeProjectParsing=function(g_repo_parsing_context){
 	}else{
 		g_repo_parsing_context.is_parsing=0;
 	}
+	UI.RefreshAllTabs();
 };
 var QueueProjectParser=function(f){
 	if(g_repo_parsing_context.is_parsing){
@@ -4575,6 +4597,13 @@ UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 		this.util_widget=body;
 		return body;
 	},
+	NeedRendering:function(){
+		if(this.util_widget){
+			return this==UI.top.app.document_area.active_tab;
+		}else{
+			return 1;
+		}
+	},
 	Save:function(){},
 	SaveMetaData:function(){},
 	OnDestroy:function(){},
@@ -4757,6 +4786,16 @@ var g_regexp_folding_templates=['[ \t]+','[0-9]+','[.0-9efEF+-]+','[0-9A-Za-z$_]
 	}
 );
 
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"){return;}
+	var fupdate_tab=function(){
+		if(this.m_owner){
+			this.m_owner.m_is_rendering_good=0;
+		}
+	};
+	this.AddEventHandler('change',fupdate_tab)
+	this.AddEventHandler('selectionChange',fupdate_tab)
+})
 W.CodeEditor=function(id,attrs){
 	if(UI.enable_timing){
 		UI.TimingEvent("enter CodeEditor "+attrs.file_name);
@@ -4858,7 +4897,7 @@ W.CodeEditor=function(id,attrs){
 					doc.m_has_refresh_timeout=1;
 					UI.setTimeout(function(){
 						doc.m_has_refresh_timeout=0;
-						UI.Refresh()
+						UI.RefreshAllTabs()
 					},((minimap_interval-Duktape.__ui_seconds_between_ticks(doc.m_scroll_samples[0],UI.m_frame_tick))*1000+100)|0)
 				}
 				doc.m_scroll_y_old=doc.scroll_y;
@@ -6413,6 +6452,7 @@ W.CodeEditor=function(id,attrs){
 				sxs_visualizer('sxs_visualizer',{x:x_sxs_area,y:y_sxs_area,w:w_sxs_area,h:h_sxs_area,owner:obj})
 			}
 		}
+		obj.m_is_rendering_good=1;
 	UI.End()
 	if(UI.enable_timing){
 		UI.TimingEvent("leaving CodeEditor");
@@ -6447,6 +6487,11 @@ UI.NewCodeEditorTab=function(fname0){
 		document_type:'text',
 		tooltip:file_name,
 		opening_callbacks:[],
+		NeedRendering:function(){
+			if(!this.main_widget){return 1;}
+			if(this==UI.top.app.document_area.active_tab){return 1;}
+			return !this.main_widget.m_is_rendering_good;
+		},
 		UpdateTitle:function(){
 			var doc=(this.main_widget&&this.main_widget.doc);
 			var fn_display=(doc&&doc.m_file_name||this.file_name)
@@ -7067,6 +7112,7 @@ W.SXS_OptionsPage=function(id,attrs){
 			}
 			plugin_items["Display"].push(
 				{name:UI._('Create FBO for linear rendering'),stable_name:'software_srgb'},
+				{name:UI._('Enable smart repainting'),stable_name:'enable_smart_tab_repainting'},
 				{special:'customize',h_special:4,text:UI._("Customize the theme script"),file:"conf_theme.js"},
 				{special:'customize',h_special:4,text:UI._("Customize the translation script"),file:"conf_translation.js"}
 			);

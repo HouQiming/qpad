@@ -1098,6 +1098,21 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 		tooltip:file_name,
 		document_type:"notebook",
 		area_name:"v_tools",
+		NeedRendering:function(){
+			if(!this.main_widget){return 1;}
+			if(this==UI.top.app.document_area.active_tab){return 1;}
+			var body=this.main_widget;
+			for(var i=0;i<body.m_cells.length;i++){
+				if(body.m_cells[i].m_proc){
+					return 1;
+				}
+				var obj0=body["doc_in_"+i.toString()];
+				var obj1=body["doc_out_"+i.toString()];
+				if(obj0&&!obj0.m_is_rendering_good){return 1;}
+				if(obj1&&!obj1.m_is_rendering_good){return 1;}
+			}
+			return 0;
+		},
 		UpdateTitle:function(){
 			if(this.main_widget){
 				var body=this.main_widget;
