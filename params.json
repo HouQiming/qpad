@@ -1,0 +1,6 @@
+{
+  "name": "Qpad",
+  "tagline": "QPad Text Editor",
+  "body": "# QPad Text Editor\r\n\r\n**Fast.** A 10MB file won't feel any different than a 10KB file. A 10GB file runs just as fast once it finishes loading.\r\n\r\n**Beautiful.** QPad renders text at PDF-reader-like quality with all the fancy effects: antialiasing, gamma correction, sub-pixel placement, high-DPI support.\r\n\r\n**Straightforward.** Powerful features can be accessed without writing arcane regexps or learning a scripting language.\r\n\r\n### Feature List\r\n\r\nWill write up later after setting up pages.\r\n\r\n",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}
