@@ -65,7 +65,12 @@ UI.m_ui_metadata={};
 (function(){
 	var s_json=IO.ReadAll(IO.GetStoragePath()+("/metadata.json"))
 	if(s_json){
-		UI.m_ui_metadata=JSON.parse(s_json)
+		try{
+			UI.m_ui_metadata=JSON.parse(s_json);
+		}catch(e){
+			//ignore invalid json
+			UI.m_ui_metadata={};
+		}
 	}
 })();
 UI.SaveMetaData=function(){

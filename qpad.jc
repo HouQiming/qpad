@@ -21,6 +21,7 @@ __generate_json("icon_file","icon256.png")
 __generate_json("icon_win","iconwin.ico")
 //__generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
+__generate_json("linux_cc","gcc-5")
 if Platform.IS_WINDOWS:
 	__generate_json("lib_files","shell32.lib")
 	__generate_json("lib_files","kernel32.lib")

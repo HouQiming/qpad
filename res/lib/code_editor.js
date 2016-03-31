@@ -5747,6 +5747,23 @@ W.CodeEditor=function(id,attrs){
 							var sel_fbar=doc_fbar.GetSelection();
 							if(!(sel_fbar[1]>sel_fbar[0])){return;}
 							var ssource_text=doc_fbar.ed.GetText(sel_fbar[0],sel_fbar[1]-sel_fbar[0]);
+							if((UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_REGEXP)){
+								//crude unescape
+								var in_slash=0;
+								var unescaped_ret=[];
+								for(var i=0;i<ssource_text.length;i++){
+									var ch=ssource_text[i];
+									if(in_slash){
+										unescaped_ret.push(ch);
+										in_slash=0
+									}else if(ch=='\\'){
+										in_slash=1;
+									}else{
+										unescaped_ret.push(ch);
+									}
+								}
+								ssource_text=unescaped_ret.join("");
+							}
 							var starget_text="(.+)";
 							for(var i=0;i<g_regexp_folding_templates.length;i++){
 								if(ssource_text.search(g_regexp_folding_templates[i].regexp)>=0){
