@@ -6,4 +6,4 @@
 
 *Straightforward.* Powerful features can be accessed without writing arcane regexps or learning a scripting language.
 
-For more details, visit the github io page.
+For more details, visit the github io page (todo).
