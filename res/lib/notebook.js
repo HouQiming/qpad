@@ -202,6 +202,7 @@ W.notebook_prototype={
 			return 0;
 		}
 		this.need_save=0;
+		UI.RefreshAllTabs()
 		return 1;
 	},
 	SaveMetaData:function(){
@@ -552,6 +553,7 @@ W.notebook_prototype={
 			err:err,
 			f:fclick_callback})
 		doc=undefined;
+		UI.RefreshAllTabs()
 	},
 	WriteCellOutput:function(id,s){
 		var cell_i=this.m_cells[id];

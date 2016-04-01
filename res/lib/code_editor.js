@@ -812,7 +812,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				return 0;
 			}
 			var neib=this.ed.GetUtf8CharNeighborhood(this.sel1.ccnt);
-			if(!(UI.ED_isWordChar(neib[0])&&!UI.ED_isWordChar(neib[1]))){
+			//\u002e: dot
+			if(!((UI.ED_isWordChar(neib[0])||this.plugin_language_desc.parser=="C"&&neib[0]==0x2e)&&!UI.ED_isWordChar(neib[1]))){
 				this.m_ac_activated=0;
 				return 0;
 			}
@@ -1526,7 +1527,7 @@ var fsave_code_editor=UI.HackCallback(function(){
 		doc.m_loaded_time=IO.GetFileTimestamp(this.file_name)
 		this.OnSave();
 		this.DismissNotification('saving_progress')
-		UI.Refresh()
+		UI.RefreshAllTabs()
 	}else if(ret=="continue"){
 		this.CreateNotification({id:'saving_progress',icon:undefined,text:"Saving @1%...".replace('@1',(ctx.progress*100).toFixed(0)),
 			progress:ctx.progress
@@ -3190,6 +3191,7 @@ var DetectRepository=function(fname){
 		if(!UI.g_is_dir_a_project[spath]){
 			UI.g_is_dir_a_project[spath]="transient";
 			UI.g_transient_projects.push(spath)
+			UI.RefreshAllTabs()
 		}
 		return spath
 	}

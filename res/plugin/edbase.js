@@ -332,6 +332,7 @@ Language.Register({
 			'break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','window','document'])
 		kwset.DefineKeywords("color_type",['typeof','var','void','boolean','byte','int','short','char','double','long','float'])
 		kwset.DefineWordColor("color2")
+		kwset.DefineWordType("color_number","0-9")
 		lang.SetKeyDeclsBaseColor("color2")
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_tag,bid_script]);
@@ -417,7 +418,7 @@ Language.Register({
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
 		var bid_cdata=lang.ColoredDelimiter("key","<![CDATA[","]]>","color_symbol2");
 		var bid_header=lang.ColoredDelimiter("key","<?","?>","color_meta");
-		var bid_content=lang.ColoredDelimiter("key",[">","/>"],["<",'</'],"color2");
+		var bid_content=lang.DefineDelimiter("key",[">","/>"],["<",'</',"<!--","<![CDATA[","<?"]);
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 		var bid_bracket=lang.DefineDelimiter("nested",['<'],['</','/>']);
@@ -432,6 +433,14 @@ Language.Register({
 		kwset.DefineWordColor("color_type")
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_cdata,bid_header,bid_string,bid_content,bid_string2]);
+			if(lang.isInside(bid_content)){
+				lang.Enable(bid_comment)
+				lang.Enable(bid_cdata)
+				lang.Enable(bid_header)
+				lang.EnableToken("<!--")
+				lang.EnableToken("<![CDATA[")
+				lang.EnableToken("<?")
+			}
 			if(lang.isInside(bid_comment)||lang.isInside(bid_cdata)||lang.isInside(bid_header)||lang.isInside(bid_string)||lang.isInside(bid_string2)){
 				lang.Disable(bid_bracket);
 			}else{
@@ -815,7 +824,7 @@ UI.RegisterOutputParser('[ \t]*at[ \t]*.*[ \t]*\\((.*):([0-9]+):([0-9]+)\\).*',3
 	var err={
 		file_name:name,
 		category:"error",
-		message:"node,js stack dump",
+		message:"node.js stack dump",
 		line0:linea-1,
 	}
 	return err
@@ -2750,7 +2759,7 @@ UI.RegisterEditorPlugin(function(){
 			var hc=UI.GetCharacterHeight(this.font)
 			this.m_hide_prev_next_buttons=0;
 			UI.DrawPrevNextAllButtons(this.owner,
-				this.owner.x+this.owner.w_line_numbers,this.owner.y+y_caret+hc*0.5, menu_edit,
+				this.owner.x+this.m_rendering_w_line_numbers,this.owner.y+y_caret+hc*0.5, menu_edit,
 				"Apply changes",["Apply to the previous line","Apply to all","Apply to the next line"],
 				function(){
 					var locs=this.m_autoedit_locators

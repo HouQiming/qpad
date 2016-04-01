@@ -107,6 +107,13 @@ LanguageDefinition.prototype={
 		this.DisableToken(this.m_bracket_types[bid].tok1);
 	},
 	EnableToken:function(tok){
+		if(typeof tok=='string'){
+			var stok=tok;
+			tok=this.m_existing_tokens[tok];
+			if(tok==undefined){
+				throw new Error("cannot enable undefined token '@1'".replace("@1",stok));
+			}
+		}
 		this.m_token_enabling_mask|=(1<<tok);
 	},
 	DisableToken:function(tok){
