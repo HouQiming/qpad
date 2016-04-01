@@ -6,4 +6,11 @@
 
 **Straightforward.** Powerful features can be accessed without writing arcane regexps or learning a scripting language.
 
-For more details, visit the github io page (todo).
+For more details, visit the [github io page](https://houqiming.github.io/qpad/).
+
+## How to Build
+
+Download the compiler package at [https://github.com/HouQiming/jacy/releases/download/v0.1/bin.zip], and run:
+```
+jc qpad.jc
+```

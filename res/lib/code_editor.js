@@ -1927,7 +1927,7 @@ var find_context_prototype={
 					//global goto
 					if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)&&!g_is_parse_more_running){
 						if(doc_forward_search.m_file_index&&doc_forward_search.m_file_index.hasDecls()){
-							var matches=(ED.ED_QueryKeyDeclByNeedle(doc_forward_search,this.m_needle)||[]);
+							var matches=(UI.ED_QueryKeyDeclByNeedle(doc_forward_search,this.m_needle)||[]);
 							for(var i=0;i<matches.length;i+=2){
 								this.ReportMatchForward(doc_forward_search,matches[i+0],matches[i+1])
 							}
