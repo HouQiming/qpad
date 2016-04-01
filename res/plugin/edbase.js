@@ -243,10 +243,12 @@ Language.Register({
 		lang.DefineDefaultColor("color_symbol")
 		//match (/, but only count the '/' part as the token
 		var tok_regexp_thing=lang.DefineToken("(/",1);
+		var tok_regexp_thing2=lang.DefineToken("=/",1);
+		var tok_regexp_thing3=lang.DefineToken("= /",1);
 		var tok_regexp_end=lang.DefineToken("/");
 		var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 		var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
-		var bid_regexp=lang.ColoredDelimiter("key",tok_regexp_thing,tok_regexp_end,"color_string");
+		var bid_regexp=lang.ColoredDelimiter("key",[tok_regexp_thing,tok_regexp_thing2,tok_regexp_thing3],tok_regexp_end,"color_string");
 		var bid_regexp_charset=lang.ColoredDelimiter("key","[","]","color_string");
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
@@ -301,16 +303,18 @@ Language.Register({
 	extensions:['htm','html'],
 	file_icon_color:0xff444444,
 	file_icon:'マ',
-	rules:function(lang,keywords,has_preprocessor){
+	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		var bid_tag=lang.DefineDelimiter("key","<",">");
-		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
 		var bid_script=lang.ColoredDelimiter("key","<script","</script>","color_symbol2");
+		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
 		var bid_js_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 		var bid_js_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 		var bid_js_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
+		lang.m_owner.line_comment=undefined;
+		lang.m_owner.paired_comment=["<!--","-->"];
 		lang.DefineToken("&amp;")
 		lang.DefineToken("&apos;")
 		lang.DefineToken('&quot;')
@@ -318,7 +322,7 @@ Language.Register({
 		lang.DefineToken('&gt;')
 		lang.DefineToken('\\/')
 		var kwset=lang.DefineKeywordSet("color_symbol",['<','/']);
-		kwset.DefineKeywords("color_keyword",["DOCTYPE","a","abbr","acronym","address","applet","area","article","aside","audio","b","base","basefont","bdi","bdo","big","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","datalist","dd","del","details","dfn","dialog","dir","div","dl","dt","em","embed","fieldset","figcaption","figure","font","footer","form","frame","frameset","h1","head","header","hr","html","i","iframe","img","input","ins","kbd","keygen","label","legend","li","link","main","map","mark","menu","menuitem","meta","meter","nav","noframes","noscript","object","ol","optgroup","option","output","p","param","pre","progress","q","rp","rt","ruby","s","samp","script","section","select","small","source","span","strike","strong","style","sub","summary","sup","table","tbody","td","textarea","tfoot","th","thead","time","title","tr","track","tt","u","ul","var","video","wbr"])
+		kwset.DefineKeywords("color_keyword",["DOCTYPE","a","abbr","acronym","address","applet","area","article","aside","audio","b","base","basefont","bdi","bdo","big","blockquote","body","br","button","canvas","caption","center","cite","code","col","colgroup","datalist","dd","del","details","dfn","dialog","dir","div","dl","dt","em","embed","fieldset","figcaption","figure","font","footer","form","frame","frameset","h1","head","header","hr","html","i","iframe","img","input","ins","kbd","keygen","label","legend","li","link","main","map","mark","menu","menuitem","meta","meter","nav","noframes","noscript","object","ol","optgroup","option","output","p","param","pre","progress","q","rp","rt","ruby","s","samp","script","section","select","small","source","span","strike","strong","style","sub","summary","sup","table","tbody","td","textarea","tfoot","th","thead","time","title","tr","track","tt","u","ul","var","video","wbr","h1","h2","h3","h4","h5","h6"])
 		kwset.DefineWordColor("color")
 		kwset=lang.DefineKeywordSet("color_symbol");
 		kwset.DefineWordColor("color")
@@ -357,16 +361,63 @@ Language.Register({
 });
 
 Language.Register({
+	name:'CSS',parser:"text",
+	extensions:['css'],
+	file_icon_color:0xff444444,
+	file_icon:'プ',
+	rules:function(lang){
+		lang.DefineDefaultColor("color_symbol")
+		var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
+		var bid_value=lang.DefineDelimiter("key",":",";");
+		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
+		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
+		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
+		lang.DefineToken("\\\\")
+		lang.DefineToken("\\'")
+		lang.DefineToken('\\"')
+		lang.DefineToken('\\\n')
+		lang.m_non_default_word_chars="-";
+		var kwset=lang.DefineKeywordSet("color_symbol");
+		kwset.DefineWordColor("color")
+		kwset.DefineKeywords("color_type",["color","opacity","background","background-attachment","background-blend-mode", "background-color","background-image","background-position","background-repeat","background-clip","background-origin","background-size","border","border-bottom","border-bottom-color", "border-bottom-left-radius","border-bottom-right-radius","border-bottom-style","border-bottom-width","border-color","border-image","border-image-outset","border-image-repeat","border-image-slice","border-image-source","border-image-width","border-left","border-left-color","border-left-style","border-left-width","border-radius","border-right","border-right-color","border-right-style","border-right-width","border-style","border-top","border-top-color","border-top-left-radius","border-top-right-radius","border-top-style","border-top-width","border-width","box-decoration-break","box-shadow","bottom","clear","clip","display","float","height","left","margin","margin-bottom","margin-left","margin-right","margin-top","max-height","max-width","min-height","min-width","overflow","overflow-x","overflow-y","padding","padding-bottom","padding-left","padding-right","padding-top","position","right","top","visibility","width","vertical-align","z-index","align-content","align-items","align-self","flex","flex-basis","flex-direction","flex-flow","flex-grow","flex-shrink","flex-wrap","justify-content","order","hanging-punctuation","hyphens","letter-spacing","line-break","line-height","overflow-wrap","tab-size","text-align","text-align-last","text-combine-upright","text-indent","text-justify","text-transform","white-space","word-break","word-spacing","word-wrap","text-decoration","text-decoration-color","text-decoration-line","text-decoration-style","text-shadow","text-underline-position","@font-face","@font-feature-values","font","font-family","font-feature-settings","font-kerning","font-language-override","font-size","font-size-adjust","font-stretch","font-style","font-synthesis","font-variant","font-variant-alternates","font-variant-caps","font-variant-east-asian","font-variant-ligatures","font-variant-numeric","font-variant-position","font-weight","direction","text-orientation","text-combine-upright","unicode-bidi","border-collapse","border-spacing","caption-side","empty-cells","table-layout","counter-increment","counter-reset","list-style","list-style-image","list-style-position","list-style-type","@keyframes","animation","animation-delay","animation-direction","animation-duration","animation-fill-mode","animation-iteration-count","animation-name","animation-play-state","animation-timing-function","backface-visibility","perspective","perspective-origin","transform","transform-origin","transform-style","transition","transition-property","transition-duration","transition-timing-function","transition-delay","box-sizing","content","cursor","ime-mode","nav-down","nav-index","nav-left","nav-right","nav-up","outline","outline-color","outline-offset","outline-style","outline-width","resize","text-overflow","break-after","break-before","break-inside","column-count","column-fill","column-gap","column-rule","column-rule-color","column-rule-style","column-rule-width","column-span","column-width","columns","widows","orphans","page-break-after","page-break-before","page-break-inside","marks","quotes","filter","image-orientation","image-rendering","image-resolution","object-fit","object-position","mark","mark-after","mark-before","phonemes","rest","rest-after","rest-before","voice-balance","voice-duration","voice-pitch","voice-pitch-range","voice-rate","voice-stress","voice-volume","marquee-direction","marquee-play-count","marquee-speed","marquee-style"])
+		kwset.DefineWordType("color_number","0-9")
+		return (function(lang){
+			lang.Enable(bid_comment)
+			if(lang.isInside(bid_comment)){
+				lang.Disable(bid_bracket)
+				lang.Disable(bid_value)
+			}else{
+				lang.Enable(bid_value)
+				if(lang.isInside(bid_value)){
+					lang.SetExclusive([bid_string,bid_string2])
+					if(lang.isInside(bid_string)||lang.isInside(bid_string2)){
+						lang.Disable(bid_bracket)
+					}else{
+						lang.Enable(bid_bracket)
+					}
+				}else{
+					lang.Enable(bid_bracket)
+				}
+			}
+		})
+	}
+});
+
+
+Language.Register({
 	name:'XML',parser:"text",
 	extensions:['xml','vcproj','vcxproj','sproj','sln','svg','mobileprovision'],
+	ignore_indentation:1,
 	file_icon_color:0xff444444,
 	file_icon:'マ',
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
-		lang.DefineToken('<')//short tokens must come first
+		var tok_left_bracket=lang.DefineToken('<')//short tokens must come first
+		lang.DefineToken('>')//short tokens must come first
 		var bid_comment=lang.ColoredDelimiter("key","<!--","-->","color_comment");
 		var bid_cdata=lang.ColoredDelimiter("key","<![CDATA[","]]>","color_symbol2");
 		var bid_header=lang.ColoredDelimiter("key","<?","?>","color_meta");
+		var bid_content=lang.ColoredDelimiter("key",[">","/>"],["<",'</'],"color2");
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 		var bid_bracket=lang.DefineDelimiter("nested",['<'],['</','/>']);
@@ -380,11 +431,12 @@ Language.Register({
 		kwset=lang.DefineKeywordSet("color_symbol",['<','/']);
 		kwset.DefineWordColor("color_type")
 		return (function(lang){
-			lang.SetExclusive([bid_comment,bid_cdata,bid_header,bid_string,bid_string2]);
+			lang.SetExclusive([bid_comment,bid_cdata,bid_header,bid_string,bid_content,bid_string2]);
 			if(lang.isInside(bid_comment)||lang.isInside(bid_cdata)||lang.isInside(bid_header)||lang.isInside(bid_string)||lang.isInside(bid_string2)){
 				lang.Disable(bid_bracket);
 			}else{
 				lang.Enable(bid_bracket);
+				lang.EnableToken(tok_left_bracket)
 			}
 		});
 	}

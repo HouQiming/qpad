@@ -696,29 +696,6 @@ UI.Application=function(id,attrs){
 		UI.Refresh()
 		UI.m_ui_metadata["<has_opened_us_before>"]=1;
 	}
-	/*if(!g_all_document_windows.length){
-		if(app.quit_on_zero_tab){
-			if(!app.OnClose()){UI.DestroyWindow(app)}
-			return;
-		}
-		//UI.NewUIEditorTab()
-		//UI.NewCodeEditorTab()
-		//UI.OpenFile("c:/tp/kara/ide/edcore.spap")
-		//UI.OpenFile("c:/h/edtest/empty.tex")
-		//UI.OpenFile("c:/tp/papers/ours/vg2015/gpu_scanline.tex")
-		//UI.OpenFile("C:/tp/qpad/history.xml")
-		//UI.NewFromTemplate("templates/blank_demo.mo")
-		//c:\tp\pure\mo\pm_tmp\win32\mo\s7main.c
-		//UI.OpenFile("C:/h/syousetu/stars_tr.md")
-		//UI.OpenFile("c:/h/edtest/crap.c")
-		//UI.UpdateNewDocumentSearchPath()
-		UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
-		UI.m_previous_document=undefined
-		UI.OpenUtilTab('file_browser');
-		UI.InvalidateCurrentFrame()
-		UI.Refresh()
-		app.quit_on_zero_tab=1;
-	}*/
 	if(UI.Platform.BUILD=="debug"){
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
@@ -814,6 +791,9 @@ UI.OpenFile=function(fn){
 	var is_first=IO.IsFirstInstance("qpad3_single_instance");
 	var fn_hack_pipe=IO.GetStoragePath()+"/tmp_pid.txt";
 	var fn_hack_pipe2=IO.GetStoragePath()+"/tmp_open.json";
+	if(argv.length>=1&&argv[0]=='--new-instance'){
+		is_first=1;
+	}
 	if(!is_first&&IO.FileExists(fn_hack_pipe)&&!IO.FileExists(fn_hack_pipe2)){
 		//in case pid exceeds 32 bits... parseFloat it
 		var pid=parseFloat(IO.ReadAll(fn_hack_pipe))

@@ -150,6 +150,7 @@ class CLanguageDescription
 	string[] m_word_color_names
 	int[] m_word_dfa
 	u8[] m_word_char_map
+	uint4 m_word_char_set
 	int m_n_word_char_types
 	int[] m_word_dfa_initial_state
 	int[] m_word_dfa_initial_state_triggered
@@ -688,6 +689,7 @@ class CLayouter_programmer
 		//get a GRACEFUL_WORD_SIZE context on each side - do it per-char
 		word_dfa=m_lang.m_word_dfa
 		word_char_map=m_lang.m_word_char_map
+		word_char_set=m_lang.m_word_char_set
 		n_word_char_types=m_lang.m_n_word_char_types
 		color_id_spell_check=m_lang.m_color_id_spell_check
 		key_decl_color_ids=m_lang.m_key_decl_color_ids
@@ -713,12 +715,18 @@ class CLayouter_programmer
 			color_table=int[int].NULL
 		s_temp_getid=new char[MAX_SPECIAL_COLOR_ID_SIZE]
 		n_tokens=m_lang.m_n_tokens
+		isCustomWordChar=inline(int ch){
+			if ch>=128:
+				return int(TextBox.detail.g_unicode_wordchars.Bisect(function(int c0){return c0<=ch})&1)
+			else
+				return TextBox.detail.isInCharSet(word_char_set,ch)
+		}
 		for(;;)
 			//Writeln(word_ccnt0)
 			ch_first=0
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
-				if isWordChar(ch):
+				if isCustomWordChar(ch):
 					ch_first=ch
 					break
 				ch_before_word=ch
@@ -784,7 +792,7 @@ class CLayouter_programmer
 			//. inside numbers
 			foreach ch,I,I2 in ed.enumUtf8Forward(word_ccnt0)
 				word_ccnt0=I
-				if isWordChar(ch)||is_number&&ch=='.':
+				if isCustomWordChar(ch)||is_number&&ch=='.':
 					ofs=iptr(word_ccnt0-ccnt_base)
 					if uptr(ofs)<uptr(color_ids.n):
 						if color_id>0:
@@ -2213,14 +2221,18 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		///////
 		clunky_dfa=new int[]
 		word_char_map=new u8[256]
+		word_char_set=new u32[4]
 		for ch=0:255
-			if !(ch<128&&isWordChar(ch)):
+			if (ch<128&&isWordChar(ch)):
+				word_char_set[ch>>5]|=1u<<(ch&31)
+			else
 				word_char_map[ch]=1
-		//s_non_default_word_chars=obj["m_non_default_word_chars"].as(string)
-		//if s_non_default_word_chars:
-		//	foreach ch in Utf8Chars(s_non_default_word_chars)
-		//		if ch<256:
-		//			word_char_map[ch]=!word_char_map[ch]
+		s_non_default_word_chars=obj["m_non_default_word_chars"].as(string)
+		if s_non_default_word_chars:
+			foreach ch in Utf8Chars(s_non_default_word_chars)
+				if ch<128:
+					word_char_set[ch>>5]^=1u<<(ch&31)
+					word_char_map[ch]=!word_char_map[ch]
 		n_word_char_types=2
 		word_color_id_map=new int[string]
 		/////////////
@@ -2300,6 +2312,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 							word_char_map[ch]=n_word_char_types
 						clunky_dfa[st0*256+ch]=~color_id
 				n_word_char_types++
+		ret.m_word_char_set=uint4(word_char_set[0],word_char_set[1],word_char_set[2],word_char_set[3])
 		ret.m_word_char_map=word_char_map
 		ret.m_n_word_char_types=n_word_char_types
 		//compact the clunky_dfa

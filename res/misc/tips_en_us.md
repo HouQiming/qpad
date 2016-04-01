@@ -8,6 +8,10 @@ If you do a regular-expression search and the expression contains brackets, edit
 
 For example, if expression `obj\.([a-z_]+)` matched `obj.foo` and you rewrote it into `obj['foo']`, “replace next” would replace `obj.bar` with `obj['bar']`.
 
+# 换 Edit Propagation
+
+To edit multiple lines at the same time, use ALT+SHIFT+↓ or ALT+SHIFT+↑ to select those lines, then edit one line manually. QPad would automatically propagate the changes to the other lines. When you're done, use the replace buttons to confirm the changes.
+
 # 本 Notebooks
 
 You can use “File” - “Open notebook...” to open a notebook window for your project. 

@@ -521,6 +521,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		return ccnt_home-this.ed.MoveToBoundary(ccnt_home,-1,"space");
 	},
 	FindOuterIndentation:function(ccnt){
+		var lang=this.plugin_language_desc;
+		if(lang.ignore_indentation){
+			return -1;
+		}
 		var ed=this.ed;
 		var id_indent=ed.m_handler_registration["seeker_indentation"]
 		var my_level=this.GetIndentLevel(ccnt);
@@ -545,7 +549,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	FindOuterBracket_SizeFriendly:function(ccnt,delta){
 		var ccnt_raw=this.FindOuterBracket(ccnt,delta)
 		//return delta<0?ccnt_raw:(ccnt_raw+1-this.BracketSizeAt(ccnt_raw,0))
-		return (ccnt_raw+1-this.BracketSizeAt(ccnt_raw,delta<0?0:1))
+		return ccnt_raw<0?ccnt_raw:(ccnt_raw+1-this.BracketSizeAt(ccnt_raw,delta<0?0:1))
 	},
 	FindOuterLevel:function(ccnt){
 		var ccnt_bracket=this.FindOuterBracket_SizeFriendly(ccnt,-1);
@@ -3937,7 +3941,7 @@ W.FileItem=function(id,attrs){
 				/////////////////////////
 				var name_font=obj.name_font;
 				var name_font_bold=obj.name_font_bold;
-				var w_name=Math.max(obj.w-20-w_icon-dims_misc.w-4,64);
+				var w_name=obj.w-20-w_icon-dims_misc.w-4;
 				if(obj.owner.m_is_fs_view||obj.is_tree_view){
 					var dims=UI.MeasureText(name_font,sname);
 					if(dims.w>w_name){
@@ -4780,7 +4784,7 @@ var finvoke_goto=function(mode){
 	//UI.m_ui_metadata["<find_state>"].m_current_needle=""
 	UI.Refresh()
 }
-var g_regexp_folding_templates=['[ \t]+','[0-9]+','[.0-9efEF+-]+','[0-9A-Za-z$_]+','["][^"]*["]',"['][^'']*[']"].map(
+var g_regexp_folding_templates=['[ \t]+','[0-9]+','[0-9a-fA-F]+','[.0-9efEF+-]+','[0-9a-zA-Z$_]+','["][^"]*["]',"['][^'']*[']"].map(
 	function(a){
 		return {regexp:new RegExp("^"+a+"$"),starget:"("+a+")"};
 	}
@@ -7146,6 +7150,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{license_line:"SDL: Copyright (C) 1997-2014 Sam Lantinga <slouken@libsdl.org>"},
 				{license_line:"duktape: Copyright (c) 2013-2015 by Duktape authors"},
 				{license_line:"Hunspell: Copyright (c) N\u00e9meth L\u00e1szl\u00f3"},
+				{license_line:"Native File Dialog by Michael Labbe mike@frogtoss.com"},
 			];
 			plugin_items["Font Licenses"]=[
 				{license_line:"OpenSans: Digitized data copyright © 2010-2011, Google Corporation"},
@@ -7381,7 +7386,7 @@ UI.RegisterSpecialFile("project_list",{
 			if(obj){
 				obj.m_file_list=undefined
 				obj.m_try_to_focus=undefined;
-				UI.Refresh()
+				UI.RefreshAllTabs()
 			}
 		}
 	},
