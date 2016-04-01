@@ -136,7 +136,7 @@ strong {
 img {
   position: relative;
   margin: 0 auto;
-  max-width: 739px;
+  max-width: 640px;
   padding: 5px;
   margin: 10px 0 10px 0;
   border: 1px solid #ebebeb;
@@ -146,6 +146,11 @@ img {
   -moz-box-shadow: 0 0 5px #ebebeb;
   -o-box-shadow: 0 0 5px #ebebeb;
   -ms-box-shadow: 0 0 5px #ebebeb;
+}
+
+p {
+	text-align: justify;
+	text-justify: auto;
 }
 
 p img {
@@ -296,7 +301,7 @@ Full-Width Styles
 }
 
 #header_wrap .inner {
-  padding: 50px 10px 30px 10px;
+  padding: 10px 10px 10px 10px;
 }
 
 #project_title {
@@ -317,12 +322,35 @@ Full-Width Styles
 
 #downloads {
   position: absolute;
-  width: 210px;
   z-index: 10;
-  bottom: -40px;
+  bottom: -10px;
   right: 0;
-  height: 70px;
-  background: url('../images/icon_download.png') no-repeat 0% 90%;
+}
+
+.download_link {
+  background: #3498db;
+  background-image: -webkit-linear-gradient(top, #3498db, #2980b9);
+  background-image: -moz-linear-gradient(top, #3498db, #2980b9);
+  background-image: -ms-linear-gradient(top, #3498db, #2980b9);
+  background-image: -o-linear-gradient(top, #3498db, #2980b9);
+  background-image: linear-gradient(to bottom, #3498db, #2980b9);
+  -webkit-border-radius: 14;
+  -moz-border-radius: 14;
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 20px;
+  padding: 10px 20px 10px 20px;
+  text-decoration: none;
+}
+
+.download_link:hover {
+  background: #3cb0fd;
+  background-image: -webkit-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -moz-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -ms-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -o-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+  text-decoration: none;
 }
 
 .zip_download_link {
@@ -354,6 +382,17 @@ Full-Width Styles
   background: url(../images/sprite_download.png) no-repeat top right;
 }
 
+.demo_image {
+  margin-bottom: 0;
+  margin-bottom: 0;
+}
+
+.demo_text {
+  font-size: 18px;
+  text-align: center;
+  margin-top: 0;
+}
+
 #main_content_wrap {
   background: #f2f2f2;
   border-top: 1px solid #111;
@@ -377,10 +416,6 @@ Small Device Styles
 @media screen and (max-width: 480px) {
   body {
     font-size:14px;
-  }
-
-  #downloads {
-    display: none;
   }
 
   .inner {
@@ -421,5 +456,8 @@ Small Device Styles
     max-width: 480px;
     font-size: 11px;
   }
-
+  
+  .demo_text {
+    font-size: 14px;
+  }
 }

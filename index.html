@@ -18,33 +18,45 @@
         <header class="inner">
           <a id="forkme_banner" href="https://github.com/HouQiming/qpad">View on GitHub</a>
 
-          <h1 id="project_title">Qpad</h1>
-          <h2 id="project_tagline">QPad Text Editor</h2>
-
-            <section id="downloads">
-              <a class="zip_download_link" href="https://github.com/HouQiming/qpad/zipball/master">Download this project as a .zip file</a>
-              <a class="tar_download_link" href="https://github.com/HouQiming/qpad/tarball/master">Download this project as a tar.gz file</a>
-            </section>
+          <h1 id="project_title">QPad Text Editor</h1>
+          <h2 id="project_tagline">Fast, beautiful and straightforward</h2>
+			
+			<section id="downloads">
+			<a class="download_link" href="https://github.com/HouQiming/qpad/releases/download/v3.0/qpad3_win64.7z">Download for Win64</a>
+			</section>
         </header>
     </div>
 
     <!-- MAIN CONTENT -->
     <div id="main_content_wrap" class="outer">
       <section id="main_content" class="inner">
-        <h1>
-<a id="qpad-text-editor" class="anchor" href="#qpad-text-editor" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>QPad Text Editor</h1>
-
-<p><strong>Fast.</strong> A 10MB file won't feel any different than a 10KB file. A 10GB file runs just as fast once it finishes loading.</p>
-
-<p><strong>Beautiful.</strong> QPad renders text at PDF-reader-like quality with all the fancy effects: antialiasing, gamma correction, sub-pixel placement, high-DPI support.</p>
-
-<p><strong>Straightforward.</strong> Powerful features can be accessed without writing arcane regexps or learning a scripting language.</p>
+<div id="demo_dots" style="text-align:center;margin-bottom:-10px;"></div>
+<div id="demos">
+<div><img class="demo_image" src="images/demo1.png"><p class="demo_text">Searching with preview</p></div>
+<div><img class="demo_image" src="images/demo0.png"><p class="demo_text">Frequent-first completion</p></div>
+<div><img class="demo_image" src="images/demo2.png"><p class="demo_text">Editing gigabyte-sized files</p></div>
+<div><img class="demo_image" src="images/demo3.png"><p class="demo_text">Editing multiple lines</p></div>
+<div><img class="demo_image" src="images/demo4.png"><p class="demo_text">Running code in a notebook</p></div>
+</div>
 
 <h3>
-<a id="feature-list" class="anchor" href="#feature-list" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Feature List</h3>
+<a id="why-qpad" class="anchor" href="#why-qpad" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Reasons to Use QPad</h3>
 
-<p>Will write up later after setting up pages.</p>
-      </section>
+<p>QPad can open very big files, or binary files.</p>
+
+<p>QPad has many programming features, including "go to definition", auto-completion, code folding, build / run, and more. </p>
+
+<p>QPad can do fancy regexp stuff without the learning effort. You can create a regexp by clicking the "fold" button in the search bar. Also, when you edit a regexp match, QPad can automatically generalize the changes. </p>
+
+<p>QPad detects common CJK encodings. Those Japanese game manuals won't appear garbled any more.</p>
+
+<p>QPad has really fancy typesetting if you choose "Markdown" in the language menu. It can make novel-reading and blog-writing much more pleasing.</p>
+
+<p>QPad adapts to your screen resolution. Things won't become ridiculously large on a cheap projector, or ridiculously small on an Ultra HD display. </p>
+
+<!--<h3>
+<a id="all-ports" class="anchor" href="#all-ports" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Other Ports</h3>-->
+	</section>
     </div>
 
     <!-- FOOTER  -->
@@ -54,8 +66,39 @@
         <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
       </footer>
     </div>
-
-    
-
+    <script>
+    	//demo slide show
+    	var demos=document.getElementById("demos");
+    	var demo_dots=document.getElementById("demo_dots");
+    	var g_current_demo=0;
+    	var g_next_demo_timeout=undefined;
+    	function setDemo(id){
+    		var n=demos.children.length;
+    		for(var i=0;i<n;i++){
+    			demos.children[i].style["display"]=(i==id?"block":"none");
+    			demo_dots.children[i].textContent=(i==id?"\u25cf ":"\u25cb ");
+    		}
+    		g_current_demo=id;
+    		if(g_next_demo_timeout){
+    			window.clearTimeout(g_next_demo_timeout);
+    		}
+	    	g_next_demo_timeout=window.setTimeout(setNextDemo,10000);
+    	};
+    	function setNextDemo(){
+    		var id=g_current_demo+1;
+    		var n=demos.children.length;
+    		if(!(id<n)){id=0;}
+    		setDemo(id);
+    	}
+    	(function(){
+    		var n=demos.children.length;
+    		var s=[];
+    		for(var i=0;i<n;i++){
+    			s.push("<a href='#' style='color:#aaa;text-decoration: none;' onclick='setDemo("+i+")'>\u25cb </a>");
+    		}
+    		demo_dots.innerHTML=s.join("");
+    		setDemo(0);
+    	})()
+    </script>
   </body>
 </html>
