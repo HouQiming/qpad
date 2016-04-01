@@ -1576,38 +1576,6 @@ var find_item_region_prototype={
 	}
 };
 
-var QueryKeyDeclList=function(matches,doc,sneedle){
-	var sneedle_lower=sneedle.toLowerCase()
-	var lg_needle=Duktape.__byte_length(sneedle_lower)
-	var all_key_decls=UI.ED_GetAllKeyDeclsLower(doc)
-	if(all_key_decls){
-		for(var i=0;i<all_key_decls.length;i+=3){
-			var s_id_lower=all_key_decls[i+0]
-			//var s_id_lower=s_id.toLowerCase()
-			if(s_id_lower.length>=sneedle_lower.length){
-				if(!sneedle_lower||s_id_lower.substr(0,sneedle_lower.length)==sneedle_lower){
-					//we don't need the type here
-					//var type=all_key_decls[i+1]
-					var ccnt_match=all_key_decls[i+2]
-					//if(sneedle_lower.length&&doc.ed.GetText(ccnt_match,lg_needle).toLowerCase()==sneedle_lower){
-					if(sneedle_lower){
-						matches.push(ccnt_match,ccnt_match+lg_needle)
-					}else{
-						matches.push(ccnt_match,ccnt_match+Duktape.__byte_length(s_id_lower))
-					}
-					//}else{
-					//	var ccnt_match1=doc.SnapToValidLocation(doc.ed.MoveToBoundary(doc.ed.SnapToCharBoundary(ccnt_match,1),1,"word_boundary_right"),1)
-					//	matches.push(ccnt_match,ccnt_match1)
-					//}
-				}
-			}
-		}
-		return all_key_decls.length;
-	}else{
-		return 0;
-	}
-};
-
 //UI.g_is_in_global_search=0;
 var find_context_prototype={
 	CreateHighlight:function(doc,ccnt0,ccnt1){
@@ -1959,12 +1927,11 @@ var find_context_prototype={
 					//global goto
 					if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)&&!g_is_parse_more_running){
 						if(doc_forward_search.m_file_index&&doc_forward_search.m_file_index.hasDecls()){
-							var matches=[];
-							var workload=QueryKeyDeclList(matches,doc_forward_search,this.m_needle)
+							var matches=(ED.ED_QueryKeyDeclByNeedle(doc_forward_search,this.m_needle)||[]);
 							for(var i=0;i<matches.length;i+=2){
 								this.ReportMatchForward(doc_forward_search,matches[i+0],matches[i+1])
 							}
-							FORWARD_BUDGET-=workload*128;
+							FORWARD_BUDGET-=matches.length*64;
 						}
 						this.m_search_doc=undefined;
 						this.m_forward_frontier=-1;
@@ -2626,7 +2593,7 @@ W.CodeEditorWidget_prototype={
 			}else{
 				//search for function / class
 				//coulddo: make it progressive - search callback, faster is-unmodified test
-				QueryKeyDeclList(matches,doc,sneedle);
+				matches=(UI.ED_QueryKeyDeclByNeedle(doc,sneedle)||[]);
 			}
 			SetFindContextFinalResult(ctx,ccnt,matches)
 			UI.Refresh()

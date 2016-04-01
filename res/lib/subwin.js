@@ -856,10 +856,9 @@ var RenderLayout=function(layout,obj,y_base){
 								//skip the first frame
 								tab.backup_frame_id=1;
 							}else if(tab.backup_frame_id==1){
-								//do the backup
-								tab.backup_frame_id=2;
+								//do the backup, update frame id when one really does the backup
 								rendering_action="backup";
-							}else{
+							}else if(tab.backup_frame_id==2){
 								//restore the backup
 								rendering_action="restore";
 							}
@@ -929,10 +928,12 @@ var RenderLayout=function(layout,obj,y_base){
 						UI.End()
 						UI.FlushTopMostContext(n0_topmost)
 						if(rendering_action=="backup"){
-							UI.GLWidget(function(){
+							UI.GLWidget(function(tab){
 								//0 for backup
 								UI.GL_LeaveBackupFBO();
-							})
+								//if somehow the GLWidget is skipped (e.g. frame invalidated, we need to re-backup)
+								tab.backup_frame_id=2;
+							}.bind(undefined,tab));
 							tab.backup_regions=[];
 							for(var i=n0_region;i<UI.context_regions.length;i++){
 								var rgn=UI.context_regions[i];
