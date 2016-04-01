@@ -10,7 +10,9 @@ For more details, visit the [github io page](https://houqiming.github.io/qpad/).
 
 ## How to Build
 
-Download the compiler package at [https://github.com/HouQiming/jacy/releases/download/v0.1/bin.zip], and run:
+Clone the repository at <https://github.com/HouQiming/jacy/>, download the compiler package at <https://github.com/HouQiming/jacy/releases/download/v0.1/bin.zip>,  add the binaries to PATH, then run:
 ```
 jc qpad.jc
 ```
+
+Right now only Windows build is supported and you need a Visual Studio.
