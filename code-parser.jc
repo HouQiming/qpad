@@ -561,6 +561,8 @@ auto tokenize(string sdata,int g_ignore_indents)
 						chu=0
 						for j=0:(c=='u'?3:1)
 							chj=int(feed[ptr])
+							if !CharSet.has(CharSet.hexdigit,chj):
+								break
 							if chj:ptr++
 							si=((chj-'0')&0x1f)
 							if si>=0x10:si-=7
@@ -699,6 +701,8 @@ auto tokenize(string sdata,int g_ignore_indents)
 										chu=0
 										for j=0:(c=='u'?3:1)
 											chj=int(feed[ptr])
+											if !CharSet.has(CharSet.hexdigit,chj):
+												break
 											if chj:ptr++
 											si=((chj-'0')&0x1f)
 											if si>=0x10:si-=7

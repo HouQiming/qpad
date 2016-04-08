@@ -548,11 +548,11 @@ W.BinaryEditor=function(id,attrs){
 			x:obj.x+4,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_icon_font))*0.5,
 			font:obj.notification_icon_font,text:'s',color:obj.notification_text_color,
 		})
+		var ctx=obj.m_find_context;
 		W.Text("",{
 			x:obj.x+28,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_styles[0].font))*0.5,
-			font:obj.notification_styles[0].font,text:UI._("Searching..."),color:obj.notification_styles[0].color,
+			font:obj.notification_styles[0].font,text:UI._("Searching ..."),color:obj.notification_styles[0].color,
 		})
-		var ctx=obj.m_find_context;
 		//1048576 is the budget
 		var ret=UI.BIN_SearchBuffer(obj.m_data,ctx.m_addr,ctx.m_dir, ctx.m_needle,ctx.m_needle_prt, 1048576);
 		if(ret==undefined||ret.found){
@@ -569,6 +569,8 @@ W.BinaryEditor=function(id,attrs){
 		}else{
 			ctx.m_addr=ret.addr;
 		}
+		//have to refresh to "search next"
+		UI.Refresh()
 	}else if(obj.m_show_find){
 		W.Text("",{
 			x:obj.x+4,y:obj.y+(obj.h_notification_area-UI.GetCharacterHeight(obj.notification_icon_font))*0.5,

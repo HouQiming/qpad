@@ -830,6 +830,19 @@ UI.RegisterOutputParser('[ \t]*at[ \t]*.*[ \t]*\\((.*):([0-9]+):([0-9]+)\\).*',3
 	return err
 });
 
+UI.RegisterOutputParser('[ \t]*at[ \t]*(.*):([0-9]+):([0-9]+)',3,function(matches){
+	var name=matches[1]
+	var linea=parseInt(matches[2])
+	//var cola=parseInt(matches[3])
+	var err={
+		file_name:name,
+		category:"error",
+		message:"node.js stack dump",
+		line0:linea-1,
+	}
+	return err
+});
+
 /////////////////////////////////////////////
 //search engine hooks
 var SearchEngineHook=function(items,ssearch, icon,stitle_template,url_template){
@@ -953,7 +966,7 @@ UI.RegisterEditorPlugin(function(){
 				if(size==Duktape.__byte_length(s_mark)){
 					doc_in.ed.Edit([0,size,s_mark+s_script]);
 				}
-				UI.Refresh()
+				UI.RefreshAllTabs()
 			}
 		}; 
 		menu_run.AddNormalItem({text:"Create file cell",key:"CTRL+F7",enable_hotkey:1,action:fgencell.bind(this,0)})

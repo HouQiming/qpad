@@ -22,6 +22,8 @@ __generate_json("icon_win","iconwin.ico")
 //__generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
 __generate_json("linux_cc","gcc-5")
+if Platform.IS_LINUX:
+	__generate_json("ssh_remote_target","~/qpad")
 if Platform.IS_WINDOWS:
 	__generate_json("lib_files","shell32.lib")
 	__generate_json("lib_files","kernel32.lib")
@@ -35,6 +37,7 @@ if Platform.IS_WINDOWS:
 //	__generate_json("vc_versions","9")
 if Platform.IS_UNIX&&Platform.BUILD!="debug":
 	__generate_json("ldflags","-s")
+	//__generate_json("ldflags","-static")
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -97,10 +100,10 @@ if Platform.BUILD=="debug":
 	JS=new JSContext
 	JS_script_sandbox=new JSContext
 	sbox=setupModuleSystem(JS,1)
-	if Platform.BUILD=="debug":
-		sbox.UILoadZip(string.NULL)
-	else
-		sbox.UILoadStaticZip()
+	//if Platform.BUILD=="debug":
+	//	sbox.UILoadZip(string.NULL)
+	//else
+	sbox.UILoadStaticZip()
 	/////////////
 	jsio=JS.New()
 	JS.GetGlobal()["IO"]=jsio

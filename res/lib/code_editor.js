@@ -2339,7 +2339,7 @@ UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found
 		if(cell_i&&is_non_quiet!="output"){
 			UI.SetFocus(is_non_quiet=="output"?cell_i.m_text_out:cell_i.m_text_in)
 		}
-		UI.Refresh()
+		UI.RefreshAllTabs()
 	}
 	return {obj_notebook:obj_notebook,cell_id:cell_id};
 }
@@ -3598,7 +3598,7 @@ var FormatFileSize=function(size){
 	}else if(size<1099511627776){
 		return (size/1073741824).toFixed(1)+"GB"
 	}else{
-		return (size/1099511627776).toFixed(1)+"TB"
+		return (size/1099527776).toFixed(1)+"TB"
 	}
 }
 
@@ -6849,7 +6849,8 @@ Language.Register({
 		"png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr",
 		"mp4","mpg","mpeg","h264","avi","mov","rm","rmvb",
 		'ttf','otf',
-		'pdb','sdf'],
+		'pdb','sdf',
+		'svn-base'],
 	////////////////////////
 	rules:function(lang){
 		lang.DefineDefaultColor("color")

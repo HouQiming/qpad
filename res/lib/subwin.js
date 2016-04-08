@@ -700,7 +700,7 @@ var g_sizing_rect_prototype={
 		UI.ReleaseMouse(this);
 	},
 };
-var g_rerender_events=["OnMouseOver","OnMouseOut","OnMouseMove","OnMouseDown","OnMouseUp","OnMouseWheel","OnClick","OnFocus","OnBlur","OnTextInput","OnTextEdit","OnKeyDown","OnKeyUp"];
+var g_rerender_events=["OnMouseOver","OnMouseOut","OnMouseMove","OnMouseDown","OnMouseUp","OnMouseWheel","OnClick","OnDblClick","OnFocus","OnBlur","OnTextInput","OnTextEdit","OnKeyDown","OnKeyUp"];
 var RenderLayout=function(layout,obj,y_base){
 	//per-tab z_order, sort and reset on workspace save / restore
 	var has_area_name={};
