@@ -352,22 +352,27 @@ KeywordSet.prototype={
 
 ///////////////////////////////////
 var g_cached_hyphenators={}
-exports.GetHyphenator=function(lang){
-	var ret=g_cached_hyphenators[lang]
-	if(!ret){
+exports.GetHyphenatorReal=function(lang){
+	var ret=g_cached_hyphenators[lang];
+	if(ret==undefined){
 		var sdata=IO.UIReadAll("res/misc/"+lang+".dfa")
 		if(!sdata){
-			sdata=IO.ReadAll(System.Env.GetExecutablePath()+"res/misc/"+lang+".dfa")
+			sdata=IO.ReadAll("res/misc/"+lang+".dfa")
 			if(!sdata){
-				sdata=IO.ReadAll(System.Env.GetExecutablePath()+"res/misc/"+lang+".tex")
+				sdata=IO.ReadAll("res/misc/"+lang+".tex")
 			}
 		}
 		if(sdata){
 			ret=UI.ParseHyphenator(sdata);
 		}
+		if(!ret){ret=0;}
 		g_cached_hyphenators[lang]=ret
 	}
 	return ret;
+}
+
+exports.GetHyphenator=function(lang){
+	return exports.GetHyphenatorReal(lang)||exports.GetHyphenatorReal("en_us");
 }
 
 ///////////////////////////////////

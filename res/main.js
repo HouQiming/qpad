@@ -252,7 +252,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 				"VersionMinor:dword",(verminor).toString(),
 				"EstimatedSize:dword",(((IO.GetFileSize(sexe)+IO.GetFileSize(spath+'/res.zip'))>>10)+1024).toString(),
 				"InstallLocation",spath])
-		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Add QPad to explorer menus"));
+		return UI.WIN_ApplyRegistryFile(sregfile,"Add QPad to explorer menus");
 	}
 	UI.UninstallQPad=function(){
 		var sshortname=UI.GetMainFileName(IO.m_my_name).toLowerCase()
@@ -263,7 +263,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			"\n[-HKEY_CLASSES_ROOT\\Applications\\@1]\n".replace("@1",sshortname),
 			"\n[-HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\@1]\n".replace("@1",sshortname),
 		];
-		return UI.WIN_ApplyRegistryFile(sregfile,UI._("Uninstall QPad"));
+		return UI.WIN_ApplyRegistryFile(sregfile,"Uninstall QPad");
 	}
 	UI.SetFileAssoc=function(sext){
 		var sregfile=["\ufeffWindows Registry Editor Version 5.00\n"];
@@ -583,7 +583,7 @@ var CreateMenus=function(){
 	W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
 	W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
 	W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
-	menu_tools.AddButtonRow({icon:"扩",text:"Zoom (@1%)".replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
+	menu_tools.AddButtonRow({icon:"扩",text:UI._("Zoom (@1%)").replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
 		{text:"-",tooltip:'CTRL -',action:function(){
 			UI.ZoomRelative(1/ZOOM_RATE)
 		}},{text:"100%",tooltip:'CTRL+0',action:function(){

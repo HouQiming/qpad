@@ -535,7 +535,7 @@ UI.RegisterHelpCommand('Find (regex) `([^`]+)`',function(op_active){
 },0);
 
 UI.RegisterUtilType("help_page",function(){return UI.NewTab({
-	title:"Help",
+	title:UI._("Help"),
 	area_name:"h_tools",
 	body:function(){
 		//frontmost doc

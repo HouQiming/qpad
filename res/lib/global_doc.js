@@ -77,10 +77,10 @@ UI.SaveMetaData=function(){
 	IO.CreateFile(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata))
 }
 
-UI.TestOption=function(stable_name){
+UI.TestOption=function(stable_name,default_value){
 	var options=(UI.m_ui_metadata["<options>"]||{});
 	var is_enabled=options[stable_name];
-	if(is_enabled==undefined){is_enabled=1;}
+	if(is_enabled==undefined){is_enabled=(default_value==undefined?1:default_value);options[stable_name]=is_enabled;}
 	return is_enabled;
 }
 

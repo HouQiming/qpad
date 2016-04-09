@@ -691,6 +691,8 @@ UI.CustomTheme=function(){
 				{font:UI.Font("res/fonts/inconsolata.ttf,!",24),line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
 				//icon
 				{font:UI.Font(UI.icon_font_name,36),raise_height:-6,line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
+				//small icon
+				{font:UI.Font(UI.icon_font_name,24),raise_height:-6,line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
 			],
 		},
 		sxs_new_page:{

@@ -169,7 +169,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				}
 				if(show_replace_hint){
 					obj.CreateNotification({
-						id:'replace_hint',icon:'换',text:['Edit the match to start replacing'].join("\n")
+						id:'replace_hint',icon:'换',text:UI._('Edit the match to start replacing')
 					},"quiet")
 				}else{
 					obj.DismissNotification('replace_hint')
@@ -377,8 +377,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216),function(encoding){
 			if(this.owner){
 				this.owner.CreateNotification({id:'saving_progress',icon:'警',
-					text:"The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.".replace(
-						"@1",g_encoding_names[encoding]||"an unknown"),
+					text:UI._("The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.").replace(
+						"@1",g_encoding_names[encoding]||UI._("an unknown")),
 				})
 			}
 			return 0
@@ -2052,7 +2052,7 @@ var find_context_prototype={
 				}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!=undefined){
 					s_bof_message=UI._("Go to line @1").replace("@1",this.m_goto_line_number.toString())
 				}else{
-					s_bof_message=UI._("No more '@1' above".replace("@1",this.m_needle))
+					s_bof_message=UI._("No more '@1' above").replace("@1",this.m_needle)
 				}
 			}
 			var text_dim=UI.MeasureText(edstyle.find_message_font,s_bof_message)
@@ -2501,6 +2501,7 @@ W.CodeEditorWidget_prototype={
 	},
 	ReleaseEditLock:function(){
 		if(this.m_edit_lock>0){this.m_edit_lock--;}
+		UI.RefreshAllTabs()
 	},
 	////////////////////////////////////
 	//the virtual document doesn't include middle expansion
@@ -2777,6 +2778,7 @@ W.CodeEditorWidget_prototype={
 		}
 	},
 	CreateNotification:function(attrs,is_quiet){
+		attrs.text=UI._(attrs.text);
 		var ns=this.m_notifications
 		if(!ns){
 			ns=[]
@@ -2867,7 +2869,7 @@ W.CodeEditorWidget_prototype={
 					this.m_owner.m_find_next_context=undefined
 					if(!this.m_match_reported){
 						//notification
-						this.m_owner.CreateNotification({id:'find_result',icon:'警',text:(direction<0?"No more '@1' above":"No more '@1' below").replace("@1",this.m_needle)})
+						this.m_owner.CreateNotification({id:'find_result',icon:'警',text:UI._(direction<0?"No more '@1' above":"No more '@1' below").replace("@1",this.m_needle)})
 					}
 					UI.Refresh()
 				}else{
@@ -3887,7 +3889,7 @@ W.FileItem=function(id,attrs){
 						x:16,y:0,
 						value:obj.selected,
 						text:"✕",
-						tooltip:"Unpin this project",
+						tooltip:UI._("Unpin this project"),
 						anchor:'parent',anchor_align:'right',anchor_valign:'center',
 						OnClick:function(){
 							UI.RemoveProjectDir(obj.name)
@@ -3899,7 +3901,7 @@ W.FileItem=function(id,attrs){
 						x:16,y:0,
 						value:obj.selected,
 						text:"✕",
-						tooltip:"Forget this file",
+						tooltip:UI._("Forget this file"),
 						anchor:'parent',anchor_align:'right',anchor_valign:'center',
 						OnClick:function(){
 							UI.ForgetFile(obj)
@@ -4207,7 +4209,7 @@ W.FileBrowserPage=function(id,attrs){
 			value:obj.selected,padding:8,
 			font:UI.icon_font_20,
 			text:"换",
-			tooltip:"Manage projects...",
+			tooltip:UI._("Manage projects..."),
 			anchor:'parent',anchor_align:'right',anchor_valign:'up',
 			OnClick:function(){
 				//UI.top.app.document_area.CloseTab()
@@ -4221,7 +4223,7 @@ W.FileBrowserPage=function(id,attrs){
 		value:obj.selected,padding:8,
 		font:UI.icon_font_20,
 		text:"刷",
-		tooltip:"Refresh",// - F5
+		tooltip:UI._("Refresh"),// - F5
 		anchor:'parent',anchor_align:'right',anchor_valign:'up',
 		OnClick:function(){
 			UI.ClearFileListingCache();
@@ -4296,14 +4298,14 @@ W.FileBrowserPage=function(id,attrs){
 				UI.m_ui_metadata["<project-treeview>"]=git_treeview_metadata;
 			}
 			if(projects.length>0){
-				files.push({caption:"Projects",no_selection:1,h:32})
+				files.push({caption:UI._("Projects"),no_selection:1,h:32})
 				for(var i=0;i<projects.length;i++){
 					//files.push({git_repo_to_list:projects[i], is_tree_view:1, search_text:""})
 					files.push({name_to_find:projects[i], is_tree_view:1})
 				}
 			}
 			if(UI.g_transient_projects.length>0){
-				files.push({caption:"Auto-detected repositories",no_selection:1,h:32})
+				files.push({caption:UI._("Auto-detected repositories"),no_selection:1,h:32})
 				UI.g_transient_projects.sort(function(a,b){
 					a=UI.RemovePath(a);
 					b=UI.RemovePath(b);
@@ -4556,7 +4558,7 @@ UI.GetFrontMostEditorTab=function(){
 }
 
 UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
-	title:"Files",
+	title:UI._("Files"),
 	area_name:"h_tools",
 	body:function(){
 		//frontmost doc
@@ -4589,9 +4591,9 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,tooltips,fprev,fall,fnext
 		return;
 	}
 	menu.AddButtonRow({text:stext},[
-		{key:"SHIFT+CTRL+D",text:"edit_up",icon:"上",tooltip:'Prev - '+UI.LocalizeKeyName(UI.TranslateHotkey('SHIFT+CTRL+D')),action:fprev},
-		{key:"ALT+A",text:"edit_all",icon:"换",tooltip:'All - '+UI.LocalizeKeyName(UI.TranslateHotkey('ALT+A')),action:fall},
-		{key:"CTRL+D",text:"edit_down",icon:"下",tooltip:'Next - '+UI.LocalizeKeyName(UI.TranslateHotkey('CTRL+D')),action:fnext}])
+		{key:"SHIFT+CTRL+D",text:"edit_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+D',action:fprev},
+		{key:"ALT+A",text:"edit_all",icon:"换",tooltip:'All - ALT+A',action:fall},
+		{key:"CTRL+D",text:"edit_down",icon:"下",tooltip:'Next - CTRL+D',action:fnext}])
 	if(!obj.doc.m_hide_prev_next_buttons){
 		var sz_button=obj.autoedit_button_size;
 		var padding=obj.autoedit_button_padding;
@@ -4659,7 +4661,7 @@ UI.ED_ParseMore_callback=function(fn){
 
 UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-		fn_include=fn_include.toLowerCase().replace("\\","/")
+		fn_include=fn_include.toLowerCase().replace(/\\/g,"/")
 	}
 	if(fn_include.indexOf('js_module@')==0){
 		fn_include=fn_include.substr(10);
@@ -4700,7 +4702,7 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 			for(var i=0;i<files.length;i++){
 				var fn_i=files[i]
 				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-					fn_i=fn_i.toLowerCase().replace("\\","/")
+					fn_i=fn_i.toLowerCase().replace(/\\/g,"/")
 				}
 				if(fn_i.length<fn_include_length){continue;}
 				if(fn_i.substr(fn_i.length-fn_include_length)==fn_include&&IO.FileExists(fn_i)){
@@ -5114,7 +5116,7 @@ W.CodeEditor=function(id,attrs){
 				id:'loading_progress',
 				icon:undefined,
 				progress:doc.ed.hfile_loading.progress,
-				text:"Loading @1%...".replace('@1',(doc.ed.hfile_loading.progress*100).toFixed(0))},"quiet")
+				text:UI._("Loading @1%...").replace('@1',(doc.ed.hfile_loading.progress*100).toFixed(0))},"quiet")
 		}else{
 			obj.DismissNotification('loading_progress')
 		}
@@ -5482,7 +5484,7 @@ W.CodeEditor=function(id,attrs){
 				}else{
 					if(rctx.m_ae_prg){
 						//use coloring
-						var s_middle='  \u2193 regexp \u2193';
+						var s_middle=UI._('  \u2193 regexp \u2193');
 						var s_text=[rctx.m_ae_raw_text,s_middle,s_replace].join("\n");
 						var offset_tar=rctx.m_ae_raw_text.length+s_middle.length+2
 						var ranges=[];
@@ -5661,7 +5663,7 @@ W.CodeEditor=function(id,attrs){
 						anchor:rect_bar,anchor_align:'right',anchor_yalign:'up',
 						font:obj.find_bar_hint_font,
 						color:UI.lerp_rgba(obj.disclaimer_color&0x00ffffff,obj.disclaimer_color,disclaimer_alpha),
-						text:"fuzzy search"})
+						text:UI._("fuzzy search")})
 				}else if(obj.m_current_find_context&&obj.m_current_find_context.m_goto_line_error){
 					W.Text("",{x:8,
 						anchor:rect_bar,anchor_align:'right',anchor_yalign:'up',
@@ -5672,7 +5674,7 @@ W.CodeEditor=function(id,attrs){
 				if(show_flag_buttons){
 					var btn_case=W.Button("find_button_case",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"写",tooltip:"Case sensitive - ALT+C",
+						font:UI.icon_font,text:"写",tooltip:UI._("Case sensitive - ALT+C"),
 						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_CASE_SENSITIVE?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_CASE_SENSITIVE)|(value?UI.SEARCH_FLAG_CASE_SENSITIVE:0)
@@ -5686,7 +5688,7 @@ W.CodeEditor=function(id,attrs){
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_word=W.Button("find_button_word",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"字",tooltip:"Whole word - ALT+H",
+						font:UI.icon_font,text:"字",tooltip:UI._("Whole word - ALT+H"),
 						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_WHOLE_WORD?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_WHOLE_WORD)|(value?UI.SEARCH_FLAG_WHOLE_WORD:0)
@@ -5700,7 +5702,7 @@ W.CodeEditor=function(id,attrs){
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_regexp=W.Button("find_button_regexp",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"正",tooltip:"Regular expression - ALT+E",
+						font:UI.icon_font,text:"正",tooltip:UI._("Regular expression - ALT+E"),
 						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_REGEXP?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_REGEXP)|(value?UI.SEARCH_FLAG_REGEXP:0)
@@ -5714,7 +5716,7 @@ W.CodeEditor=function(id,attrs){
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_fold=W.Button("find_button_fold",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"叠",tooltip:"Convert to wildcard - ALT+LEFT",
+						font:UI.icon_font,text:"叠",tooltip:UI._("Convert to wildcard - ALT+LEFT"),
 						OnClick:function(value){
 							var doc_fbar=obj.find_bar_edit;
 							var sel_fbar=doc_fbar.GetSelection();
@@ -5765,7 +5767,7 @@ W.CodeEditor=function(id,attrs){
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_code=W.Button("find_button_code",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"プ",tooltip:"Code only - ALT+D",
+						font:UI.icon_font,text:"プ",tooltip:UI._("Code only - ALT+D"),
 						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_CODE_ONLY?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_CODE_ONLY)|(value?UI.SEARCH_FLAG_CODE_ONLY:0)
@@ -5779,7 +5781,7 @@ W.CodeEditor=function(id,attrs){
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 					var btn_hidden=W.Button("find_button_hidden",{style:UI.default_styles.check_button,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"藏",tooltip:"Search hidden text - ALT+T",
+						font:UI.icon_font,text:"藏",tooltip:UI._("Search hidden text - ALT+T"),
 						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_HIDDEN?1:0),
 						OnChange:function(value){
 							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_HIDDEN)|(value?UI.SEARCH_FLAG_HIDDEN:0)
@@ -5794,7 +5796,7 @@ W.CodeEditor=function(id,attrs){
 				}
 				W.Button("find_button_close",{style:UI.default_styles.check_button,
 					x:x_button_right+2,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5+2,w:obj.find_bar_button_size-4,h:obj.find_bar_button_size-4,
-					font:UI.icon_font_20,text:"✕",tooltip:"Close - ESC",
+					font:UI.icon_font_20,text:"✕",tooltip:UI._("Close - ESC"),
 					OnClick:function(){
 						var ctx=obj.m_current_find_context
 						if(ctx){
@@ -5966,10 +5968,11 @@ W.CodeEditor=function(id,attrs){
 						var fconfirm=function(){
 							doc.ConfirmAC(acctx.m_selection)
 						}
-						menu_edit.AddButtonRow({text:"Auto-complete"},[
-							{text:"<",tooltip:'- or ,',action:fprevpage},
-							{key:"RETURN RETURN2",text:"confirm",tooltip:'ENTER or SPACE',action:fconfirm},
-							{text:">",tooltip:'= or .',action:fnextpage}])
+						//need this for hotkeys - RETURN
+						//menu_edit.AddButtonRow({text:"Auto-complete"},[
+						//	{text:"<",tooltip:'- or ,',action:fprevpage},
+						//	{key:"RETURN RETURN2",text:"confirm",tooltip:'ENTER or SPACE',action:fconfirm},
+						//	{text:">",tooltip:'= or .',action:fnextpage}])
 						//W.Hotkey("",{text:",",action:fprevpage})
 						//W.Hotkey("",{text:".",action:fnextpage})
 						doc.AddTransientHotkey("-",fprevpage)
@@ -5978,6 +5981,7 @@ W.CodeEditor=function(id,attrs){
 						doc.AddTransientHotkey("RIGHT",fnextcand)
 						doc.AddTransientHotkey(" ",fconfirm)
 						doc.AddTransientHotkey("TAB",fconfirm)
+						doc.AddTransientHotkey("RETURN RETURN2",fconfirm)
 					}
 				}
 				///////////////////////
@@ -7070,6 +7074,7 @@ W.SXS_OptionsPage=function(id,attrs){
 			plugin_items["Display"]=[
 				{special:'theme_button',h_special:4},
 				{special:'tab_width',h_special:4},
+				{name:'Use English (need to restart)',stable_name:'force_english'},//DO NOT TRANSLATE THIS!
 				{name:UI._('Highlight the current line'),stable_name:'show_line_highlight'},
 				{name:UI._('Show the menu bar'),stable_name:'always_show_menu'},
 				{name:UI._('Show horizontal scroll-bar'),stable_name:'show_x_scroll_bar'},
@@ -7084,10 +7089,12 @@ W.SXS_OptionsPage=function(id,attrs){
 				{name:UI._('Allow \u2190/\u2192 to cross lines'),stable_name:'left_right_line_wrap'},
 				{name:UI._('Move forward old tabs when manually opened'),stable_name:'explicit_open_mtf'},
 			];
+			plugin_items["Tools"]=[];
 			if(UI.InstallQPad){
-				plugin_items["Tools"]=[
-					{special:'install_button',h_special:8},
-				];
+				plugin_items["Tools"].push({special:'install_button',h_special:8})
+			}
+			if(UI.ShowCompletionNotification){
+				plugin_items["Tools"].push({name:UI._('Notify when a notebook cell completes'),stable_name:'completion_notification'})
 			}
 			/////////////////
 			//plugin options
@@ -7099,6 +7106,7 @@ W.SXS_OptionsPage=function(id,attrs){
 					cat_list=[];
 					plugin_items[desc_i.category]=cat_list;
 				}
+				desc_i.name=UI._(desc_i.name);
 				cat_list.push(desc_i);
 			}
 			plugin_items["Display"].push(
@@ -7110,8 +7118,8 @@ W.SXS_OptionsPage=function(id,attrs){
 			/////////////////
 			//qpad credits
 			plugin_items["About"]=[
-				{license_line:"QPad v"+UI.g_version+", by Qiming HOU",text_color_license:UI.default_styles.feature_item.text_color},
-				{license_line:"Contact: hqm03ster@gmail.com",text_color_license:UI.default_styles.feature_item.text_color},
+				{license_line:UI.Format("QPad v@1, by Qiming HOU",UI.g_version),text_color_license:UI.default_styles.feature_item.text_color},
+				{license_line:UI._("Contact: hqm03ster@gmail.com"),text_color_license:UI.default_styles.feature_item.text_color},
 			];
 			/////////////////
 			//OSS licenses
@@ -7139,7 +7147,7 @@ W.SXS_OptionsPage=function(id,attrs){
 					var desc_i=cat_list[j];
 					desc_i.is_first=(j==0);
 					if(j==0){
-						desc_i.category=scat_i;
+						desc_i.category=UI._(scat_i);
 						desc_i.category_icon=obj.category_icons[i];
 					}
 					view_items.push(desc_i);

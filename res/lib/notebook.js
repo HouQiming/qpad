@@ -695,6 +695,10 @@ W.notebook_prototype={
 					IO.DeleteFile(fn_script)
 					UI.OnApplicationSwitch()
 					UI.Refresh();
+					//completion notification
+					if(UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
+						UI.ShowCompletionNotification();
+					}
 				}
 			}).bind(this,cell_i,proc_desc)
 			UI.NextTick(fpoll)
@@ -872,7 +876,7 @@ W.NotebookView=function(id,attrs){
 			btn_last=W.Button("close_btn_"+i.toString(),{
 				style:obj.button_style,
 				text:"✕",
-				tooltip:"Delete cell",
+				tooltip:UI._("Delete cell"),
 				x:obj.caption_button_padding,y:0,anchor:rect_bar,anchor_align:'right',anchor_valign:'center',
 				OnClick:function(i){
 					this.DeleteCell(i)
@@ -883,7 +887,7 @@ W.NotebookView=function(id,attrs){
 				btn_last=W.Button("move_down_btn_"+i.toString(),{
 					style:obj.button_style,
 					text:"下",
-					tooltip:'Move down',
+					tooltip:UI._('Move down'),
 					x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
 					OnClick:function(i){
 						this.SwapCells(i,i+1)
@@ -895,7 +899,7 @@ W.NotebookView=function(id,attrs){
 				btn_last=W.Button("move_up_btn_"+i.toString(),{
 					style:obj.button_style,
 					text:"上",
-					tooltip:'Move up',
+					tooltip:UI._('Move up'),
 					x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
 					OnClick:function(i){
 						this.SwapCells(i,i-1)
@@ -906,7 +910,7 @@ W.NotebookView=function(id,attrs){
 			btn_last=W.Button("add_btn_"+i.toString(),{
 				style:obj.button_style,
 				text:"+",
-				tooltip:"Add cell below",
+				tooltip:UI._("Add cell below"),
 				x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
 				OnClick:function(i){
 					this.NewCell(undefined,i)
@@ -917,7 +921,7 @@ W.NotebookView=function(id,attrs){
 				W.Button("kill_btn_"+i.toString(),{
 					style:obj.button_style,
 					text:"停",
-					tooltip:'Stop',
+					tooltip:UI._('Stop'),
 					x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
 					OnClick:function(i){
 						this.KillCell(i);
@@ -927,7 +931,7 @@ W.NotebookView=function(id,attrs){
 				W.Button("play_btn_"+i.toString(),{
 					style:obj.button_style,
 					text:"放",
-					tooltip:'Run cell',
+					tooltip:UI._('Run cell'),
 					x:obj.caption_button_padding,y:0,anchor:btn_last,anchor_placement:'left',anchor_align:'right',anchor_valign:'center',
 					OnClick:function(i){
 						this.RunCell(i)
@@ -978,7 +982,7 @@ W.NotebookView=function(id,attrs){
 			btn_last=W.Button("clear_btn_"+i.toString(),{
 				style:obj.button_style,
 				text:"清",
-				tooltip:"Clear output",
+				tooltip:UI._("Clear output"),
 				x:obj.caption_button_padding,y:0,anchor:rect_bar,anchor_align:'right',anchor_valign:'center',
 				OnClick:function(i){
 					this.ClearCellOutput(i)

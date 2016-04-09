@@ -1041,6 +1041,16 @@ var SortTabsByArea=function(layout,obj){
 	}
 }
 
+var TranslateTooltip=function(s){
+	if(!s){return s;}
+	var s=UI._(s);
+	var p_hotkey=s.indexOf(' - ');
+	if(p_hotkey>=0){
+		s=s.substr(0,p_hotkey+3)+UI.LocalizeKeyName(UI.TranslateHotkey(s.substr(p_hotkey+3)));
+	}
+	return s;
+};
+
 UI.g_caption_scroll_by_name={};
 W.TabbedDocument=function(id,attrs){
 	var obj=UI.Keep(id,attrs,W.TabbedDocument_prototype);
@@ -1215,7 +1225,7 @@ W.TabbedDocument=function(id,attrs){
 					W.TabLabel(tab_j.__global_tab_id,{
 						x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
 						selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
-						title:tab_j.title, tooltip:tab_j.tooltip,
+						title:tab_j.title, tooltip:TranslateTooltip(tab_j.tooltip),
 						hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
 						tabid:tab_j.__global_tab_id,owner:obj})
 				}
@@ -1230,7 +1240,7 @@ W.TabbedDocument=function(id,attrs){
 					x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
 					w:w_src_at_target,h:area_i.h,
 					selected:2,
-					title:tab_dragging_src.title, tooltip:tab_dragging_src.tooltip,
+					title:tab_dragging_src.title, tooltip:TranslateTooltip(tab_dragging_src.tooltip),
 					hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
 					tabid:tab_dragging_src.__global_tab_id,owner:obj})
 			})
@@ -1277,7 +1287,7 @@ W.TabbedDocument=function(id,attrs){
 							W.TabLabel(tab_j.__global_tab_id,{
 								x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
 								selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
-								title:tab_j.title, tooltip:tab_j.tooltip,
+								title:tab_j.title, tooltip:TranslateTooltip(tab_j.tooltip),
 								hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
 								tabid:tab_j.__global_tab_id,owner:obj})
 						}
@@ -1317,7 +1327,7 @@ W.TabbedDocument=function(id,attrs){
 				x:obj.x+obj.w-obj.padding-obj.w_menu_button,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),
 				w:obj.w_menu_button,h:obj.h_menu_button,
 				style:obj.menu_button_style,
-				tooltip:'Restore tab size - ESC',
+				tooltip:TranslateTooltip('Restore tab size - ESC'),
 				font:UI.icon_font,text:"还",
 				value:0,
 				OnClick:function(){
@@ -1548,7 +1558,7 @@ W.CFancyMenuDesc.prototype={
 	AddNormalItem:function(attrs){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',icon:attrs.icon,text:attrs.text,
+		children.push({type:'text',icon:attrs.icon,text:UI._(attrs.text),
 			color:attrs.action?style.text_color:style.hotkey_color,
 			icon_color:attrs.icon=="■"||attrs.icon=="□"?style.icon_color:style.text_color,
 			context_menu_group:attrs.context_menu_group,
@@ -1583,7 +1593,7 @@ W.CFancyMenuDesc.prototype={
 	AddButtonRow:function(attrs,buttons){
 		var style=UI.default_styles['fancy_menu']
 		var children=this.$
-		children.push({type:'text',icon:attrs.icon,text:attrs.text,
+		children.push({type:'text',icon:attrs.icon,text:UI._(attrs.text),
 			icon_color:style.text_color,
 			color:style.text_color,sel_color:style.text_sel_color},{type:'rubber'})
 		for(var i=0;i<buttons.length;i++){
@@ -1618,7 +1628,7 @@ UI.BigMenu=function(){
 	var menu=UI.m_global_menu;
 	var style=UI.default_styles['fancy_menu']
 	for(var i=0;i<arguments.length;i++){
-		var name=arguments[i]
+		var name=UI._(arguments[i]);
 		//if(UI.Platform.ARCH=="mac"){
 		//	name=name.replace('&','')
 		//}
@@ -1940,7 +1950,7 @@ W.FancyMenu=function(id,attrs){
 				value:selected,
 				show_tooltip_override:selected,
 				style:obj.button_style,
-				tooltip:item_i.tooltip,
+				tooltip:TranslateTooltip(item_i.tooltip),
 				flags:8})
 		}else if(s_type=='separator'){
 			UI.RoundRect({x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:obj.h_separator_fill,
@@ -2020,12 +2030,12 @@ var LoadTips=function(){
 	for(var i=0;i<tips.length;i++){
 		var s_i=tips[i];
 		if(!s_i){continue;}
-		if(s_i[0]==' '){
-			s_i=(
-				UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+3)+
-				s_i[1]+
-				UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1)+s_i.substr(2));
-		}
+		s_i=s_i.replace(/^@([^@]+)@ /g,function(smatch,stext){
+			return UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+3)+stext+UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1)+' ';
+		})
+		s_i=s_i.replace(/@([^@]+)@/g,function(smatch,stext){
+			return UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+4)+stext+UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0);
+		})
 		var code_segs=s_i.split('`');
 		var code_segs2=[];
 		for(var j=0;j<code_segs.length;j++){

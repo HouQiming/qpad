@@ -71,22 +71,21 @@ W.BinaryEditor_prototype={
 				sz={1:0,2:1,4:2,8:3}[sz];
 				var s_i_prev=undefined;
 				for(var isbe=0;isbe<2;isbe++){
-					final_text.push('"',UI.BIN_ReadToString(this,addr,{tid:isbe*16+sz}),'" is ');
+					final_text.push(UI.Format('"@1" is ',UI.BIN_ReadToString(this,addr,{tid:isbe*16+sz})));
 					for(var ttype=1;ttype<4;ttype++){
 						var tid=isbe*16+ttype*4+sz;
 						var s_i=UI.BIN_ReadToString(this,addr,{tid:tid});
 						if(s_i&&(s_i!=s_i_prev||ttype!=2)){
-							if(ttype==3){final_text.push("or ")}
-							final_text.push(
-								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
+							var s_format="@1 in @2, ";
+							if(ttype==3){s_format="or @1 in @2. ";}
+							final_text.push(UI.Format(s_format,
+								[UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
 								s_i,
-								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0),' in ',g_types[(tid>>2)&3],g_sizes[tid&3].toString(),
-								', ')
+								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0)].join(''),[g_types[(tid>>2)&3],g_sizes[tid&3].toString()].join('')
+							))
 						}
 						s_i_prev=s_i;
 					}
-					final_text.pop()
-					final_text.push('. ')
 				}
 				did=1
 				this.CreateNotification('眼',final_text.join(''))
@@ -94,7 +93,7 @@ W.BinaryEditor_prototype={
 			}
 		}
 		if(!did){
-			this.CreateNotification('眼','Address: '+(this.m_sel0!=this.m_sel1?this.FormatAddr(this.m_sel0)+'-':'')+this.FormatAddr(this.m_sel1))
+			this.CreateNotification('眼',UI._('Address: ')+(this.m_sel0!=this.m_sel1?this.FormatAddr(this.m_sel0)+'-':'')+this.FormatAddr(this.m_sel1))
 		}
 		this.AutoScroll()
 	},
@@ -477,7 +476,7 @@ W.BinaryEditor_prototype={
 		UI.Refresh()
 	},
 	CreateNotification:function(icon,text){
-		this.m_notification={icon:icon,text:text};
+		this.m_notification={icon:icon,text:UI._(text)};
 		UI.Refresh()
 	},
 	DismissNotification:function(){
@@ -562,9 +561,9 @@ W.BinaryEditor=function(id,attrs){
 				obj.m_sel1=ret.addr+ctx.m_dir*ctx.m_needle.length;
 				obj.ValidateSelection(1,-1)
 				obj.AutoScroll()
-				obj.CreateNotification('s','Found one')
+				obj.CreateNotification('s',UI._('Found one'))
 			}else{
-				obj.CreateNotification('s',(ctx.m_dir<0?'No more matches above':'No more matches below'))
+				obj.CreateNotification('s',UI._(ctx.m_dir<0?'No more matches above':'No more matches below'))
 			}
 		}else{
 			ctx.m_addr=ret.addr;
@@ -608,7 +607,7 @@ W.BinaryEditor=function(id,attrs){
 				try{
 					ret=JSON.parse(Duktape.__eval_expr_sandbox(stext_raw))
 				}catch(e){
-					obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"Bad search expression: "+e.message)
+					obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+UI._("Bad search expression: ")+e.message)
 					UI.Refresh()
 					return;
 				}
@@ -616,7 +615,7 @@ W.BinaryEditor=function(id,attrs){
 					ret=new Uint8Array(ret);
 				}
 				if(!(UI.BIN_isBuffer(ret)||!this.tid&&(typeof ret)=='string')){
-					obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"The search expression has to be a string or a buffer")
+					obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+UI._("The search expression has to be a string or a buffer"))
 					UI.Refresh()
 					return;
 				}
@@ -948,7 +947,7 @@ W.BinaryEditor=function(id,attrs){
 						try{
 							ret=JSON.parse(Duktape.__eval_expr_sandbox(stext_raw))
 						}catch(e){
-							obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"Bad value expression: "+e.message)
+							obj.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+UI._("Bad value expression: ")+e.message)
 							UI.Refresh()
 							return;
 						}
@@ -1130,7 +1129,7 @@ W.BinaryEditor=function(id,attrs){
 			new_metadata.m_language_id=name;
 			UI.m_ui_metadata[obj.file_name]=new_metadata;
 			if((obj.saved_point||0)!=obj.m_undo_queue.length){
-				obj.CreateNotification("警","Save and reload to reopen it in the text editor")
+				obj.CreateNotification("警",UI._("Save and reload to reopen it in the text editor"))
 			}else{
 				var fn=obj.file_name;
 				obj.SaveMetaData();
@@ -1250,10 +1249,10 @@ W.BinaryToolsPage=function(id,attrs){
 	}
 	var y_current=obj.y+8;
 	//go-to bar
-	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Go to",color:obj.text_color_panel})
+	var text_goto=W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:UI._("Go to"),color:obj.text_color_panel})
 	var got_edit_before=!!(obj.goto_bar_edit&&obj.goto_bar_edit.edit)
 	W.EditBox("goto_bar_edit",{
-		x:obj.x+64,w:144,y:y_current+2,h:24,
+		x:text_goto.x+text_goto.w+4,w:144,y:y_current+2,h:24,
 		is_single_line:1,
 		value:obj_real.FormatAddr(obj_real.m_sel1),
 		font:obj.font_goto,
@@ -1262,7 +1261,7 @@ W.BinaryToolsPage=function(id,attrs){
 			try{
 				ret=JSON.parse(Duktape.__eval_expr_sandbox(value));
 			}catch(e){
-				obj_real.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+"Bad address: "+e.message)
+				obj_real.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+UI._("Bad address: ")+e.message)
 				UI.SetFocus(obj_real)
 				UI.Refresh()
 				return;
@@ -1281,8 +1280,8 @@ W.BinaryToolsPage=function(id,attrs){
 	}
 	y_current+=32;
 	//width buttons
-	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Display width",color:obj.text_color_panel})
-	var x_buttons=obj.x+128;
+	var text_width=W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:UI._("Display width"),color:obj.text_color_panel})
+	var x_buttons=text_width.x+text_width.w+4;
 	W.Button("btn_w16",{
 		style:UI.default_styles.check_button,
 		x:x_buttons,y:y_current,w:24,h:24,
@@ -1304,7 +1303,7 @@ W.BinaryToolsPage=function(id,attrs){
 	//	value:obj.m_w_bytes==64,OnClick:function(){obj.ResetWBytes(64)},
 	//	font:obj.font_panel_fixed,text:"64"});x_buttons+=28;
 	y_current+=32;
-	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Display type",color:obj.text_color_panel})
+	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:UI._("Display type"),color:obj.text_color_panel})
 	y_current+=28;
 	//type buttons
 	var rg=UI.BIN_GetRangeAt(obj_real,Math.min(obj_real.m_sel0,obj_real.m_sel1));
@@ -1332,7 +1331,7 @@ W.BinaryToolsPage=function(id,attrs){
 		}
 	}
 	y_current+=28*4+4;
-	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:"Display color",color:obj.text_color_panel})
+	W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:UI._("Display color"),color:obj.text_color_panel})
 	y_current+=28;
 	var g_colors=obj.color_choices;
 	for(var i=0;i<2;i++){
@@ -1361,7 +1360,7 @@ W.BinaryToolsPage=function(id,attrs){
 };
 
 UI.RegisterUtilType("binary_tools",function(){return UI.NewTab({
-	title:"Binary Tools",
+	title:UI._("Binary Tools"),
 	area_name:"h_tools",
 	body:function(){
 		//frontmost doc

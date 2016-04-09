@@ -866,8 +866,8 @@ UI.RegisterHelpHook(function(items,ssearch){
 		return;
 	}
 	if(lang.enable_dictionary){
-		SearchEngineHook(items,'define '+ssearch,'写',"Google “@1”","https://www.google.com/search?sourceid=navclient&q=文");
-		SearchEngineHook(items,ssearch.toLowerCase(),'写',"Wiktionary entry for “@1”","https://en.wiktionary.org/wiki/文");
+		SearchEngineHook(items,'define '+ssearch,'写',UI._("Google “@1”"),"https://www.google.com/search?sourceid=navclient&q=文");
+		SearchEngineHook(items,ssearch.toLowerCase(),'写',UI._("Wiktionary entry for “@1”"),UI._("https://en.wiktionary.org/wiki/文"));
 	}
 })
 
@@ -882,20 +882,20 @@ UI.RegisterHelpHook(function(items,ssearch){
 	var sext=UI.GetFileNameExtension(fn).toLowerCase();
 	if(lang.name=="C/C++"){
 		if(sext=='m'||sext=='mm'){
-			SearchEngineHook(items,ssearch,'プ',"“@1” for Apple developers","https://developer.apple.com/search/?q=文");
+			SearchEngineHook(items,ssearch,'プ',UI._("“@1” for Apple developers"),"https://developer.apple.com/search/?q=文");
 		}
 		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-			SearchEngineHook(items,ssearch,'プ',"“@1” on MSDN","https://social.msdn.microsoft.com/Search/en-US?query=文&pgArea=header&emptyWatermark=true&ac=4");
+			SearchEngineHook(items,ssearch,'プ',UI._("“@1” on MSDN"),"https://social.msdn.microsoft.com/Search/en-US?query=文&pgArea=header&emptyWatermark=true&ac=4");
 		}
 	}
 	if(lang.name=="Java"){
-		SearchEngineHook(items,ssearch,'プ',"Android class “@1”","http://developer.android.com/reference/classes.html#q=文");
+		SearchEngineHook(items,ssearch,'プ',UI._("Android class “@1”"),"http://developer.android.com/reference/classes.html#q=文");
 	}
 	if(lang.name=="Javascript"){
 		if(g_node_modules[ssearch.toLowerCase()]){
-			SearchEngineHook(items,ssearch.toLowerCase(),'プ','Node.js package “@1”',"https://nodejs.org/api/文.html");
+			SearchEngineHook(items,ssearch.toLowerCase(),'プ',UI._('Node.js package “@1”'),"https://nodejs.org/api/文.html");
 		}else{
-			SearchEngineHook(items,ssearch.toLowerCase(),'プ','Node.js package “@1”',"https://www.npmjs.com/search?q=文");
+			SearchEngineHook(items,ssearch.toLowerCase(),'プ',UI._('Node.js package “@1”'),"https://www.npmjs.com/search?q=文");
 		}
 	}
 })
@@ -904,7 +904,7 @@ UI.RegisterHelpHook(function(items,ssearch){
 //general Googling - put it in the end
 UI.RegisterHelpHook(function(items,ssearch){
 	if(!ssearch){return;}
-	SearchEngineHook(items,ssearch,'s',"Google for “@1”","https://www.google.com/search?sourceid=navclient&q=文");
+	SearchEngineHook(items,ssearch,'s',UI._("Google for “@1”"),"https://www.google.com/search?sourceid=navclient&q=文");
 })
 
 /////////////////////////////////////////////
@@ -2984,9 +2984,9 @@ UI.RegisterEditorPlugin(function(){
 			var doc=this;
 			menu_search.AddSeparator();
 			menu_search.AddButtonRow({text:"Navigate"},[
-				{text:"\u2190",tooltip:"Back - CTRL+ALT+'-'",action:function(){
+				{text:"\u2190",tooltip:"Back - CTRL+ALT+MINUS",action:function(){
 					fprevhist.call(doc)
-				}},{text:"\u2192",tooltip:"Forward - CTRL+ALT+'+'",action:function(){
+				}},{text:"\u2192",tooltip:"Forward - CTRL+ALT+PLUS",action:function(){
 					//text:"&select to"
 					fnexthist.call(doc)
 				}}])
