@@ -270,7 +270,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\."+sext,["","qpad3_file"])
 		var sexe=IO.m_my_name.replace(/[/]/g,"\\");
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\qpad3_file\\shell\\open\\command",["","\""+sexe+"\" \"%1\""])
-		return UI.WIN_ApplyRegistryFile(sregfile,UI.Format("Set .@1 association",sext));
+		return UI.WIN_ApplyRegistryFile(sregfile,UI.Format( "Set .@1 association",sext));
 	}
 	UI.ShowInFolder=function(fn){
 		IO.Shell(["explorer","/select,",IO.NormalizeFileName(fn,1).replace(/[/]/g,'\\')])
@@ -360,9 +360,10 @@ var OpenShell=function(){
 		if(IO.FileExists("/usr/bin/x-terminal-emulator")){
 			s_terminal="x-terminal-emulator";
 		}
-		var fn_sh=IO.GetNewDocumentName("a","sh","temp")
-		IO.CreateFile(fn_sh,'#!/bin/sh\ncd '+UI.m_new_document_search_path+'\nrm -- "$0"\nexec "$SHELL"\n')
-		IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh,"&"])
+		//var fn_sh=IO.GetNewDocumentName("a","sh","temp")
+		//IO.CreateFile(fn_sh,'#!/bin/sh\ncd \''+UI.m_new_document_search_path+'\'\nrm -- "$0"\nexec "$SHELL"\n')
+		//IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh,"&"])
+		IO.RunProcess([s_terminal],UI.m_new_document_search_path)
 	}else{
 		//mac
 		//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x

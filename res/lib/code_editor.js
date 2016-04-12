@@ -374,7 +374,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			UI.Refresh();
 			return;
 		}
-		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?524288:16777216),function(encoding){
+		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?262144:4194304),function(encoding){
 			if(this.owner){
 				this.owner.CreateNotification({id:'saving_progress',icon:'警',
 					text:UI._("The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.").replace(
@@ -862,6 +862,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	ConfirmAC:function(id){
 		var acctx=this.m_ac_context;
+		if(!acctx||!acctx.m_accands){return;}
 		var s_prefix=acctx.m_accands.s_prefix
 		if(acctx.m_is_spell_mode&&id==acctx.m_n_cands-1){
 			//coulddo: remove, or just give a "user-dic-editing" option
@@ -1459,7 +1460,7 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 }
 
 var g_is_parse_more_running=0;
-var FPS_PARSING=30;
+var PARSING_SECONDS_PER_FRAME=0.1;
 var CallParseMore=function(){
 	if(g_is_parse_more_running){return;}
 	var fcallmore=UI.HackCallback(function(){
@@ -1470,7 +1471,6 @@ var CallParseMore=function(){
 				var doc=UI.g_editor_from_file[ret.file_name];
 				if(doc){
 					doc.m_file_index=ret.file_index;
-					UI.RefreshAllTabs()
 				}
 				//var obj_tab=undefined;
 				//for(var i=0;i<UI.g_all_document_windows.length;i++){
@@ -1490,15 +1490,16 @@ var CallParseMore=function(){
 				//}
 			}else{
 				g_is_parse_more_running=0;
-				UI.RefreshAllTabs();
 				break;
 			}
 			var tick1=Duktape.__ui_get_tick()
-			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>1.0/FPS_PARSING){
+			//print(Duktape.__ui_seconds_between_ticks(tick0,tick1))
+			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>PARSING_SECONDS_PER_FRAME||UI.TestEventInPollJob()){
 				UI.NextTick(fcallmore)
 				break;
 			}
 		}
+		UI.RefreshAllTabs();
 	});
 	g_is_parse_more_running=1;
 	//in-global-search test
@@ -2156,10 +2157,10 @@ var find_context_prototype={
 						this.m_repo_files[this.m_p_repo_files],
 						"0");
 				}else{
-					s_eof_message=UI._("All files searched")
+					s_eof_message=UI._("All files searched, found @1").replace("@1",((this.m_forward_matches.length+this.m_backward_matches.length)/3).toString())
 				}
 			}else{
-				s_eof_message=UI._("No more '@1' below").replace("@1",this.m_needle)
+				s_eof_message=UI.Format("No more '@1' below, found @2",this.m_needle,((this.m_forward_matches.length+this.m_backward_matches.length)/3).toString())
 			}
 			var text_dim=UI.MeasureText(edstyle.find_message_font,s_eof_message)
 			var y=this.m_y_extent_forward-find_scroll_y+edstyle.find_item_separation
@@ -3608,7 +3609,8 @@ UI.FormatRelativeTime=function(then,now){
 	if(now[0]==then[0]){
 		if(now[1]==then[1]){
 			if(now[2]==then[2]){
-				return UI.Format("@1:@2",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
+				//the space disables translation
+				return UI.Format( "@1:@2",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
 			}
 			//else if(now[2]==then[2]+1){
 			//	return UI.Format("@1:@2 Yesterday",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
@@ -3616,7 +3618,8 @@ UI.FormatRelativeTime=function(then,now){
 		}
 		return UI.MonthDay(then[1],then[2])
 	}else{
-		return UI.Format("@1/@2/@3",ZeroPad(then[1]+1,2),ZeroPad(then[2]+1,2),then[0])
+		//the space disables translation
+		return UI.Format( "@1/@2/@3",ZeroPad(then[1]+1,2),ZeroPad(then[2]+1,2),then[0])
 	}
 }
 
@@ -5110,8 +5113,8 @@ W.CodeEditor=function(id,attrs){
 		//	//UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:h_obj_area})
 		//	//UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_obj_area-w_line_numbers,h:h_obj_area})
 		//}
+		//loading progress
 		if(doc&&doc.ed.hfile_loading){
-			//loading progress
 			obj.CreateNotification({
 				id:'loading_progress',
 				icon:undefined,
@@ -5119,6 +5122,17 @@ W.CodeEditor=function(id,attrs){
 				text:UI._("Loading @1%...").replace('@1',(doc.ed.hfile_loading.progress*100).toFixed(0))},"quiet")
 		}else{
 			obj.DismissNotification('loading_progress')
+		}
+		//parsing progress
+		var parsing_jobs=UI.ED_GetRemainingParsingJobs();
+		if(doc&&!doc.notebook_owner&&parsing_jobs){
+			var fn_next=UI.GetSmartTabName(parsing_jobs.fn_next);
+			obj.CreateNotification({
+				id:'parsing_progress',
+				icon:undefined,
+				text:UI.Format("Parsing @1, @2 files left...",fn_next,parsing_jobs.n)},"quiet")
+		}else{
+			obj.DismissNotification('parsing_progress')
 		}
 		var f_draw_accands=undefined
 		if(doc){

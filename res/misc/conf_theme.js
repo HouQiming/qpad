@@ -9,6 +9,8 @@ if(UI.Platform.ARCH=="mac"){
 
 UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
 //UI.Theme_Minimalistic(0xffb4771f);
+UI.interpolators.border_color_active=UI.interpolators.color;
+UI.interpolators.border_color=UI.interpolators.color;
 UI.CustomTheme=function(){
 	var L=UI.TestOption("use_light_theme");
 	if(L){//light
@@ -363,7 +365,7 @@ UI.CustomTheme=function(){
 				padding_ellipsis:2,
 				h_ellipsis:20,
 				/////////////
-				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x22ffffff),
+				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				scroll_transition_dt:0.075,
 				/////////////
 				caret_width:UI.IS_MOBILE?1:2,
@@ -490,7 +492,7 @@ UI.CustomTheme=function(){
 				color_symbol2:L?0xff7f7f7f:0xffccdcdc,
 				color_meta:L?0xff9a3d6a:0xff8fafdf,
 				rectex_styles:[{color:0}],
-				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x22ffffff),
+				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				/////////////
 				caret_width:UI.IS_MOBILE?1:2,
 				caret_color:L?0xff000000:0xffbfdfdf,
@@ -714,7 +716,7 @@ UI.CustomTheme=function(){
 			find_bar_editor_style:{
 				font:UI.Font("res/fonts/inconsolata.ttf",20),
 				color:L?0xff000000:0xffe8e8e8,
-				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x22ffffff),
+				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				caret_width:UI.IS_MOBILE?1:2,
 				caret_color:L?0xff000000:0xffe8e8e8,
 				caret_flicker:500,
@@ -746,7 +748,7 @@ UI.CustomTheme=function(){
 			find_bar_editor_style:{
 				font:UI.Font("res/fonts/inconsolata.ttf",20),
 				color:L?0xff000000:0xffe8e8e8,
-				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x22ffffff),
+				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				caret_width:UI.IS_MOBILE?1:2,
 				caret_color:L?0xff000000:0xffe8e8e8,
 				caret_flicker:500,
@@ -814,7 +816,7 @@ UI.CustomTheme=function(){
 			caret_flicker:500,
 			text_color:L?0xff000000:0xffbfdfdf,
 			bgcolor:L?0xffe8e8e8:0xff3f3f3f,
-			bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x22ffffff),
+			bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 			separator_color:L?0xff999999:0xff000000,
 			minimap_padding:12,
 			minimap_page_shadow:L?0x55000000:0x3faaaaaa,
@@ -1088,7 +1090,7 @@ UI.CustomTheme=function(){
 			//animating edit would ruin a lot of object properties
 			transition_dt:0,
 			scroll_transition_dt:0.1,
-			bgcolor_selection:C_raw&0x22ffffff,
+			bgcolor_selection:C_raw&0x55ffffff,
 			caret_width:UI.IS_MOBILE?1:2,
 			caret_color:0xffe8e8e8,
 			caret_flicker:500,

@@ -976,7 +976,7 @@ W.NotebookView=function(id,attrs){
 			obj.button_style["$"].out.text_color=cur_caption_text_color;
 			W.Text("",{
 				x:obj.x+obj.padding+obj.caption_padding,y:obj.y+delta_y+current_y-scroll_y,
-				font:obj.caption_font,text:cell_i.m_proc?"Output (running...)":(cell_i.m_completion_time?UI.Format("Output - @1",UI.FormatRelativeTime(cell_i.m_completion_time,now)):"Output"),
+				font:obj.caption_font,text:cell_i.m_proc?UI._("Output (running...)"):(cell_i.m_completion_time?UI.Format("Output - @1",UI.FormatRelativeTime(cell_i.m_completion_time,now)):UI._("Output")),
 				color:cur_caption_text_color,
 			})
 			btn_last=W.Button("clear_btn_"+i.toString(),{

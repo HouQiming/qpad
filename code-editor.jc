@@ -2604,6 +2604,7 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 	if dir>0?has4:has6:
 		has_tail_enter=1
 	pbudget=budget
+	//Writeln(!!matcher.ex.dfa)
 	testMatch=function(int ch,i64 ccnt,iptr[] match){
 		assert(match.n>=2)
 		auto ccnt0=ccnt_base+dir*match[match.n-2]

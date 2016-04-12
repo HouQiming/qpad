@@ -3134,8 +3134,9 @@ UI.RegisterEditorPlugin(function(){
 				return Array(smatch.length+1).join(s_tab_space);
 			})})
 		menu_convert.AddNormalItem({text:"Leading &spaces to tabs",action:
-			fsmart_replace.bind(this,"^("+s_tab_space+")+",function(smatch){
-				return Array(((smatch.length/tab_width)|0)+1).join('\t');
+			//("+s_tab_space+")
+			fsmart_replace.bind(this,"^ +",function(smatch){
+				return Array((((smatch.length+tab_width-1)/tab_width)|0)+1).join('\t');
 			})})
 		menu_convert.AddNormalItem({text:"Letters to &UPPERCASE",action:
 			fsmart_replace.bind(this,"[a-z]+",function(smatch){

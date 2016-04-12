@@ -928,6 +928,7 @@ g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),ge
 g_function_ids=[getid("function"),getid("function*"),getid("inline")]
 g_id_if=getid("if")
 g_id_while=getid("while")
+g_in_parse_queue=new int[int]
 g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
@@ -971,7 +972,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		fn_found=System.Env.NormalizeFileName(fn_found)
 		idfn_found=getid(fn_found)
 		dep_files.push(idfn_found)
-		g_c_like_parse_queue.push(idfn_found)
+		if !g_in_parse_queue[idfn_found]:
+			g_in_parse_queue[idfn_found]=1
+			g_c_like_parse_queue.push(idfn_found)
 		dep_file_name_tokens.push(int3(toks[ptok].epos0,toks[ptok].epos1,idfn_found))
 	///////////////////
 	struct TStkEntry
@@ -1503,13 +1506,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if !(fn.n&&fn[0]=='*'):
 			fn=System.Env.NormalizeFileName(fn)
 		if fn.n&&fn[0]=='*'||System.IO.FileExists(fn)&&System.IO.GetFileSize(fn)<MAX_PARSABLE_SIZE:
-			g_c_like_parse_queue.push(getid(fn))
+			idfn=getid(fn)
+			if !g_in_parse_queue[idfn]:
+				g_in_parse_queue[idfn]=1
+				g_c_like_parse_queue.push(idfn)
 		return 1
 	}
 	//coulddo: budgeted parse
 	JS_UI["ED_ParseMore"]=function(JSContext JS){
 		while g_c_like_parse_queue.n:
 			idfn=g_c_like_parse_queue.pop()
+			g_in_parse_queue[idfn]=0
 			fn=getIdString(idfn)
 			timestamp=0uLL
 			foreach fnx,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
@@ -1556,6 +1563,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return JS.Return(jsret)
 		g_c_like_parse_queue.discard()
 		return 0
+	}
+	JS_UI["ED_GetRemainingParsingJobs"]=function(JSContext JS){
+		if g_c_like_parse_queue.n:
+			ret=JS.New()
+			ret["n"]=g_c_like_parse_queue.n
+			ret["fn_next"]=getIdString(g_c_like_parse_queue.back())
+			return JS.Return(ret)
+		else
+			return 0
 	}
 	jsPrepareAccands=function(JSContext JS,int2[] cands,string s_prefix,string s_common_prefix,i64 ccnt0){
 		cands.Sortby(byMember("x"))
