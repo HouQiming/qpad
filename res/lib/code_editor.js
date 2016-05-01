@@ -1729,11 +1729,22 @@ var find_context_prototype={
 			this.m_current_visual_y-h_bof_eof_message_with_sep-edstyle.find_item_expand_current*this.m_hfont*0.5)
 		this.ValidateFindItemScroll()
 	},
+	GetFindItemsScrollRange:function(){
+		var find_shared_h=this.m_current_visual_h;
+		var edstyle=UI.default_styles.code_editor
+		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation*2;
+		return [
+			this.m_y_extent_backward-h_bof_eof_message_with_sep,
+			this.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h];
+	},
 	ValidateFindItemScroll:function(){
 		var find_shared_h=this.m_current_visual_h;
 		var edstyle=UI.default_styles.code_editor
 		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation*2;
-		this.m_find_scroll_visual_y=Math.max(Math.min(this.m_find_scroll_visual_y,this.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),this.m_y_extent_backward-h_bof_eof_message_with_sep)
+		this.m_find_scroll_visual_y=Math.max(Math.min(
+			this.m_find_scroll_visual_y,
+			this.m_y_extent_forward+h_bof_eof_message_with_sep-find_shared_h),
+			this.m_y_extent_backward-h_bof_eof_message_with_sep)
 		//print(this.m_find_scroll_visual_y,this.m_current_visual_y,this.m_current_point,r,JSON.stringify(fitem_current));
 	},
 	IsForwardSearchCompleted:function(){
@@ -4857,7 +4868,7 @@ W.CodeEditor=function(id,attrs){
 		var y_bottom_shadow=undefined;
 		var desc_x_scroll_bar=undefined;
 		//&&!(doc&&doc.notebook_owner)
-		var show_minimap=(UI.TestOption("show_minimap")&&!obj.disable_minimap);
+		var show_minimap=(UI.TestOption("show_minimap")&&!obj.disable_minimap&&!(!obj.m_edit_lock&&obj.show_find_bar));
 		var w_minimap=obj.w_minimap;
 		if(show_minimap){
 			show_minimap=1;
@@ -6348,83 +6359,103 @@ W.CodeEditor=function(id,attrs){
 						obj.sbar_diff_color,doc.m_diff_minimap);
 				})
 			}
-			//at-scrollbar bookmark marker
-			var hc_bookmark=UI.GetCharacterHeight(obj.bookmark_font)
-			var bm_ccnts=doc.m_rendering_bm_ccnts;
-			if(bm_ccnts&&bm_ccnts.length){
-				var bm_xys=doc.m_rendering_bm_xys;
-				for(var i=0;i<bm_ccnts.length;i++){
-					var y=Math.max(Math.min(bm_xys[i*2+1]/ytot,1),0)*sbar.h+sbar.y
-					var id=bm_ccnts[i][0]
-					UI.RoundRect({
-						x:sbar.x, w:sbar.w,
-						y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
-						color:obj.bookmark_text_color})
-					if(id>=0){
-						UI.DrawChar(obj.bookmark_font,sbar.x+2,
-							y-sbar.y>hc_bookmark?y-obj.bookmark_scroll_bar_marker_size*0.5-hc_bookmark:y+obj.bookmark_scroll_bar_marker_size*0.5,
-							obj.bookmark_text_color,48+id)
+			//if(doc.OnMouseWheel_real){
+			//	doc.OnMouseWheel=doc.OnMouseWheel_real;
+			//}else{
+			//	doc.OnMouseWheel_real=doc.OnMouseWheel;
+			//}
+			if(is_find_mode_rendering){
+				//find items scrollbar
+				var ctx=obj.m_current_find_context;
+				//the actual bar
+				if(ctx){
+					var srange=ctx.GetFindItemsScrollRange();
+					if(srange[1]-srange[0]>0){
+						var find_sbar_value=(ctx.m_find_scroll_visual_y-srange[0])/(srange[1]-srange[0]);
+						W.ScrollBar("find_sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area, dimension:'y',
+							page_size:ctx.m_current_visual_h, total_size:(srange[1]-srange[0]), value:find_sbar_value,
+							OnChange:function(value){
+								ctx.m_find_scroll_visual_y=value*(srange[1]-srange[0])+srange[0];
+								ctx.ValidateFindItemScroll()
+								UI.Refresh()
+							},
+							icon_color:obj.scroll_bar_style.$.over.icon_color,
+							style:obj.scroll_bar_style
+						})
 					}
 				}
-			}
-			//at-scrollbar error markers
-			if(doc.m_error_overlays){
-				var error_ccnts=[];
-				for(var i=0;i<doc.m_error_overlays.length;i++){
-					var err=doc.m_error_overlays[i];
-					if(!err.is_in_active_doc){continue;}
-					error_ccnts.push(err.sel_ccnt0.ccnt)
-				}
-				error_ccnts.sort(function(a,b){return a-b})
-				var error_xys=doc.ed.GetXYEnMasse(error_ccnts)
-				for(var i=0;i<error_xys.length;i+=2){
-					var y=Math.max(Math.min(error_xys[i+1]/ytot,1),0)*sbar.h+sbar.y
-					UI.RoundRect({
-						x:sbar.x, w:sbar.w,
-						y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
-						color:doc.color_tilde_compiler_error})
-				}
-			}
-			//the actual bar
-			W.ScrollBar("sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area, dimension:'y',
-				page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
-				OnChange:function(value){
-					doc.scroll_y=value*(this.total_size-this.page_size)
-					doc.scrolling_animation=undefined
-					if(is_find_mode_rendering){
-						var ctx=obj.m_current_find_context;
-						if(ctx){
-							var ccnt=doc.ed.SeekXY(0,doc.scroll_y);
-							ctx.m_find_scroll_visual_y=ctx.GetFindItem(ctx.SeekMergedItemByUnmergedID(ctx.BisectMatches(doc,ccnt))).visual_y;
-							ctx.ValidateFindItemScroll();
+				//doc.OnMouseWheel=obj.find_bar_edit.OnMouseWheel.bind(obj.find_bar_edit);
+			}else{
+				//at-scrollbar bookmark marker
+				var hc_bookmark=UI.GetCharacterHeight(obj.bookmark_font)
+				var bm_ccnts=doc.m_rendering_bm_ccnts;
+				if(bm_ccnts&&bm_ccnts.length){
+					var bm_xys=doc.m_rendering_bm_xys;
+					for(var i=0;i<bm_ccnts.length;i++){
+						var y=Math.max(Math.min(bm_xys[i*2+1]/ytot,1),0)*sbar.h+sbar.y
+						var id=bm_ccnts[i][0]
+						UI.RoundRect({
+							x:sbar.x, w:sbar.w,
+							y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
+							color:obj.bookmark_text_color})
+						if(id>=0){
+							UI.DrawChar(obj.bookmark_font,sbar.x+2,
+								y-sbar.y>hc_bookmark?y-obj.bookmark_scroll_bar_marker_size*0.5-hc_bookmark:y+obj.bookmark_scroll_bar_marker_size*0.5,
+								obj.bookmark_text_color,48+id)
 						}
 					}
-					UI.Refresh()
-				},
-				style:obj.scroll_bar_style
-			})
-			//at-scrollbar current page marker, show on mouseout to keep a consistent scale w.r.t. other markers
-			var page_state_alpha=255-((obj.sbar.icon_color[0].color>>24)&0xff);
-			if(page_state_alpha>0){
-				var opacity=page_state_alpha/255
-				var sbar_page_y0=Math.max(Math.min(doc.visible_scroll_y/ytot,1),0)*sbar.h+sbar.y
-				var sbar_page_y1=Math.max(Math.min((doc.visible_scroll_y+h_scrolling_area)/ytot,1),0)*sbar.h+sbar.y
-				var h_sbar_rendering=Math.max(sbar_page_y1-sbar_page_y0,obj.bookmark_scroll_bar_marker_size);
-				if(!(h_sbar_rendering>obj.bookmark_scroll_bar_marker_size*2)){
-					UI.DrawChar(obj.sbar_eye_font,
-						sbar.x+sbar.w-UI.MeasureText(obj.sbar_eye_font,"眼").w-1,
-						sbar_page_y0-sbar.y>hc_bookmark?sbar_page_y0-hc_bookmark:sbar_page_y1,
-						UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity),"眼".charCodeAt(0))
 				}
-				UI.RoundRect({
-					x:sbar.x, y:sbar_page_y0-(h_sbar_rendering-(sbar_page_y1-sbar_page_y0))*0.5, w:sbar.w, h:h_sbar_rendering,
-					color:UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity)})
-				//UI.RoundRect({
-				//	x:sbar.x, y:sbar.y+sbar_page_y0, w:sbar.w, h:obj.sbar_page_border_width,
-				//	color:UI.lerp_rgba(obj.sbar_page_border_color&0xffffff,obj.sbar_page_border_color,opacity)})
-				//UI.RoundRect({
-				//	x:sbar.x, y:sbar.y+sbar_page_y1-obj.sbar_page_border_width, w:sbar.w, h:obj.sbar_page_border_width,
-				//	color:UI.lerp_rgba(obj.sbar_page_border_color&0xffffff,obj.sbar_page_border_color,opacity)})
+				//at-scrollbar error markers
+				if(doc.m_error_overlays){
+					var error_ccnts=[];
+					for(var i=0;i<doc.m_error_overlays.length;i++){
+						var err=doc.m_error_overlays[i];
+						if(!err.is_in_active_doc){continue;}
+						error_ccnts.push(err.sel_ccnt0.ccnt)
+					}
+					error_ccnts.sort(function(a,b){return a-b})
+					var error_xys=doc.ed.GetXYEnMasse(error_ccnts)
+					for(var i=0;i<error_xys.length;i+=2){
+						var y=Math.max(Math.min(error_xys[i+1]/ytot,1),0)*sbar.h+sbar.y
+						UI.RoundRect({
+							x:sbar.x, w:sbar.w,
+							y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
+							color:doc.color_tilde_compiler_error})
+					}
+				}
+				//the actual bar
+				W.ScrollBar("sbar",{x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area, dimension:'y',
+					page_size:h_scrolling_area, total_size:ytot, value:sbar_value,
+					OnChange:function(value){
+						doc.scroll_y=value*(this.total_size-this.page_size)
+						doc.scrolling_animation=undefined
+						UI.Refresh()
+					},
+					style:obj.scroll_bar_style
+				})
+				//at-scrollbar current page marker, show on mouseout to keep a consistent scale w.r.t. other markers
+				var page_state_alpha=255-((obj.sbar.icon_color[0].color>>24)&0xff);
+				if(page_state_alpha>0){
+					var opacity=page_state_alpha/255
+					var sbar_page_y0=Math.max(Math.min(doc.visible_scroll_y/ytot,1),0)*sbar.h+sbar.y
+					var sbar_page_y1=Math.max(Math.min((doc.visible_scroll_y+h_scrolling_area)/ytot,1),0)*sbar.h+sbar.y
+					var h_sbar_rendering=Math.max(sbar_page_y1-sbar_page_y0,obj.bookmark_scroll_bar_marker_size);
+					if(!(h_sbar_rendering>obj.bookmark_scroll_bar_marker_size*2)){
+						UI.DrawChar(obj.sbar_eye_font,
+							sbar.x+sbar.w-UI.MeasureText(obj.sbar_eye_font,"眼").w-1,
+							sbar_page_y0-sbar.y>hc_bookmark?sbar_page_y0-hc_bookmark:sbar_page_y1,
+							UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity),"眼".charCodeAt(0))
+					}
+					UI.RoundRect({
+						x:sbar.x, y:sbar_page_y0-(h_sbar_rendering-(sbar_page_y1-sbar_page_y0))*0.5, w:sbar.w, h:h_sbar_rendering,
+						color:UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity)})
+					//UI.RoundRect({
+					//	x:sbar.x, y:sbar.y+sbar_page_y0, w:sbar.w, h:obj.sbar_page_border_width,
+					//	color:UI.lerp_rgba(obj.sbar_page_border_color&0xffffff,obj.sbar_page_border_color,opacity)})
+					//UI.RoundRect({
+					//	x:sbar.x, y:sbar.y+sbar_page_y1-obj.sbar_page_border_width, w:sbar.w, h:obj.sbar_page_border_width,
+					//	color:UI.lerp_rgba(obj.sbar_page_border_color&0xffffff,obj.sbar_page_border_color,opacity)})
+				}
 			}
 			//vertical scrollbar separator
 			UI.RoundRect({
