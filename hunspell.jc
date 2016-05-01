@@ -6,18 +6,18 @@ import System.Console.*
 
 //for iPad... we need to be static
 HSPELLER=__pointer
-__generate_json("c_files","hunspell/affentry.cxx");
-__generate_json("c_files","hunspell/affixmgr.cxx");
-__generate_json("c_files","hunspell/csutil.cxx");
-__generate_json("c_files","hunspell/dictmgr.cxx");
-__generate_json("c_files","hunspell/filemgr.cxx");
-__generate_json("c_files","hunspell/hashmgr.cxx");
-__generate_json("c_files","hunspell/hunspell.cxx");
-__generate_json("c_files","hunspell/hunzip.cxx");
-__generate_json("c_files","hunspell/phonet.cxx");
-__generate_json("c_files","hunspell/replist.cxx");
-__generate_json("c_files","hunspell/suggestmgr.cxx");
-__generate_json("c_files","hunspell/hunspelldll.cxx");
+__generate_json("c_files","hunspell/affentry.cpp");
+__generate_json("c_files","hunspell/affixmgr.cpp");
+__generate_json("c_files","hunspell/csutil.cpp");
+__generate_json("c_files","hunspell/dictmgr.cpp");
+__generate_json("c_files","hunspell/filemgr.cpp");
+__generate_json("c_files","hunspell/hashmgr.cpp");
+__generate_json("c_files","hunspell/hunspell.cpp");
+__generate_json("c_files","hunspell/hunzip.cpp");
+__generate_json("c_files","hunspell/phonet.cpp");
+__generate_json("c_files","hunspell/replist.cpp");
+__generate_json("c_files","hunspell/suggestmgr.cpp");
+__generate_json("c_files","hunspell/hunspelldll.cpp");
 
 __generate_json("h_files","hunspell/affentry.hxx");
 __generate_json("h_files","hunspell/affixmgr.hxx");
@@ -39,10 +39,12 @@ __generate_json("h_files","hunspell/w_char.hxx");
 __generate_json("h_files","hunspell/hunspelldll.h");
 __generate_json("h_files","hunspell/config.h");
 __generate_json("h_files","hunspell/hunvisapi.h");
-__generate_json("h_files","hunspell/utf_info.cxx");
+__generate_json("h_files","hunspell/utf_info.cpp");
 
-if Platform.IS_UNIX
+if Platform.IS_UNIX:
 	__generate_json("ldflags","-lstdc++")
+if Platform.ARCH=="android":
+	__generate_json("android_stl","stlport_static")
 
 //coulddo: do we call hunspell_free_list?
 Hunspell_create=__c_function(HSPELLER,"hunspell_initialize","hunspell/hunspelldll.h")

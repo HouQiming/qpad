@@ -17,13 +17,19 @@ __generate_json("js_units","gui2d/ui.js")
 __generate_json("js_units","gui2d/gl.js")
 __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
-__generate_json("icon_file","icon256.png")
+if Platform.ARCH=="ios":
+	__generate_json("icon_file","icon_ios.png")
+else
+	__generate_json("icon_file","icon256.png")
 __generate_json("icon_win","iconwin.ico")
 //__generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
 __generate_json("linux_cc","gcc-5")
 if Platform.IS_LINUX:
 	__generate_json("ssh_remote_target","~/qpad")
+	__generate_json("ssh_server","houqiming@192.168.85.106")
+//if Platform.IS_UNIX&&Platform.BUILD!="debug":
+//	__generate_json("ldflags","-s")
 if Platform.IS_WINDOWS:
 	__generate_json("lib_files","shell32.lib")
 	__generate_json("lib_files","kernel32.lib")
@@ -32,12 +38,12 @@ if Platform.IS_WINDOWS:
 	if Platform.BUILD!="debug":
 		__generate_json("subsystem","windows")
 		__generate_json("c_files","jc_winmain.c")
+	__generate_json("vc_versions","11")
 //if Platform.ARCH=="win32":
 //	//use VC2008 for XP support
 //	__generate_json("vc_versions","9")
-if Platform.IS_UNIX&&Platform.BUILD!="debug":
-	__generate_json("ldflags","-s")
-	//__generate_json("ldflags","-static")
+if Platform.ARCH=="android":
+	__generate_json("android_activity_manifest","android:windowSoftInputMode=stateAlwaysHidden|adjustResize")
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -106,10 +112,10 @@ if Platform.BUILD=="debug":
 	JS=new JSContext
 	JS_script_sandbox=new JSContext
 	sbox=setupModuleSystem(JS,1)
-	//if Platform.BUILD=="debug":
-	//	sbox.UILoadZip(string.NULL)
-	//else
-	sbox.UILoadStaticZip()
+	if Platform.IS_MOBILE:
+		sbox.UILoadZip(string.NULL)
+	else
+		sbox.UILoadStaticZip()
 	/////////////
 	jsio=JS.New()
 	JS.GetGlobal()["IO"]=jsio
@@ -267,7 +273,10 @@ if Platform.BUILD=="debug":
 			return JS.Return(fn)
 	}
 	jsio["GetExecutablePath"]=function(JSContext JS){
-		return JS.Return(System.Env.GetExecutablePath())
+		if Platform.IS_MOBILE:
+			return 0
+		else
+			return JS.Return(System.Env.GetExecutablePath())
 	}
 	jsio["GetFileSize"]=function(JSContext JS){
 		fn=JS.Param(0).as(string)

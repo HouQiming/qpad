@@ -15,7 +15,12 @@ if(UI.TestOption('software_srgb')){
 	//UI.SetSRGBEnabling(0);
 	UI.SetSRGBEnabling(2);
 }
-UI.ChooseScalingFactor({designated_screen_size:1080})
+if(UI.IS_MOBILE){
+	//on mobile, we're better without the IME - it doesn't work on external kbd anyway
+	UI.SDL_StartTextInput=function(){};
+	UI.SDL_StopTextInput=function(){};
+}
+UI.ChooseScalingFactor({designated_screen_size:UI.IS_MOBILE?720:1080})
 UI.SetFontSharpening(1);
 UI.wheel_message_mode="over";
 (function(){
@@ -741,7 +746,7 @@ if(UI.Platform.ARCH=="mac"){
 	}
 }
 
-if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
+if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"||UI.IS_MOBILE){
 	IO.IsFirstInstance=function(){
 		return 1;
 	};

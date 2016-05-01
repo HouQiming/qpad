@@ -939,12 +939,14 @@ var RenderLayout=function(layout,obj,y_base){
 								var rgn=UI.context_regions[i];
 								for(var j=0;j<g_rerender_events.length;j++){
 									var s_method_name=g_rerender_events[j];
-									if(rgn[s_method_name]){
+									if(rgn[s_method_name]&&!rgn[s_method_name].is_rerender_hacked){
 										rgn[s_method_name]=function(tab,rgn,fn,event){
 											//force-update the tab
 											tab.backup_x=undefined;
 											fn.call(rgn,event);
 										}.bind(undefined,tab,rgn,rgn[s_method_name])
+										//avoid repeated application
+										rgn[s_method_name].is_rerender_hacked=1;
 									}
 								}
 								tab.backup_regions.push(rgn);

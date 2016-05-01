@@ -3010,13 +3010,13 @@ var ffindbar_plugin=function(){
 		this.CallOnChange();
 		UI.Refresh()
 	})
-	this.AddEventHandler('CTRL+SHIFT+F',function(){
+	this.AddEventHandler('SHIFT+CTRL+F',function(){
 		var obj=this.find_bar_owner;
 		obj.show_find_bar=UI.SHOW_GLOBAL_FIND;
 		this.CallOnChange();
 		UI.Refresh()
 	})
-	this.AddEventHandler('CTRL+SHIFT+G',function(){
+	this.AddEventHandler('SHIFT+CTRL+G',function(){
 		var obj=this.find_bar_owner;
 		obj.show_find_bar=UI.SHOW_GLOBAL_GOTO;
 		this.CallOnChange();
@@ -4386,6 +4386,15 @@ W.FileBrowserPage=function(id,attrs){
 						UI.m_current_file_list.m_listed_git_repos[spath_repo]=1;
 						files.push({git_repo_to_list:spath_repo, search_text:s_search_text,
 							relevance:FILE_RELEVANCE_REPO_SCORE,hist_ord:-1})
+					}
+					var projects=UI.m_ui_metadata["<projects>"];
+					for(var i=0;i<projects.length;i++){
+						var spath_repo_i=projects[i];
+						if(!UI.m_current_file_list.m_listed_git_repos[spath_repo_i]){
+							UI.m_current_file_list.m_listed_git_repos[spath_repo_i]=1;
+							files.push({git_repo_to_list:spath_repo_i, search_text:s_search_text,
+								relevance:0,hist_ord:-1})
+						}
 					}
 				}
 				//sort by relevance
@@ -6002,7 +6011,7 @@ W.CodeEditor=function(id,attrs){
 				var menu_search=UI.BigMenu("&Search")
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
 				W.Hotkey("",{key:"CTRL+R",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
-				menu_search.AddNormalItem({text:"Find in project...",enable_hotkey:1,key:"CTRL+SHIFT+F",action:finvoke_find.bind(obj,UI.SHOW_GLOBAL_FIND)})
+				menu_search.AddNormalItem({text:"Find in project...",enable_hotkey:1,key:"SHIFT+CTRL+F",action:finvoke_find.bind(obj,UI.SHOW_GLOBAL_FIND)})
 				menu_search.AddButtonRow({text:"Find previous / next"},[
 					{key:"SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+F3',action:function(){
 						obj.FindNext(-1)
@@ -6031,7 +6040,7 @@ W.CodeEditor=function(id,attrs){
 				}
 				menu_search.AddSeparator();
 				menu_search.AddNormalItem({text:"&Go to...",icon:'去',enable_hotkey:1,key:"CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GOTO)})
-				menu_search.AddNormalItem({text:"Go to ... in project",enable_hotkey:1,key:"CTRL+SHIFT+G",action:finvoke_goto.bind(obj,UI.SHOW_GLOBAL_GOTO)})
+				menu_search.AddNormalItem({text:"Go to ... in project",enable_hotkey:1,key:"SHIFT+CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GLOBAL_GOTO)})
 				var neib=doc.ed.GetUtf8CharNeighborhood(doc.sel1.ccnt);
 				if(UI.g_goto_definition_context&&obj.m_prev_next_button_drawn!=UI.m_frame_tick){
 					//render the current gotodef context, and put up #/# text as notification
@@ -6400,12 +6409,15 @@ W.CodeEditor=function(id,attrs){
 				var opacity=page_state_alpha/255
 				var sbar_page_y0=Math.max(Math.min(doc.visible_scroll_y/ytot,1),0)*sbar.h+sbar.y
 				var sbar_page_y1=Math.max(Math.min((doc.visible_scroll_y+h_scrolling_area)/ytot,1),0)*sbar.h+sbar.y
-				UI.DrawChar(obj.sbar_eye_font,
-					sbar.x+sbar.w-UI.MeasureText(obj.sbar_eye_font,"眼").w-1,
-					sbar_page_y0-sbar.y>hc_bookmark?sbar_page_y0-hc_bookmark:sbar_page_y1,
-					UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity),"眼".charCodeAt(0))
+				var h_sbar_rendering=Math.max(sbar_page_y1-sbar_page_y0,obj.bookmark_scroll_bar_marker_size);
+				if(!(h_sbar_rendering>obj.bookmark_scroll_bar_marker_size*2)){
+					UI.DrawChar(obj.sbar_eye_font,
+						sbar.x+sbar.w-UI.MeasureText(obj.sbar_eye_font,"眼").w-1,
+						sbar_page_y0-sbar.y>hc_bookmark?sbar_page_y0-hc_bookmark:sbar_page_y1,
+						UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity),"眼".charCodeAt(0))
+				}
 				UI.RoundRect({
-					x:sbar.x, y:sbar_page_y0, w:sbar.w, h:sbar_page_y1-sbar_page_y0,
+					x:sbar.x, y:sbar_page_y0-(h_sbar_rendering-(sbar_page_y1-sbar_page_y0))*0.5, w:sbar.w, h:h_sbar_rendering,
 					color:UI.lerp_rgba(obj.sbar_page_shadow&0xffffff,obj.sbar_page_shadow,opacity)})
 				//UI.RoundRect({
 				//	x:sbar.x, y:sbar.y+sbar_page_y0, w:sbar.w, h:obj.sbar_page_border_width,

@@ -925,7 +925,7 @@ inline IDToOrder(id)
 	return g_symbols[id].user_slot
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
-g_function_ids=[getid("function"),getid("function*"),getid("inline")]
+g_function_ids=[getid("function"),getid("function*"),getid("inline"),getid('def')]
 g_id_if=getid("if")
 g_id_while=getid("while")
 g_in_parse_queue=new int[int]

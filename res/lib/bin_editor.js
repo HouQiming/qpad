@@ -195,18 +195,18 @@ W.BinaryEditor_prototype={
 		}else if(IsHotkey(event,"CTRL+C")){
 			this.Copy()
 			return;
-		}else if(IsHotkey(event,"CTRL+F")){
-			this.m_show_find=!this.m_show_find;
-			UI.Refresh()
-			return;
-		}else if(this.m_last_needle&&IsHotkey(event,"F3")){
-			this.FindNext(this.m_sel1,1,this.m_last_needle)
-		}else if(this.m_last_needle&&IsHotkey(event,"SHIFT+F3")){
-			this.FindNext(this.m_sel1,-1,this.m_last_needle)
-		}else if(IsHotkey(event,"CTRL+F3")){
-			this.FindNext(this.m_sel1,1,new Uint8Array(this.GetSelectionAsBuffer()))
-		}else if(IsHotkey(event,"SHIFT+CTRL+F3")){
-			this.FindNext(this.m_sel1,-1,new Uint8Array(this.GetSelectionAsBuffer()))
+		//}else if(IsHotkey(event,"CTRL+F")){
+		//	this.m_show_find=!this.m_show_find;
+		//	UI.Refresh()
+		//	return;
+		//}else if(this.m_last_needle&&IsHotkey(event,"F3")){
+		//	this.FindNext(this.m_sel1,1,this.m_last_needle)
+		//}else if(this.m_last_needle&&IsHotkey(event,"SHIFT+F3")){
+		//	this.FindNext(this.m_sel1,-1,this.m_last_needle)
+		//}else if(IsHotkey(event,"CTRL+F3")){
+		//	this.FindNext(this.m_sel1,1,new Uint8Array(this.GetSelectionAsBuffer()))
+		//}else if(IsHotkey(event,"SHIFT+CTRL+F3")){
+		//	this.FindNext(this.m_sel1,-1,new Uint8Array(this.GetSelectionAsBuffer()))
 		}else if(IsHotkey(event,"CTRL+V")){
 			this.StartEdit("OnKeyDown",event);
 		}else if(IsHotkey(event,"ESC")){
@@ -345,6 +345,7 @@ W.BinaryEditor_prototype={
 		new_metadata.sel0=this.m_sel0;
 		new_metadata.sel1=this.m_sel1;
 		new_metadata.ranges=this.m_ranges;
+		new_metadata.bookmarks=this.m_bookmarks;
 		new_metadata.w_bytes=this.m_w_bytes;
 		new_metadata.m_scroll=this.m_scroll;
 		UI.m_ui_metadata[this.file_name]=new_metadata
@@ -491,6 +492,45 @@ W.BinaryEditor_prototype={
 			m_dir:dir,
 		};
 		this.m_last_needle=buf_needle;
+		UI.Refresh()
+	},
+	ToggleBookmark:function(id){
+		for(var i=0;i<this.m_bookmarks.length;i++){
+			var bm=this.m_bookmarks[i];
+			if(!bm){continue;}
+			if(bm.addr==this.m_sel1){
+				//remove the bookmark instead of setting a new one
+				this.m_bookmarks[i]=this.m_bookmarks[this.m_bookmarks.length-1];
+				this.m_bookmarks.pop();
+				UI.Refresh();
+				return;
+			}
+		}
+		this.m_bookmarks.push({addr:this.m_sel1,id:id});
+		UI.Refresh();
+	},
+	GetNextBookmark:function(addr,direction){
+		var best=undefined,best_bm=undefined;
+		for(var i=0;i<this.m_bookmarks.length;i++){
+			var bm=this.m_bookmarks[i];
+			if(!bm){continue;}
+			var dist=(bm.addr-addr)*direction;
+			if(dist>0&&!(best<dist)){
+				best=dist;
+				best_bm=bm;
+			}
+		}
+		return best_bm&&best_bm.addr;
+	},
+	GotoNextBookmark:function(direction,is_sel){
+		var addr_new=this.GetNextBookmark(this.m_sel1,direction);
+		if(addr_new==undefined){return;}
+		if(!is_sel){
+			this.m_sel0=addr_new;
+		}
+		this.m_sel1=addr_new;
+		this.ValidateSelection(0,-1)
+		this.AutoScroll()
 		UI.Refresh()
 	},
 };
@@ -667,6 +707,7 @@ W.BinaryEditor=function(id,attrs){
 				//coulddo: default parsing script
 			}
 			obj.m_ranges=(loaded_metadata.ranges||[]);
+			obj.m_bookmarks=(loaded_metadata.bookmarks||[]);
 			obj.m_native_view=UI.BIN_CreateView(obj.m_ranges);
 			obj.m_scroll=(loaded_metadata.m_scroll||0);
 			obj.m_sel0=(loaded_metadata.sel0||0);
@@ -863,6 +904,20 @@ W.BinaryEditor=function(id,attrs){
 					h:hc,
 					color:obj.color_cur_line_highlight
 				})
+				var t_caret_xy=XYFromCcntText(obj.m_sel1);
+				var t_caret_r_xy=XYFromCcntText(obj.m_sel1+(1<<(rg.tid&3))-1);
+				if(t_caret_r_xy.y>t_caret_xy.y){
+					t_caret_r_xy.x=dx_text+w_text_char*obj.m_w_bytes;
+				}else{
+					t_caret_r_xy.x+=w_text_char;
+				}
+				UI.RoundRect({
+					x:obj.x+obj.m_w_addr+t_caret_xy.x,
+					y:y_main_area+obj.m_h_addr,
+					w:t_caret_r_xy.x-t_caret_xy.x,
+					h:h_main_area-obj.m_h_addr,
+					color:obj.color_cur_line_highlight
+				})
 			}
 			//draw selection
 			if(obj.m_sel0!=obj.m_sel1){
@@ -888,6 +943,24 @@ W.BinaryEditor=function(id,attrs){
 				xy1=XYFromCcntText(Math.max(obj.m_sel0,obj.m_sel1));
 				fDrawSel(dx_text,dx_text+w_text_char*obj.m_w_bytes);
 			}
+			//draw bookmarks
+			for(var i=0;i<obj.m_bookmarks.length;i++){
+				var bm_i=obj.m_bookmarks[i];
+				var xy0=XYFromCcnt(bm_i.addr);
+				//draw a bar
+				UI.RoundRect({
+					x:obj.x+obj.m_w_addr+xy0.x-4,
+					y:y_main_area+obj.m_h_addr+xy0.y*hc-2,
+					w:2,h:hc+4,color:obj.bookmark_border_color})
+				if(bm_i.id){
+					//draw a number
+					UI.DrawChar(obj.bookmark_font,
+						obj.x+obj.m_w_addr+xy0.x-10,
+						y_main_area+obj.m_h_addr+xy0.y*hc-4,
+						obj.bookmark_text_color,48+bm_i.id);
+				}
+			}
+			//draw the actual text
 			UI.BIN_Render(obj.x+obj.m_w_addr,y_main_area+obj.m_h_addr,undefined,h_main_area-obj.m_h_addr,obj,obj.m_scroll)
 			//main-area mouse regions
 			obj.m_x_main=obj.x+obj.m_w_addr;
@@ -1122,6 +1195,63 @@ W.BinaryEditor=function(id,attrs){
 				obj.Redo()
 			}})
 			menu_edit=undefined;
+			var menu_search=UI.BigMenu("&Search")
+			menu_search.AddNormalItem({text:"&Find...",icon:"s",enable_hotkey:1,key:'CTRL+F',action:function(){
+				this.m_show_find=!this.m_show_find;
+				UI.Refresh()
+				return;
+			}})
+			menu_search.AddButtonRow({text:"Find previous / next"},[
+				{key:"SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+F3',action:function(){
+					obj.FindNext(obj.m_sel1,-1,obj.m_last_needle)
+				}},{key:"F3",text:"find_down",icon:"下",tooltip:'Next - F3',action:function(){
+					obj.FindNext(obj.m_sel1,1,obj.m_last_needle)
+				}}])
+			menu_search.AddButtonRow({text:"Find the current word"},[
+				{key:"SHIFT+CTRL+F3",text:"word_up",icon:"上",tooltip:'Prev - SHIFT+CTRL+F3',action:function(){
+					obj.FindNext(obj.m_sel1,-1,new Uint8Array(obj.GetSelectionAsBuffer()))
+				}},{key:"CTRL+F3",text:"word_down",icon:"下",tooltip:'Next - CTRL+F3',action:function(){
+					obj.FindNext(obj.m_sel1,1,new Uint8Array(obj.GetSelectionAsBuffer()))
+				}}])
+			menu_search.AddSeparator();
+			menu_search.AddNormalItem({text:"Set &bookmark",icon:"签",enable_hotkey:1,key:'SHIFT+CTRL+Q',action:function(){
+				obj.ToggleBookmark();
+			}})
+			menu_search.AddButtonRow({text:"Go to bookmark"},[
+				{key:"SHIFT+F2",text:"bookmark_up",icon:"上",tooltip:'Prev - SHIFT+F2',action:function(){
+					obj.GotoNextBookmark(-1,0)
+				}},{key:"F2",text:"bookmark_down",icon:"下",tooltip:'Next - F2',action:function(){
+					obj.GotoNextBookmark(1,0)
+				}}])
+			menu_search.AddButtonRow({text:"Select to bookmark"},[
+				{text:"bookmark_sel_up",icon:"上",tooltip:'Prev',action:function(){
+					obj.GotoNextBookmark(-1,1)
+				}},{text:"bookmark_sel_down",icon:"下",tooltip:'Next',action:function(){
+					obj.GotoNextBookmark(1,1)
+				}}])
+			if(UI.nd_focus==obj){
+				for(var i=0;i<10;i++){
+					W.Hotkey("",{key:'SHIFT+CTRL+'+i.toString(),action:function(i){
+						this.ToggleBookmark(i);
+						return 0;
+					}.bind(obj,i)});
+					W.Hotkey("",{key:'CTRL+'+i.toString(),action:function(id){
+						for(var i=0;i<this.m_bookmarks.length;i++){
+							var bm_i=this.m_bookmarks[i];
+							if(bm_i.id==id){
+								this.m_sel0=bm_i.addr;
+								this.m_sel1=bm_i.addr;
+								this.ValidateSelection(0,-1)
+								this.AutoScroll()
+								UI.Refresh();
+								break;
+							}
+						}
+						return 0;
+					}.bind(obj,i)});
+				}
+			}
+			menu_search=undefined;
 		}
 		UI.FillLanguageMenu(UI.GetFileNameExtension(obj.file_name),'Binary',function(name){
 			if(name=='Binary'){return;}

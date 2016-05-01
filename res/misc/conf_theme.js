@@ -640,7 +640,7 @@ UI.CustomTheme=function(){
 				$:{
 					out:{
 						//border_color:0xff444444,color:0xffffffff,
-						border_color:0,color:0,
+						border_color:0,color:[{x:0,y:0,color:0x00ffffff},{x:0,y:1,color:0x00e8e8e8}],
 						icon_color:L?0xff7f7f7f:0xff7f7f7f,
 						text_color:L?0xff7f7f7f:0xff7f7f7f,
 					},
@@ -796,7 +796,7 @@ UI.CustomTheme=function(){
 			font_edit:UI.Font("res/fonts/inconsolata.ttf",16),
 			font_goto:UI.Font("res/fonts/inconsolata.ttf",16),
 			mouse_wheel_speed:4,
-			color_cur_line_highlight:L?0x55ffffff:0x55666666,
+			color_cur_line_highlight:L?0xaaffffff:0x55666666,
 			edit_padding:8,
 			edit_bgcolor:L?0xffffffff:0xff3f3f3f,
 			edit_border_width:2,
@@ -811,6 +811,9 @@ UI.CustomTheme=function(){
 			line_number_bgcolor:L?0xffd0d0d0:0xff333333,
 			line_number_color:L?0xff7f7f7f:0xff6a8264,
 			line_number_color_focus:L?0xff000000:0xff8DAC85,
+			bookmark_font:UI.Font(UI.font_name,12,200),
+			bookmark_text_color:L?C:UI.lerp_rgba(C,0xffbfdfdf,0.5),
+			bookmark_border_color:L?C:UI.lerp_rgba(C,0xffbfdfdf,0.5),
 			caret_width:2,
 			caret_color:L?0xff000000:0xffbfdfdf,
 			caret_flicker:500,

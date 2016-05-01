@@ -3454,6 +3454,28 @@ auto RenderRichTextObject(JSContext JS,float x,float y,float w,JSObject objs,int
 			y/g_renderer.m_pixels_per_unit,
 			obj_i)
 
+auto ReplaceFile(string fntar,string fnsrc)
+	if !System.IO.FileExists(fntar):
+		return System.IO.MoveFile(fnsrc,fntar)
+	if Platform.IS_WINDOWS:
+		WinReplaceFile=__c_function(int,"ReplaceFileW","windows.h")
+		fntaru=System.detail.toNativeString(fntar.Replace(["/","\\"]))
+		fnsrcu=System.detail.toNativeString(fnsrc.Replace(["/","\\"]))
+		return WinReplaceFile(fntaru,fnsrcu,NULL,0,NULL,NULL)
+	else if Platform.IS_UNIX:
+		UnixMatchFileAttributes=__c_function(int,"UnixMatchFileAttributes","c_helper.h","c_files","c_helper.c")
+		fntaru=System.detail.toNativeString(fntar)
+		fnsrcu=System.detail.toNativeString(fnsrc)
+		if !UnixMatchFileAttributes(fntaru,fnsrcu):return 0
+		if !System.IO.DeleteFile(fntar):return 0
+		if !System.IO.MoveFile(fnsrc,fntar):return 0
+		return 1
+	else
+		assert(0)
+		if !System.IO.DeleteFile(fntar):return 0
+		if !System.IO.MoveFile(fnsrc,fntar):return 0
+		return 1
+
 isWesternLetter=inline(ch){
 	chi=int(u8(ch))
 	return chi>=0x80||isWordChar(chi)
@@ -3544,11 +3566,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ret.ofs+=i64(szwrite)
 		if ret.ofs>=szmax:
 			ret.hf.Close()
-			if !System.IO.DeleteFile(ret.fn)&&System.IO.FileExists(ret.fn):
+			if !ReplaceFile(ret.fn,ret.fn+".$$$"):
 				return JS.Return("failed")
-			if !System.IO.MoveFile(ret.fn+".$$$",ret.fn):
-				return JS.Return("failed")
-			return JS.Return("done")
+			else
+				return JS.Return("done")
 		ret.progress=f32(ret.ofs)/f32(szmax)
 		return JS.Return("continue")
 	}

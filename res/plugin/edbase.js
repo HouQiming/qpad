@@ -2633,6 +2633,7 @@ UI.RegisterEditorPlugin(function(){
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		renderer.m_tentative_editops=undefined
 		renderer.ResetTentativeOps()
+		//if(this.owner){this.owner.m_no_more_replace=0;}
 	}
 	var StartAutoEdit=function(cclines,mode){
 		var locs=[]
@@ -2864,6 +2865,7 @@ UI.RegisterEditorPlugin(function(){
 			return;
 		}
 		this.is_in_vsel=1
+		//if(this.owner){this.owner.m_no_more_replace=1;}
 		if(!this.vsel_sel0){
 			this.vsel_sel0=this.ed.CreateLocator(this.sel1.ccnt,1)
 			var hl_items=this.CreateTransientHighlight({
@@ -2882,6 +2884,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 	}).bind(this)
 	var UpdateVSel=(function(){
+		if(this.owner){this.owner.m_no_more_replace=1}
 		var ccnt0=this.vsel_sel0.ccnt
 		var ccnt1=this.sel1.ccnt
 		if(ccnt0>ccnt1){

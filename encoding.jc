@@ -178,6 +178,9 @@ auto OSConvertString(int win_codepage,string iconv_name,string s)
 		us=new i16[nu]
 		nu=MultiByteToWideChar(win_codepage,MB_PRECOMPOSED,s,int(s.n),us,int(us.n))
 		return UnicodeToUtf8(us)
+	else if Platform.IS_MOBILE:
+		//on mobile, we can't support it yet
+		return s
 	else
 		iconv_open=__c_function(iptr,"iconv_open","iconv.h")
 		iconv=__c_function(iptr,"iconv","iconv.h")
