@@ -228,7 +228,7 @@ W.BinaryEditor_prototype={
 		var mapXLeft=function(daddr_x){
 			return w_digit*2*daddr_x+w_space1*(daddr_x)+w_space4*(daddr_x>>2)+w_space8*(daddr_x>>3);
 		};
-		var daddr_y=Math.floor((event.y-(this.y+this.m_h_addr))/hc);
+		var daddr_y=Math.floor((event.y-((this.m_main_area_scale_factor!=1?0:this.y)+this.m_h_addr))/hc);
 		var daddr_x=0;
 		if(rgid=="rgn_text"){
 			daddr_x=Math.floor((event.x-this.m_x_text)/w_text_char);
