@@ -1561,6 +1561,7 @@ var find_item_region_prototype={
 			}
 		}
 		ctx.m_current_point=p_match;
+		ctx.UpdateFindItemSelection()
 		ctx.AutoScrollFindItems()
 		if(event.clicks>1){
 			var obj=ctx.m_owner;

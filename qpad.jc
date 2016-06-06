@@ -80,6 +80,13 @@ if Platform.IS_WINDOWS:
 			SetForegroundProcess=__c_function(int,"SetForegroundProcess","windows.h")
 			return JS.Return(SetForegroundProcess(pid))
 		}
+		JS_UI["SetTaskbarProgress"]=function(JSContext JS){
+			hwnd_sdl=JS.Param(0).as(__pointer)
+			progress=JS.Param(1).or(0.f)
+			SetTaskbarProgress=__c_function(int,"SetTaskbarProgress","taskbar_win.h","c_files","taskbar_win.cpp")
+			SDL_GetHWND=__c_function(__pointer,"SDL_GetHWND","sdl_hwnd.h","c_files","sdl_hwnd.c")
+			return JS.Return(SetTaskbarProgress(SDL_GetHWND(hwnd_sdl),progress))
+		}
 	})
 if Platform.BUILD=="debug":
 	registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){

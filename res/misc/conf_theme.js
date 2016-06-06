@@ -81,6 +81,45 @@ UI.CustomTheme=function(){
 				},
 			}),
 		},
+		button_progress:{
+			transition_dt:0.1,
+			round:0.1,border_width:1,padding:0,
+			font:UI.Font(UI.font_name,20,-50),
+			icon_font:UI.Font(UI.icon_font_name,18),
+			$:(L?{//light
+				out:{
+					border_color:C,color:C,
+					icon_color:0xffffffff,
+					text_color:0xffffffff,
+				},
+				over:{
+					border_color:C,color:C,
+					icon_color:0xffffffff,
+					text_color:0xffffffff,
+				},
+				down:{
+					border_color:C_dark,color:C_dark,
+					icon_color:0xffffffff,
+					text_color:0xffffffff,
+				},
+			}:{//dark
+				out:{
+					border_color:C,color:C,
+					icon_color:0xffe8e8e8,
+					text_color:0xffe8e8e8,
+				},
+				over:{
+					border_color:C,color:C,
+					icon_color:0xffe8e8e8,
+					text_color:0xffe8e8e8,
+				},
+				down:{
+					border_color:C_dark,color:C_dark,
+					icon_color:0xffe8e8e8,
+					text_color:0xffe8e8e8,
+				},
+			}),
+		},
 		check_button:{
 			transition_dt:0.1,
 			round:0,border_width:2,padding:12,
@@ -619,6 +658,7 @@ UI.CustomTheme=function(){
 			w_scroll_bar:20,
 			h_caption:36,
 			h_separation:0,
+			h_button:32,
 			padding:12,
 			caption_padding:4,
 			caption_font:UI.Font(UI.font_name,28,-50),
@@ -630,6 +670,8 @@ UI.CustomTheme=function(){
 			color:L?0xffc0c0c0:0xff333333,
 			shadow_size:8,
 			shadow_color:C_shadow,
+			button_area_shadow_size:6,
+			button_area_shadow_color:C_shadow,
 			scale:7/8,
 			//scale:0.75,
 			//scale:0.625,
@@ -1097,6 +1139,7 @@ UI.CustomTheme=function(){
 			caret_width:UI.IS_MOBILE?1:2,
 			caret_color:0xffe8e8e8,
 			caret_flicker:500,
+			color:0xffe8e8e8,
 		};
 		styles.edit_box={
 			transition_dt:0.1,

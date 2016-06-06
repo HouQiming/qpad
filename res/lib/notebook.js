@@ -19,7 +19,7 @@ var MeasureEditorSize=function(doc,max_lines,w_content){
 };
 
 var g_re_errors=new RegExp("^error_.*$")
-var g_re_cancel_note=new RegExp("^cancel_notification$")
+var g_re_cancel_note=new RegExp("^cancel_notification$");
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	//do not reload errors
@@ -307,7 +307,7 @@ W.notebook_prototype={
 					var menu_run=UI.BigMenu("&Run");
 					var obj_notebook=this.notebook_owner;
 					var cell_id=this.m_cell_id;
-					var cur_compiler_name=(obj_notebook[cell_id].m_compiler_name||UI.GetDefaultBuildEnv(obj_notebook[cell_id].m_language));
+					var cur_compiler_name=(obj_notebook.m_cells[cell_id].m_compiler_name||UI.GetDefaultBuildEnv(obj_notebook.m_cells[cell_id].m_language));
 					for(var i=0;i<desc.m_buildenvs.length;i++){
 						var s_name_i=desc.m_buildenvs[i].name;
 						menu_run.AddNormalItem({
@@ -316,10 +316,25 @@ W.notebook_prototype={
 							action:function(name){
 								this.m_compiler_name=name;
 								UI.Refresh();
-							}.bind(obj_notebook[cell_id],s_name_i)})
+							}.bind(obj_notebook.m_cells[cell_id],s_name_i)})
 					}
 					menu_run=undefined;
 				}
+			})
+			//button list update
+			this.AddEventHandler('change',function(){
+				var s_check=this.ed.GetText(0,Math.min(this.ed.GetTextSize(),4096));
+				var match=s_check.match(/\[button: (.+)\]/);
+				var obj_notebook=this.notebook_owner;
+				var cell_id=this.m_cell_id;
+				if(obj_notebook.m_cells[cell_id]){
+					if(match){
+						obj_notebook.m_cells[cell_id].m_button_name=match[1];
+					}else{
+						obj_notebook.m_cells[cell_id].m_button_name=undefined;
+					}
+				}
+				UI.Refresh();
 			})
 		}
 	}],
@@ -364,6 +379,8 @@ W.notebook_prototype={
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
 			this.ProcessCell(cell_i);
+			cell_i.m_text_in.m_cell_id=i;
+			cell_i.m_text_in.CallOnChange();
 		}
 		//if(!this.m_cells.length){
 		//	this.NewCell();
@@ -564,6 +581,7 @@ W.notebook_prototype={
 		var ccnt=ed.GetTextSize();
 		var sel=doc.GetSelection();
 		ed.Edit([ccnt,0,s],1);
+		//try to advance the selection
 		if(sel[0]==sel[1]&&sel[1]==ccnt){
 			var ccnt_end=doc.ed.GetTextSize()
 			doc.SetSelection(ccnt_end,ccnt_end)
@@ -572,14 +590,61 @@ W.notebook_prototype={
 		var line=doc.GetLC(ccnt)[0]
 		var ccnt_lh=doc.SeekLC(line,0)
 		var ccnt_tot=doc.ed.GetTextSize()
+		cell_i.m_progress=undefined;
 		for(;;){
 			var ccnt_next=doc.SeekLineBelowKnownPosition(ccnt_lh,line,line+1)
+			var need_break=0;
 			if(!(ccnt_next<ccnt_tot)){
-				if(!(doc.GetLC(ccnt_next)[0]>line)){break;}
+				if(!(doc.GetLC(ccnt_next)[0]>line)){
+					if(ccnt_next-ccnt_lh>=MAX_PARSABLE_LINE){
+						break;
+					}
+					need_break=1;
+				}
 			}
 			var sline=doc.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh);
-			var err=ParseOutput(sline);
-			if(err){this.CreateCompilerError(id,err,ccnt_lh,ccnt_next);}
+			var lg=Duktape.__byte_length(sline);
+			if(lg<MAX_PARSABLE_LINE){
+				//chop line feeds
+				var lf_groups=sline.split('\r');
+				if(lf_groups.length>1&&!(lf_groups.length==2&&lf_groups[lf_groups.length-1]=='\n')){
+					var need_newline=0;
+					if(lf_groups[lf_groups.length-1]=='\n'){
+						lf_groups.pop();
+						need_newline=1;
+					}
+					while(lf_groups.length>0&&!lf_groups[lf_groups.length-1]){
+						lf_groups.pop();
+					}
+					if(lf_groups.length>0){
+						s_new=lf_groups.pop();
+					}else{
+						s_new='';
+					}
+					if(need_newline){
+						s_new=s_new+'\n';
+					}
+					if(need_break){
+						var match_progress=s_new.match(/([0-9]+(.[0-9]*)?)[%]/);
+						if(match_progress){
+							cell_i.m_progress=match_progress[1];
+						}
+					}
+					ed.Edit([ccnt_lh,lg,s_new],0);
+					ccnt_tot=doc.ed.GetTextSize();
+					ccnt_next=ccnt_lh+Duktape.__byte_length(s_new);
+					sline=s_new;
+				}
+				///////////////
+				if(need_break){
+					break;
+				}
+				var err=ParseOutput(sline)
+				if(err){this.CreateCompilerError(id,err,ccnt_lh,ccnt_next);}
+			}
+			if(need_break){
+				break;
+			}
 			ccnt_lh=ccnt_next;
 			line++;
 		}
@@ -600,11 +665,12 @@ W.notebook_prototype={
 			doc.ResetSaveDiff()
 		}
 		cell_i.m_has_any_error=0;;
+		cell_i.m_progress=undefined;
 		doc.ClearClickableRanges();
 	},
 	RunCell:function(id){
 		var cell_i=this.m_cells[id];
-		var doc=cell_i.m_text_out;
+		var doc=cell_i.m_text_in;
 		if(cell_i.m_proc){
 			if(doc&&doc.owner){
 				var noti_new={
@@ -692,6 +758,7 @@ W.notebook_prototype={
 							this.WriteCellOutput(cell_i.m_cell_id,this.file_name+":1:1: fatal error: the script has returned an error "+code+"\n")
 						}
 						cell_i.m_proc=undefined;
+						cell_i.m_progress=undefined;
 						cell_i.m_completion_time=JsifyBuffer(IO.WallClockTime());
 					}
 					IO.DeleteFile(fn_script)
@@ -797,10 +864,24 @@ W.NotebookView=function(id,attrs){
 	UI.Begin(obj)
 	UI.RoundRect(obj)
 	W.PureRegion(id,obj)
-	UI.PushSubWindow(obj.x,obj.y,obj.w-obj.w_scroll_bar+obj.padding*0.5*obj.scale,obj.h,obj.scale)
+	var buttons=[];
+	if(obj.m_cells){
+		for(var i=0;i<obj.m_cells.length;i++){
+			var cell_i=obj.m_cells[i];
+			if(cell_i.m_button_name){
+				buttons.push({id:i,text:cell_i.m_button_name});
+			}
+		}
+	}
+	var w_buttons=0;
+	for(var i=0;i<buttons.length;i++){
+		var w_button_i=16+UI.MeasureText(UI.default_styles.button.font,buttons[i].text).w;
+		w_buttons=Math.max(w_buttons,w_button_i);
+	}
+	UI.PushSubWindow(obj.x,obj.y,obj.w-obj.w_scroll_bar-w_buttons+obj.padding*0.5*obj.scale,obj.h,obj.scale)
 	var n0_topmost=UI.RecordTopMostContext()
 	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
-	obj.x=0;obj.y=0;obj.w=(obj.w-obj.w_scroll_bar)/obj.scale+obj.padding*0.5;obj.h/=obj.scale;
+	obj.x=0;obj.y=0;obj.w=(obj.w-obj.w_scroll_bar-w_buttons)/obj.scale+obj.padding*0.5;obj.h/=obj.scale;
 	if(!obj.m_cells){
 		obj.Load();
 	}
@@ -958,6 +1039,9 @@ W.NotebookView=function(id,attrs){
 				doc:doc_in,
 				x:obj.x+obj.padding,y:obj.y+delta_y+current_y-scroll_y,w:w_content-obj.padding*2,h:h_in,
 			})
+			if(UI.nd_focus!=doc_in||!cell_i.m_proc){
+				obj_widget.DismissNotificationsByRegexp(g_re_cancel_note);
+			}
 		}
 		doc_in.sub_cell_id=i*2+0;
 		doc_in.default_focus=(obj.m_last_focus_cell_id==doc_in.sub_cell_id?2:1)
@@ -1066,7 +1150,7 @@ W.NotebookView=function(id,attrs){
 	var sbar_value=Math.max(Math.min(scroll_y/(ytot_all_notes-h_scrolling_area),1),0);
 	if(h_scrolling_area<ytot_all_notes){
 		W.ScrollBar("sbar",{
-			x:obj.x+obj.w-obj.w_scroll_bar, y:obj.y, w:obj.w_scroll_bar, h:obj.h, dimension:'y',
+			x:obj.x+obj.w-obj.w_scroll_bar-w_buttons, y:obj.y, w:obj.w_scroll_bar, h:obj.h, dimension:'y',
 			page_size:h_scrolling_area, total_size:ytot_all_notes, value:sbar_value,
 			OnChange:function(value){
 				obj.scrolling_animation=undefined;
@@ -1075,6 +1159,48 @@ W.NotebookView=function(id,attrs){
 			},
 			OnMouseWheel:obj.OnMouseWheel.bind(obj),
 		})
+	}
+	//buttons
+	var y_button=0;
+	var h_button=obj.h_button;
+	for(var i=0;i<buttons.length;i++){
+		var cell_i=obj.m_cells[buttons[i].id];
+		var btn=W.Button("btn_"+buttons[i].id,{
+			x:obj.x+obj.w-w_buttons,y:y_button,w:w_buttons,h:h_button,
+			text:buttons[i].text,
+			OnClick:(function(cell_id){
+				this.m_last_focus_cell_id=cell_id*2;
+				this.need_auto_scroll=1;
+				var cell_i=this.m_cells[cell_id];
+				if(cell_i){
+					UI.SetFocus(cell_i.m_text_in);
+				}
+				this.RunCell(cell_id);
+			}).bind(obj,buttons[i].id)
+		})
+		if(cell_i.m_proc){
+			//running
+			var progress=(cell_i&&(parseFloat(cell_i.m_progress)/100));
+			if(progress>0){
+				UI.PushCliprect(obj.x+obj.w-w_buttons,y_button,w_buttons*progress,h_button);
+				W.Button("btnp_"+buttons[i].id,{
+					x:obj.x+obj.w-w_buttons,y:y_button,w:w_buttons,h:h_button,
+					text:buttons[i].text,
+					OnClick:btn.OnClick,
+					style:UI.default_styles.button_progress,
+				})
+				UI.PopCliprect();
+			}
+		}
+		y_button+=h_button;
+	}
+	if(w_buttons>0){
+		UI.PushCliprect(obj.x,obj.y,obj.w-w_buttons,obj.h);
+		UI.RoundRect({
+			x:obj.x+obj.w-w_buttons-obj.button_area_shadow_size,y:obj.y-obj.button_area_shadow_size,w:obj.button_area_shadow_size*2,h:obj.h+obj.button_area_shadow_size*2,
+			color:obj.button_area_shadow_color,border_width:-obj.button_area_shadow_size,round:obj.button_area_shadow_size,
+		})
+		UI.PopCliprect();
 	}
 	UI.End()
 	if(UI.enable_timing){
@@ -1126,14 +1252,24 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 				var body=this.main_widget;
 				var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
 				var is_running=0;
+				var s_progress=undefined;
 				for(var i=0;i<body.m_cells.length;i++){
 					if(body.m_cells[i].m_proc){
 						is_running=1;
-						break
+						if(s_progress==undefined){
+							s_progress=body.m_cells[i].m_progress;
+						}
 					}
 				}
 				if(is_running){
-					this.title=UI.Format("@1 (running)",s_name)+(this.need_save?'*':'');
+					if(UI.top.app.progress==undefined&&s_progress!=undefined){
+						UI.top.app.progress=parseFloat(s_progress)/100;
+					}
+					if(s_progress!=undefined){
+						this.title=UI.Format("@1 (@2%)",s_name,s_progress)+(this.need_save?'*':'');
+					}else{
+						this.title=UI.Format("@1 (running)",s_name)+(this.need_save?'*':'');
+					}
 				}else{
 					this.title=UI.Format("@1 - Notebook",s_name)+(this.need_save?'*':'');
 				}
@@ -1154,20 +1290,21 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 				this.main_widget=body;
 			}
 			this.need_save=this.main_widget.need_save;
-			var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
-			var is_running=0;
-			for(var i=0;i<body.m_cells.length;i++){
-				if(body.m_cells[i].m_proc){
-					is_running=1;
-					break
-				}
-			}
-			if(is_running){
-				body.title=UI.Format("@1 (running)",s_name)+(this.need_save?'*':'');
-			}else{
-				body.title=UI.Format("@1 - Notebook",s_name)+(this.need_save?'*':'');
-			}
-			body.tooltip=this.file_name;
+			this.UpdateTitle();
+			//var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
+			//var is_running=0;
+			//for(var i=0;i<body.m_cells.length;i++){
+			//	if(body.m_cells[i].m_proc){
+			//		is_running=1;
+			//		break
+			//	}
+			//}
+			//if(is_running){
+			//	body.title=UI.Format("@1 (running)",s_name)+(this.need_save?'*':'');
+			//}else{
+			//	body.title=UI.Format("@1 - Notebook",s_name)+(this.need_save?'*':'');
+			//}
+			//body.tooltip=this.file_name;
 			return body;
 		},
 		NeedMainWidget:function(){

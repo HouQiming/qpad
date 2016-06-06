@@ -963,6 +963,13 @@ UI.RegisterEditorPlugin(function(){
 			var s_name_in_script="'"+this.m_file_name+"'";
 			if(is_project){
 				s_name_in_script='the project'
+				var s_button;
+				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+					s_button="rem [button: "+UI._("Run project")+"]";
+				}else{
+					s_button="# [button: "+UI._("Run project")+"]";
+				}
+				s_script=s_button+s_script;
 			}
 			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 				s_mark="@echo off\nrem build script for "+s_name_in_script+"\n";

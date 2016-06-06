@@ -220,8 +220,8 @@
 			"Show changed lines in scrollbar":"在滚动条上显示修改区域",
 			"No more '@1' above":"上面没有别的'@1'了",
 			"No more '@1' below":"下面没有别的'@1'了",
-			"No more matches above":"上面找不到新的了",
-			"No more matches below":"下面找不到新的了",
+			"No more matches above":"上面找不到别的了",
+			"No more matches below":"下面找不到别的了",
 			"Search a JS expression, e.g. 'MZ' or [0x4d,0x5a]":"请搜索JS表达式，例如'MZ'或[0x4d,0x5a]",
 			"Address: ":"地址：",
 			"Found one":"找到了",
@@ -241,7 +241,6 @@
 			"Output - @1":"输出 - @1",
 			"@1 - Notebook":"@1 - 脚本簿",
 			"@1 (running)":"@1 (运行中)",
-			//"Set .@1 association":"",
 			"Use QPad to open *.@1":"用QPad打开所有@1文件",
 			//"Markdown":""
 			///////////////////
@@ -275,6 +274,13 @@
 			"Don't save":"不存",
 			"Parsing @1, @2 files left...":"正在解析@1，还剩@2个文件……",
 			"in project '@1'":"在工程'@1'中查找",
+			"Run project":"运行工程",
+			"&Find...":"查找(&F)……",
+			"Go to bookmark":"转到书签",
+			"Select to bookmark":"选择到书签",
+			"Bad width: ":"非法宽度：",
+			"Highlight find at the scrollbar":"在滚动条上标出查找结果",
+			"No more '@1' below, found @2":"下面没有别的'@1'了，共@2个",
 			///////////////////
 			"Display":"显示",
 			"Controls":"操作",
@@ -340,7 +346,11 @@
 	if(UI.Platform.BUILD=="debug"){
 		var s_translations=IO.ReadAll("build/translation.txt");
 		if(s_translations){
-			var taboos=['16','32','48','64','confirm','IT','100%',"&Browse...","&select to","- or ,","ENTER or SPACE","= or .","CTRL -","CTRL+0","CTRL +"];
+			var taboos=['16','32','48','64','confirm','IT','100%',"&Browse...","&select to","- or ,","ENTER or SPACE","= or .","CTRL -","CTRL+0","CTRL +",
+				"@1:@2",
+				"@1/@2/@3",
+				"U+@1",
+				"Markdown"];
 			var all_translatable_strings=[];
 			var dedup={};
 			var taboo={};

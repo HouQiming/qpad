@@ -275,7 +275,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\."+sext,["","qpad3_file"])
 		var sexe=IO.m_my_name.replace(/[/]/g,"\\");
 		UI.WIN_AddRegistryItem(sregfile,"HKEY_CLASSES_ROOT\\qpad3_file\\shell\\open\\command",["","\""+sexe+"\" \"%1\""])
-		return UI.WIN_ApplyRegistryFile(sregfile,UI.Format( "Set .@1 association",sext));
+		return UI.WIN_ApplyRegistryFile(sregfile,"Set file association");
 	}
 	UI.ShowInFolder=function(fn){
 		IO.Shell(["explorer","/select,",IO.NormalizeFileName(fn,1).replace(/[/]/g,'\\')])
@@ -631,6 +631,7 @@ UI.Application=function(id,attrs){
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
 				W.Hotkey("",{key:"ALT+F4",action:function(){if(!app.OnClose()){UI.DestroyWindow(app)}}});
 			}
+			app.progress=undefined;
 			var w_property_bar=320;
 			//UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):
 			//var obj_panel=W.AutoHidePanel("property_panel",{
@@ -707,6 +708,9 @@ UI.Application=function(id,attrs){
 		UI.InvalidateCurrentFrame()
 		UI.Refresh()
 		UI.m_ui_metadata["<has_opened_us_before>"]=1;
+	}
+	if(UI.SetTaskbarProgress){
+		UI.SetTaskbarProgress(app.__hwnd,app.progress||0);
 	}
 	if(UI.Platform.BUILD=="debug"){
 		//detect memory leaks

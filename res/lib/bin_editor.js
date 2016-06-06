@@ -1197,7 +1197,7 @@ W.BinaryEditor=function(id,attrs){
 			menu_edit=undefined;
 			var menu_search=UI.BigMenu("&Search")
 			menu_search.AddNormalItem({text:"&Find...",icon:"s",enable_hotkey:1,key:'CTRL+F',action:function(){
-				this.m_show_find=!this.m_show_find;
+				obj.m_show_find=!obj.m_show_find;
 				UI.Refresh()
 				return;
 			}})
