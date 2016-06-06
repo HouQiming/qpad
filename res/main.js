@@ -617,7 +617,7 @@ UI.Application=function(id,attrs){
 		var app=UI.Begin(W.Window('app',{
 				title:'QPad',w:1280,h:720,bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
-				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
+				flags:UI.Platform.ARCH=="web"?UI.SDL_WINDOW_FULLSCREEN:(UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE),
 				is_main_window:1,
 				OnWindowBlur:function(){
 					this.document_area.OnWindowBlur();
@@ -632,7 +632,8 @@ UI.Application=function(id,attrs){
 				W.Hotkey("",{key:"ALT+F4",action:function(){if(!app.OnClose()){UI.DestroyWindow(app)}}});
 			}
 			app.progress=undefined;
-			var w_property_bar=320;
+			//console.log(app.w,app.h,UI.pixels_per_unit)
+			//var w_property_bar=320;
 			//UI.Platform.ARCH=='android'?(app.w<app.h?'down':'left'):
 			//var obj_panel=W.AutoHidePanel("property_panel",{
 			//	x:0,y:0,w:w_property_bar,h:w_property_bar,initial_position:0,
