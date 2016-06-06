@@ -1120,7 +1120,11 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					UI.RoundRect({
 						x:area_x+w_line_numbers-6,y:line_xys[i*2+1]-scroll_y+area_y,
 						w:6,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
-						color:edstyle.color_diff_tag})
+						color:edstyle.sbar_diff_color})
+					//UI.RoundRect({
+					//	x:area_x,y:line_xys[i*2+1]-scroll_y+area_y,
+					//	w:w_line_numbers,h:Math.min(Math.max((line_xys[i*2+3]-line_xys[i*2+1])||hc,hc),area_h),
+					//	color:edstyle.sbar_diff_color&0x55ffffff})
 				}
 			}
 			if(enable_interaction){
@@ -1387,6 +1391,7 @@ W.NotificationItem=function(id,attrs){
 	obj.w=obj.padding*2+obj.w_icon+obj.w_text
 	obj.h=obj.padding*2+Math.max(obj.w_icon,obj.m_cached_prt.m_h_text)
 	UI.StdAnchoring(id,obj);
+	obj.alpha=1;//disable fadein to avoid weird effects, it's not that needed anyway
 	UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width-obj.shadow_size*0.375,y:obj.y-obj.shadow_size*0.375,
 		w:obj.w+obj.shadow_size*1.125,h:obj.h+obj.shadow_size*1.125,
 		color:fadein(obj.shadow_color,obj.alpha),
@@ -4909,6 +4914,7 @@ W.CodeEditor=function(id,attrs){
 			}
 		}
 		w_minimap*=show_minimap;
+		//var show_at_scrollbar_find_minimap=UI.TestOption("show_at_scrollbar_find_minimap")
 		if(doc){
 			//scrolling and stuff
 			var ccnt_tot=doc.ed.GetTextSize()
@@ -5096,6 +5102,10 @@ W.CodeEditor=function(id,attrs){
 				}
 				var rendering_ccnt0=doc.SeekXY(scroll_x,y0_rendering)
 				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,y1_rendering)
+				//if(show_at_scrollbar_find_minimap){
+				//	rendering_ccnt0=Math.max(rendering_ccnt0-65536,0);
+				//	rendering_ccnt1=Math.min(rendering_ccnt1+65536,doc.ed.GetTextSize());
+				//}
 				var s_bk=UI.m_ui_metadata["<find_state>"].m_current_needle;
 				obj.ResetFindingContext(s_autofind_needle,UI.m_ui_metadata["<find_state>"].m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
 				UI.m_ui_metadata["<find_state>"].m_current_needle=s_bk;
@@ -5119,7 +5129,7 @@ W.CodeEditor=function(id,attrs){
 			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(obj.line_number_font,56);
 		}
-		var is_find_mode_rendering=(!obj.m_edit_lock&&obj.show_find_bar);
+		var is_find_mode_rendering=(!obj.m_edit_lock&&obj.show_find_bar&&current_find_context);
 		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4
 		w_line_numbers+=obj.padding+w_bookmark;
 		if(is_find_mode_rendering){
@@ -6346,6 +6356,26 @@ W.CodeEditor=function(id,attrs){
 			var sbar=UI.RoundRect({x:obj.x+w_obj_area-obj.w_scroll_bar, y:y_scrolling_area, w:obj.w_scroll_bar, h:h_scrolling_area,
 				color:obj.line_number_bgcolor
 			})
+			//at-scrollbar find minimap
+			//this is too slow, should use a bitmap
+			//var ctx=obj.m_current_find_context;
+			//if(!obj.show_find_bar&&show_at_scrollbar_find_minimap&&ctx&&ctx.m_locators){
+			//	//var findhl_ccnts=[];
+			//	//for(var i=0;i<ctx.m_locators.length;i+=2){
+			//	//	findhl_ccnts.push(ctx.m_locators[i].ccnt);
+			//	//}
+			//	//findhl_ccnts.sort(function(a,b){return a-b})
+			//	//var findhl_xys=doc.ed.GetXYEnMasse(findhl_ccnts)
+			//	var findhl_xys=UI.ED_GetFindLocatorXYEnMasse(doc.ed,ctx.m_locators);
+			//	print(findhl_xys[1],findhl_xys.length)
+			//	for(var i=0;i<findhl_xys.length;i+=2){
+			//		var y=Math.max(Math.min(findhl_xys[i+1]/ytot,1),0)*sbar.h+sbar.y
+			//		UI.RoundRect({
+			//			x:sbar.x, w:sbar.w,
+			//			y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
+			//			color:doc.rectex_styles[0].color})
+			//	}
+			//}
 			//diff minimap
 			if(doc.m_diff_minimap){
 				if(obj.m_diff_minimap_h_obj_area!=h_obj_area){
@@ -7133,6 +7163,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{special:'tab_width',h_special:4},
 				{name:'Use English (need to restart)',stable_name:'force_english'},//DO NOT TRANSLATE THIS!
 				{name:UI._('Highlight the current line'),stable_name:'show_line_highlight'},
+				//{name:UI._('Highlight find at the scrollbar'),stable_name:'show_at_scrollbar_find_minimap'},
 				{name:UI._('Show the menu bar'),stable_name:'always_show_menu'},
 				{name:UI._('Show horizontal scroll-bar'),stable_name:'show_x_scroll_bar'},
 				{name:UI._('Show outer scope overlays'),stable_name:'show_top_hint'},

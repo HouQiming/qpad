@@ -283,7 +283,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 }
 if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 	UI.InstallQPad=function(){
-		//windows installation, generate .reg and run it
+		//linux installation, generate .desktop and copy it
 		if(UI.Platform.BUILD=="debug"){
 			print("*** WARNING: INSTALLING A DEBUG VERSION! ***")
 		}
@@ -516,7 +516,13 @@ var CreateMenus=function(){
 	var obj_real_active_tab=UI.top.app.document_area.active_tab;
 	if(obj_real_active_tab&&obj_real_active_tab.file_name){
 		menu_tools.AddNormalItem({text:"Copy path",tab_menu_group:'tools',enable_hotkey:0,
-			action:function(fn){UI.SDL_SetClipboardText(IO.NormalizeFileName(fn,1))}.bind(undefined,obj_real_active_tab.file_name)
+			action:function(fn){
+				var s=IO.NormalizeFileName(fn,1);
+				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+					s=s.replace(/[/]/g,'\\');
+				}
+				UI.SDL_SetClipboardText(s)
+			}.bind(undefined,obj_real_active_tab.file_name)
 		})
 		menu_tools.AddNormalItem({text:"Move related tabs to front",tab_menu_group:'tools',
 			enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})

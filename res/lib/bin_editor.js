@@ -1412,7 +1412,7 @@ W.BinaryToolsPage=function(id,attrs){
 	//width buttons
 	var text_width=W.Text("",{x:obj.x+12,y:y_current,font:obj.font_panel,text:UI._("Display width"),color:obj.text_color_panel})
 	var x_buttons=text_width.x+text_width.w+4;
-	W.Button("btn_w16",{
+	/*W.Button("btn_w16",{
 		style:UI.default_styles.check_button,
 		x:x_buttons,y:y_current,w:24,h:24,
 		value:obj_real.m_w_bytes==16,OnClick:function(){obj_real.ResetWBytes(16)},
@@ -1426,7 +1426,32 @@ W.BinaryToolsPage=function(id,attrs){
 		style:UI.default_styles.check_button,
 		x:x_buttons,y:y_current,w:24,h:24,
 		value:obj_real.m_w_bytes==48,OnClick:function(){obj_real.ResetWBytes(48)},
-		font:obj.font_panel_fixed,text:"48"});x_buttons+=28;
+		font:obj.font_panel_fixed,text:"48"});x_buttons+=28;*/
+	W.EditBox("width_edit",{
+		x:x_buttons,w:84,y:y_current+2,h:24,
+		is_single_line:1,
+		value:obj_real.m_w_bytes.toString(),
+		font:obj.font_goto,
+		OnChange:function(value){
+			var ret=obj_real.m_w_bytes;
+			try{
+				ret=JSON.parse(Duktape.__eval_expr_sandbox(value));
+			}catch(e){
+				obj_real.CreateNotification('错',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+2)+UI._("Bad width: ")+e.message)
+				UI.SetFocus(obj_real)
+				UI.Refresh()
+				return;
+			}
+			if(typeof(ret)=='number'){
+				ret=(ret|0);
+				if(ret>0&&ret<1024){
+					obj_real.ResetWBytes(ret);
+				}
+			}
+			UI.SetFocus(obj_real)
+			UI.Refresh()
+		},
+	});
 	//W.Button("btn_w64",{
 	//	style:UI.default_styles.check_button,
 	//	x:x_buttons,y:y_current,w:24,h:24,

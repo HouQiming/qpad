@@ -3928,6 +3928,39 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					bmp[j]=u8(255)
 		return JS.Return(new CDiffBitmap(){data:bmp})
 	}
+	JS_UI["ED_GetFindLocatorXYEnMasse"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return 0
+		locators=JS.Param(1).as(JSObject)
+		n=locators["length"].as(iptr)
+		ccnts=new i64[]
+		for i=0:2:n-2
+			ccnts.push(locators[i].as(CLocator).ccnt)
+		ccnts.Sort()
+		xys=ed.GetXYEnMasse(ccnts)
+		return JS.Return([fixed2double(d) for d in xys])
+	}
+	spaceTabWidth=function(string smatch,int tab_width){
+		cw=0
+		for ch in smatch
+			if ch=='\t':
+				cw=(cw/tab_width+1)*tab_width
+			else
+				cw++
+		return cw
+	}
+	JS_UI["ED_NativeToSpace"]=function(JSContext JS){
+		smatch=JS.Param(0).as(string)
+		tab_width=JS.Param(1).as(int)
+		lg=spaceTabWidth(smatch,tab_width)
+		return JS.Return([' ' for i=0:lg-1])
+	}
+	JS_UI["ED_NativeToTab"]=function(JSContext JS){
+		smatch=JS.Param(0).as(string)
+		tab_width=JS.Param(1).as(int)
+		lg=spaceTabWidth(smatch,tab_width)
+		return JS.Return(['\t' for i=0:(lg+(tab_width-1))/tab_width-1])
+	}
 	JS_UI["ED_DrawDiffMinimap"]=function(JSContext JS){
 		x=JS.Param(0).as(float)
 		y=JS.Param(1).as(float)

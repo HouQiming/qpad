@@ -92,8 +92,8 @@ var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.P
 ]);
 
 Language.Register({
-	name:"C/C++",parser:"C",
-	extensions:["c","cxx","cpp","cc","h","hpp","mm"],
+	name:"C/C++/C#",parser:"C",
+	extensions:["c","cxx","cpp","cc","h","hpp","mm","cs"],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
 	file_icon_color:0xff9a3d6a,
@@ -313,8 +313,23 @@ Language.Register({
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
 		var bid_js_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
-		lang.m_owner.line_comment=undefined;
-		lang.m_owner.paired_comment=["<!--","-->"];
+		lang.m_owner.GetCommentStrings=function(mask){
+			if(mask&(1<<bid_script)){
+				//in script
+				//if(mask&(1<<bid_string)){
+				//	return {line_comment:"//",paired_comment:['",',',"']}
+				//}
+				//if(mask&(1<<bid_string2)){
+				//	return {line_comment:"//",paired_comment:["',",",'"]}
+				//}
+				return {line_comment:"//",paired_comment:["/*","*/"]}
+			}else{
+				//in HTML
+				return {paired_comment:["<!--","-->"]}
+			}
+		}
+		//lang.m_owner.line_comment=undefined;
+		//lang.m_owner.paired_comment=["<!--","-->"];
 		lang.DefineToken("&amp;")
 		lang.DefineToken("&apos;")
 		lang.DefineToken('&quot;')
@@ -433,7 +448,7 @@ Language.Register({
 		kwset.DefineWordColor("color_type")
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_cdata,bid_header,bid_string,bid_content,bid_string2]);
-			if(lang.isInside(bid_content)){
+			if(lang.isInside(bid_content)||lang.m_inside_mask==0){
 				lang.Enable(bid_comment)
 				lang.Enable(bid_cdata)
 				lang.Enable(bid_header)
@@ -531,7 +546,6 @@ Language.Register({
 		lang.DefineDefaultColor("color_symbol")
 		var bid_comment=lang.ColoredDelimiter("key","rem ","\n","color_comment");
 		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
-		lang.DefineToken('\\\n')
 		var kwset=lang.DefineKeywordSet("color_symbol");
 		var keywords={
 			'keyword':['if','exists','not','goto','for','do'],
@@ -1516,9 +1530,13 @@ UI.RegisterEditorPlugin(function(){
 		var sel=this.GetSelection();
 		var line0=this.GetLC(sel[0])[0];
 		var line1=this.GetLC(sel[1])[0];
-		if((line0==line1&&sel[0]<sel[1]||!lang.line_comment)&&lang.paired_comment){
-			var s0=lang.paired_comment[0]
-			var s1=lang.paired_comment[1]
+		var cmt_holder=lang;
+		if(lang.GetCommentStrings){
+			cmt_holder=lang.GetCommentStrings(this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
+		}
+		if((line0==line1&&sel[0]<sel[1]||!cmt_holder.line_comment)&&cmt_holder.paired_comment){
+			var s0=cmt_holder.paired_comment[0]
+			var s1=cmt_holder.paired_comment[1]
 			var lg0=Duktape.__byte_length(s0)
 			var lg1=Duktape.__byte_length(s1)
 			if(ed.GetText(sel[0],lg0)==s0&&ed.GetText(sel[1]-lg1,lg1)==s1){
@@ -1533,7 +1551,7 @@ UI.RegisterEditorPlugin(function(){
 			UI.Refresh();
 			return 0;
 		}
-		if(!lang.line_comment){
+		if(!cmt_holder.line_comment){
 			return 1
 		}
 		if(line0==line1||this.SeekLC(line1,0)<sel[1]){line1++;}
@@ -1541,7 +1559,7 @@ UI.RegisterEditorPlugin(function(){
 		var line_ccnts_new=[];
 		var ops=[];
 		var is_decomment=1
-		var s0=lang.line_comment
+		var s0=cmt_holder.line_comment
 		var lg0=Duktape.__byte_length(s0)
 		var min_n_spaces=undefined;
 		for(var i=0;i<line_ccnts.length-1;i++){
@@ -3131,15 +3149,17 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('menu',function(){
 		var menu_convert=UI.BigMenu("Con&vert")
 		var tab_width=UI.GetOption("tab_width",4);
-		var s_tab_space=Array(tab_width+1).join(' ');
+		//var s_tab_space=Array(tab_width+1).join(' ');
 		menu_convert.AddNormalItem({text:"Leading &tabs to spaces",action:
-			fsmart_replace.bind(this,"^[\t]+",function(smatch){
-				return Array(smatch.length+1).join(s_tab_space);
+			fsmart_replace.bind(this,"^[ \t]+",function(smatch){
+				//return Array(smatch.length+1).join(s_tab_space);
+				return UI.ED_NativeToSpace(smatch,tab_width)
 			})})
 		menu_convert.AddNormalItem({text:"Leading &spaces to tabs",action:
 			//("+s_tab_space+")
-			fsmart_replace.bind(this,"^ +",function(smatch){
-				return Array((((smatch.length+tab_width-1)/tab_width)|0)+1).join('\t');
+			fsmart_replace.bind(this,"^[ \t]+",function(smatch){
+				//return Array((((smatch.length+tab_width-1)/tab_width)|0)+1).join('\t');
+				return UI.ED_NativeToTab(smatch,tab_width)
 			})})
 		menu_convert.AddNormalItem({text:"Letters to &UPPERCASE",action:
 			fsmart_replace.bind(this,"[a-z]+",function(smatch){

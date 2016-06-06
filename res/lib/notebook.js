@@ -444,6 +444,8 @@ W.notebook_prototype={
 				var proc_desc=this.m_cells[i].m_proc;
 				if(proc_desc){
 					proc_desc.proc.Terminate()
+					UI.Refresh()
+					return;
 				}
 				this.ClearCellOutput(i)
 				continue;
