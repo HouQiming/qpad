@@ -44,6 +44,9 @@ if Platform.IS_WINDOWS:
 //	__generate_json("vc_versions","9")
 if Platform.ARCH=="android":
 	__generate_json("android_activity_manifest","android:windowSoftInputMode=stateAlwaysHidden|adjustResize")
+if Platform.ARCH=="web":
+	__generate_json("cflags","-s TOTAL_MEMORY=268435456")
+	__generate_json("ldflags","-s TOTAL_MEMORY=268435456")
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -369,7 +372,7 @@ if Platform.BUILD=="debug":
 	else if Platform.ARCH=="mac":
 		//osal_DoFileDialogMac=__c_function(int,"osal_DoFileDialogMac","filedlg.h","c_files","filedlg_mac.m")
 		//__generate_json("mac_frameworks","System/Library/Frameworks/AppKit.framework")
-	if Platform.IS_MOBILE||Platform.ARCH=="rasppi":
+	if Platform.IS_MOBILE||Platform.ARCH=="rasppi"||Platform.ARCH=="web":
 		jsio["DoFileDialog"]=function(JSContext JS){
 			return 0
 		}
@@ -518,6 +521,9 @@ if Platform.BUILD=="debug":
 				f.Close()
 	}
 	Gui2D.g_log_file=s_storage_path+"/log.txt"
+	//for fn in sbox.m_ui_zip.AllFileNames()
+	//	Writeln(fn)
+	//Writeln('main: ',sbox.UIReadAll("res/main.js"))
 	sbox.UIRunJS(JS,"res/main.js")
 	//if Platform.IS_WINDOWS&&System.IO.FileExists(System.Env.GetExecutablePath()+"/opengl32.dll"):
 	//	//LLVMPipe tends to crash

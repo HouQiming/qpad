@@ -3430,7 +3430,7 @@ auto RenderRichTextObject(JSContext JS,float x,float y,float w,JSObject objs,int
 					}")
 				else
 					g_richtext_img_tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
-			mini_vbo=[
+			vbo=g_renderer.UploadMiniVBO([
 				__float_as_int((x)),__float_as_int((y)),
 				__float_as_int((x+w_render)),__float_as_int((y)),
 				__float_as_int((x+w_render)),__float_as_int((y+h_render)),
@@ -3438,15 +3438,15 @@ auto RenderRichTextObject(JSContext JS,float x,float y,float w,JSObject objs,int
 				0,0,
 				0x3f800000,0,
 				0x3f800000,0x3f800000,
-				0,0x3f800000]
-			g_richtext_img_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(int),mini_vbo.d)
-			g_richtext_img_tech.SetVertexPointer("uv_vert", 2,GL_FLOAT,0, 2*sizeof(int),mini_vbo.d+8*sizeof(float))
+				0,0x3f800000])
+			g_richtext_img_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(int),0L)
+			g_richtext_img_tech.SetVertexPointer("uv_vert", 2,GL_FLOAT,0, 2*sizeof(int),0L+8*sizeof(float))
 			prev_viewport=new int[4]
 			glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
 			//Writeln('render: ',x,' ',y,' ',w_render,' ',h_render)
 			g_richtext_img_tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
 			g_richtext_img_tech.SetTexture2D("tex0",texid);
-			g_richtext_img_tech.Draw(0u,GL_QUADS,4)
+			g_richtext_img_tech.Draw(vbo,GL_TRIANGLE_FAN,4)
 		})
 	else if stype=="pre":
 		JS["UI"].CallMethod(int,"RenderEmbededCodeBox",
@@ -3991,22 +3991,21 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		glTexSubImage2D(GL_TEXTURE_2D,0,0,0,int(bmp.n),1,GL_ALPHA,GL_UNSIGNED_BYTE,__pointer(bmp.d))
 		glBindTexture(GL_TEXTURE_2D,0u)
 		u_max=f32(bmp.n)/2048.f
-		mini_vbo=[
+		vbo=g_renderer.UploadMiniVBO([
 			__float_as_int(x),__float_as_int(y),
 			__float_as_int(x+w),__float_as_int(y),
 			__float_as_int(x+w),__float_as_int(y+h),
 			__float_as_int(x),__float_as_int(y+h),
 			C,C,C,C,
-			0,0,__float_as_int(u_max),__float_as_int(u_max)]
-		tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(int),mini_vbo.d)
-		tech.SetVertexPointer("C_vert", 4,GL_UNSIGNED_BYTE,1, sizeof(int),mini_vbo.d+8*sizeof(float))
-		tech.SetVertexPointer("u_vert", 1,GL_FLOAT,1, sizeof(int),mini_vbo.d+12*sizeof(float))
+			0,0,__float_as_int(u_max),__float_as_int(u_max)])
+		tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(int),0L)
+		tech.SetVertexPointer("C_vert", 4,GL_UNSIGNED_BYTE,1, sizeof(int),0L+8*sizeof(float))
+		tech.SetVertexPointer("u_vert", 1,GL_FLOAT,1, sizeof(int),0L+12*sizeof(float))
 		prev_viewport=new int[4]
 		glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
 		tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
 		tech.SetTexture2D("tex0",texid)
-		tech.Draw(0u,GL_QUADS,4)
-		mini_vbo.discard()
+		tech.Draw(vbo,GL_TRIANGLE_FAN,4)
 		return 0
 	}
 	JS_UI["ED_isWordChar"]=function(JSContext JS){

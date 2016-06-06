@@ -747,23 +747,26 @@ if(UI.Platform.ARCH=="mac"){
 	*/
 	IO.IsFirstInstance=function(){
 		//todo
+		return 1;
 	};
 	IO.SetForegroundProcess=function(pid){
 		//todo
+		return 0;
 	};
 	UI.ShowInFolder=function(fn){
 		//todo
 	}
 }
 
-if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"||UI.IS_MOBILE){
-	IO.IsFirstInstance=function(){
-		return 1;
-	};
-	IO.SetForegroundProcess=function(pid){
-		return 0;
-	};
-}
+//if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"||UI.IS_MOBILE||UI.Platform.ARCH=="web")
+//if(!IO.IsFirstInstance){
+//	IO.IsFirstInstance=function(){
+//		return 1;
+//	};
+//	IO.SetForegroundProcess=function(pid){
+//		return 0;
+//	};
+//}
 
 UI.OpenFile=function(fn){
 	var fn=IO.NormalizeFileName(fn);
@@ -804,26 +807,30 @@ UI.OpenFile=function(fn){
 	//this is not safe. it could race. shouldn't happen too often though
 	//we try to open new instances when it races
 	//temp file with pid + temp file check during OnFocus
-	var is_first=IO.IsFirstInstance("qpad3_single_instance");
-	var fn_hack_pipe=IO.GetStoragePath()+"/tmp_pid.txt";
-	var fn_hack_pipe2=IO.GetStoragePath()+"/tmp_open.json";
-	if(argv.length>=1&&argv[0]=='--new-instance'){
-		is_first=1;
-	}
-	if(!is_first&&IO.FileExists(fn_hack_pipe)&&!IO.FileExists(fn_hack_pipe2)){
-		//in case pid exceeds 32 bits... parseFloat it
-		var pid=parseFloat(IO.ReadAll(fn_hack_pipe))
-		for(var i=0;i<argv.length;i++){
-			argv[i]=IO.NormalizeFileName(argv[i])
+	if(IO.IsFirstInstance){
+		var is_first=IO.IsFirstInstance("qpad3_single_instance");
+		var fn_hack_pipe=IO.GetStoragePath()+"/tmp_pid.txt";
+		var fn_hack_pipe2=IO.GetStoragePath()+"/tmp_open.json";
+		if(argv.length>=1&&argv[0]=='--new-instance'){
+			is_first=1;
 		}
-		IO.CreateFile(fn_hack_pipe2,JSON.stringify(argv))
-		if(IO.SetForegroundProcess(pid)){
-			return;
+		if(!is_first&&IO.FileExists(fn_hack_pipe)&&!IO.FileExists(fn_hack_pipe2)){
+			//in case pid exceeds 32 bits... parseFloat it
+			var pid=parseFloat(IO.ReadAll(fn_hack_pipe))
+			for(var i=0;i<argv.length;i++){
+				argv[i]=IO.NormalizeFileName(argv[i])
+			}
+			IO.CreateFile(fn_hack_pipe2,JSON.stringify(argv))
+			if(IO.SetForegroundProcess(pid)){
+				return;
+			}
 		}
+		IO.DeleteFile(fn_hack_pipe2)//delete lingering files
+		IO.CreateFile(fn_hack_pipe,IO.GetPID().toString())
 	}
-	IO.DeleteFile(fn_hack_pipe2)//delete lingering files
-	IO.CreateFile(fn_hack_pipe,IO.GetPID().toString())
 	UI.m_cmdline_opens=argv;
 	UI.Run();
-	IO.DeleteFile(fn_hack_pipe)
+	if(IO.IsFirstInstance){
+		IO.DeleteFile(fn_hack_pipe)
+	}
 })()
