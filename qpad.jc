@@ -17,6 +17,8 @@ __generate_json("js_units","gui2d/ui.js")
 __generate_json("js_units","gui2d/gl.js")
 __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
+if Platform.ARCH=="ios"||Platform.ARCH=="web":
+	__generate_json("extra_resource_dirs","cjk_fonts")
 if Platform.ARCH=="ios":
 	__generate_json("icon_file","icon_ios.png")
 else

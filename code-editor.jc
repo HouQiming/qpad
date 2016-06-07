@@ -21,6 +21,7 @@ import SmartFind.*
 import CodeParser.*
 import Encoding.*
 import GL.*
+USE_BLIT_FRAMEBUFFER=0
 
 //text -> i64[]
 auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line, int m_tab_width)
@@ -4469,6 +4470,24 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		JS["UI"]["m_saved_render_fbo"]=pdraw_fbo[0]
 		return 0
 	}
+	myBlitFBO=function(JS,x0,y0,x1,y1,rtt_src,draw_fbo){
+		glBindFramebuffer(GL_FRAMEBUFFER,draw_fbo)
+		glViewport(x0,y0,x1-x0,y1-y0)
+		tech=JS["UI"]["m_blit_framebuffer_tech"].as(GLTechnique)
+		if !tech:
+			tech=new GLTechnique
+			tech.SetFragmentShader("
+				void main(){
+					gl_FragColor=texture2D(tex0,base+st*size);
+				}
+			")
+		tech.SetTexture2D("tex0",rtt_src.m_tex)
+		tech.SetUniform("base",float2(float(x0),float(y0))/float2(float(rtt_src.w),float(rtt_src.h)))
+		tech.SetUniform("size",float2(float(x1-x0),float(y1-y0))/float2(float(rtt_src.w),float(rtt_src.h)))
+		glDisable(GL_BLEND)
+		tech.DrawScreenQuad()
+		glEnable(GL_BLEND)
+	}
 	JS_UI["GL_LeaveBackupFBO"]=function(JSContext JS){
 		tab_viewport=new int[4]
 		glGetIntegerv(GL_VIEWPORT,__pointer(tab_viewport.d));
@@ -4478,10 +4497,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		y0=tab_viewport[1]
 		x1=x0+tab_viewport[2]
 		y1=y0+tab_viewport[3]
-		glBindFramebuffer(GL_READ_FRAMEBUFFER,g_rtt_tab_backup.m_fbo)
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER,draw_fbo)
-		glBlitFramebuffer(x0,y0,x1,y1, x0,y0,x1,y1, GL_COLOR_BUFFER_BIT,GL_NEAREST)
-		glBindFramebuffer(GL_FRAMEBUFFER,draw_fbo)
+		if USE_BLIT_FRAMEBUFFER:
+			glBindFramebuffer(GL_READ_FRAMEBUFFER,g_rtt_tab_backup.m_fbo)
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER,draw_fbo)
+			glBlitFramebuffer(x0,y0,x1,y1, x0,y0,x1,y1, GL_COLOR_BUFFER_BIT,GL_NEAREST)
+			glBindFramebuffer(GL_FRAMEBUFFER,draw_fbo)
+		else
+			myBlitFBO(JS,x0,y0,x1,y1,g_rtt_tab_backup,draw_fbo)
 		return 0;
 	}
 	JS_UI["GL_RestoreFromBackupFBO"]=function(JSContext JS){
@@ -4495,10 +4517,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		y0=tab_viewport[1]
 		x1=x0+tab_viewport[2]
 		y1=y0+tab_viewport[3]
-		glBindFramebuffer(GL_READ_FRAMEBUFFER,g_rtt_tab_backup.m_fbo)
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER,pdraw_fbo[0])
-		glBlitFramebuffer(x0,y0,x1,y1, x0,y0,x1,y1, GL_COLOR_BUFFER_BIT,GL_NEAREST)
-		glBindFramebuffer(GL_FRAMEBUFFER,pdraw_fbo[0])
+		if USE_BLIT_FRAMEBUFFER:
+			glBindFramebuffer(GL_READ_FRAMEBUFFER,g_rtt_tab_backup.m_fbo)
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER,pdraw_fbo[0])
+			glBlitFramebuffer(x0,y0,x1,y1, x0,y0,x1,y1, GL_COLOR_BUFFER_BIT,GL_NEAREST)
+			glBindFramebuffer(GL_FRAMEBUFFER,pdraw_fbo[0])
+		else
+			myBlitFBO(JS,x0,y0,x1,y1,g_rtt_tab_backup,pdraw_fbo[0])
 		return 0;
 	}
 	/////////////////////////////

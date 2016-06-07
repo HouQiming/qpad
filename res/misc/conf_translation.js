@@ -337,9 +337,9 @@
 		UI.fallback_font_names=["DroidSansFallbackFull.ttf"]
 	}else{
 		if(UI.m_ui_language=="ja_jp"){
-			UI.fallback_font_names=["res/fonts/dsansjp.ttc"]
+			UI.fallback_font_names=["cjk_fonts/dsansja.ttf"]
 		}else{
-			UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
+			UI.fallback_font_names=["cjk_fonts/dsanscn.ttc"]
 		}
 	}
 	////////////////////////////

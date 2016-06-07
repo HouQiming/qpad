@@ -10,6 +10,7 @@ var CALL_GC_DOC_SIZE_THRESHOLD=4194304;
 var GRACEFUL_WORD_SIZE=256;
 var MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT=256;
 var MAX_ALLOWED_INDENTATION=20;//has to match the similarly-named const in code-editor.jc
+var MAX_HIGHLIGHTED_MATCHES=1024;
 
 UI.m_code_editor_persistent_members_doc=[
 	"m_language_id",
@@ -4915,7 +4916,7 @@ W.CodeEditor=function(id,attrs){
 			}
 		}
 		w_minimap*=show_minimap;
-		//var show_at_scrollbar_find_minimap=UI.TestOption("show_at_scrollbar_find_minimap")
+		var show_at_scrollbar_find_minimap=UI.TestOption("show_at_scrollbar_find_minimap")
 		if(doc){
 			//scrolling and stuff
 			var ccnt_tot=doc.ed.GetTextSize()
@@ -5077,7 +5078,7 @@ W.CodeEditor=function(id,attrs){
 			}
 			//find highlight
 			if(!obj.show_find_bar&&s_autofind_needle&&!obj.m_hide_find_highlight){
-				//repeat the animation to get correct the correct scrolling information
+				//repeat the animation to get the correct scrolling information
 				UI.Begin(doc)
 					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
 						scroll_x:doc.scroll_x,
@@ -5103,21 +5104,41 @@ W.CodeEditor=function(id,attrs){
 				}
 				var rendering_ccnt0=doc.SeekXY(scroll_x,y0_rendering)
 				var rendering_ccnt1=doc.SeekXY(scroll_x+area_w,y1_rendering)
-				//if(show_at_scrollbar_find_minimap){
-				//	rendering_ccnt0=Math.max(rendering_ccnt0-65536,0);
-				//	rendering_ccnt1=Math.min(rendering_ccnt1+65536,doc.ed.GetTextSize());
-				//}
 				var s_bk=UI.m_ui_metadata["<find_state>"].m_current_needle;
-				obj.ResetFindingContext(s_autofind_needle,UI.m_ui_metadata["<find_state>"].m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
+				var need_new_ctx=0;
+				if(obj.m_current_find_context&&
+				show_at_scrollbar_find_minimap&&
+				!obj.m_changed_after_find&&
+				s_autofind_needle==obj.m_current_find_context.m_needle&&
+				!(obj.m_current_find_context.m_flags&UI.SEARCH_FLAG_FUZZY)){
+					if(!UI.IsSearchFrontierCompleted(obj.m_current_find_context.m_backward_frontier)&&UI.GetSearchFrontierCcnt(obj.m_current_find_context.m_backward_frontier)>rendering_ccnt0){
+						//the previous context went out of range
+						need_new_ctx=1;
+					}else if(!UI.IsSearchFrontierCompleted(obj.m_current_find_context.m_forward_frontier)&&UI.GetSearchFrontierCcnt(obj.m_current_find_context.m_forward_frontier)<rendering_ccnt1){
+						//the previous context went out of range
+						need_new_ctx=1;
+					}else{
+						//keep the current context
+					}
+				}else{
+					need_new_ctx=1;
+				}
+				if(show_at_scrollbar_find_minimap){
+					rendering_ccnt0=0;
+					rendering_ccnt1=doc.ed.GetTextSize();
+				}
+				if(need_new_ctx){
+					obj.ResetFindingContext(s_autofind_needle,UI.m_ui_metadata["<find_state>"].m_find_flags, Math.min(Math.max(rendering_ccnt0,doc.SeekLC(doc.GetLC(doc.sel1.ccnt)[0],0)),rendering_ccnt1))
+				}
 				UI.m_ui_metadata["<find_state>"].m_current_needle=s_bk;
 				current_find_context=obj.m_current_find_context
 				//print(UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier),UI.GetSearchFrontierCcnt(current_find_context.m_forward_frontier),current_find_context.m_backward_frontier,current_find_context.m_forward_frontier,current_find_context.m_flags)
 				if(current_find_context){
-					if(!UI.IsSearchFrontierCompleted(current_find_context.m_backward_frontier)&&UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier)>rendering_ccnt0){
+					if(!UI.IsSearchFrontierCompleted(current_find_context.m_backward_frontier)&&UI.GetSearchFrontierCcnt(current_find_context.m_backward_frontier)>rendering_ccnt0&&current_find_context.m_backward_matches.length<MAX_HIGHLIGHTED_MATCHES){
 						current_find_context.m_backward_frontier=UI.ED_Search(doc.ed,current_find_context.m_backward_frontier,-1,current_find_context.m_needle,current_find_context.m_flags,65536,current_find_context.ReportMatchBackward.bind(current_find_context,doc),current_find_context)
 						UI.Refresh()
 					}
-					if(!UI.IsSearchFrontierCompleted(current_find_context.m_forward_frontier)&&UI.GetSearchFrontierCcnt(current_find_context.m_forward_frontier)<rendering_ccnt1){
+					if(!UI.IsSearchFrontierCompleted(current_find_context.m_forward_frontier)&&UI.GetSearchFrontierCcnt(current_find_context.m_forward_frontier)<rendering_ccnt1&&current_find_context.m_forward_matches.length<MAX_HIGHLIGHTED_MATCHES){
 						current_find_context.m_forward_frontier=UI.ED_Search(doc.ed,current_find_context.m_forward_frontier,1,current_find_context.m_needle,current_find_context.m_flags,65536,current_find_context.ReportMatchForward.bind(current_find_context,doc),current_find_context);
 						UI.Refresh()
 					}
@@ -6358,25 +6379,34 @@ W.CodeEditor=function(id,attrs){
 				color:obj.line_number_bgcolor
 			})
 			//at-scrollbar find minimap
-			//this is too slow, should use a bitmap
-			//var ctx=obj.m_current_find_context;
-			//if(!obj.show_find_bar&&show_at_scrollbar_find_minimap&&ctx&&ctx.m_locators){
-			//	//var findhl_ccnts=[];
-			//	//for(var i=0;i<ctx.m_locators.length;i+=2){
-			//	//	findhl_ccnts.push(ctx.m_locators[i].ccnt);
-			//	//}
-			//	//findhl_ccnts.sort(function(a,b){return a-b})
-			//	//var findhl_xys=doc.ed.GetXYEnMasse(findhl_ccnts)
-			//	var findhl_xys=UI.ED_GetFindLocatorXYEnMasse(doc.ed,ctx.m_locators);
-			//	print(findhl_xys[1],findhl_xys.length)
-			//	for(var i=0;i<findhl_xys.length;i+=2){
-			//		var y=Math.max(Math.min(findhl_xys[i+1]/ytot,1),0)*sbar.h+sbar.y
-			//		UI.RoundRect({
-			//			x:sbar.x, w:sbar.w,
-			//			y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
-			//			color:doc.rectex_styles[0].color})
-			//	}
-			//}
+			var ctx=obj.m_current_find_context;
+			if(!obj.show_find_bar&&show_at_scrollbar_find_minimap&&ctx&&ctx.m_locators){
+				//save highlight-computed frontier and merged y ranges in ctx
+				if(ctx.m_asbfmm_last_length!=ctx.m_locators.length||ctx.m_asbfmm_h!=sbar.h){
+					ctx.m_asbfmm_last_length=ctx.m_locators.length;
+					ctx.m_asbfmm_h=sbar.h;
+					var findhl_xys=UI.ED_GetFindLocatorXYEnMasse(doc.ed,ctx.m_locators);
+					//print(findhl_xys[1],findhl_xys.length)
+					var y_ranges=[];
+					for(var i=0;i<findhl_xys.length;i+=2){
+						var y=Math.max(Math.min(findhl_xys[i+1]/ytot,1),0)*sbar.h-obj.bookmark_scroll_bar_marker_size*0.5;
+						var y2=y+obj.bookmark_scroll_bar_marker_size;
+						if(!y_ranges.length||y>y_ranges[y_ranges.length-1]){
+							y_ranges.push(y,y2)
+						}else{
+							y_ranges[y_ranges.length-1]=y2;
+						}
+					}
+					ctx.m_asbfmm_y_ranges=y_ranges;
+				}
+				var y_ranges=ctx.m_asbfmm_y_ranges;
+				for(var i=0;i<y_ranges.length;i+=2){
+					UI.RoundRect({
+						x:sbar.x, w:sbar.w,
+						y:sbar.y+y_ranges[i],h:y_ranges[i+1]-y_ranges[i],
+						color:doc.rectex_styles[0].color})
+				}
+			}
 			//diff minimap
 			if(doc.m_diff_minimap){
 				if(obj.m_diff_minimap_h_obj_area!=h_obj_area){
@@ -7164,7 +7194,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{special:'tab_width',h_special:4},
 				{name:'Use English (need to restart)',stable_name:'force_english'},//DO NOT TRANSLATE THIS!
 				{name:UI._('Highlight the current line'),stable_name:'show_line_highlight'},
-				//{name:UI._('Highlight find at the scrollbar'),stable_name:'show_at_scrollbar_find_minimap'},
+				{name:UI._('Highlight find at the scrollbar'),stable_name:'show_at_scrollbar_find_minimap'},
 				{name:UI._('Show the menu bar'),stable_name:'always_show_menu'},
 				{name:UI._('Show horizontal scroll-bar'),stable_name:'show_x_scroll_bar'},
 				{name:UI._('Show outer scope overlays'),stable_name:'show_top_hint'},
@@ -7220,12 +7250,16 @@ W.SXS_OptionsPage=function(id,attrs){
 				{license_line:"Native File Dialog by Michael Labbe mike@frogtoss.com"},
 			];
 			plugin_items["Font Licenses"]=[
-				{license_line:"OpenSans: Digitized data copyright © 2010-2011, Google Corporation"},
+				{license_line:"Open Sans: Digitized data copyright © 2010-2011, Google Corporation"},
 				{license_line:"Inconsolata: Copyright (c) 2006-2012, Raph Levien (Raph.Levien@gmail.com)"},
 				{license_line:"    Copyright (c) 2011-2012, Cyreal (cyreal.org)",h_special:-12},
 				{license_line:"Computer Modern: Copyright (c) Authors of original metafont fonts"},
 				{license_line:"    Copyright (c) 2003-2009, Andrey V. Panov (panov@canopus.iacp.dvo.ru)",h_special:-12},
 			];
+			if(UI.Platform.ARCH=="ios"||UI.Platform.ARCH=="web"){
+				plugin_items["Font Licenses"].push(
+					{license_line:"Droid Sans: Digitized data copyright © 2007, Google Corporation"});
+			}
 			/////////////////
 			var view_items=[];
 			for(var i=0;i<obj.categories.length;i++){

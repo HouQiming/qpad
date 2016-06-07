@@ -615,9 +615,10 @@ UI.Application=function(id,attrs){
 	UI.Begin(attrs);
 		///////////////////
 		var app=UI.Begin(W.Window('app',{
-				title:'QPad',w:1280,h:720,bgcolor:UI.default_styles.tabbed_document.color,
+				title:'QPad',w:1280,h:720,
+				bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
-				flags:UI.Platform.ARCH=="web"?UI.SDL_WINDOW_FULLSCREEN:(UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE),
+				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1,
 				OnWindowBlur:function(){
 					this.document_area.OnWindowBlur();

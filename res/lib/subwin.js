@@ -1539,7 +1539,6 @@ W.SaveDialog=function(id,attrs){
 }
 
 ////////////////////////////////////////////////////////
-//text (colored), rubber, button, newline (with optional line-wide event)
 //var g_menu_action_invoked=0;
 var WrapMenuAction=function(action){
 	if(!action){return action;}
@@ -1826,7 +1825,7 @@ W.FancyMenu=function(id,attrs){
 			if(s_type=='text'){
 				w_acc+=UI.MeasureText(obj.font,item_i.text.replace('&','')).w
 			}else if(s_type=='button'){
-				w_acc+=UI.MeasureText(obj.font,item_i.icon||item_i.text).w
+				w_acc+=UI.MeasureText(item_i.icon?obj.button_style.icon_font:obj.button_style.font,item_i.icon||item_i.text).w
 				w_acc+=obj.button_padding*2
 			}else if(s_type=='rubber'){
 				per_part_w[part_id]=Math.max(per_part_w[part_id]||0,w_acc)
@@ -1865,7 +1864,7 @@ W.FancyMenu=function(id,attrs){
 				item_i.x=w_acc
 				item_i.y=h_acc+(obj.h_menu_line-obj.h_button)*0.5
 				w_acc+=obj.button_padding
-				w_acc+=UI.MeasureText(obj.font,item_i.icon||item_i.text).w
+				w_acc+=UI.MeasureText(item_i.icon?obj.button_style.icon_font:obj.button_style.font,item_i.icon||item_i.text).w
 				w_acc+=obj.button_padding
 				item_i.w=w_acc-item_i.x
 				item_i.h=obj.h_button
