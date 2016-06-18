@@ -710,7 +710,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var ccnt_fcall_bracket=this.FindOuterBracket(this.sel1.ccnt,-1)
 		if(!(fhctx&&fhctx.m_ccnt_fcall_bracket==ccnt_fcall_bracket)){
 			//context changed, detect new fcall
-			fhctx=undefined
+			fhctx=undefined;
 			if(ccnt_fcall_bracket>=0&&this.ed.GetUtf8CharNeighborhood(ccnt_fcall_bracket)[1]=='('.charCodeAt(0)){
 				var ccnt_fcall_word1=this.ed.MoveToBoundary(ccnt_fcall_bracket+1,-1,"word_boundary_right")
 				if(ccnt_fcall_word1>=0){
@@ -721,7 +721,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 						if(prototypes){
 							fhctx={
 								m_prototypes:prototypes,
-								m_ccnt_fcall_bracket:ccnt_fcall_bracket
+								m_ccnt_fcall_bracket:ccnt_fcall_bracket,
+								m_function_id:function_id,
 							}
 						}
 					}
@@ -732,11 +733,54 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var s_fhint=undefined;
 		if(fhctx&&this.sel1.ccnt-ccnt_fcall_bracket<MAX_PARSABLE_FCALL){
 			var ccnt_rbracket=this.ed.MoveToBoundary(this.sel1.ccnt,1,"space_newline")
-			if(this.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]==')'.charCodeAt(0)){
-				//do the parsing in native code, GetStateAt then ComputeCharColorID, then do the deed
-				var n_commas=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,this.sel1.ccnt)
-				if(n_commas!=undefined){
-					var prototypes=fhctx.m_prototypes
+			//do the parsing in native code, GetStateAt then ComputeCharColorID, then do the deed
+			var is_tail=1;
+			if(this.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]!=')'.charCodeAt(0)){
+				var ccnt_rbracket_r=this.FindOuterBracket(ccnt_rbracket,1);
+				if(ccnt_rbracket<ccnt_rbracket_r){
+					ccnt_rbracket=ccnt_rbracket_r;
+					ccnt_rbracket=ccnt_rbracket-this.BracketSizeAt(ccnt_rbracket,1);
+				}
+				is_tail=0;
+			}
+			fhctx.m_ccnt_rbracket=ccnt_rbracket;
+			var n_commas=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,this.sel1.ccnt);
+			var n_commas_before=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,this.sel1.ccnt-1);
+			var n_total_commas=n_commas;
+			if(!is_tail){
+				n_total_commas=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,ccnt_rbracket);
+			}
+			if(n_commas!=undefined){
+				//notification
+				var proto_acceptable=undefined;
+				var prototypes=fhctx.m_prototypes
+				for(var i=0;i<prototypes.length;i++){
+					var proto_i=prototypes[i]
+					if(n_total_commas>=proto_i.length){continue;}
+					proto_acceptable=proto_i;
+					break;
+				}
+				////////
+				if(proto_acceptable){
+					var a_proto=[fhctx.m_function_id,'('];
+					for(var j=0;j<proto_acceptable.length;j++){
+						if(j>0){a_proto.push(', ');}
+						if(j==n_commas_before){
+							a_proto.push(
+								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+6),
+								proto_acceptable[j],
+								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0));
+						}else{
+							a_proto.push(proto_acceptable[j])
+						}
+					}
+					a_proto.push(')');
+					fhctx.s_notification=a_proto.join('');
+				}else{
+					fhctx.s_notification=undefined;
+				}
+				////////
+				if(is_tail){
 					for(var i=0;i<prototypes.length;i++){
 						var proto_i=prototypes[i]
 						if(n_commas>=proto_i.length){continue;}
@@ -5362,6 +5406,12 @@ W.CodeEditor=function(id,attrs){
 							doc.ed.m_other_overlay={'type':'AC','text':s_fhint}
 						}
 					}
+					var s_notification=(fhctx&&fhctx.s_notification);
+					if(s_notification){
+						obj.CreateNotification({id:'function_proto',text:s_notification},"quiet")
+					}else{
+						obj.DismissNotification('function_proto')
+					}
 					//if(got_overlay_before&&!doc.ed.m_other_overlay){
 					//	UI.InvalidateCurrentFrame()
 					//	UI.Refresh()
@@ -7055,7 +7105,17 @@ UI.RegisterEditorPlugin(function(){
 	})
 	this.AddEventHandler('selectionChange',function(){
 		this.CancelAutoCompletion()
-		this.m_fhint_ctx=undefined;
+		if(this.m_fhint_ctx){
+			var fhctx=this.m_fhint_ctx;
+			if(fhctx.m_ccnt_fcall_bracket<=this.sel1.ccnt&&this.sel1.ccnt<=fhctx.m_ccnt_rbracket){
+				//leave it be
+				this.TestFunctionHint();
+			}else{
+				this.m_fhint_ctx=undefined;
+			}
+		}else{
+			this.m_fhint_ctx=undefined;
+		}
 		this.m_ac_activated=0
 		this.TestCorrection();
 	})

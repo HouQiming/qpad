@@ -1181,6 +1181,7 @@ W.NotebookView=function(id,attrs){
 		if(cell_i.m_proc){
 			//running
 			var progress=(cell_i&&(parseFloat(cell_i.m_progress)/100));
+			if((cell_i&&cell_i.m_progress)==undefined){progress=1;}
 			if(progress>0){
 				UI.PushCliprect(obj.x+obj.w-w_buttons,y_button,w_buttons*progress,h_button);
 				W.Button("btnp_"+buttons[i].id,{

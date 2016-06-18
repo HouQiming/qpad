@@ -396,9 +396,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		tech.SetTexture2D("tex0",g_minimap_tex)
 		xf=floor(x)
 		yf=floor(y)
-		tech.SetVertexArray("P",[float2(xf,yf), float2(xf+float(w_true),yf), float2(xf+float(w_true),yf+float(h_true)), float2(xf,yf+float(h_true))])
-		tech.SetVertexArray("uv_vert",[float2(0.f,0.f), float2(1.f,0.f), float2(1.f,1.f), float2(0.f,1.f)])
-		tech.Draw(0u,GL_QUADS,4)
+		vbo=Gui2D.detail.g_renderer.UploadMiniVBO([
+			xf,yf, xf+float(w_true),yf, xf+float(w_true),yf+float(h_true), xf,yf+float(h_true),
+			0.f,0.f, 1.f,0.f, 1.f,1.f, 0.f,1.f].ConvertToAsBinary(int))
+		//tech.SetVertexArray("P",[float2(xf,yf), float2(xf+float(w_true),yf), float2(xf+float(w_true),yf+float(h_true)), float2(xf,yf+float(h_true))])
+		//tech.SetVertexArray("uv_vert",[float2(0.f,0.f), float2(1.f,0.f), float2(1.f,1.f), float2(0.f,1.f)])
+		tech.SetVertexPointer("P",2,GL_FLOAT,0,0,0L)
+		tech.SetVertexPointer("uv_vert",2,GL_FLOAT,0,0,8*sizeof(float))
+		tech.Draw(vbo,GL_TRIANGLE_FAN,4)
 		return JS.Return(w_true)
 	}
 	JS_UI["BIN_float2half"]=function(JSContext JS){

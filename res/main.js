@@ -319,6 +319,19 @@ if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 			"-e",'sudo /bin/sh '+fn_sh])
 	}
 }
+if(UI.Platform.ARCH=="mac"){
+	UI.InstallQPad=function(){
+		//mac installation, copy qpad.app to /Applications/
+		var spath=IO.GetExecutablePath();
+		spath=UI.GetPathFromFilename(spath)+'../../../qpad.app';
+		var a_sh_installer=["#!/bin/sh\n"];
+		a_sh_installer.push("cp -r ",spath," /Applications/\n")
+		a_sh_installer.push('rm -- "$0"\n')
+		var fn_sh=IO.GetNewDocumentName("a","sh","temp")
+		IO.CreateFile(fn_sh,a_sh_installer.join(""))
+		IO.Shell(['sudo','/bin/sh',fn_sh])
+	}
+}
 //UI.InstallQPad()
 
 var SetHelpText=function(doc_code){

@@ -1405,6 +1405,7 @@ W.TabbedDocument=function(id,attrs){
 			if(num_id<0){return;}
 			obj.CloseTab(num_id)
 		}});
+		var is_apple=(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios");
 		W.Hotkey("",{key:"CTRL+TAB",action:function(){
 			var num_id=tabid
 			if(num_id<0){return;}

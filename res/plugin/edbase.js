@@ -965,9 +965,9 @@ UI.RegisterEditorPlugin(function(){
 				s_name_in_script='the project'
 				var s_button;
 				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-					s_button="rem [button: "+UI._("Run project")+"]";
+					s_button="rem [button: "+UI._("Run project")+"]\n";
 				}else{
-					s_button="# [button: "+UI._("Run project")+"]";
+					s_button="# [button: "+UI._("Run project")+"]\n";
 				}
 				s_script=s_button+s_script;
 			}

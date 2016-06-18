@@ -1,6 +1,7 @@
 import "system.jc"
 import "gui2d.jc"
 import "javascript.jc"
+import "encoding.jc"
 import "text-box.jc"
 import System.Math.*
 import System.Algorithm.*
@@ -9,6 +10,7 @@ import Gui2D.detail.*
 import Javascript.*
 import TextBox.*
 import TextBox.detail.*
+import Encoding.*
 
 /////////////////////////////////////
 //parser utility from compiler code
@@ -1545,6 +1547,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				else
 					sdata=System.IO.ReadAll(fn)
 				if !sdata:continue
+				encoding=DetectEncoding(sdata)
+				if encoding!=ENCODING_UTF8&&encoding!=ENCODING_INVALID:
+					(s_utf8,s_lingering)=ConvertToUTF8(encoding,sdata)
+					sdata=s_utf8
 				//Writeln('ED_ParserMore ',fn)
 				if sparser=="C":
 					ret=parseAsCLike(JS,idfn,sdata,options)
@@ -1943,10 +1949,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ccnt1=JS.Param(2).as(i64)
 		hid_colorer=ed.m_handler_registration["colorer"].or(-1)
 		state_at_ccnt=ed.GetStateAt(hid_colorer,ccnt0)
+		if ccnt1-ccnt0+1LL<0L:
+			return JS.ReturnError("invalid range")
 		s=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
 		handler_colorer=ed.m_handlers[hid_colorer]
 		s_context=ed.GetContextBefore(handler_colorer,ccnt0)
 		color_ids=handler_colorer.ComputeCharColorID(state_at_ccnt,s_context,s)
+		if !color_ids.n:return 0
 		//return undefined if it's an "offensive" color id
 		color_std=color_ids[0]
 		color_final=color_ids[color_ids.n-1]

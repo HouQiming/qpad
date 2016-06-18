@@ -21,6 +21,8 @@ if Platform.ARCH=="ios"||Platform.ARCH=="web":
 	__generate_json("extra_resource_dirs","cjk_fonts")
 if Platform.ARCH=="ios":
 	__generate_json("icon_file","icon_ios.png")
+else if Platform.ARCH=="mac":
+	__generate_json("icon_file","icon1k.png")
 else
 	__generate_json("icon_file","icon256.png")
 __generate_json("icon_win","iconwin.ico")
