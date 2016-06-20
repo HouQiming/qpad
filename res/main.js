@@ -8,6 +8,8 @@ require("res/lib/notebook");
 require("res/lib/help_page");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
+//if something was never viewed after 24 active editing hours, close it
+var MAX_STALE_TIME=3600*24;
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 
@@ -680,10 +682,14 @@ UI.Application=function(id,attrs){
 		var workspace=UI.m_ui_metadata["<workspace_v2>"]
 		var fn_current_tab=UI.m_ui_metadata["<current_tab>"]
 		if(workspace){
-			var current_tab_id=undefined
+			var current_tab_id=undefined;
+			var close_stale=UI.TestOption('close_stale');
 			UI.g_current_z_value=0;
 			for(var i=0;i<workspace.length;i++){
 				//UI.NewCodeEditorTab(workspace[i])
+				if(close_stale&&workspace[i].stale_time>=MAX_STALE_TIME&&!workspace[i].util_type&&workspace[i].file_name!=fn_current_tab){
+					continue;
+				}
 				if(workspace[i].util_type){
 					UI.OpenUtilTab(workspace[i].util_type)
 				}else if(workspace[i].document_type=='notebook'){
@@ -694,6 +700,7 @@ UI.Application=function(id,attrs){
 				var item=UI.top.app.document_area.items[UI.top.app.document_area.items.length-1];
 				item.z_order=workspace[i].z_order;
 				item.area_name=(workspace[i].area_name||"doc_default");
+				item.stale_time=(workspace[i].stale_time||0);
 				UI.g_current_z_value=Math.max(UI.g_current_z_value,item.z_order+1);
 				if(workspace[i].file_name==fn_current_tab){
 					current_tab_id=UI.top.app.document_area.items.length-1;

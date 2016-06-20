@@ -281,6 +281,8 @@
 			"Bad width: ":"非法宽度：",
 			"Highlight find at the scrollbar":"在滚动条上标出查找结果",
 			"No more '@1' below, found @2":"下面没有别的'@1'了，共@2个",
+			"Automatically close stale tabs":"自动关闭很久没用的窗格",
+			"Highlight same-project tabs":"高亮同一工程的窗格",
 			///////////////////
 			"Display":"显示",
 			"Controls":"操作",

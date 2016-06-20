@@ -102,6 +102,7 @@ UI.GetOption=function(stable_name,default_value){
 
 ////////////////////////////////////
 UI.g_current_z_value=0;
+UI.g_tick_program_opened=Duktape.__ui_get_tick();
 UI.SaveWorkspace=function(){
 	//compact z values
 	var z_values=[];
@@ -125,6 +126,7 @@ UI.SaveWorkspace=function(){
 	}
 	//save workspace
 	var workspace=[];
+	var t_this_run=Duktape.__ui_seconds_between_ticks(UI.g_tick_program_opened,Duktape.__ui_get_tick());
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var wnd=UI.g_all_document_windows[i]
 		if(wnd.util_type){
@@ -135,7 +137,9 @@ UI.SaveWorkspace=function(){
 		if((wnd.main_widget&&wnd.main_widget.file_name||wnd.file_name).indexOf('<')>=0){continue;}
 		workspace.push({
 			file_name:wnd.file_name,document_type:wnd.document_type,
-			z_order:(wnd.z_order||0),area_name:wnd.area_name})
+			z_order:(wnd.z_order||0),area_name:wnd.area_name,
+			stale_time:wnd.main_widget?0:(wnd.stale_time||0)+t_this_run
+		})
 	}
 	UI.m_ui_metadata["<workspace_v2>"]=workspace
 	var obj_current_tab=UI.g_all_document_windows[UI.top.app.document_area.current_tab_id]

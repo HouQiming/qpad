@@ -3746,7 +3746,7 @@ var OpenInPlace=function(obj,name){
 	//UI.ClearFileListingCache();
 	if(IO.FileExists(fn)){
 		UI.OpenFile(fn);
-	}else{
+	}else if(fn){
 		//new file
 		UI.OpenEditorWindow(fn)
 	}
@@ -7255,6 +7255,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{name:'Use English (need to restart)',stable_name:'force_english'},//DO NOT TRANSLATE THIS!
 				{name:UI._('Highlight the current line'),stable_name:'show_line_highlight'},
 				{name:UI._('Highlight find at the scrollbar'),stable_name:'show_at_scrollbar_find_minimap'},
+				{name:UI._('Highlight same-project tabs'),stable_name:'use_tab_alphas'},
 				{name:UI._('Show the menu bar'),stable_name:'always_show_menu'},
 				{name:UI._('Show horizontal scroll-bar'),stable_name:'show_x_scroll_bar'},
 				{name:UI._('Show outer scope overlays'),stable_name:'show_top_hint'},
@@ -7267,6 +7268,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{name:UI._('Make @1 stop at both sides').replace("@1",UI.Platform.ARCH=="mac"?"\u2325\u2190/\u2325\u2192":"CTRL+\u2190/\u2192"),stable_name:'precise_ctrl_lr_stop'},
 				{name:UI._('Allow \u2190/\u2192 to cross lines'),stable_name:'left_right_line_wrap'},
 				{name:UI._('Move forward old tabs when manually opened'),stable_name:'explicit_open_mtf'},
+				{name:UI._('Automatically close stale tabs'),stable_name:'close_stale'},
 			];
 			plugin_items["Tools"]=[];
 			if(UI.InstallQPad){
