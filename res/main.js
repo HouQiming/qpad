@@ -1,6 +1,5 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
-require("gui2d/dockbar");
 require("res/lib/code_editor");
 require("res/lib/bin_editor");
 require("res/lib/subwin");
