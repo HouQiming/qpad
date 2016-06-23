@@ -1,0 +1,5 @@
+function(input,output){
+	//@in=code,type:code
+	//@out=merged,type:code
+	output.merged=input.code.join('\n');
+};

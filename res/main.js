@@ -495,7 +495,7 @@ var CreateMenus=function(){
 				//	//hack: put the tab at the end of it
 				//	UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
 				//}
-				UI.OpenEditorWindow(fn);
+				UI.OpenFile(fn);
 				UI.Refresh();
 			}
 		}})
@@ -694,6 +694,8 @@ UI.Application=function(id,attrs){
 					UI.OpenUtilTab(workspace[i].util_type)
 				}else if(workspace[i].document_type=='notebook'){
 					UI.OpenNoteBookTab(workspace[i].file_name)
+				}else if(workspace[i].document_type=='graph'){
+					UI.OpenGraphTab(workspace[i].file_name)
 				}else{
 					UI.OpenEditorWindow(workspace[i].file_name)
 				}
@@ -795,6 +797,10 @@ UI.OpenFile=function(fn){
 	if(IO.DirExists(fn)){
 		UI.AddProjectDir(fn);
 	}else if(IO.FileExists(fn)){
+		if(UI.GetFileNameExtension(fn).toLowerCase()=='zg'){
+			UI.OpenGraphTab(fn);
+			return;
+		}
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
 			if(UI.g_all_document_windows[i].file_name==fn){
 				if(UI.TestOption("explicit_open_mtf")){

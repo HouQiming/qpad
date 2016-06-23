@@ -145,16 +145,12 @@ auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
 			pport=sline.IndexOf('@out=')
 			if pport>=0:
 				pport+=5
-				if !obj_id2port:
-					isin=0
+				isin=0
 			else
 				continue
 		words=[StripLeadingSpaces(s) for s in sline[pport:].Tokenize(",")]
-		if words.n<1+isin:continue
-		if isin:
-			sname=words[0]
-		else
-			sname="$"
+		if words.n<2:continue
+		sname=words[0]
 		if obj_id2port:
 			obj_port=obj_id2port[sname].as(JSObject)
 		else 
@@ -162,7 +158,7 @@ auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
 			obj_ports[p]=obj_port; p++
 			obj_port["id"]=sname
 			obj_port["dir"]=(isin?"input":"output")
-		for i=isin:words.n-1
+		for i=1:words.n-1
 			s_word=words[i]
 			pcolon=s_word.IndexOf(':')
 			if pcolon<0:continue
@@ -176,9 +172,9 @@ auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
 			else
 				obj_port[s_key]=s_value
 
-auto ParseJSNode(string scode0)
-	pnewline=scode0.IndexOf('\n')
-	scode=scode0[pnewline+1:]
+auto ParseJSNode(string scode)
+	//pnewline=scode0.IndexOf('\n')
+	//scode=scode0[pnewline+1:]
 	if !scode.StartsWith(g_js_std_header):
 		return JS.ReturnError('JS nodes must begin with "@1"'.Replace(["@1",g_js_std_header]))
 	obj_func=JS["eval"].Call(JSObject,"(function(){return "+scode+"})()")
@@ -186,13 +182,14 @@ auto ParseJSNode(string scode0)
 	ports=[new string[] for i=0:1]
 	got=new int[string]
 	word_mode=0
+	plast=0L
 	foreach ch,I in scode
 		isalnum=(ch>='a'&&ch<='z'||ch>='A'&&ch<='Z'||ch>='0'&&ch<='9'||ch=='_'||ch>=128)
 		if !isalnum:
 			if plast<I:
 				s_word=scode[plast:I-1]
 				if word_mode>0:
-					if !got[s_word]&(1<<(word_mode-1)):
+					if !(got[s_word]&(1<<(word_mode-1))):
 						ports[word_mode-1].push(s_word)
 						got[s_word]|=(1<<(word_mode-1))
 					word_mode=0
@@ -232,14 +229,12 @@ auto ParseTextNode(string scode)
 	return JS.Return(ret)
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
-	JS_UI["ParseNode"]=function(JSContext JS)
+	JS_UI["ParseJSNode"]=function(JSContext JS)
 		scode=JS.Param(0).as(string)
-		if scode.StartsWith("//JS"):
-			//JS
-			return ParseJSNode(scode)
-		else
-			//text
-			return ParseTextNode(scode)
+		return ParseJSNode(scode)
+	JS_UI["ParseTextNode"]=function(JSContext JS)
+		scode=JS.Param(0).as(string)
+		return ParseTextNode(scode)
 	JS_UI["m_node_dir"]=System.Env.GetExecutablePath()+"../../nodes"
 	///////////////////////////
 	g_edge_vbo=new float[]

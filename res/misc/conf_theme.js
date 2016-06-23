@@ -1129,8 +1129,7 @@ UI.CustomTheme=function(){
 			caption_icon_color:L?0xff7f7f7f:0xff444444,
 		},
 		graph_view:{
-			//todo: light / dark theme
-			color:0xff444444,
+			color:0xffe8e8e8,
 			node_style:{
 				font_port:UI.Font(UI.font_name,16),
 				port_w_sep:16,
@@ -1140,10 +1139,8 @@ UI.CustomTheme=function(){
 				port_round:4,
 				port_h:18,
 				port_h_sep:4,
-				port_color:0xff8adfb2,
-				port_text_color:0xff444444,
-				port_selection_color:0xff2ca033,
-				port_selection_width:4,
+				port_color:C,//0xff8adfb2,
+				port_text_color:0xffffffff,//0xff444444,
 				//////////
 				font_caption:UI.Font(UI.font_name,20),
 				caption_padding:6,
@@ -1152,6 +1149,10 @@ UI.CustomTheme=function(){
 				//////////
 				node_round:6,
 				node_color_default:0xffffffff,
+				node_selection_color:0xff2ca033,
+				node_selection_width:2,
+				shadow_color:C_shadow,
+				shadow_size:6,
 			},
 			edge_style:{
 				color:0xff2ca033,
@@ -1170,7 +1171,10 @@ UI.CustomTheme=function(){
 				edit_shadow_color:0x7f000000,
 				edit_shadow_size:8,
 			},
-		}
+		},
+		graph_param_panel:{
+			//nothing for now
+		},
 	};
 	if(!L){//dark
 		styles.edit={
