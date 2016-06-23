@@ -5,6 +5,7 @@ require("res/lib/bin_editor");
 require("res/lib/subwin");
 require("res/lib/notebook");
 require("res/lib/help_page");
+require("res/lib/graphview");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
@@ -408,7 +409,7 @@ var CreateMenus=function(){
 			UI.top.app.document_area.CloseTab();
 		}
 		UI.UpdateNewDocumentSearchPath()
-		UI.NewCodeEditorTab()
+		UI.OpenGraphTab(undefined)
 		UI.Refresh()
 	}})
 	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){

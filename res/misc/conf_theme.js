@@ -7,8 +7,7 @@ if(UI.Platform.ARCH=="mac"){
 	UI.eng_font_name="res/fonts/opensans.ttf,!"
 }
 
-UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
-//UI.Theme_Minimalistic(0xffb4771f);
+UI.Theme_Minimalistic(0xff2ca033);
 UI.interpolators.border_color_active=UI.interpolators.color;
 UI.interpolators.border_color=UI.interpolators.color;
 UI.CustomTheme=function(){
@@ -1129,6 +1128,49 @@ UI.CustomTheme=function(){
 			caption_text_color:0xff000000,
 			caption_icon_color:L?0xff7f7f7f:0xff444444,
 		},
+		graph_view:{
+			//todo: light / dark theme
+			color:0xff444444,
+			node_style:{
+				font_port:UI.Font(UI.font_name,16),
+				port_w_sep:16,
+				port_w_min:16,
+				port_padding:4,
+				port_extrude:8,
+				port_round:4,
+				port_h:18,
+				port_h_sep:4,
+				port_color:0xff8adfb2,
+				port_text_color:0xff444444,
+				port_selection_color:0xff2ca033,
+				port_selection_width:4,
+				//////////
+				font_caption:UI.Font(UI.font_name,20),
+				caption_padding:6,
+				caption_h:24,
+				caption_text_color:0xff444444,
+				//////////
+				node_round:6,
+				node_color_default:0xffffffff,
+			},
+			edge_style:{
+				color:0xff2ca033,
+				line_width:2,
+				region_width:12,
+				snapping_distance:12,
+			},
+			edit_style:{
+				font_edit:UI.Font(UI.font_name,20),
+				edit_w:96,
+				edit_padding:8,
+				edit_bgcolor:0xffffffff,
+				edit_border_width:2,
+				edit_border_color:C,
+				edit_round:4,
+				edit_shadow_color:0x7f000000,
+				edit_shadow_size:8,
+			},
+		}
 	};
 	if(!L){//dark
 		styles.edit={

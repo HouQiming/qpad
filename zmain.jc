@@ -3,6 +3,7 @@ import "bin-editor.jc"
 import "code-editor.jc"
 import "code-parser.jc"
 import "encoding.jc"
+import "g-l.jc"
 //import "txtx-editor.jc"
 //import "zip-doc.jc"
 //import "ooc-mipmap.jc"
@@ -11,6 +12,7 @@ import Gui2D.*
 import Javascript.*
 import System.Console.*
 import System.Algorithm.*
+import GL.*
 //import Uisandbox.*
 
 __generate_json("js_units","gui2d/ui.js")
@@ -121,9 +123,184 @@ if Platform.BUILD=="debug":
 		}
 	})
 
+g_js_std_header="function(input,output)";
+MODE_INPUT=1
+MODE_OUTPUT=2
+inline StripLeadingSpaces(string s)
+	p=0L
+	while p<s.n&&(s[p]==' '||s[p]=='\t'):
+		p++
+	return s[p:]
+
+auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
+	//just ignore all errors
+	obj_ports=ret["m_ports"].as(JSObject)
+	p=obj_ports["length"].as(iptr)
+	for sline in scode.Tokenize("\r\n")
+		isin=1
+		pport=sline.IndexOf('@in=')
+		if pport>=0:
+			pport+=4
+		else
+			pport=sline.IndexOf('@out=')
+			if pport>=0:
+				pport+=5
+				if !obj_id2port:
+					isin=0
+			else
+				continue
+		words=[StripLeadingSpaces(s) for s in sline[pport:].Tokenize(",")]
+		if words.n<1+isin:continue
+		if isin:
+			sname=words[0]
+		else
+			sname="$"
+		if obj_id2port:
+			obj_port=obj_id2port[sname].as(JSObject)
+		else 
+			obj_port=JS.New()
+			obj_ports[p]=obj_port; p++
+			obj_port["id"]=sname
+			obj_port["dir"]=(isin?"input":"output")
+		for i=isin:words.n-1
+			s_word=words[i]
+			pcolon=s_word.IndexOf(':')
+			if pcolon<0:continue
+			s_key=s_word[:pcolon-1]
+			s_value=s_word[pcolon+1:]
+			if s_value.n&&s_value[0]>='0'&&s_value[0]<='9':
+				if s_value.StartsWith('0x'):
+					obj_port[s_key]=s_value[2:].asHex(int)
+				else
+					obj_port[s_key]=s_value.as(double)
+			else
+				obj_port[s_key]=s_value
+
+auto ParseJSNode(string scode0)
+	pnewline=scode0.IndexOf('\n')
+	scode=scode0[pnewline+1:]
+	if !scode.StartsWith(g_js_std_header):
+		return JS.ReturnError('JS nodes must begin with "@1"'.Replace(["@1",g_js_std_header]))
+	obj_func=JS["eval"].Call(JSObject,"(function(){return "+scode+"})()")
+	///////////////
+	ports=[new string[] for i=0:1]
+	got=new int[string]
+	word_mode=0
+	foreach ch,I in scode
+		isalnum=(ch>='a'&&ch<='z'||ch>='A'&&ch<='Z'||ch>='0'&&ch<='9'||ch=='_'||ch>=128)
+		if !isalnum:
+			if plast<I:
+				s_word=scode[plast:I-1]
+				if word_mode>0:
+					if !got[s_word]&(1<<(word_mode-1)):
+						ports[word_mode-1].push(s_word)
+						got[s_word]|=(1<<(word_mode-1))
+					word_mode=0
+				else
+					word_mode=0
+					if ch=='.':
+						if s_word=='input':
+							word_mode=MODE_INPUT
+						else if s_word=='output':
+							word_mode=MODE_OUTPUT
+			plast=I+1
+	//we still need @type for type labels
+	ret=JS.New()
+	ret["m_script"]=obj_func
+	obj_ports=JS.NewArray()
+	ret["m_ports"]=obj_ports
+	obj_id2port=JS.New()
+	p=0L
+	for i=0:1
+		for s in ports[i]
+			obj=JS.New()
+			obj_ports[p]=obj;p++
+			obj["id"]=s
+			obj["dir"]=(i==0?"input":"output")
+			obj_id2port[s]=obj
+	ParsePortDescs(ret,obj_id2port,scode)
+	return JS.Return(ret)
+
+JS=new JSContext
+auto ParseTextNode(string scode)
+	//need @type for type labels
+	ret=JS.New()
+	ret["m_code"]=scode
+	obj_ports=JS.NewArray()
+	ret["m_ports"]=obj_ports
+	ParsePortDescs(ret,JSObject.NULL,scode)
+	return JS.Return(ret)
+
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["ParseNode"]=function(JSContext JS)
+		scode=JS.Param(0).as(string)
+		if scode.StartsWith("//JS"):
+			//JS
+			return ParseJSNode(scode)
+		else
+			//text
+			return ParseTextNode(scode)
+	JS_UI["m_node_dir"]=System.Env.GetExecutablePath()+"../../nodes"
+	///////////////////////////
+	g_edge_vbo=new float[]
+	g_vbo_tech=GLTechnique.NULL
+	JS_UI["RenderEdge"]=function(JSContext JS){
+		auto x0=JS.Param(0).as(float)*Gui2D.detail.g_renderer.m_pixels_per_unit
+		auto y0=JS.Param(1).as(float)*Gui2D.detail.g_renderer.m_pixels_per_unit
+		auto x1=JS.Param(2).as(float)*Gui2D.detail.g_renderer.m_pixels_per_unit
+		auto y1=JS.Param(3).as(float)*Gui2D.detail.g_renderer.m_pixels_per_unit
+		auto line_width=JS.Param(4).as(float)*Gui2D.detail.g_renderer.m_pixels_per_unit
+		Nx=y1-y0
+		Ny=x0-x1
+		ilg=Nx*Nx+Ny*Ny
+		if ilg>0.f:
+			ilg=1.f/System.Math.sqrt(ilg)
+		else
+			ilg=0.f
+		ilg*=0.5f*line_width
+		Nx*=ilg;Ny*=ilg;
+		g_edge_vbo.push(x0+Nx);g_edge_vbo.push(y0+Ny)
+		g_edge_vbo.push(x1+Nx);g_edge_vbo.push(y1+Ny)
+		g_edge_vbo.push(x1-Nx);g_edge_vbo.push(y1-Ny)
+		g_edge_vbo.push(x0+Nx);g_edge_vbo.push(y0+Ny)
+		g_edge_vbo.push(x1-Nx);g_edge_vbo.push(y1-Ny)
+		g_edge_vbo.push(x0-Nx);g_edge_vbo.push(y0-Ny)
+		return 0
+	}
+	JS_UI["FlushEdges"]=function(JSContext JS){
+		auto C=JS.Param(0).as(int)
+		if !g_vbo_tech:
+			g_vbo_tech=new GLTechnique
+			g_vbo_tech.SetVertexShader("
+				void main(){
+					vec2 P_scr=P*scale;
+					gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
+				}")
+			g_vbo_tech.SetFragmentShader("
+				void main(){
+					gl_FragColor=vec4(pow(C.xyz,vec3(gamma)),C.w);
+				}")
+		prev_viewport=new int[4]
+		glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
+		BATCH=65536/sizeof(float)/12
+		for i=0:BATCH:g_edge_vbo.n-1
+			real_batch=min(g_edge_vbo.n-i,BATCH)
+			ref=g_edge_vbo[i:i+real_batch-1].ConvertToAsBinary(i32)
+			vbo=Gui2D.detail.g_renderer.UploadMiniVBO(ref)
+			ref.discard()
+			if !vbo:break
+			g_vbo_tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
+			g_vbo_tech.SetUniform("gamma",Gui2D.detail.g_renderer.m_gamma)
+			g_vbo_tech.SetUniformColor("C",C)
+			g_vbo_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(float),0L)
+			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch>>1)
+		g_edge_vbo.clear()
+		return 0
+	}
+});
+
 (function(){
 	//Gui2D.ProvideGLFunctions()
-	JS=new JSContext
 	JS_script_sandbox=new JSContext
 	sbox=setupModuleSystem(JS,1)
 	if Platform.IS_MOBILE:
