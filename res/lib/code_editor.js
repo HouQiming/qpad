@@ -4629,7 +4629,7 @@ UI.GetFrontMostEditorTab=function(){
 		item_i.__global_tab_id=i;
 	}
 	return tab_frontmost;
-}
+};
 
 UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 	title:UI._("Files"),

@@ -668,6 +668,7 @@ UI.Application=function(id,attrs){
 			//		Close:function(){UI.DestroyWindow(app)},
 			//	})
 			//}else{
+			UI.m_invalid_util_tabs=[];
 			W.TabbedDocument("document_area",{
 				'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
 				'x':0,'y':0,'w':app.w,//obj_panel.x,
@@ -675,6 +676,13 @@ UI.Application=function(id,attrs){
 				Close:function(){UI.DestroyWindow(app)},
 				fmenu_callback:CreateMenus,
 			})
+			if(UI.m_invalid_util_tabs.length){
+				UI.m_invalid_util_tabs.sort();
+				while(UI.m_invalid_util_tabs.length>0){
+					UI.top.app.document_area.CloseTab(UI.m_invalid_util_tabs.pop());
+				}
+				UI.InvalidateCurrentFrame();
+			}
 			//////////////////////////
 		UI.End();
 	UI.End();

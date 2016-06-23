@@ -1528,9 +1528,9 @@ UI.RegisterUtilType("binary_tools",function(){return UI.NewTab({
 			'activated':this==UI.top.app.document_area.active_tab,
 			'x':0,'y':0});
 		this.util_widget=body;
-		//if(!obj_real){
-		//	UI.top.app.document_area.CloseTab(this.__global_tab_id);
-		//}
+		if(!obj_real){
+			UI.m_invalid_util_tabs.push(this.__global_tab_id);
+		}
 		return body;
 	},
 	Save:function(){},
