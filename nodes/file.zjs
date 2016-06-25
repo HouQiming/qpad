@@ -1,10 +1,7 @@
 function(input,output){
-	//@in=project,type:path string,ui:folder
-	//@in=name,type:path string,ui:file
+	//@in=name,type:path string,ui:editbox
 	//@in=code,type:code
-	for(var i=0;i<input.project.length;i++){
-		for(var j=0;j<input.name.length;j++){
-			UI.CreateFileIfDifferent(input.project[i]+'/'+input.name[j],input.code);
-		}
+	for(var j=0;j<input.name.length;j++){
+		IO.CreateFile(IO.m_current_graph_path+'/'+input.name[j],input.code.join(''));
 	}
 };

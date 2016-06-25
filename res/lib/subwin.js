@@ -914,6 +914,7 @@ var RenderLayout=function(layout,obj,y_base){
 						var n0_topmost=UI.RecordTopMostContext()
 						obj_tab=UI.Keep(s_wrapper_name,W.RoundRect("",{
 							x:0,y:0,w:w,h:h_content,tab:tab,
+							x_real:x,y_real:y+obj.h_caption,
 						}));
 						UI.Begin(obj_tab)
 							var bk_focus_is_a_region=UI.context_focus_is_a_region;

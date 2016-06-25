@@ -1129,6 +1129,7 @@ UI.CustomTheme=function(){
 			caption_icon_color:L?0xff7f7f7f:0xff444444,
 		},
 		graph_view:{
+			//todo: dark theme support
 			color:0xffe8e8e8,
 			node_style:{
 				font_port:UI.Font(UI.font_name,16),
@@ -1173,7 +1174,23 @@ UI.CustomTheme=function(){
 			},
 		},
 		graph_param_panel:{
-			//nothing for now
+			//todo: dark theme support
+			color:L?0xffffffff:0xff444444,
+			message_style:{
+				text_color:L?0xff444444:0xffcccccc,
+				font:UI.Font(UI.font_name,32,-50),
+			},
+			ui_style:{
+				font_caption:UI.Font(UI.font_name,24),
+				font_label:UI.Font(UI.font_name,20),
+				font_widgets:UI.Font(UI.font_name,20),
+				icon_font:UI.Font(UI.icon_font_name,20),
+				caption_color:L?0xff7f7f7f:0xffaaaaaa,
+				widget_color:L?0xff000000:0xffe8e8e8,
+				spacing_node:12,
+				spacing_caption:24,
+				spacing_widget:28,
+			},
 		},
 	};
 	if(!L){//dark

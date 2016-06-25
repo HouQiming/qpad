@@ -153,7 +153,12 @@ auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
 		sname=words[0]
 		if obj_id2port:
 			obj_port=obj_id2port[sname].as(JSObject)
-		else 
+			if Platform.BUILD=="debug":
+				if !obj_port:
+					Writeln('port not found: ',sname)
+		else
+			obj_port=JSObject.NULL
+		if !obj_port:
 			obj_port=JS.New()
 			obj_ports[p]=obj_port; p++
 			obj_port["id"]=sname
@@ -172,6 +177,27 @@ auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
 			else
 				obj_port[s_key]=s_value
 
+EnumWords=inline(scode){
+	return {forEach:inline(fbody){
+		plast=0L
+		foreach ch,I in scode
+			isalnum=(ch>='a'&&ch<='z'||ch>='A'&&ch<='Z'||ch>='0'&&ch<='9'||ch=='_'||ch>=128)
+			word0=plast
+			word1=-1L
+			ch_delimiter=ch
+			if !isalnum:
+				word1=I
+			else if isalnum&&I==scode.n-1:
+				word1=scode.n
+				ch_delimiter=char(0)
+			if word0<word1:
+				s_word=scode[word0:word1-1]
+				fbody(s_word,ch_delimiter,word0,word1)
+			if !isalnum:
+				plast=word1+1
+	}}
+}
+
 auto ParseJSNode(string scode)
 	//pnewline=scode0.IndexOf('\n')
 	//scode=scode0[pnewline+1:]
@@ -182,25 +208,19 @@ auto ParseJSNode(string scode)
 	ports=[new string[] for i=0:1]
 	got=new int[string]
 	word_mode=0
-	plast=0L
-	foreach ch,I in scode
-		isalnum=(ch>='a'&&ch<='z'||ch>='A'&&ch<='Z'||ch>='0'&&ch<='9'||ch=='_'||ch>=128)
-		if !isalnum:
-			if plast<I:
-				s_word=scode[plast:I-1]
-				if word_mode>0:
-					if !(got[s_word]&(1<<(word_mode-1))):
-						ports[word_mode-1].push(s_word)
-						got[s_word]|=(1<<(word_mode-1))
-					word_mode=0
-				else
-					word_mode=0
-					if ch=='.':
-						if s_word=='input':
-							word_mode=MODE_INPUT
-						else if s_word=='output':
-							word_mode=MODE_OUTPUT
-			plast=I+1
+	for s_word,ch in EnumWords(scode)
+		if word_mode>0:
+			if !(got[s_word]&(1<<(word_mode-1))):
+				ports[word_mode-1].push(s_word)
+				got[s_word]|=(1<<(word_mode-1))
+			word_mode=0
+		else
+			word_mode=0
+			if ch=='.':
+				if s_word=='input':
+					word_mode=MODE_INPUT
+				else if s_word=='output':
+					word_mode=MODE_OUTPUT
 	//we still need @type for type labels
 	ret=JS.New()
 	ret["m_script"]=obj_func
@@ -220,12 +240,57 @@ auto ParseJSNode(string scode)
 
 JS=new JSContext
 auto ParseTextNode(string scode)
-	//need @type for type labels
+	//make @out lines hard separators
+	obj_code_blocks=JS.NewArray()
+	p=0L
+	s_port_name=string.NULL
+	sblock=new string
+	for sline,I in scode.TokenizeEx("\r\n",scode.TOKENIZE_ALLOW_EMPTY|scode.TOKENIZE_INCLUDE_SEPARATOR)
+		pport=sline.IndexOf('@out=')
+		if pport<0:
+			if sline.IndexOf('@in=')<0:
+				sblock.push(sline)
+			continue
+		else
+			//found a separator
+			if s_port_name&&sblock.n:
+				obj_code_blocks[p+0]=s_port_name
+				obj_code_blocks[p+1]=sblock
+				p+=2
+			sblock=new string
+			pport+=5
+			s_port_name=StripLeadingSpaces(sline[pport:])
+			pcomma=s_port_name.IndexOf(',')
+			if pcomma>=0:
+				s_port_name.n=pcomma
+	if s_port_name&&sblock.n:
+		obj_code_blocks[p+0]=s_port_name
+		obj_code_blocks[p+1]=sblock
+		p+=2
 	ret=JS.New()
-	ret["m_code"]=scode
+	ret["m_blocks"]=obj_code_blocks
 	obj_ports=JS.NewArray()
 	ret["m_ports"]=obj_ports
 	ParsePortDescs(ret,JSObject.NULL,scode)
+	is_in_port=new int[string]
+	n_ports=obj_ports["length"].as(iptr)
+	for i=0:n_ports-1
+		s_id=obj_ports[i]["id"].as(string)
+		if obj_ports[i]["dir"].as(string)=="input":
+			is_in_port[s_id]=1
+	for i=1:2:p-1
+		sblock=obj_code_blocks[i].as(string)
+		p_splits=new iptr[]
+		p_splits.push(0L)
+		for s_word,ch,p0,p1 in EnumWords(sblock)
+			if is_in_port[s_word]:
+				p_splits.push(p0)
+				p_splits.push(p1)
+		p_splits.push(sblock.n)
+		obj_block=JS.NewArray()
+		for i=0:p_splits.n-2
+			obj_block[i]=sblock[p_splits[i]:p_splits[i+1]-1]
+		obj_code_blocks[i]=obj_block
 	return JS.Return(ret)
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
@@ -335,6 +400,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return JS.Return(s)
 		else
 			return 0
+	}
+	jsio["CreateDirectory"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		if !fn:return 0
+		return JS.Return(System.IO.CreateDirectory(fn))
 	}
 	jsio["CreateFile"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)

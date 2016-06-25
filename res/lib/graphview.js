@@ -1,5 +1,6 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
+require("res/lib/global_doc");
 
 ///////////////////////////
 //load global config
@@ -95,7 +96,8 @@ var graph_prototype={
 			m_renamed_ports:{},
 			m_ui_values:{},
 			m_class:class_name,
-			m_caption:GetMainFileName(class_name),
+			m_caption:class_name,
+			m_need_rebuild:1,
 		}
 		this.nds.push(ret);
 		return ret;
@@ -115,6 +117,114 @@ var graph_prototype={
 			is_valid[this.nds[i].__id__]=1;
 		}
 		this.es=this.es.filter(function(edgei){return is_valid[edgei.id0]&&is_valid[edgei.id1];})
+	},
+	Build:function(sbasepath,cache,is_rebuild){
+		//todo: expand subgraphs - may need that for toposort to work
+		//todo: y sort for edge output - inverse collection desc
+		IO.m_current_graph_path=sbasepath;
+		var node_map={},degs=[],es_topo=[],es_gather=[];
+		var n=this.nds.length,m=this.es.length;
+		for(var i=0;i<n;i++){
+			node_map[this.nds[i].__id__]=i;
+			degs[i]=0;
+			es_topo[i]=[];
+			es_gather[i]=[];
+		}
+		for(var i=0;i<m;i++){
+			var e=this.es[i];
+			var v0=node_map[e.id0];
+			var v1=node_map[e.id1];
+			es_topo[v0].push(v1);
+			es_gather[v1].push({v0:v0,port0:e.port0,port1:e.port1});
+			degs[v1]++;
+		}
+		//todo: reset m_need_rebuild
+		var Q=[],head=0;
+		for(var i=0;i<n;i++){
+			if(degs[i]==0){
+				Q.push(i);
+			}
+		}
+		while(head<Q.length){
+			var v0=Q[head];
+			head++;
+			var es_v0=es_topo[v0];
+			for(var i=0;i<es_v0.length;i++){
+				var v1=es_v0[i];
+				if(0==--degs[v1]){
+					Q.push(v1);
+				}
+			}
+		}
+		if(Q.length<n){
+			//error - select the in-loop nodes
+			for(var i=0;i<n;i++){
+				this.nds[i].m_is_selected=(degs[i]>0?1:0);
+			}
+			//todo: error message
+			return 0;
+		}
+		var port_value_map=[];
+		for(var i=0;i<n;i++){
+			port_value_map[i]={};
+		}
+		for(var i=0;i<Q.length;i++){
+			var v0=Q[i];
+			var ndi=this.nds[v0];
+			var need_build_i=(is_rebuild||ndi.m_need_rebuild);
+			if(!need_build_i){continue;}
+			var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+			if(ndcls){
+				var pvmap_v0=port_value_map[v0];
+				//gather connected input
+				var es_v0=es_gather[v0];
+				es_v0.sort(function(e0,e1){return this.nds[e0.v].y<this.nds[e1.v].y;}.bind(this))
+				for(var j=0;j<es_v0.length;j++){
+					var s_output=port_value_map[es_v0[j].v0][es_v0[j].port0];
+					if(typeof(s_output)=='string'){
+						var s_port1=es_v0[j].port1;
+						var ss_input_v0=pvmap_v0[s_port1];
+						if(!ss_input_v0){ss_input_v0=[];pvmap_v0[s_port1]=ss_input_v0;}
+						ss_input_v0.push(s_output);
+					}
+				}
+				//fill dangling ports with m_ui_values or empty array
+				for(var j=0;j<ndcls.m_ports.length;j++){
+					var id=ndcls.m_ports[j].id;
+					if(ndcls.m_ports[j].dir=='input'&&!pvmap_v0[id]){
+						var s_ui_value=ndi.m_ui_values[id];
+						if(s_ui_value){
+							pvmap_v0[id]=[s_ui_value];
+						}else{
+							pvmap_v0[id]=[];
+						}
+					}
+				}
+				//run the implementation to fill the outputs
+				//inputs are arrays, outputs are strings
+				if(ndcls.m_script){
+					ndcls.m_script.call(null,pvmap_v0,pvmap_v0);
+				}else if(ndcls.m_blocks){
+					var pvmap_v0_s={};
+					for(var id in pvmap_v0){
+						pvmap_v0_s[id]=pvmap_v0[id].join('');
+					}
+					for(var j=0;j<ndcls.m_blocks.length;j+=2){
+						var id=ndcls.m_blocks[j];
+						var blocks_j=ndcls.m_blocks[j+1];
+						var blocks_ret=[];
+						for(var k=0;k<blocks_j.length;k++){
+							var s_block_jk=blocks_j[k];
+							if(k&1){
+								s_block_jk=pvmap_v0_s[s_block_jk];
+							}
+							blocks_ret.push(s_block_jk);
+						}
+						pvmap_v0[id]=blocks_ret.join('');
+					}
+				}
+			}
+		}
 	},
 };
 
@@ -217,6 +327,10 @@ var rproto_port={
 		if(v1){
 			if(v1.region){
 				//create edge
+				if(v0.region.dir=='input'){
+					//all edges should be output -> input
+					var tmp=v0;v0=v1;v1=tmp;
+				}
 				this.owner.graph.es.push({
 					id0:v0.region.nd.__id__, port0:v0.region.port,
 					id1:v1.region.nd.__id__, port1:v1.region.port,
@@ -255,10 +369,12 @@ UI.GetNodeCache=function(cache,ndi){
 	}
 	//get the node's class
 	var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+	//var is_invalid_class=0;
 	if(!ndcls){
 		//assume empty class when rendering before it's loaded, do not cache the result
 		cache[ndi.__id__]=undefined;
 		ndcls={m_ports:[]};
+		//is_invalid_class=1;
 	}
 	var style=UI.default_styles.graph_view.node_style;
 	var wr=style.port_w_min,wl=style.port_w_min, nr=0,nl=0;
@@ -325,9 +441,9 @@ UI.GetNodeCache=function(cache,ndi){
 		var port_i=ndcls.m_ports[i];
 		var name=(ndi.m_renamed_ports[port_i.id]||port_i.id);
 		var side=(port_i.side||(port_i.dir=="input"?"R":"L"));
-		if(port_i.ui&&!degs_ndi[port_i.id]){
+		if(port_i.ui&&(!degs_ndi||!degs_ndi[port_i.id])){
 			//generate node UI for non-connected port
-			cache_item.m_param_panel.push({nd:ndi, port:port_i.id, ui:port_i.ui});
+			cache_item.m_param_panel.push({nd:ndi, name:name, port:port_i.id, ui:port_i.ui});
 		}
 		if(side=="R"){
 			yr+=dyr;
@@ -375,6 +491,9 @@ UI.GetNodeCache=function(cache,ndi){
 			yl+=style.port_h;
 		}
 	}
+	//if(is_invalid_class){
+	//	cache_item.m_param_panel.push({create_class:ndi.m_class});
+	//}
 	return cache_item;
 };
 
@@ -466,13 +585,13 @@ W.graphview_prototype={
 		UI.ReleaseMouse(this);
 	},
 	OnMouseWheel:function(event){
-		var mx_world=(UI.m_absolute_mouse_position.x-this.graph.tr.trans[0])/this.graph.tr.scale;
-		var my_world=(UI.m_absolute_mouse_position.y-this.graph.tr.trans[1])/this.graph.tr.scale;
+		var mx_world=((UI.m_absolute_mouse_position.x-this.x_real)-this.graph.tr.trans[0])/this.graph.tr.scale;
+		var my_world=((UI.m_absolute_mouse_position.y-this.y_real)-this.graph.tr.trans[1])/this.graph.tr.scale;
 		var log_scale=Math.log(this.graph.tr.scale);
 		log_scale+=event.y*0.1;
 		this.graph.tr.scale=(Math.exp(log_scale)||1);
-		this.graph.tr.trans[0]=UI.m_absolute_mouse_position.x-mx_world*this.graph.tr.scale;
-		this.graph.tr.trans[1]=UI.m_absolute_mouse_position.y-my_world*this.graph.tr.scale;
+		this.graph.tr.trans[0]=(UI.m_absolute_mouse_position.x-this.x_real)-mx_world*this.graph.tr.scale;
+		this.graph.tr.trans[1]=(UI.m_absolute_mouse_position.y-this.y_real)-my_world*this.graph.tr.scale;
 		if(this.m_drag_ctx){
 			this.m_drag_ctx={x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.graph.tr))};
 		}
@@ -486,7 +605,7 @@ W.graphview_prototype={
 			//tab: temp UI
 			if(!this.m_temp_ui){
 				this.m_temp_ui="add_node";
-				this.m_temp_ui_desc={x:UI.m_absolute_mouse_position.x-this.x,y:UI.m_absolute_mouse_position.y-this.y};
+				this.m_temp_ui_desc={x:UI.m_absolute_mouse_position.x-this.x_real,y:UI.m_absolute_mouse_position.y-this.y_real};
 			}
 			UI.Refresh()
 		}else if(IsHotkey(event,"DELETE")){
@@ -600,14 +719,17 @@ W.GraphView=function(id,attrs){
 			}
 		}
 		//create UI panel
-		if(ndi.m_is_selected&&ndi.m_param_panel.length>0){
+		if(ndi.m_is_selected&&cache_item.m_param_panel.length>0){
 			big_param_panel.push({caption:ndi.m_caption});
-			for(var i=0;i<ndi.m_param_panel.length;i++){
-				big_param_panel.push(ndi.m_param_panel[i]);
+			for(var i=0;i<cache_item.m_param_panel.length;i++){
+				big_param_panel.push(cache_item.m_param_panel[i]);
 			}
 		}
 	}
 	obj.m_big_param_panel=big_param_panel;
+	if(big_param_panel.length){
+		UI.OpenUtilTab("param_panel","quiet");
+	}
 	//render the links
 	var port_pos_map={};
 	for(var i=0;i<obj.m_proxy_ports.length;i++){
@@ -663,7 +785,7 @@ W.GraphView=function(id,attrs){
 		})
 		var hc_editing=UI.GetCharacterHeight(style_edit.font_edit);
 		var obj_prev=obj.newnode_edit;
-		//todo: AC
+		//todo: AC, OnChange explanation
 		W.Edit("newnode_edit",{
 			x:x_caret-style_edit.edit_padding,y:y_caret+(hc-hc_editing)*0.5,
 			w:style_edit.edit_w+style_edit.edit_padding*2,h:hc_editing,
@@ -689,6 +811,19 @@ W.GraphView=function(id,attrs){
 				var graph=obj.graph;
 				var cache=obj.cache;
 				var stext_raw=this.ed.GetText();
+				if(stext_raw.indexOf('.')>=0){
+					//it's a file! a new class!
+					//create the file in znodes/
+					var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/znodes'
+					IO.CreateDirectory(sdir)
+					if(!IO.DirExists(sdir)){
+						stext_raw=UI._('Unable to create the znodes directory');
+					}else{
+						UI.OpenEditorWindow(sdir+'/'+stext_raw);
+						//we still need the node
+						stext_raw=UI.RemoveExtension(stext_raw);
+					}
+				}
 				var nd_new=graph.CreateNode(stext_raw);
 				//todo: auto-connect
 				//todo: connection-based auto-layout
@@ -716,9 +851,26 @@ W.GraphView=function(id,attrs){
 		var rg_port=obj.m_temp_ui_desc.region;
 		//todo
 	}
-	W.Hotkey("",{key:"CTRL+S",action:function(){
-		this.Save();
-	}.bind(this)});
+	//////////////////
+	var menu_run=UI.BigMenu("&Run")
+	menu_run.AddNormalItem({
+		text:"Build &graph",key:"CTRL+B",
+		enable_hotkey:1,action:function(){
+			var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/build'
+			IO.CreateDirectory(sdir)
+			this.graph.Build(sdir,this.cache,0)
+		}.bind(obj)})
+	menu_run.AddNormalItem({
+		text:"R&ebuild graph",key:"CTRL+SHIFT+B",
+		enable_hotkey:1,action:function(){
+			var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/build'
+			IO.CreateDirectory(sdir)
+			this.graph.Build(sdir,this.cache,1)
+		}.bind(obj)})
+	menu_run=undefined;
+	//W.Hotkey("",{key:"CTRL+S",action:function(){
+	//	this.Save();
+	//}.bind(this)});
 	UI.End()
 	return obj;
 };
@@ -731,7 +883,7 @@ UI.OpenGraphTab=function(file_name){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab_i=UI.g_all_document_windows[i];
 		if(obj_tab_i.file_name==file_name&&obj_tab_i.document_type=="graph"){
-			if(!is_quiet){UI.top.app.document_area.SetTab(i)}
+			UI.top.app.document_area.SetTab(i)
 			return obj_tab_i;
 		}
 	}
@@ -768,6 +920,7 @@ UI.OpenGraphTab=function(file_name){
 			var attrs={
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
+				'x_real':UI.context_parent.x_real,'y_real':UI.context_parent.y_real,
 				//'default_focus':1,
 			};
 			if(!this.main_widget){
@@ -823,13 +976,61 @@ UI.OpenGraphTab=function(file_name){
 
 ///////////////////////////////////////
 //ui panel
+var g_panel_ui_widgets={
+	//this is not a prototype... yet
+	editbox:function(x,y,w,h){
+		var style=UI.default_styles.graph_param_panel.ui_style;
+		var id0=this.nd.__id__+'='+this.port;
+		W.EditBox(id0,{
+			x:x,y:y,w:w,h:h,font:style.font_widgets,
+			value:this.nd.m_ui_values[this.port],
+			OnChange:function(value){
+				this.nd.m_ui_values[this.port]=value;
+				//todo: m_need_rebuild, undo, cache invalidation
+				UI.Refresh();
+			}.bind(this)
+		});
+	},
+};
 W.ParamPanelPage=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"graph_param_panel",W.graphview_prototype);
 	if(!obj.graphview){
-		//todo
+		return obj;
+	}
+	var big_param_panel=obj.graphview.m_big_param_panel;
+	if(!big_param_panel||!big_param_panel.length){
+		W.Text("",{
+			x:0,y:0,anchor:obj,anchor_align:"center",anchor_valign:"center",
+			font:obj.message_style.font,text:UI._("No parameters available"),
+			color:obj.message_style.text_color,
+		})
+		return obj;
 	}
 	UI.Begin(obj)
-	//todo
+		var y_current=obj.y;
+		var style=obj.ui_style;
+		var dy_label=(style.spacing_widget-UI.GetCharacterHeight(style.font_label))*0.5;
+		for(var i=0;i<big_param_panel.length;i++){
+			var item_i=big_param_panel[i];
+			if(item_i.caption!=undefined){
+				//caption
+				if(i){
+					y_current+=style.spacing_node;
+				}
+				var dim=UI.MeasureText(style.font_caption,item_i.caption);
+				UI.RoundRect({x:obj.x+8,y:y_current+(dim.h-2)*0.5,w:obj.w-16,h:2,color:style.caption_color})
+				UI.RoundRect({x:obj.x+30,y:y_current+(dim.h-8)*0.5,w:dim.w+8,h:8,color:obj.color})
+				W.Text("",{x:obj.x+34,y:y_current,font:style.font_caption,text:item_i.caption,color:style.caption_color});
+				y_current+=style.spacing_caption;
+			}else if(item_i.ui){
+				var dim=W.Text("",{x:obj.x+16,y:y_current+dy_label,font:style.font_label,text:item_i.name,color:style.widget_color});
+				var fwidget=g_panel_ui_widgets[item_i.ui[0].toLowerCase()];
+				if(fwidget){
+					fwidget.call(item_i,obj.x+16+dim.w+8,y_current,obj.w-24-dim.w-16,style.spacing_widget);
+				}
+				y_current+=style.spacing_widget;
+			}
+		}
 	UI.End()
 	return obj;
 };
@@ -846,8 +1047,12 @@ UI.RegisterUtilType("param_panel",function(){return UI.NewTab({
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'graphview':obj_real,
 			'activated':this==UI.top.app.document_area.active_tab,
-			'x':0,'y':0});
+			'x':0,'y':0,
+		});
 		this.util_widget=body;
+		if(!obj_real){
+			UI.m_invalid_util_tabs.push(this.__global_tab_id);
+		}
 		return body;
 	},
 	Save:function(){},
