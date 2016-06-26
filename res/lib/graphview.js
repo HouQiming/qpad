@@ -90,6 +90,13 @@ UI.GetNodeClass=function(cache,sname){
 //the graph class
 var g_per_run_id=0;
 var graph_prototype={
+	SignalEdit:function(nds_rebuild){
+		for(var i=0;i<nds_rebuild.length;i++){
+			nds_rebuild[i].m_need_rebuild=1;
+		}
+		//the undo queue has to be built in cache
+		this.OnChange(nds_rebuild);
+	},
 	CreateNode:function(class_name){
 		var ret={
 			__id__:[g_developer.email, (new Date()).toUTCString(), g_per_run_id++].join("&"),
@@ -114,9 +121,17 @@ var graph_prototype={
 		this.nds=this.nds.filter(function(ndi){return !ndi.m_is_selected;})
 		var is_valid={};
 		for(var i=0;i<this.nds.length;i++){
-			is_valid[this.nds[i].__id__]=1;
+			is_valid[this.nds[i].__id__]=this.nds[i];
 		}
-		this.es=this.es.filter(function(edgei){return is_valid[edgei.id0]&&is_valid[edgei.id1];})
+		var signals=[];
+		this.es=this.es.filter(function(edgei){
+			var nd0=is_valid[edgei.id0];
+			var nd1=is_valid[edgei.id1];
+			if(nd0){signals.push(nd0);}
+			if(nd1){signals.push(nd1);}
+			return nd0&&nd1;
+		})
+		this.SignalEdit([signals]);
 	},
 	Build:function(sbasepath,cache,is_rebuild){
 		//todo: expand subgraphs - may need that for toposort to work
@@ -138,7 +153,6 @@ var graph_prototype={
 			es_gather[v1].push({v0:v0,port0:e.port0,port1:e.port1});
 			degs[v1]++;
 		}
-		//todo: reset m_need_rebuild
 		var Q=[],head=0;
 		for(var i=0;i<n;i++){
 			if(degs[i]==0){
@@ -174,6 +188,13 @@ var graph_prototype={
 			var need_build_i=(is_rebuild||ndi.m_need_rebuild);
 			if(!need_build_i){continue;}
 			var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+			//reset/propagate need_rebuild
+			var es_v0=es_topo[v0];
+			for(var j=0;j<es_v0.length;j++){
+				var v1=es_v0[j];
+				this.nds[v1].m_need_rebuild=1;
+			}
+			ndi.m_need_rebuild=0;
 			if(ndcls){
 				var pvmap_v0=port_value_map[v0];
 				//gather connected input
@@ -267,6 +288,10 @@ var rproto_node={
 		this.OnMouseMove(event);
 		if(this.m_drag_ctx){
 			this.m_drag_distance=PointDist(event,this.m_drag_ctx);
+			if((this.m_drag_distance||0)>8){
+				//move would necessitate rebuild - potential order change
+				this.owner.graph.SignalEdit([this.nd]);
+			}
 		}
 		this.m_drag_ctx=undefined;
 		UI.ReleaseMouse(this);
@@ -335,6 +360,7 @@ var rproto_port={
 					id0:v0.region.nd.__id__, port0:v0.region.port,
 					id1:v1.region.nd.__id__, port1:v1.region.port,
 				})
+				this.owner.graph.SignalEdit([v1.region.nd]);
 			}else{
 				//self-click, rename
 				this.owner.m_temp_ui="rename_port";
@@ -564,6 +590,7 @@ W.graphview_prototype={
 				var rg_trigger=(1-side)==0?pos0.region:pos1.region;
 				this.graph.es[best_eid]=this.graph.es[this.graph.es.length-1]
 				this.graph.es.pop();
+				this.graph.SignalEdit([pos1.region.nd]);
 				rg_trigger.OnMouseDown(event_edge)
 				rg_trigger.OnMouseMove(event_edge)
 				return;
@@ -616,13 +643,53 @@ W.graphview_prototype={
 	},
 	Save:function(){
 		this.graph.Save(this.m_file_name);
-		this.need_save=0;
+		this.m_saved_point=(this.cache&&this.cache.m_undo_queue.length||0);
+	},
+	NeedSave:function(){
+		return this.m_saved_point!=(this.cache&&this.cache.m_undo_queue.length||0);
 	},
 	SaveMetaData:function(){
 		//nothing - all metadata are saved in the main file for now
 	},
 	Reload:function(){
 		//todo
+	},
+	/////////////////////
+	OnGraphChange:function(nds_rebuild){
+		this.cache.m_undo_queue.push(JSON.stringify(this.graph));
+		//clear node cache
+		for(var i=0;i<nds_rebuild.length;i++){
+			this.cache.nds[nds_rebuild[i].__id__]=undefined;
+		}
+	},
+	Undo:function(){
+		var uq=this.cache.m_undo_queue;
+		if(uq.length>=2){
+			this.cache.m_redo_queue.push(uq.pop());
+			var bk=this.graph.OnChange;
+			this.graph=JSON.parse(uq[uq.length-1]);
+			this.graph.__proto__=graph_prototype;
+			this.graph.OnChange=bk;
+			this.cache.nds={};
+			return 1;
+		}else{
+			return 0;
+		}
+	},
+	Redo:function(){
+		var uq=this.cache.m_undo_queue;
+		var rq=this.cache.m_redo_queue;
+		if(rq.length>=1){
+			uq.push(rq.pop());
+			var bk=this.graph.OnChange;
+			this.graph=JSON.parse(uq[uq.length-1]);
+			this.graph.__proto__=graph_prototype;
+			this.graph.OnChange=bk;
+			this.cache.nds={};
+			return 1;
+		}else{
+			return 0;
+		}
 	},
 };
 W.GraphView=function(id,attrs){
@@ -633,9 +700,13 @@ W.GraphView=function(id,attrs){
 		cache={
 			nds:{},
 			m_classes_by_name:{},
+			m_undo_queue:[JSON.stringify(graph)],
+			m_redo_queue:[],
 			search_paths:[UI.m_node_dir,UI.GetPathFromFilename(obj.m_file_name)+'/znodes'],
 		};
 		obj.cache=cache;
+		obj.m_saved_point=1;
+		obj.graph.OnChange=obj.OnGraphChange.bind(obj);
 	}
 	UI.Begin(obj)
 	W.PureRegion(id,obj);
@@ -687,15 +758,26 @@ W.GraphView=function(id,attrs){
 			item_i.x=x+item_i.dx;
 			item_i.y=y+item_i.dy;
 			UI.RoundRect(item_i);
-			if(i==1&&ndi.m_is_selected){
-				//render selection
-				item_i.x=x+item_i.dx;
-				item_i.y=y+item_i.dy;
-				UI.RoundRect({
-					x:item_i.x,y:item_i.y,w:item_i.w,h:item_i.h,round:item_i.round,
-					border_color:obj.node_style.node_selection_color,border_width:obj.node_style.node_selection_width,
-					color:0,
-				});
+			if(i==1){
+				if(ndi.m_is_selected){
+					//render selection
+					item_i.x=x+item_i.dx;
+					item_i.y=y+item_i.dy;
+					UI.RoundRect({
+						x:item_i.x,y:item_i.y,w:item_i.w,h:item_i.h,round:item_i.round,
+						border_color:obj.node_style.node_selection_color,border_width:obj.node_style.node_selection_width,
+						color:0,
+					});
+				}
+				if(ndi.m_need_rebuild){
+					//render rebuild indicator
+					item_i.x=x+item_i.dx;
+					item_i.y=y+item_i.dy;
+					UI.RoundRect({
+						x:item_i.x+item_i.round,y:item_i.y,w:item_i.w-item_i.round*2,h:item_i.round,round:item_i.round,
+						color:obj.node_style.node_selection_color,
+					});
+				}
 			}
 		}
 		for(var i=0;i<cache_item.m_texts.length;i++){
@@ -748,8 +830,10 @@ W.GraphView=function(id,attrs){
 		UI.RenderEdge(pos0.x,pos0.y,pos1.x,pos1.y,obj.edge_style.line_width);
 		obj.m_proxy_edges.push({line:[pos0.x,pos0.y,pos1.x,pos1.y],eid:ei})
 	}
+	var edge_vbo=UI.GetEdgeVBO();
+	//the GLWidget function will be called multiple times, while the outside part won't
 	UI.GLWidget(function(){
-		UI.FlushEdges(obj.edge_style.color);
+		UI.FlushEdges(obj.edge_style.color,edge_vbo);
 		if(obj.m_temp_ui=="edge"){
 			//rendering edges
 			var pos0=obj.m_temp_ui_desc.v0;
@@ -758,7 +842,7 @@ W.GraphView=function(id,attrs){
 			pos0.y=pos0.region.y-pos0.region.dy+pos0.region.pdy;
 			if(pos1){
 				UI.RenderEdge(pos0.x*tr.scale,pos0.y*tr.scale,pos1.x*tr.scale,pos1.y*tr.scale,obj.edge_style.line_width*tr.scale);
-				UI.FlushEdges((pos1.region?0xffffffff:0x55ffffff)&obj.edge_style.color);
+				UI.FlushEdges((pos1.region?0xffffffff:0x55ffffff)&obj.edge_style.color,UI.GetEdgeVBO());
 			}
 		}
 	});
@@ -840,6 +924,7 @@ W.GraphView=function(id,attrs){
 				nd_new.x=x_y_max;
 				nd_new.y=y_max+8;
 				obj.m_temp_ui=undefined;
+				graph.SignalEdit([nd_new]);
 				UI.Refresh()
 			},
 		});
@@ -852,6 +937,14 @@ W.GraphView=function(id,attrs){
 		//todo
 	}
 	//////////////////
+	var menu_edit=UI.BigMenu("&Edit")
+	menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:1,key:"CTRL+Z",action:function(){
+		this.Undo()
+	}.bind(obj)})
+	menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:1,key:"SHIFT+CTRL+Z",action:function(){
+		this.Redo()
+	}.bind(obj)})
+	menu_edit=undefined;
 	var menu_run=UI.BigMenu("&Run")
 	menu_run.AddNormalItem({
 		text:"Build &graph",key:"CTRL+B",
@@ -868,9 +961,6 @@ W.GraphView=function(id,attrs){
 			this.graph.Build(sdir,this.cache,1)
 		}.bind(obj)})
 	menu_run=undefined;
-	//W.Hotkey("",{key:"CTRL+S",action:function(){
-	//	this.Save();
-	//}.bind(this)});
 	UI.End()
 	return obj;
 };
@@ -907,7 +997,7 @@ UI.OpenGraphTab=function(file_name){
 				fn_display=IO.NormalizeFileName(fn_display,1);
 				this.title=UI.GetSmartTabName(fn_display);
 				this.tooltip=fn_display;
-				this.need_save=this.main_widget.need_save;
+				this.need_save=this.main_widget.NeedSave();
 				if(this.need_save){
 					this.title=this.title+'*';
 				}
@@ -935,7 +1025,7 @@ UI.OpenGraphTab=function(file_name){
 				this.main_widget=body;
 				body.m_file_name=this.file_name;
 			}
-			this.need_save=this.main_widget.need_save;
+			this.need_save=this.main_widget.NeedSave();
 			this.UpdateTitle();
 			return body;
 		},
@@ -946,7 +1036,7 @@ UI.OpenGraphTab=function(file_name){
 				return
 			}
 			this.main_widget.Save();
-			this.need_save=this.main_widget.need_save;
+			this.need_save=this.main_widget.NeedSave();
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}

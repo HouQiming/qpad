@@ -857,6 +857,19 @@ UI.RegisterOutputParser('[ \t]*at[ \t]*(.*):([0-9]+):([0-9]+)',3,function(matche
 	return err
 });
 
+UI.RegisterOutputParser('[ \t]*at[ \t]*\\[.*\\] \\((.*):([0-9]+)\\)[ a-zA-Z]*',2,function(matches){
+	var name=matches[1]
+	var linea=parseInt(matches[2])
+	//var cola=parseInt(matches[3])
+	var err={
+		file_name:name.indexOf('.')>=0?name:(name+'.js'),
+		category:"error",
+		message:"duktape stack dump",
+		line0:linea-1,
+	}
+	return err
+});
+
 /////////////////////////////////////////////
 //search engine hooks
 var SearchEngineHook=function(items,ssearch, icon,stitle_template,url_template){

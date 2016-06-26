@@ -327,8 +327,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		g_edge_vbo.push(x0-Nx);g_edge_vbo.push(y0-Ny)
 		return 0
 	}
+	JS_UI["GetEdgeVBO"]=function(JSContext JS){
+		auto ret=g_edge_vbo
+		g_edge_vbo=new float[]
+		return JS.Return(ret)
+	}
 	JS_UI["FlushEdges"]=function(JSContext JS){
 		auto C=JS.Param(0).as(int)
+		auto g_edge_vbo=JS.Param(1).as(float[])
+		if !g_edge_vbo||!g_edge_vbo.n:
+			return 0
 		if !g_vbo_tech:
 			g_vbo_tech=new GLTechnique
 			g_vbo_tech.SetVertexShader("
@@ -354,7 +362,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			g_vbo_tech.SetUniformColor("C",C)
 			g_vbo_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(float),0L)
 			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch>>1)
-		g_edge_vbo.clear()
 		return 0
 	}
 });
