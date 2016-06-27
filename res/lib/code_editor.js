@@ -2520,6 +2520,7 @@ W.CodeEditorWidget_prototype={
 		UI.m_ui_metadata[this.file_name]=new_metadata
 	},
 	OnSave:function(){
+		UI.OnCodeEditorSave(IO.NormalizeFileName(this.doc.m_file_name));
 		this.m_file_index=undefined;
 		this.SaveMetaData();
 		UI.SaveMetaData();

@@ -62,13 +62,20 @@ UI.GetNodeClass=function(cache,sname){
 				}else{
 					var snode=IO.ReadAll(fs[0]);
 					if(snode){
+						var ndcls=undefined;
 						if(UI.GetFileNameExtension(fs[0]).toLowerCase()=='zjs'){
-							holder=UI.ParseJSNode(snode);
+							ndcls=UI.ParseJSNode(snode);
 						}else{
-							holder=UI.ParseTextNode(snode);
+							ndcls=UI.ParseTextNode(snode);
 						}
-						for(var i=0;i<holder.m_ports.length;i++){
-							var port_i=holder.m_ports[i];
+						ndcls.m_file_name=IO.NormalizeFileName(fs[0]);
+						holder={
+							m_ndcls:ndcls,
+							m_file_name:IO.NormalizeFileName(fs[0]),
+						};
+						holder.m_file_save_time=UI.g_ce_file_save_time[holder.m_file_name];
+						for(var i=0;i<ndcls.m_ports.length;i++){
+							var port_i=ndcls.m_ports[i];
 							if(typeof(port_i.type)=="string"){
 								port_i.type=port_i.type.split(' ');
 							}
@@ -83,7 +90,7 @@ UI.GetNodeClass=function(cache,sname){
 		}
 		cache.m_classes_by_name[sname]=holder;
 	}
-	return holder;
+	return holder&&holder.m_ndcls;
 };
 
 //////////////////////////
@@ -299,8 +306,11 @@ var rproto_node={
 	OnClick:function(event){
 		if((this.m_drag_distance||0)>8){return;}
 		if(event.clicks>=2){
-			//param pane / edit node file / edit caption
-			//todo: module system overhaul
+			//edit node file - put fn in parser
+			var ndcls=UI.GetNodeClass(this.owner.cache,this.nd.m_class);
+			if(ndcls){
+				UI.OpenEditorWindow(ndcls.m_file_name);
+			}
 		}
 	},
 };
@@ -708,6 +718,17 @@ W.GraphView=function(id,attrs){
 		obj.m_saved_point=1;
 		obj.graph.OnChange=obj.OnGraphChange.bind(obj);
 	}
+	//test code-editor-saved class files
+	if(cache.m_tested_save_time!=UI.g_ce_save_time){
+		for(var sname in cache.m_classes_by_name){
+			var holder=cache.m_classes_by_name[sname];
+			if(holder&&holder.m_file_save_time!=(UI.g_ce_file_save_time[holder.m_file_name]||0)){
+				cache.m_classes_by_name[sname]=undefined;
+				cache.nds={};
+			}
+		}
+		cache.m_tested_save_time=UI.g_ce_save_time;
+	}
 	UI.Begin(obj)
 	W.PureRegion(id,obj);
 	UI.RoundRect({x:obj.x,y:obj.y,w:obj.w,h:obj.h,color:obj.color})
@@ -770,7 +791,7 @@ W.GraphView=function(id,attrs){
 					});
 				}
 				if(ndi.m_need_rebuild){
-					//render rebuild indicator
+					//render to-build indicator
 					item_i.x=x+item_i.dx;
 					item_i.y=y+item_i.dy;
 					UI.RoundRect({
@@ -1149,3 +1170,9 @@ UI.RegisterUtilType("param_panel",function(){return UI.NewTab({
 	SaveMetaData:function(){},
 	OnDestroy:function(){},
 })});
+
+UI.g_ce_save_time=0;
+UI.g_ce_file_save_time={};
+UI.OnCodeEditorSave=function(fn){
+	UI.g_ce_file_save_time[fn]=++UI.g_ce_save_time;
+};
