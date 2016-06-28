@@ -78,6 +78,8 @@ UI.GetNodeClass=function(cache,sname){
 							var port_i=ndcls.m_ports[i];
 							if(typeof(port_i.type)=="string"){
 								port_i.type=port_i.type.split(' ');
+							}else{
+								port_i.type=[];
 							}
 							if(typeof(port_i.ui)=="string"){
 								port_i.ui=port_i.ui.split(' ');
@@ -142,7 +144,6 @@ var graph_prototype={
 	},
 	Build:function(sbasepath,cache,is_rebuild){
 		//todo: expand subgraphs - may need that for toposort to work
-		//todo: y sort for edge output - inverse collection desc
 		IO.m_current_graph_path=sbasepath;
 		var node_map={},degs=[],es_topo=[],es_gather=[];
 		var n=this.nds.length,m=this.es.length;
@@ -253,6 +254,7 @@ var graph_prototype={
 				}
 			}
 		}
+		this.SignalEdit([]);
 	},
 };
 
@@ -848,8 +850,10 @@ W.GraphView=function(id,attrs){
 		var e=graph.es[ei];
 		var pos0=port_pos_map[e.id0][e.port0];
 		var pos1=port_pos_map[e.id1][e.port1];
-		UI.RenderEdge(pos0.x,pos0.y,pos1.x,pos1.y,obj.edge_style.line_width);
-		obj.m_proxy_edges.push({line:[pos0.x,pos0.y,pos1.x,pos1.y],eid:ei})
+		if(pos0&&pos1){
+			UI.RenderEdge(pos0.x,pos0.y,pos1.x,pos1.y,obj.edge_style.line_width);
+			obj.m_proxy_edges.push({line:[pos0.x,pos0.y,pos1.x,pos1.y],eid:ei})
+		}
 	}
 	var edge_vbo=UI.GetEdgeVBO();
 	//the GLWidget function will be called multiple times, while the outside part won't
@@ -930,20 +934,74 @@ W.GraphView=function(id,attrs){
 					}
 				}
 				var nd_new=graph.CreateNode(stext_raw);
-				//todo: auto-connect
-				//todo: connection-based auto-layout
-				//by default, add it "down"
-				var y_max=0,x_y_max=0;
-				for(var i=0;i<graph.nds.length;i++){
-					var cache_item=UI.GetNodeCache(cache,graph.nds[i]);
-					var y_i=graph.nds[i].y+(cache_item.m_h||0);
-					if(y_max<y_i||y_max==y_i&&x_y_max<graph.nds[i].x){
-						x_y_max=graph.nds[i].x;
-						y_max=y_i;
+				//////////////////////////////////////
+				//score-based auto-connect
+				//enum and test all ports
+				//keys: matched_type_id m_is_selected x
+				var ndcls_new=UI.GetNodeClass(cache,nd_new.m_class);
+				//do auto-layout in the same loop
+				var al_x_max=-1e10,al_y_avg=0,al_n=0;
+				for(var pi=0;pi<ndcls_new.m_ports.length;pi++){
+					var port_pi=ndcls_new.m_ports[pi];
+					if(port_pi.dir!='output'){continue;}
+					var type_ordering={};
+					for(var i=0;i<port_pi.type.length;i++){
+						type_ordering[port_pi.type[i]]=i+1;
+					}
+					var type_key_best=1e9;
+					var port_best=undefined;
+					for(var i=0;i<graph.nds.length;i++){
+						var ndi=graph.nds[i];
+						var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+						var type_key=1e10;
+						var id_best=undefined;
+						for(var j=0;j<ndcls.m_ports.length;j++){
+							var port_j=ndcls.m_ports[j];
+							var type_j=port_j.type;
+							if(port_j.dir!='input'){continue;}
+							for(var tj=0;tj<type_j.length;tj++){
+								if(type_key>type_ordering[type_j[tj]]+tj){
+									type_key=type_ordering[type_j[tj]]+tj;
+									id_best=port_j.id;
+								}
+							}
+						}
+						if(id_best&&(type_key_best>type_key||type_key_best==type_key&&(
+						port_best.nd.m_is_selected<ndi.m_is_selected||port_best.nd.m_is_selected<ndi.m_is_selected&&(
+						port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y)))){
+							type_key_best=type_key;
+							port_best={nd:ndi,port:id_best};
+						}
+					}
+					if(port_best){
+						graph.es.push({
+							id0:nd_new.__id__, port0:port_pi.id,
+							id1:port_best.nd.__id__, port1:port_best.port,
+						})
+						var cache_item=UI.GetNodeCache(cache,port_best.nd);
+						al_x_max=Math.max(al_x_max,port_best.nd.x+cache_item.m_w);
+						al_y_avg+=port_best.nd.y;
+						al_n++;
 					}
 				}
-				nd_new.x=x_y_max;
-				nd_new.y=y_max+8;
+				if(al_n){
+					//connection-based auto-layout: x_max+margin, y_average
+					nd_new.x=al_x_max+32;
+					nd_new.y=al_y_avg/al_n;
+				}else{
+					//by default, add it "down"
+					var y_max=0,x_y_max=0;
+					for(var i=0;i<graph.nds.length;i++){
+						var cache_item=UI.GetNodeCache(cache,graph.nds[i]);
+						var y_i=graph.nds[i].y+(cache_item.m_h||0);
+						if(y_max<y_i||y_max==y_i&&x_y_max<graph.nds[i].x){
+							x_y_max=graph.nds[i].x;
+							y_max=y_i;
+						}
+					}
+					nd_new.x=x_y_max;
+					nd_new.y=y_max+8;
+				}
 				obj.m_temp_ui=undefined;
 				graph.SignalEdit([nd_new]);
 				UI.Refresh()

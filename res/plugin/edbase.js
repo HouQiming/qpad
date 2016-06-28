@@ -136,7 +136,7 @@ Language.Register({
 			'type':['void','char','short','int','long','iptr','uptr','auto','byte','ushort','uint','ulong','i8','i16','i32','i64','u8','u16','u32','u64','f32','f64','float','double','string','Object','Interface','typename','typeof'],
 		},0)
 	},
-	include_paths:['c:/tp/pure/units']
+	include_paths:ProcessIncludePaths(['c:/tp/pure/units',UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?'%JC_PATH%/units':'${JC_PATH}/units'])
 });
 
 Language.Register({
