@@ -131,7 +131,12 @@ var ParseOutput=function(sline){
 			m_match_places:match_places
 		};
 	}
-	var big_match=sline.match(g_processed_output_parser.m_big_regex);
+	var big_match=undefined;
+	try{
+		big_match=sline.match(g_processed_output_parser.m_big_regex);
+	}catch(err){
+		//we may exceed the regexp step limit
+	}
 	if(!big_match){return undefined;}
 	var match_places=g_processed_output_parser.m_match_places;
 	for(var i=0;i<match_places.length;i+=2){

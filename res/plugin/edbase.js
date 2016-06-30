@@ -1177,7 +1177,7 @@ UI.RegisterBuildEnv("Jacy",{
 	CreateBuildScript:function(fname,doc){
 		return [
 			UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?'cd /d ':'cd ',UI.GetPathFromFilename(fname),'\n',
-			'jc ',fname,' --run\n',
+			'jc ',UI.RemovePath(fname),' --run\n',
 		].join("");
 	}
 })

@@ -73,7 +73,7 @@ UI.GetNodeClass=function(cache,sname){
 							m_ndcls:ndcls,
 							m_file_name:IO.NormalizeFileName(fs[0]),
 						};
-						holder.m_file_save_time=UI.g_ce_file_save_time[holder.m_file_name];
+						holder.m_file_save_time=(UI.g_ce_file_save_time[holder.m_file_name]||0);
 						for(var i=0;i<ndcls.m_ports.length;i++){
 							var port_i=ndcls.m_ports[i];
 							if(typeof(port_i.type)=="string"){
@@ -145,6 +145,7 @@ var graph_prototype={
 	Build:function(sbasepath,cache,is_rebuild){
 		//todo: expand subgraphs - may need that for toposort to work
 		IO.m_current_graph_path=sbasepath;
+		IO.SetCurrentDirectory(IO.m_current_graph_path);
 		var node_map={},degs=[],es_topo=[],es_gather=[];
 		var n=this.nds.length,m=this.es.length;
 		for(var i=0;i<n;i++){
@@ -207,7 +208,7 @@ var graph_prototype={
 				var pvmap_v0=port_value_map[v0];
 				//gather connected input
 				var es_v0=es_gather[v0];
-				es_v0.sort(function(e0,e1){return this.nds[e0.v].y<this.nds[e1.v].y;}.bind(this))
+				es_v0.sort(function(e0,e1){return this.nds[e0.v0].y<this.nds[e1.v0].y;}.bind(this))
 				for(var j=0;j<es_v0.length;j++){
 					var s_output=port_value_map[es_v0[j].v0][es_v0[j].port0];
 					if(typeof(s_output)=='string'){
@@ -722,11 +723,18 @@ W.GraphView=function(id,attrs){
 	}
 	//test code-editor-saved class files
 	if(cache.m_tested_save_time!=UI.g_ce_save_time){
+		var classes_to_rebuild={};
 		for(var sname in cache.m_classes_by_name){
 			var holder=cache.m_classes_by_name[sname];
 			if(holder&&holder.m_file_save_time!=(UI.g_ce_file_save_time[holder.m_file_name]||0)){
 				cache.m_classes_by_name[sname]=undefined;
 				cache.nds={};
+				classes_to_rebuild[sname]=1;
+			}
+		}
+		for(var i=0;i<graph.nds.length;i++){
+			if(classes_to_rebuild[graph.nds[i].m_class]){
+				graph.nds[i].m_need_rebuild=1;
 			}
 		}
 		cache.m_tested_save_time=UI.g_ce_save_time;
@@ -936,52 +944,95 @@ W.GraphView=function(id,attrs){
 				var nd_new=graph.CreateNode(stext_raw);
 				//////////////////////////////////////
 				//score-based auto-connect
-				//enum and test all ports
-				//keys: matched_type_id m_is_selected x
-				var ndcls_new=UI.GetNodeClass(cache,nd_new.m_class);
-				//do auto-layout in the same loop
-				var al_x_max=-1e10,al_y_avg=0,al_n=0;
-				for(var pi=0;pi<ndcls_new.m_ports.length;pi++){
-					var port_pi=ndcls_new.m_ports[pi];
-					if(port_pi.dir!='output'){continue;}
-					var type_ordering={};
-					for(var i=0;i<port_pi.type.length;i++){
-						type_ordering[port_pi.type[i]]=i+1;
+				//better selection key - use "distance-to-selection"
+				var node_map={};
+				var es_uni=[];
+				var Q=[];
+				var dist_to_sel=[];
+				for(var i=0;i<graph.nds.length;i++){
+					if(graph.nds[i].m_is_selected){
+						Q.push(i);
+						dist_to_sel[i]=0;
 					}
-					var type_key_best=1e9;
-					var port_best=undefined;
-					for(var i=0;i<graph.nds.length;i++){
-						var ndi=graph.nds[i];
-						var ndcls=UI.GetNodeClass(cache,ndi.m_class);
-						var type_key=1e10;
-						var id_best=undefined;
-						for(var j=0;j<ndcls.m_ports.length;j++){
-							var port_j=ndcls.m_ports[j];
-							var type_j=port_j.type;
-							if(port_j.dir!='input'){continue;}
-							for(var tj=0;tj<type_j.length;tj++){
-								if(type_key>type_ordering[type_j[tj]]+tj){
-									type_key=type_ordering[type_j[tj]]+tj;
-									id_best=port_j.id;
-								}
+					node_map[graph.nds[i].__id__]=i;
+					es_uni[i]=[];
+				}
+				for(var i=0;i<graph.es.length;i++){
+					var e=graph.es[i];
+					var v0=node_map[e.id0];
+					var v1=node_map[e.id1];
+					es_uni[v0].push(v1);
+					es_uni[v1].push(v0);
+				}
+				//BFS for dist-to-sel
+				var head=0;
+				for(var dist=0;head<Q.length;dist++){
+					for(var tail=Q.length;head<tail;head++){
+						var v0=Q[head];
+						var vs_next=es_uni[v0];
+						for(var i=0;i<vs_next.length;i++){
+							var v1=vs_next[i];
+							if(dist_to_sel[v1]==undefined){
+								dist_to_sel[v1]=dist+1;
+								Q.push(v1);
 							}
 						}
-						if(id_best&&(type_key_best>type_key||type_key_best==type_key&&(
-						port_best.nd.m_is_selected<ndi.m_is_selected||port_best.nd.m_is_selected<ndi.m_is_selected&&(
-						port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y)))){
-							type_key_best=type_key;
-							port_best={nd:ndi,port:id_best};
-						}
 					}
-					if(port_best){
-						graph.es.push({
-							id0:nd_new.__id__, port0:port_pi.id,
-							id1:port_best.nd.__id__, port1:port_best.port,
-						})
-						var cache_item=UI.GetNodeCache(cache,port_best.nd);
-						al_x_max=Math.max(al_x_max,port_best.nd.x+cache_item.m_w);
-						al_y_avg+=port_best.nd.y;
-						al_n++;
+				}
+				//for the unconnected...
+				for(var i=0;i<graph.nds.length;i++){
+					if(dist_to_sel[i]==undefined){
+						dist_to_sel[i]=graph.nds.length;
+					}
+				}
+				//enum and test all ports
+				//keys: matched_type_id selection key x
+				//do auto-layout in the same loop
+				var ndcls_new=UI.GetNodeClass(cache,nd_new.m_class);
+				if(ndcls_new&&ndcls_new.m_ports){
+					var al_x_max=-1e10,al_y_avg=0,al_n=0;
+					for(var pi=0;pi<ndcls_new.m_ports.length;pi++){
+						var port_pi=ndcls_new.m_ports[pi];
+						if(port_pi.dir!='output'){continue;}
+						var type_ordering={};
+						for(var i=0;i<port_pi.type.length;i++){
+							type_ordering[port_pi.type[i]]=i+1;
+						}
+						var type_key_best=1e9;
+						var port_best=undefined;
+						for(var i=0;i<graph.nds.length;i++){
+							var ndi=graph.nds[i];
+							var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+							var type_key=1e10;
+							var id_best=undefined;
+							for(var j=0;j<ndcls.m_ports.length;j++){
+								var port_j=ndcls.m_ports[j];
+								var type_j=port_j.type;
+								if(port_j.dir!='input'){continue;}
+								for(var tj=0;tj<type_j.length;tj++){
+									if(type_key>type_ordering[type_j[tj]]+tj){
+										type_key=type_ordering[type_j[tj]]+tj;
+										id_best=port_j.id;
+									}
+								}
+							}
+							if(id_best&&(type_key_best>type_key||type_key_best==type_key&&(
+							dist_to_sel[port_best.ndid]>dist_to_sel[i]||dist_to_sel[port_best.ndid]==dist_to_sel[i]&&(
+							port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y)))){
+								type_key_best=type_key;
+								port_best={nd:ndi,ndid:i,port:id_best};
+							}
+						}
+						if(port_best){
+							graph.es.push({
+								id0:nd_new.__id__, port0:port_pi.id,
+								id1:port_best.nd.__id__, port1:port_best.port,
+							})
+							var cache_item=UI.GetNodeCache(cache,port_best.nd);
+							al_x_max=Math.max(al_x_max,port_best.nd.x+cache_item.m_w);
+							al_y_avg+=port_best.nd.y;
+							al_n++;
+						}
 					}
 				}
 				if(al_n){
@@ -1002,6 +1053,10 @@ W.GraphView=function(id,attrs){
 					nd_new.x=x_y_max;
 					nd_new.y=y_max+8;
 				}
+				for(var i=0;i<graph.nds.length;i++){
+					graph.nds[i].m_is_selected=0;
+				}
+				nd_new.m_is_selected=1;
 				obj.m_temp_ui=undefined;
 				graph.SignalEdit([nd_new]);
 				UI.Refresh()
@@ -1028,14 +1083,14 @@ W.GraphView=function(id,attrs){
 	menu_run.AddNormalItem({
 		text:"Build &graph",key:"CTRL+B",
 		enable_hotkey:1,action:function(){
-			var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/build'
+			var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/../build'
 			IO.CreateDirectory(sdir)
 			this.graph.Build(sdir,this.cache,0)
 		}.bind(obj)})
 	menu_run.AddNormalItem({
 		text:"R&ebuild graph",key:"CTRL+SHIFT+B",
 		enable_hotkey:1,action:function(){
-			var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/build'
+			var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/../build'
 			IO.CreateDirectory(sdir)
 			this.graph.Build(sdir,this.cache,1)
 		}.bind(obj)})
@@ -1146,8 +1201,8 @@ UI.OpenGraphTab=function(file_name){
 ///////////////////////////////////////
 //ui panel
 var g_panel_ui_widgets={
-	//this is not a prototype... yet
-	editbox:function(x,y,w,h){
+	//this is not a class prototype... yet
+	editbox:function(obj_gview, x,y,w,h){
 		var style=UI.default_styles.graph_param_panel.ui_style;
 		var id0=this.nd.__id__+'='+this.port;
 		W.EditBox(id0,{
@@ -1155,7 +1210,7 @@ var g_panel_ui_widgets={
 			value:this.nd.m_ui_values[this.port],
 			OnChange:function(value){
 				this.nd.m_ui_values[this.port]=value;
-				//todo: m_need_rebuild, undo, cache invalidation
+				obj_gview.graph.SignalEdit([this.nd]);
 				UI.Refresh();
 			}.bind(this)
 		});
@@ -1195,7 +1250,7 @@ W.ParamPanelPage=function(id,attrs){
 				var dim=W.Text("",{x:obj.x+16,y:y_current+dy_label,font:style.font_label,text:item_i.name,color:style.widget_color});
 				var fwidget=g_panel_ui_widgets[item_i.ui[0].toLowerCase()];
 				if(fwidget){
-					fwidget.call(item_i,obj.x+16+dim.w+8,y_current,obj.w-24-dim.w-16,style.spacing_widget);
+					fwidget.call(item_i,obj.graphview, obj.x+16+dim.w+8,y_current,obj.w-24-dim.w-16,style.spacing_widget);
 				}
 				y_current+=style.spacing_widget;
 			}
