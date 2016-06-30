@@ -11,6 +11,7 @@ var GRACEFUL_WORD_SIZE=256;
 var MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT=256;
 var MAX_ALLOWED_INDENTATION=20;//has to match the similarly-named const in code-editor.jc
 var MAX_HIGHLIGHTED_MATCHES=1024;
+var MAX_HISTORY_ITEMS=20;
 
 UI.m_code_editor_persistent_members_doc=[
 	"m_language_id",
@@ -1749,7 +1750,7 @@ var find_context_prototype={
 		var renderer=doc.GetRenderer();
 		var bk=renderer.m_enable_hidden;
 		renderer.m_enable_hidden=((this.m_flags&UI.SEARCH_FLAG_HIDDEN)?0:1);
-		this.m_current_visual_y=doc.ed.XYFromCcnt(this.GetMatchCcnt(id,0)).y-fitem_current.scroll_y+fitem_current.visual_y
+		this.m_current_visual_y=(doc.ed.XYFromCcnt(this.GetMatchCcnt(id,0))||{y:0}).y-fitem_current.scroll_y+fitem_current.visual_y
 		renderer.m_enable_hidden=bk;
 		////////////////////
 		var hc=this.m_hfont;
@@ -4406,6 +4407,9 @@ W.FileBrowserPage=function(id,attrs){
 						hl_ranges.push(pj,pj+hist_keywords[j].length)
 					}
 					if(is_invalid){continue;}
+					if(files.length>=MAX_HISTORY_ITEMS){
+						continue;
+					}
 					files.push({name_to_find:fn_i, relevance:FILE_RELEVANCE_BASE_SCORE,hist_ord:i,
 						history_hl_ranges:hl_ranges})
 				}
@@ -4793,7 +4797,28 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 			if(IO.FileExists(fn)){return fn}
 		}
 	}
-	return ''
+	//all paths ever mentioned
+	if(!UI.g_all_paths_ever_mentioned){
+		UI.g_all_paths_ever_mentioned=[];
+		var hist=UI.m_ui_metadata["<history>"];
+		var arv={};
+		for(var i=hist.length-1;i>=0;i--){
+			var fn=hist[i];
+			var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
+			if(!arv[fn_path]){
+				arv[fn_path]=1;
+				UI.g_all_paths_ever_mentioned.push(fn_path);
+			}
+		}
+	}
+	var paths=UI.g_all_paths_ever_mentioned;
+	for(var i=0;i<paths.length;i++){
+		var fn=paths[i]+'/'+fn_include
+		if(IO.FileExists(fn)){
+			return fn;
+		}
+	}
+	return '';
 }
 
 var MAX_PARSABLE_FCALL=4096
