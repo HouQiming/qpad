@@ -576,8 +576,10 @@ W.graphview_prototype={
 		}
 		if(best_eid==undefined){
 			//bg dragging
-			//todo: drag-sel
-			this.m_drag_ctx={x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.graph.tr))};
+			this.m_drag_ctx={mode:"translation",x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.graph.tr))};
+			if(event.button==UI.SDL_BUTTON_LEFT){
+				this.m_drag_ctx.mode="selection";
+			}
 		}else{
 			//we've got an edge
 			var e=this.graph.es[best_eid];
@@ -589,7 +591,7 @@ W.graphview_prototype={
 			}
 			if(!(pid0>=0&&pid1>=0)){
 				//error out
-				this.m_drag_ctx={x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.graph.tr))};
+				this.m_drag_ctx={mode:"translation",x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.graph.tr))};
 			}else{
 				var pos0=this.m_proxy_ports[pid0];
 				var pos1=this.m_proxy_ports[pid1];
@@ -614,13 +616,36 @@ W.graphview_prototype={
 	},
 	OnMouseMove:function(event){
 		if(!this.m_drag_ctx){return;}
-		var ndi=this.nd;
-		this.graph.tr.trans[0]=this.m_drag_ctx.tr.trans[0]+ (event.x-this.m_drag_ctx.x);
-		this.graph.tr.trans[1]=this.m_drag_ctx.tr.trans[1]+ (event.y-this.m_drag_ctx.y);
+		if(this.m_drag_ctx.mode=='translation'){
+			this.graph.tr.trans[0]=this.m_drag_ctx.tr.trans[0]+ (event.x-this.m_drag_ctx.x);
+			this.graph.tr.trans[1]=this.m_drag_ctx.tr.trans[1]+ (event.y-this.m_drag_ctx.y);
+		}else if(this.m_drag_ctx.mode=='selection'){
+			var nds=this.graph.nds;
+			var cache=this.cache;
+			var x0=(Math.min(this.m_drag_ctx.x, event.x)-this.x)/this.graph.tr.scale;
+			var y0=(Math.min(this.m_drag_ctx.y, event.y)-this.y)/this.graph.tr.scale;
+			var x1=(Math.max(this.m_drag_ctx.x, event.x)-this.x)/this.graph.tr.scale;
+			var y1=(Math.max(this.m_drag_ctx.y, event.y)-this.y)/this.graph.tr.scale;
+			this.m_drag_ctx.m_sel_rect=[x0,y0,x1,y1];
+			for(var i=0;i<nds.length;i++){
+				var ndi=nds[i];
+				var cache_item=UI.GetNodeCache(cache,ndi);
+				var ndi_x0=cache_item.m_rects[1].x;
+				var ndi_y0=cache_item.m_rects[1].y;
+				var ndi_x1=cache_item.m_rects[1].x+cache_item.m_rects[1].w;
+				var ndi_y1=cache_item.m_rects[1].y+cache_item.m_rects[1].h;
+				if(x0<=ndi_x0&&ndi_x1<=x1&&y0<=ndi_y0&&ndi_y1<=y1){
+					ndi.m_is_selected=1;
+				}else{
+					ndi.m_is_selected=0;
+				}
+			}
+		}
 		UI.Refresh();
 	},
 	OnMouseUp:function(event){
 		if(!this.m_drag_ctx){return;}
+		this.OnMouseMove(event);
 		this.m_drag_ctx=undefined;
 		UI.ReleaseMouse(this);
 	},
@@ -805,7 +830,7 @@ W.GraphView=function(id,attrs){
 					item_i.x=x+item_i.dx;
 					item_i.y=y+item_i.dy;
 					UI.RoundRect({
-						x:item_i.x+item_i.round,y:item_i.y,w:item_i.w-item_i.round*2,h:item_i.round,round:item_i.round,
+						x:item_i.x+item_i.round,y:item_i.y,w:item_i.w-item_i.round*2,h:obj.node_style.node_rebuild_bar_height,round:item_i.round,
 						color:obj.node_style.node_selection_color,
 					});
 				}
@@ -879,6 +904,15 @@ W.GraphView=function(id,attrs){
 			}
 		}
 	});
+	if(obj.m_drag_ctx&&obj.m_drag_ctx.m_sel_rect){
+		var rc=obj.m_drag_ctx.m_sel_rect;
+		UI.RoundRect({
+			x:rc[0],y:rc[1],w:rc[2]-rc[0],h:rc[3]-rc[1],
+			color:obj.node_style.dragsel_bgcolor,
+			border_color:obj.node_style.dragsel_border_color,
+			border_width:obj.node_style.dragsel_border_width,
+		})
+	}
 	UI.PopSubWindow()
 	////////////
 	//render the temp UI - add-node edit

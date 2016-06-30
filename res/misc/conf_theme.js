@@ -1151,9 +1151,14 @@ UI.CustomTheme=function(){
 				node_round:6,
 				node_color_default:0xffffffff,
 				node_selection_color:0xff2ca033,
-				node_selection_width:2,
+				node_selection_width:4,
+				node_rebuild_bar_height:3,
 				shadow_color:C_shadow,
 				shadow_size:6,
+				//////////
+				dragsel_bgcolor:L?(C&0x55ffffff):(C_raw&0x55ffffff),
+				dragsel_border_color:C,
+				dragsel_border_width:0,
 			},
 			edge_style:{
 				color:0xff2ca033,

@@ -265,7 +265,7 @@ Language.Register({
 		var kwset=lang.DefineKeywordSet("color_symbol");
 		var keywords={
 			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined','yield','await'],
-			'type':['typeof','var','void','boolean','byte','int','short','char','double','long','float'],
+			'type':['typeof','var','let','void','boolean','byte','int','short','char','double','long','float'],
 		};
 		for(var k in keywords){
 			kwset.DefineKeywords("color_"+k,keywords[k])
@@ -345,7 +345,7 @@ Language.Register({
 		kwset.DefineKeywords("color_keyword",[
 			'script',
 			'break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','window','document'])
-		kwset.DefineKeywords("color_type",['typeof','var','void','boolean','byte','int','short','char','double','long','float'])
+		kwset.DefineKeywords("color_type",['typeof','var','let','void','boolean','byte','int','short','char','double','long','float'])
 		kwset.DefineWordColor("color2")
 		kwset.DefineWordType("color_number","0-9")
 		lang.SetKeyDeclsBaseColor("color2")
@@ -805,7 +805,7 @@ UI.RegisterOutputParser('(.*?):([0-9]+),([0-9]+)-(([0-9]+),)?([0-9]+): (.*)\\(([
 });
 
 //vc
-UI.RegisterOutputParser('[ \t]*(.*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.+)',7,function(matches){
+UI.RegisterOutputParser('[ \t]*([^ \t].*)[ \t]*\\(([0-9]+)\\)[ \t]*:?[ \t]*(fatal )?((error)|(warning))[ \t]+C[0-9][0-9][0-9][0-9][ \t]*:[ \t]*(.+)',7,function(matches){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	var message=matches[7]
@@ -857,7 +857,7 @@ UI.RegisterOutputParser('[ \t]*at[ \t]*(.*):([0-9]+):([0-9]+)',3,function(matche
 	return err
 });
 
-UI.RegisterOutputParser('[ \t]*at[ \t]*\\[.*\\] \\((.*):([0-9]+)\\)[ a-zA-Z]*',2,function(matches){
+UI.RegisterOutputParser('[ \t]*at[ \t]*[^ ]* \\((.*):([0-9]+)\\)[ a-zA-Z]*',2,function(matches){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	//var cola=parseInt(matches[3])
@@ -3190,11 +3190,11 @@ UI.RegisterEditorPlugin(function(){
 				return smatch.toLowerCase();
 			})})
 		menu_convert.AddNormalItem({text:"Line ending to &DOS",action:
-			fsmart_replace.bind(this,"\r?\n",function(smatch){
+			fsmart_replace.bind(this,"\r*\n",function(smatch){
 				return "\r\n"
 			})})
 		menu_convert.AddNormalItem({text:"Line ending to Uni&x",action:
-			fsmart_replace.bind(this,"\r?\n",function(smatch){
+			fsmart_replace.bind(this,"\r+\n",function(smatch){
 				return "\n";
 			})})
 		menu_convert.AddSeparator();
