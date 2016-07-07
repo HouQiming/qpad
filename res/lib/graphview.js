@@ -97,6 +97,28 @@ UI.GetNodeClass=function(cache,sname){
 
 //////////////////////////
 //the graph class
+var g_edge_formats={
+	oneline:function(arr_output,s_input){
+		return s_input.replace(/\r?\n[ \t]*/g,'');
+	},
+	indented:function(arr_output,s_input){
+		var s_target_indent='';
+		var s_context=arr_output.length?arr_output[arr_output.length-1]:'';
+		var p_newline=s_context.lastIndexOf('\n');
+		if(p_newline>0){
+			var match=s_context.substr(p_newline+1).match(/[ \t]+/);
+			s_target_indent=(match&&match[0]||'');
+		}
+		if(s_input&&s_input[s_input.length-1]=='\n'){
+			s_input=s_input.substr(0,s_input.length-1);
+		}
+		if(s_input&&s_target_indent){
+			return UI.ED_GetClipboardTextSmart(s_target_indent,s_input);
+		}else{
+			return s_input;
+		} 
+	},
+};
 var g_per_run_id=0;
 var graph_prototype={
 	SignalEdit:function(nds_rebuild){
@@ -189,7 +211,12 @@ var graph_prototype={
 		}
 		var port_value_map=[];
 		for(var i=0;i<n;i++){
-			port_value_map[i]={};
+			var bc_i=this.nds[i].m_build_cache;
+			if(!bc_i){
+				bc_i={};
+				this.nds[i].m_build_cache=bc_i;
+			}
+			port_value_map[i]=bc_i;
 		}
 		for(var i=0;i<Q.length;i++){
 			var v0=Q[i];
@@ -206,33 +233,37 @@ var graph_prototype={
 			ndi.m_need_rebuild=0;
 			if(ndcls){
 				var pvmap_v0=port_value_map[v0];
-				//gather connected input
-				var es_v0=es_gather[v0];
-				es_v0.sort(function(e0,e1){return this.nds[e0.v0].y<this.nds[e1.v0].y;}.bind(this))
-				for(var j=0;j<es_v0.length;j++){
-					var s_output=port_value_map[es_v0[j].v0][es_v0[j].port0];
-					if(typeof(s_output)=='string'){
-						var s_port1=es_v0[j].port1;
-						var ss_input_v0=pvmap_v0[s_port1];
-						if(!ss_input_v0){ss_input_v0=[];pvmap_v0[s_port1]=ss_input_v0;}
-						ss_input_v0.push(s_output);
-					}
-				}
-				//fill dangling ports with m_ui_values or empty array
-				for(var j=0;j<ndcls.m_ports.length;j++){
-					var id=ndcls.m_ports[j].id;
-					if(ndcls.m_ports[j].dir=='input'&&!pvmap_v0[id]){
-						var s_ui_value=ndi.m_ui_values[id];
-						if(s_ui_value){
-							pvmap_v0[id]=[s_ui_value];
-						}else{
-							pvmap_v0[id]=[];
+				if(need_build_i){
+					//wipe the build cache
+					pvmap_v0={};
+					port_value_map[v0]=pvmap_v0;
+					ndi.m_build_cache=pvmap_v0;
+					//gather connected input
+					var es_v0=es_gather[v0];
+					es_v0.sort(function(e0,e1){return this.nds[e0.v0].y<this.nds[e1.v0].y;}.bind(this))
+					for(var j=0;j<es_v0.length;j++){
+						var s_output=port_value_map[es_v0[j].v0][es_v0[j].port0];
+						if(typeof(s_output)=='string'){
+							var s_port1=es_v0[j].port1;
+							var ss_input_v0=pvmap_v0[s_port1];
+							if(!ss_input_v0){ss_input_v0=[];pvmap_v0[s_port1]=ss_input_v0;}
+							ss_input_v0.push(s_output);
 						}
 					}
-				}
-				//run the implementation to fill the outputs
-				//inputs are arrays, outputs are strings
-				if(need_build_i){
+					//fill dangling ports with m_ui_values or empty array
+					for(var j=0;j<ndcls.m_ports.length;j++){
+						var id=ndcls.m_ports[j].id;
+						if(ndcls.m_ports[j].dir=='input'&&!pvmap_v0[id]){
+							var s_ui_value=ndi.m_ui_values[id];
+							if(s_ui_value){
+								pvmap_v0[id]=[s_ui_value];
+							}else{
+								pvmap_v0[id]=[];
+							}
+						}
+					}
+					//run the implementation to fill the outputs
+					//inputs are arrays, outputs are strings
 					if(ndcls.m_script){
 						try{
 							ndcls.m_script.call(null,pvmap_v0,pvmap_v0);
@@ -244,6 +275,13 @@ var graph_prototype={
 						for(var id in pvmap_v0){
 							pvmap_v0_s[id]=pvmap_v0[id].join('');
 						}
+						var output_formats={};
+						for(var j=0;j<ndcls.m_ports.length;j++){
+							var port_j=ndcls.m_ports[j];
+							if(port_j.dir=='input'&&port_j.format){
+								output_formats[port_j.id]=port_j.format;
+							}
+						}
 						for(var j=0;j<ndcls.m_blocks.length;j+=2){
 							var id=ndcls.m_blocks[j];
 							var blocks_j=ndcls.m_blocks[j+1];
@@ -251,7 +289,15 @@ var graph_prototype={
 							for(var k=0;k<blocks_j.length;k++){
 								var s_block_jk=blocks_j[k];
 								if(k&1){
+									var f_format=output_formats[s_block_jk];
+									if(f_format){
+										f_format=g_edge_formats[f_format];
+									}
 									s_block_jk=pvmap_v0_s[s_block_jk];
+									if(f_format){
+										//format input ports
+										s_block_jk=f_format(blocks_ret,s_block_jk);
+									}
 								}
 								blocks_ret.push(s_block_jk);
 							}

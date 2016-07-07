@@ -1,1 +1,81 @@
-{"cells":[{"m_language":"Windows BAT","m_text_in":"@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n","m_text_out":"","m_cell_id":0,"m_completion_time":[2016,6,2,14,47,58,0],"m_has_any_error":0,"m_current_path":"c:/tp/z","m_button_name":"Debug"},{"m_language":"Markdown","m_text_in":"# TODO LIST\nrebuild issues - have to *cache* the previous build outputs\nmake newly-created classes connect to all dangling in-ports on selected nodes\n\"installing npm packages\" prompt\nport coloring\n\tneed rect-port tagging\n\tUI-ed\n\tunconnected\n\tnormal\n\thighlight during dragging\nbetter port proxy when dragging\nmodule metadata\n\tper-module concepts\n\t\tconflict / search\n\t\tlinks\n\tdefault values for ports\n\t\tfunction prototype and ...\n\t\tor not ports - JSON-like options:{\n\t\t\tmethod:'POST',\n\t\t\turi:url,\n\t\t\tbody:Buffer.concat(buf_package),\n\t\t\tencoding:null,\n\t\t}\n\t@ref=\n\t\tfor in-port default value\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nautoconnect\ngroup to subgraph\n\tdoesn't have to be actual files, could be a simple display trick\n\tinput / output connecting / renaming\n\tuse the current port renaming mechanism\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\ndup/copy/paste\nvisual indicator for need-to-build-ness\n\talpha?\ndrag-from-port-to-space: pop out an add node window?\n\twe have multiple ports...\n\tbut that's easier to remember than tab, and can give autoconnect hint...\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n","m_text_out":"","m_cell_id":1,"m_has_any_error":0,"m_completion_time":[2016,1,11,22,42,45,5]},{"m_language":"Markdown","m_text_in":"Search result","m_text_out":"c:/tp/z/res/lib/help_page.js:15126..15136: RunProcess\nc:/tp/z/res/main.js:12487..12497: RunProcess\nc:/tp/z/res/main.js:12598..12608: RunProcess\nc:/tp/z/res/main.js:13060..13070: RunProcess\nc:/tp/z/zmain.jc:20775..20785: RunProcess\n","m_has_any_error":1,"m_cell_id":2},{"m_language":"Windows BAT","m_text_in":"@echo off\nrem build script for 'c:/tp/qpad/qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 c:/tp/qpad/qpad.jc\njc -brelease -awin32 c:/tp/qpad/qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n","m_text_out":"s7main.c\r\ns7res.c\r\n   Creating library c:/tp/qpad/bin/win64_release/qpad.lib and object c:/tp/qpad/bin/win64_release/qpad.exp\r\ns7main.c\r\ns7res.c\r\n   Creating library c:/tp/qpad/bin/win32_release/qpad.lib and object c:/tp/qpad/bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 5188608 bytes (5067 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1826288 bytes (1784 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 5452800 bytes (5325 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1906831 bytes (1863 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n","m_cell_id":3,"m_has_any_error":0,"m_current_path":"c:/tp/qpad","m_completion_time":[2016,5,19,23,0,31,1],"m_button_name":"Release"},{"m_language":"Unix Shell Script","m_text_in":"#!/bin/sh\n#[button: Translate]\ncd /c/tp/qpad/res\ngrep -ERoh text:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * > ../build/translation.txt\ngrep -ERoh UI\\._\\\\\\(\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\)\\\\\\) * >> ../build/translation.txt\ngrep -ERoh UI\\.Format\\\\\\(\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\), * >> ../build/translation.txt\ngrep -ERoh tooltip:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * >> ../build/translation.txt\ngrep -ERoh ,name:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * >> ../build/translation.txt\n","m_text_out":"","m_cell_id":4,"m_has_any_error":0,"m_current_path":"c:/tp/qpad","m_completion_time":[2016,5,5,18,49,13,1],"m_button_name":"Translate"}]}
+{
+ "cells": [
+  {
+   "m_language": "Windows BAT",
+   "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n",
+   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\n",
+   "m_cell_id": 0,
+   "m_completion_time": [
+    2016,
+    6,
+    6,
+    16,
+    17,
+    34,
+    4
+   ],
+   "m_has_any_error": 0,
+   "m_current_path": "c:/tp/z",
+   "m_button_name": "Debug"
+  },
+  {
+   "m_language": "Markdown",
+   "m_text_in": "# TODO LIST\nmake newly-created classes connect to all dangling in-ports on selected nodes\nport coloring\n\tneed rect-port tagging\n\tUI-ed\n\tunconnected\n\tnormal\n\thighlight during dragging\ngrey out disabled edges\nbetter port proxy when dragging\ngroup to subgraph\n\tdoesn't have to be actual files, could be a simple display trick\n\t\tbut we could save it to files for reuse\n\t\tthose files are reloaded like node classes\n\t\tin-graph groups would still need dots for port definition\n\t\t\tauto-create them on CTRL+G\n\tinput / output connecting / renaming\n\tuse the current port renaming mechanism\n\tdummy-dot nodes for specifying group ins/outs\n\t\tit's not a node, it connects all ins to all outs\nmodule metadata\n\tper-module concepts\n\t\tconflict / search\n\t\tlinks\n\tdefault values for ports\n\t\tfunction prototype and ...\n\t\tor not ports - JSON-like options:{\n\t\t\tmethod:'POST',\n\t\t\turi:url,\n\t\t\tbody:Buffer.concat(buf_package),\n\t\t\tencoding:null,\n\t\t}\n\t@ref=\n\t\tfor in-port default values\n\t\tor just write values for in-ports like the out-ports\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\ndup/copy/paste\nvisual indicator for need-to-build-ness\n\talpha?\ndrag-from-port-to-space: pop out an add node window?\n\twe have multiple ports...\n\tbut that's easier to remember than tab, and can give autoconnect hint...\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
+   "m_text_out": "",
+   "m_cell_id": 1,
+   "m_has_any_error": 0,
+   "m_completion_time": [
+    2016,
+    1,
+    11,
+    22,
+    42,
+    45,
+    5
+   ]
+  },
+  {
+   "m_language": "Markdown",
+   "m_text_in": "Search result",
+   "m_text_out": "c:/tp/z/res/lib/help_page.js:15126..15136: RunProcess\nc:/tp/z/res/main.js:12487..12497: RunProcess\nc:/tp/z/res/main.js:12598..12608: RunProcess\nc:/tp/z/res/main.js:13060..13070: RunProcess\nc:/tp/z/zmain.jc:20775..20785: RunProcess\n",
+   "m_has_any_error": 1,
+   "m_cell_id": 2
+  },
+  {
+   "m_language": "Windows BAT",
+   "m_text_in": "@echo off\nrem build script for 'c:/tp/qpad/qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 c:/tp/qpad/qpad.jc\njc -brelease -awin32 c:/tp/qpad/qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
+   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library c:/tp/qpad/bin/win64_release/qpad.lib and object c:/tp/qpad/bin/win64_release/qpad.exp\r\ns7main.c\r\ns7res.c\r\n   Creating library c:/tp/qpad/bin/win32_release/qpad.lib and object c:/tp/qpad/bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4299776 bytes (4199 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1545262 bytes (1510 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4562432 bytes (4456 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1625666 bytes (1588 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
+   "m_cell_id": 3,
+   "m_has_any_error": 0,
+   "m_current_path": "c:/tp/qpad",
+   "m_completion_time": [
+    2016,
+    6,
+    6,
+    15,
+    6,
+    0,
+    4
+   ],
+   "m_button_name": "Release"
+  },
+  {
+   "m_language": "Unix Shell Script",
+   "m_text_in": "#!/bin/sh\n#[button: Translate]\ncd /c/tp/qpad/res\ngrep -ERoh text:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * > ../build/translation.txt\ngrep -ERoh UI\\._\\\\\\(\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\)\\\\\\) * >> ../build/translation.txt\ngrep -ERoh UI\\.Format\\\\\\(\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\), * >> ../build/translation.txt\ngrep -ERoh tooltip:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * >> ../build/translation.txt\ngrep -ERoh ,name:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * >> ../build/translation.txt\n",
+   "m_text_out": "",
+   "m_cell_id": 4,
+   "m_has_any_error": 0,
+   "m_current_path": "c:/tp/qpad",
+   "m_completion_time": [
+    2016,
+    5,
+    5,
+    18,
+    49,
+    13,
+    1
+   ],
+   "m_button_name": "Translate"
+  }
+ ]
+}
