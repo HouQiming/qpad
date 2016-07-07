@@ -3,15 +3,15 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n",
-   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\n",
+   "m_text_out": "s7main.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\n",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
     6,
     6,
     16,
-    17,
-    34,
+    32,
+    25,
     4
    ],
    "m_has_any_error": 0,
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\nmake newly-created classes connect to all dangling in-ports on selected nodes\nport coloring\n\tneed rect-port tagging\n\tUI-ed\n\tunconnected\n\tnormal\n\thighlight during dragging\ngrey out disabled edges\nbetter port proxy when dragging\ngroup to subgraph\n\tdoesn't have to be actual files, could be a simple display trick\n\t\tbut we could save it to files for reuse\n\t\tthose files are reloaded like node classes\n\t\tin-graph groups would still need dots for port definition\n\t\t\tauto-create them on CTRL+G\n\tinput / output connecting / renaming\n\tuse the current port renaming mechanism\n\tdummy-dot nodes for specifying group ins/outs\n\t\tit's not a node, it connects all ins to all outs\nmodule metadata\n\tper-module concepts\n\t\tconflict / search\n\t\tlinks\n\tdefault values for ports\n\t\tfunction prototype and ...\n\t\tor not ports - JSON-like options:{\n\t\t\tmethod:'POST',\n\t\t\turi:url,\n\t\t\tbody:Buffer.concat(buf_package),\n\t\t\tencoding:null,\n\t\t}\n\t@ref=\n\t\tfor in-port default values\n\t\tor just write values for in-ports like the out-ports\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\ndup/copy/paste\nvisual indicator for need-to-build-ness\n\talpha?\ndrag-from-port-to-space: pop out an add node window?\n\twe have multiple ports...\n\tbut that's easier to remember than tab, and can give autoconnect hint...\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
+   "m_text_in": "# TODO LIST\nmake newly-created classes connect to all dangling in-ports on selected nodes\nport coloring\n\tneed rect-port tagging\n\tUI-ed\n\tunconnected\n\tnormal\n\thighlight during dragging\nbetter port proxy when dragging\ngroup to subgraph\n\tdoesn't have to be actual files, could be a simple display trick\n\t\tbut we could save it to files for reuse\n\t\tthose files are reloaded like node classes\n\t\tin-graph groups would still need dots for port definition\n\t\t\tauto-create them on CTRL+G\n\tinput / output connecting / renaming\n\tuse the current port renaming mechanism\n\tdummy-dot nodes for specifying group ins/outs\n\t\tit's not a node, it connects all ins to all outs\nmodule metadata\n\tper-module concepts\n\t\tconflict / search\n\t\tlinks\n\tdefault values for ports\n\t\tfunction prototype and ...\n\t\tor not ports - JSON-like options:{\n\t\t\tmethod:'POST',\n\t\t\turi:url,\n\t\t\tbody:Buffer.concat(buf_package),\n\t\t\tencoding:null,\n\t\t}\n\t@ref=\n\t\tfor in-port default values\n\t\tor just write values for in-ports like the out-ports\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\ndup/copy/paste\nvisual indicator for need-to-build-ness\n\talpha?\ndrag-from-port-to-space: pop out an add node window?\n\twe have multiple ports...\n\tbut that's easier to remember than tab, and can give autoconnect hint...\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,

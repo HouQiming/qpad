@@ -935,19 +935,26 @@ W.GraphView=function(id,attrs){
 		}
 		port_pos_map_nd[region.port]=obj.m_proxy_ports[i];
 	}
-	for(var ei=0;ei<graph.es.length;ei++){
-		var e=graph.es[ei];
-		var pos0=port_pos_map[e.id0][e.port0];
-		var pos1=port_pos_map[e.id1][e.port1];
-		if(pos0&&pos1){
-			UI.RenderEdge(pos0.x,pos0.y,pos1.x,pos1.y,obj.edge_style.line_width);
-			obj.m_proxy_edges.push({line:[pos0.x,pos0.y,pos1.x,pos1.y],eid:ei})
+	var edge_vbo=[];
+	for(var pass=0;pass<2;pass++){
+		for(var ei=0;ei<graph.es.length;ei++){
+			var e=graph.es[ei];
+			var pos0=port_pos_map[e.id0][e.port0];
+			var pos1=port_pos_map[e.id1][e.port1];
+			if(pos0&&pos1){
+				var edge_disabled=((pos0.region.nd.m_is_disabled||pos1.region.nd.m_is_disabled)?1:0);
+				if(edge_disabled==pass){
+					UI.RenderEdge(pos0.x,pos0.y,pos1.x,pos1.y,obj.edge_style.line_width);
+					obj.m_proxy_edges.push({line:[pos0.x,pos0.y,pos1.x,pos1.y],eid:ei})
+				}
+			}
 		}
+		edge_vbo[pass]=UI.GetEdgeVBO();
 	}
-	var edge_vbo=UI.GetEdgeVBO();
 	//the GLWidget function will be called multiple times, while the outside part won't
 	UI.GLWidget(function(){
-		UI.FlushEdges(obj.edge_style.color,edge_vbo);
+		UI.FlushEdges(obj.edge_style.color,obj.edge_style.line_width*tr.scale,edge_vbo[0]);
+		UI.FlushEdges(obj.edge_style.color&0x55ffffff,obj.edge_style.line_width*tr.scale,edge_vbo[1]);
 		if(obj.m_temp_ui=="edge"){
 			//rendering edges
 			var pos0=obj.m_temp_ui_desc.v0;
@@ -956,7 +963,7 @@ W.GraphView=function(id,attrs){
 			pos0.y=pos0.region.y-pos0.region.dy+pos0.region.pdy;
 			if(pos1){
 				UI.RenderEdge(pos0.x*tr.scale,pos0.y*tr.scale,pos1.x*tr.scale,pos1.y*tr.scale,obj.edge_style.line_width*tr.scale);
-				UI.FlushEdges((pos1.region?0xffffffff:0x55ffffff)&obj.edge_style.color,UI.GetEdgeVBO());
+				UI.FlushEdges((pos1.region?0xffffffff:0x55ffffff)&obj.edge_style.color,obj.edge_style.line_width*tr.scale,UI.GetEdgeVBO());
 			}
 		}
 	});

@@ -318,14 +318,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ilg=1.f/System.Math.sqrt(ilg)
 		else
 			ilg=0.f
-		ilg*=0.5f*line_width
+		ilg*=0.5f*line_width+1.f
 		Nx*=ilg;Ny*=ilg;
-		g_edge_vbo.push(x0+Nx);g_edge_vbo.push(y0+Ny)
-		g_edge_vbo.push(x1+Nx);g_edge_vbo.push(y1+Ny)
-		g_edge_vbo.push(x1-Nx);g_edge_vbo.push(y1-Ny)
-		g_edge_vbo.push(x0+Nx);g_edge_vbo.push(y0+Ny)
-		g_edge_vbo.push(x1-Nx);g_edge_vbo.push(y1-Ny)
-		g_edge_vbo.push(x0-Nx);g_edge_vbo.push(y0-Ny)
+		g_edge_vbo.push(x0+Nx);g_edge_vbo.push(y0+Ny); g_edge_vbo.push((0.5f*line_width+1.f))
+		g_edge_vbo.push(x1+Nx);g_edge_vbo.push(y1+Ny); g_edge_vbo.push((0.5f*line_width+1.f))
+		g_edge_vbo.push(x1-Nx);g_edge_vbo.push(y1-Ny); g_edge_vbo.push(-(0.5f*line_width+1.f))
+		g_edge_vbo.push(x0+Nx);g_edge_vbo.push(y0+Ny); g_edge_vbo.push((0.5f*line_width+1.f))
+		g_edge_vbo.push(x1-Nx);g_edge_vbo.push(y1-Ny); g_edge_vbo.push(-(0.5f*line_width+1.f))
+		g_edge_vbo.push(x0-Nx);g_edge_vbo.push(y0-Ny); g_edge_vbo.push(-(0.5f*line_width+1.f))
 		return 0
 	}
 	JS_UI["GetEdgeVBO"]=function(JSContext JS){
@@ -335,23 +335,27 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	}
 	JS_UI["FlushEdges"]=function(JSContext JS){
 		auto C=JS.Param(0).as(int)
-		auto g_edge_vbo=JS.Param(1).as(float[])
+		auto line_width=JS.Param(1).as(float)*Gui2D.detail.g_renderer.m_pixels_per_unit
+		auto g_edge_vbo=JS.Param(2).as(float[])
 		if !g_edge_vbo||!g_edge_vbo.n:
 			return 0
 		if !g_vbo_tech:
 			g_vbo_tech=new GLTechnique
+			g_vbo_tech.SetVarying("float dist")
 			g_vbo_tech.SetVertexShader("
 				void main(){
-					vec2 P_scr=P*scale;
+					vec2 P_scr=P.xy*scale;
 					gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
+					dist=P.z;
 				}")
 			g_vbo_tech.SetFragmentShader("
 				void main(){
-					gl_FragColor=vec4(pow(C.xyz,vec3(gamma)),C.w);
+					float coverage=min(max(dist+0.5,-half_line_width),half_line_width)-min(max(dist-0.5,-half_line_width),half_line_width);
+					gl_FragColor=vec4(pow(C.xyz,vec3(gamma)),C.w*coverage);
 				}")
 		prev_viewport=new int[4]
 		glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
-		BATCH=65536/sizeof(float)/12
+		BATCH=65536/(sizeof(float)*3 *6)
 		for i=0:BATCH:g_edge_vbo.n-1
 			real_batch=min(g_edge_vbo.n-i,BATCH)
 			ref=g_edge_vbo[i:i+real_batch-1].ConvertToAsBinary(i32)
@@ -360,9 +364,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if !vbo:break
 			g_vbo_tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
 			g_vbo_tech.SetUniform("gamma",Gui2D.detail.g_renderer.m_gamma)
+			g_vbo_tech.SetUniform("half_line_width",0.5f*line_width);
 			g_vbo_tech.SetUniformColor("C",C)
-			g_vbo_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(float),0L)
-			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch>>1)
+			g_vbo_tech.SetVertexPointer("P", 3,GL_FLOAT,0, 3*sizeof(float),0L)
+			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch/3)
 		return 0
 	}
 });
