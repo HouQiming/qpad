@@ -1161,7 +1161,7 @@ UI.CustomTheme=function(){
 				dragsel_border_width:0,
 			},
 			edge_style:{
-				color:0xff2ca033,
+				color:0xff444444,
 				line_width:2,
 				region_width:12,
 				snapping_distance:12,

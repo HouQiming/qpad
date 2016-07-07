@@ -543,6 +543,7 @@ UI.GetNodeCache=function(cache,ndi){
 				w:wr,h:style.port_h,
 				round:style.port_round,
 				color:port_i.color||style.port_color,
+				port_ref:port_i,
 			});
 			cache_item.m_regions.push({
 				dx:xr,dy:yr,
@@ -550,12 +551,15 @@ UI.GetNodeCache=function(cache,ndi){
 				name:[ndi.__id__,'port',port_i.id].join('_'),
 				nd:ndi,port:port_i.id,dir:port_i.dir,
 				pdx:pxr,pdy:yr+style.port_h*0.5,
+				color:port_i.color||style.port_color,
+				port_ref:port_i,
 				proto:rproto_port,
 			})
 			endpoints[name]={dx:xr+wr,dy:yr+style.port_h*0.5};
 			cache_item.m_texts.push({
 				dx:xr+style.port_padding,dy:yr+port_padding_y,
-				font:style.font_port,text:name,color:style.port_text_color
+				font:style.font_port,text:name,color:style.port_text_color,
+				port_ref:port_i,
 			});
 			yr+=style.port_h;
 		}else{
@@ -565,6 +569,7 @@ UI.GetNodeCache=function(cache,ndi){
 				w:wl,h:style.port_h,
 				round:style.port_round,
 				color:port_i.color||style.port_color,
+				port_ref:port_i,
 			});
 			cache_item.m_regions.push({
 				dx:xl,dy:yl,
@@ -572,12 +577,15 @@ UI.GetNodeCache=function(cache,ndi){
 				name:[ndi.__id__,'port',port_i.id].join('_'),
 				nd:ndi,port:port_i.id,dir:port_i.dir,
 				pdx:pxl,pdy:yl+style.port_h*0.5,
+				color:port_i.color||style.port_color,
+				port_ref:port_i,
 				proto:rproto_port,
 			})
 			endpoints[name]={dx:xl,dy:yl+style.port_h*0.5};
 			cache_item.m_texts.push({
 				dx:xl+(wl-UI.MeasureText(style.font_port,name).w-style.port_padding),dy:yl+port_padding_y,
-				font:style.font_port,text:name,color:style.port_text_color
+				font:style.font_port,text:name,color:style.port_text_color,
+				port_ref:port_i,
 			});
 			yl+=style.port_h;
 		}
@@ -855,7 +863,20 @@ W.GraphView=function(id,attrs){
 	cache.m_degs=degs_map;
 	////////////
 	//render the nodes
+	//when we're connecting, we need to grey out all but type-connectable ones, use the .port tag on renderables
+	var is_connecting_edges=(obj.m_temp_ui=="edge");
 	var big_param_panel=[];
+	var port_ref_drag_v0=undefined;
+	var port_ref_drag_v1=undefined;
+	var type_ref_drag_v0=undefined;
+	if(is_connecting_edges){
+		port_ref_drag_v0=obj.m_temp_ui_desc.v0.region.port_ref;
+		port_ref_drag_v1=obj.m_temp_ui_desc.v1&&obj.m_temp_ui_desc.v1.region&&obj.m_temp_ui_desc.v1.region.port_ref;
+		type_ref_drag_v0=(port_ref_drag_v0&&port_ref_drag_v0.type&&port_ref_drag_v0.type[0]);
+		if(!port_ref_drag_v0){
+			is_connecting_edges=0;
+		}
+	}
 	for(var ni=0;ni<graph.nds.length;ni++){
 		var ndi=graph.nds[ni];
 		var x=ndi.x+tr.trans[0]/tr.scale;
@@ -865,7 +886,20 @@ W.GraphView=function(id,attrs){
 			var item_i=cache_item.m_rects[i];
 			item_i.x=x+item_i.dx;
 			item_i.y=y+item_i.dy;
-			if(i!=1&&ndi.m_is_disabled){item_i.color&=0x55ffffff;}
+			var is_faded=ndi.m_is_disabled;
+			var fade_mask=0x55ffffff;
+			if(is_connecting_edges&&!is_faded){
+				is_faded=1;
+				fade_mask=0x7fffffff;
+				if(item_i.port_ref){
+					if(item_i.port_ref==port_ref_drag_v0||item_i.port_ref==port_ref_drag_v1){
+						is_faded=0;
+					}else if(item_i.port_ref.dir!=port_ref_drag_v0.dir&&item_i.port_ref.type&&item_i.port_ref.type.indexOf(type_ref_drag_v0)>=0){
+						is_faded=0;
+					}
+				}
+			}
+			if(i!=1&&is_faded){item_i.color&=fade_mask;}
 			UI.RoundRect(item_i);
 			item_i.color|=0xff000000;
 			if(i==1){
@@ -875,7 +909,7 @@ W.GraphView=function(id,attrs){
 					item_i.y=y+item_i.dy;
 					UI.RoundRect({
 						x:item_i.x,y:item_i.y,w:item_i.w,h:item_i.h,round:item_i.round,
-						border_color:obj.node_style.node_selection_color,border_width:obj.node_style.node_selection_width,
+						border_color:obj.node_style.node_selection_color&(is_faded?fade_mask:0xffffffff),border_width:obj.node_style.node_selection_width,
 						color:0,
 					});
 				}
@@ -885,7 +919,7 @@ W.GraphView=function(id,attrs){
 					item_i.y=y+item_i.dy;
 					UI.RoundRect({
 						x:item_i.x+item_i.round,y:item_i.y,w:item_i.w-item_i.round*2,h:obj.node_style.node_rebuild_bar_height,round:item_i.round,
-						color:obj.node_style.node_selection_color,
+						color:obj.node_style.node_selection_color&(is_faded?fade_mask:0xffffffff),
 					});
 				}
 			}
@@ -894,7 +928,18 @@ W.GraphView=function(id,attrs){
 			var item_i=cache_item.m_texts[i];
 			item_i.x=x+item_i.dx;
 			item_i.y=y+item_i.dy;
-			if(ndi.m_is_disabled){item_i.color&=0x55ffffff;}
+			var is_faded=ndi.m_is_disabled;
+			//if(is_connecting_edges&&!is_faded){
+			//	is_faded=1;
+			//	if(item_i.port_ref){
+			//		if(item_i.port_ref==port_ref_drag_v0){
+			//			is_faded=0;
+			//		}else if(item_i.port_ref.dir!=port_ref_drag_v0.dir&&item_i.port_ref.type&&item_i.port_ref.type[0]==type_ref_drag_v0){
+			//			is_faded=0;
+			//		}
+			//	}
+			//}
+			if(is_faded){item_i.color&=0x55ffffff;}
 			W.Text('',item_i);
 			item_i.color|=0xff000000;
 			item_i.w=undefined;
@@ -935,26 +980,26 @@ W.GraphView=function(id,attrs){
 		}
 		port_pos_map_nd[region.port]=obj.m_proxy_ports[i];
 	}
-	var edge_vbo=[];
-	for(var pass=0;pass<2;pass++){
-		for(var ei=0;ei<graph.es.length;ei++){
-			var e=graph.es[ei];
-			var pos0=port_pos_map[e.id0][e.port0];
-			var pos1=port_pos_map[e.id1][e.port1];
-			if(pos0&&pos1){
-				var edge_disabled=((pos0.region.nd.m_is_disabled||pos1.region.nd.m_is_disabled)?1:0);
-				if(edge_disabled==pass){
-					UI.RenderEdge(pos0.x,pos0.y,pos1.x,pos1.y,obj.edge_style.line_width);
-					obj.m_proxy_edges.push({line:[pos0.x,pos0.y,pos1.x,pos1.y],eid:ei})
-				}
+	for(var ei=0;ei<graph.es.length;ei++){
+		var e=graph.es[ei];
+		var pos0=port_pos_map[e.id0][e.port0];
+		var pos1=port_pos_map[e.id1][e.port1];
+		if(pos0&&pos1){
+			var edge_disabled=((pos0.region.nd.m_is_disabled||pos1.region.nd.m_is_disabled)?1:0);
+			var C0=pos0.region.color;
+			var C1=pos1.region.color;
+			if(edge_disabled||is_connecting_edges){
+				C0&=0x55ffffff;
+				C1&=0x55ffffff;
 			}
+			UI.RenderEdge(pos0.x,pos0.y,pos1.x,pos1.y,C0,C1,obj.edge_style.line_width);
+			obj.m_proxy_edges.push({line:[pos0.x,pos0.y,pos1.x,pos1.y],eid:ei})
 		}
-		edge_vbo[pass]=UI.GetEdgeVBO();
 	}
+	var edge_vbo=UI.GetEdgeVBO();
 	//the GLWidget function will be called multiple times, while the outside part won't
 	UI.GLWidget(function(){
-		UI.FlushEdges(obj.edge_style.color,obj.edge_style.line_width*tr.scale,edge_vbo[0]);
-		UI.FlushEdges(obj.edge_style.color&0x55ffffff,obj.edge_style.line_width*tr.scale,edge_vbo[1]);
+		UI.FlushEdges(obj.edge_style.line_width*tr.scale,edge_vbo);
 		if(obj.m_temp_ui=="edge"){
 			//rendering edges
 			var pos0=obj.m_temp_ui_desc.v0;
@@ -962,8 +1007,12 @@ W.GraphView=function(id,attrs){
 			pos0.x=pos0.region.x-pos0.region.dx+pos0.region.pdx;
 			pos0.y=pos0.region.y-pos0.region.dy+pos0.region.pdy;
 			if(pos1){
-				UI.RenderEdge(pos0.x*tr.scale,pos0.y*tr.scale,pos1.x*tr.scale,pos1.y*tr.scale,obj.edge_style.line_width*tr.scale);
-				UI.FlushEdges((pos1.region?0xffffffff:0x55ffffff)&obj.edge_style.color,obj.edge_style.line_width*tr.scale,UI.GetEdgeVBO());
+				UI.RenderEdge(
+					pos0.x*tr.scale,pos0.y*tr.scale,pos1.x*tr.scale,pos1.y*tr.scale,
+					pos0.region.color,
+					pos1.region?pos1.region.color:(0x55ffffff&obj.edge_style.color),
+					obj.edge_style.line_width*tr.scale);
+				UI.FlushEdges(obj.edge_style.line_width*tr.scale,UI.GetEdgeVBO());
 			}
 		}
 	});

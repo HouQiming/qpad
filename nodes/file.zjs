@@ -1,5 +1,5 @@
 function(input,output){
-	//@in=name,type:path string,ui:editbox
+	//@in=name,type:path string,ui:editbox,color:0xffb4771f
 	//@out=out_name,type:path string
 	//@in=code,type:code
 	for(var j=0;j<input.name.length;j++){
