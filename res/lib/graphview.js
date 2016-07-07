@@ -195,7 +195,7 @@ var graph_prototype={
 			var v0=Q[i];
 			var ndi=this.nds[v0];
 			var need_build_i=(is_rebuild||ndi.m_need_rebuild);
-			if(!need_build_i){continue;}
+			if(ndi.m_is_disabled){continue;}
 			var ndcls=UI.GetNodeClass(cache,ndi.m_class);
 			//reset/propagate need_rebuild
 			var es_v0=es_topo[v0];
@@ -232,25 +232,31 @@ var graph_prototype={
 				}
 				//run the implementation to fill the outputs
 				//inputs are arrays, outputs are strings
-				if(ndcls.m_script){
-					ndcls.m_script.call(null,pvmap_v0,pvmap_v0);
-				}else if(ndcls.m_blocks){
-					var pvmap_v0_s={};
-					for(var id in pvmap_v0){
-						pvmap_v0_s[id]=pvmap_v0[id].join('');
-					}
-					for(var j=0;j<ndcls.m_blocks.length;j+=2){
-						var id=ndcls.m_blocks[j];
-						var blocks_j=ndcls.m_blocks[j+1];
-						var blocks_ret=[];
-						for(var k=0;k<blocks_j.length;k++){
-							var s_block_jk=blocks_j[k];
-							if(k&1){
-								s_block_jk=pvmap_v0_s[s_block_jk];
-							}
-							blocks_ret.push(s_block_jk);
+				if(need_build_i){
+					if(ndcls.m_script){
+						try{
+							ndcls.m_script.call(null,pvmap_v0,pvmap_v0);
+						}catch(err){
+							console.log(err.stack);
 						}
-						pvmap_v0[id]=blocks_ret.join('');
+					}else if(ndcls.m_blocks){
+						var pvmap_v0_s={};
+						for(var id in pvmap_v0){
+							pvmap_v0_s[id]=pvmap_v0[id].join('');
+						}
+						for(var j=0;j<ndcls.m_blocks.length;j+=2){
+							var id=ndcls.m_blocks[j];
+							var blocks_j=ndcls.m_blocks[j+1];
+							var blocks_ret=[];
+							for(var k=0;k<blocks_j.length;k++){
+								var s_block_jk=blocks_j[k];
+								if(k&1){
+									s_block_jk=pvmap_v0_s[s_block_jk];
+								}
+								blocks_ret.push(s_block_jk);
+							}
+							pvmap_v0[id]=blocks_ret.join('');
+						}
 					}
 				}
 			}
@@ -813,7 +819,9 @@ W.GraphView=function(id,attrs){
 			var item_i=cache_item.m_rects[i];
 			item_i.x=x+item_i.dx;
 			item_i.y=y+item_i.dy;
+			if(i!=1&&ndi.m_is_disabled){item_i.color&=0x55ffffff;}
 			UI.RoundRect(item_i);
+			item_i.color|=0xff000000;
 			if(i==1){
 				if(ndi.m_is_selected){
 					//render selection
@@ -840,7 +848,9 @@ W.GraphView=function(id,attrs){
 			var item_i=cache_item.m_texts[i];
 			item_i.x=x+item_i.dx;
 			item_i.y=y+item_i.dy;
+			if(ndi.m_is_disabled){item_i.color&=0x55ffffff;}
 			W.Text('',item_i);
+			item_i.color|=0xff000000;
 			item_i.w=undefined;
 			item_i.h=undefined;
 		}
@@ -1106,11 +1116,29 @@ W.GraphView=function(id,attrs){
 	}
 	//////////////////
 	var menu_edit=UI.BigMenu("&Edit")
-	menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:1,key:"CTRL+Z",action:function(){
+	menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:UI.nd_focus==obj,key:"CTRL+Z",action:function(){
 		this.Undo()
 	}.bind(obj)})
-	menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:1,key:"SHIFT+CTRL+Z",action:function(){
+	menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:UI.nd_focus==obj,key:"SHIFT+CTRL+Z",action:function(){
 		this.Redo()
+	}.bind(obj)})
+	menu_edit.AddNormalItem({text:"&Disable",icon:"释",enable_hotkey:UI.nd_focus==obj,key:"D",action:function(){
+		var graph=this.graph;
+		var is_all_disabled=1;
+		for(var i=0;i<graph.nds.length;i++){
+			if(graph.nds[i].m_is_selected&&!graph.nds[i].m_is_disabled){
+				is_all_disabled=0;
+			}
+		}
+		var nds_toggled=[];
+		for(var i=0;i<graph.nds.length;i++){
+			if(graph.nds[i].m_is_selected){
+				graph.nds[i].m_is_disabled=!is_all_disabled;
+				nds_toggled.push(graph.nds[i]);
+			}
+		}
+		graph.SignalEdit(nds_toggled);
+		UI.Refresh();
 	}.bind(obj)})
 	menu_edit=undefined;
 	var menu_run=UI.BigMenu("&Run")
@@ -1240,7 +1268,7 @@ var g_panel_ui_widgets={
 		var style=UI.default_styles.graph_param_panel.ui_style;
 		var id0=this.nd.__id__+'='+this.port;
 		W.EditBox(id0,{
-			x:x,y:y,w:w,h:h,font:style.font_widgets,
+			x:x,y:y+4,w:w,h:h-8,font:style.font_widgets,
 			value:this.nd.m_ui_values[this.port],
 			OnChange:function(value){
 				this.nd.m_ui_values[this.port]=value;

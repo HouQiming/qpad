@@ -1192,9 +1192,9 @@ UI.CustomTheme=function(){
 				icon_font:UI.Font(UI.icon_font_name,20),
 				caption_color:L?0xff7f7f7f:0xffaaaaaa,
 				widget_color:L?0xff000000:0xffe8e8e8,
-				spacing_node:12,
-				spacing_caption:24,
-				spacing_widget:28,
+				spacing_node:24,
+				spacing_caption:28,
+				spacing_widget:36,
 			},
 		},
 	};
