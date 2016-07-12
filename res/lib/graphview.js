@@ -36,6 +36,9 @@ var GetMainFileName=function(fname){
 };
 
 UI.GetNodeClass=function(cache,sname){
+	if(typeof(sname)!='string'){
+		return sname;
+	}
 	var holder=cache.m_classes_by_name[sname];
 	if(holder==undefined){
 		holder=null;
@@ -74,8 +77,10 @@ UI.GetNodeClass=function(cache,sname){
 							m_file_name:IO.NormalizeFileName(fs[0]),
 						};
 						holder.m_file_save_time=(UI.g_ce_file_save_time[holder.m_file_name]||0);
+						ndcls.m_port_map={};
 						for(var i=0;i<ndcls.m_ports.length;i++){
 							var port_i=ndcls.m_ports[i];
+							ndcls.m_port_map[port_i.id]=port_i;
 							if(typeof(port_i.type)=="string"){
 								port_i.type=port_i.type.split(' ');
 							}else{
@@ -120,6 +125,153 @@ var g_edge_formats={
 	},
 };
 var g_per_run_id=0;
+var ExpandDots=function(nds,es,is_ungroup){
+	var node_map={};
+	var n=nds.length,m=es.length;
+	var is_dot=[];
+	var dot_dad=[],dot_ins=[],dot_outs=[];
+	for(var i=0;i<nds.length;i++){
+		is_dot[i]=(nds[i].m_class=="__dot__");
+		if(is_dot[i]&&is_ungroup&&!nds[i].m_is_group_dot){
+			is_dot[i]=0;
+		}
+		dot_dad[i]=i;
+		if(is_dot[i]){
+			dot_ins[i]=[];
+			dot_outs[i]=[];
+		}
+		node_map[nds[i].__id__]=i;
+	}
+	var Collapse=function(a){
+		if(dot_dad[a]==a){return a;}
+		var a0=Collapse(dot_dad[a]);
+		dot_dad[a]=a0;
+		return a0;
+	}
+	var es_new=[];
+	for(var i=0;i<m;i++){
+		var e=es[i];
+		var v0=node_map[e.id0];
+		var v1=node_map[e.id1];
+		if(is_dot[v0]){
+			v0=Collapse(v0);
+			if(is_dot[v1]){
+				//both are dots, merge in the dset
+				v1=Collapse(v1);
+				if(v0!=v1){
+					dot_dad[v1]=v0;
+					Array.prototype.push.apply(dot_ins[v0],dot_ins[v1]);
+					Array.prototype.push.apply(dot_outs[v0],dot_outs[v1]);
+				}
+			}else{
+				dot_outs[v0].push({v:v1,port:e.port1});
+			}
+		}else{
+			if(is_dot[v1]){
+				v1=Collapse(v1);
+				dot_ins[v1].push({v:v0,port:e.port0});
+			}else{
+				//keep the edge
+				es_new.push(e);
+			}
+		}
+	}
+	for(var i=0;i<n;i++){
+		if(!is_dot[i]||dot_dad[i]!=i){continue;}
+		var ins=dot_ins[i];
+		var outs=dot_outs[i];
+		for(var j0=0;j0<ins.length;j0++){
+			for(var j1=0;j1<outs.length;j1++){
+				es_new.push({
+					id0:nds[ins[j0].v].__id__,port0:ins[j0].port,
+					id1:nds[outs[j1].v].__id__,port1:outs[j1].port,
+				});
+			}
+		}
+	}
+	return es_new;
+};
+var Ungroup=function(nds,es, nds_ungroup,do_sel){
+	//remove group nodes and restore the old connections
+	var nds_new=[];
+	var es_new=[];
+	var is_in_group={};
+	for(var i=0;i<nds_ungroup.length;i++){
+		is_in_group[nds_ungroup[i].__id__]=1;
+	}
+	//first copy the non-group-related nodes / edges
+	for(var i=0;i<nds.length;i++){
+		if(!is_in_group[nds[i].__id__]){
+			nds_new.push(nds[i]);
+			if(do_sel){nds[i].m_is_selected=0;}
+		}
+	}
+	for(var i=0;i<es.length;i++){
+		if(!is_in_group[es[i].id0]&&!is_in_group[es[i].id1]){
+			es_new.push(es[i]);
+		}
+	}
+	//then put in the old graphs and connect the dots
+	var gport_map={};
+	for(var i=0;i<nds_ungroup.length;i++){
+		var nd_group=nds_ungroup[i];
+		var ndcls=nd_group.m_class;
+		if(typeof(ndcls)=='string'){continue;}
+		//the old graph
+		var gr=ndcls.m_graph;
+		if(!gr){
+			throw new Error('bad ungroup');
+			continue;
+		}
+		var dx=nd_group.x-nd_group.m_x0;
+		var dy=nd_group.y-nd_group.m_y0;
+		for(var j=0;j<gr.nds.length;j++){
+			var ndj=gr.nds[j];
+			nds_new.push(ndj);
+			if(do_sel){ndj.m_is_selected=1;}
+			ndj.x+=dx;
+			ndj.y+=dy;
+		}
+		for(var j=0;j<gr.es.length;j++){
+			es_new.push(gr.es[j]);
+		}
+		//the edges
+		gr_reconnects=ndcls.m_reconnects;
+		for(var j=0;j<gr_reconnects.length;j++){
+			var cnj=gr_reconnects[j];
+			gport_map[nd_group.__id__+'='+cnj.port_outer]=cnj.id_inner;
+		}
+	}
+	//translate the dot connections
+	for(var i=0;i<es.length;i++){
+		//the original es should be immutable
+		var e=es[i];
+		e={id0:e.id0,port0:e.port0,id1:e.id1,port1:e.port1};
+		var did=0;
+		if(is_in_group[e.id0]){
+			did=1;
+			e.id0=gport_map[e.id0+'='+e.port0];
+			if(!e.id0){continue;}
+			e.port0='out';
+		}
+		if(is_in_group[e.id1]){
+			did=1;
+			e.id1=gport_map[e.id1+'='+e.port1];
+			if(!e.id0){continue;}
+			e.port1='in';
+		}
+		if(did){
+			es_new.push(e);
+		}
+	}
+	//finally remove the dots
+	if(do_sel){
+		es_new=ExpandDots(nds_new,es_new,1);
+		nds_new=nds_new.filter(function(ndi){return !ndi.m_is_group_dot;})
+	}
+	return [nds_new,es_new];
+};
+var isGroup=function(ndi){return typeof(ndi.m_class)!='string';}
 var graph_prototype={
 	SignalEdit:function(nds_rebuild){
 		for(var i=0;i<nds_rebuild.length;i++){
@@ -148,7 +300,7 @@ var graph_prototype={
 			this.nds[i].m_is_selected=0;
 		}
 	},
-	DeleteSelection:function(){
+	DeleteSelection:function(is_quiet){
 		this.nds=this.nds.filter(function(ndi){return !ndi.m_is_selected;})
 		var is_valid={};
 		for(var i=0;i<this.nds.length;i++){
@@ -162,22 +314,36 @@ var graph_prototype={
 			if(nd1){signals.push(nd1);}
 			return nd0&&nd1;
 		})
-		this.SignalEdit([signals]);
+		if(!is_quiet){
+			this.SignalEdit([signals]);
+		}
 	},
 	Build:function(sbasepath,cache,is_rebuild){
-		//todo: expand subgraphs - may need that for toposort to work
 		IO.m_current_graph_path=sbasepath;
 		IO.SetCurrentDirectory(IO.m_current_graph_path);
+		var es=this.es;
+		var nds=this.nds;
+		////////////////////////
+		//expand groups
+		var ret_ung=Ungroup(nds,es,nds.filter(isGroup),0);
+		nds=ret_ung[0];
+		es=ret_ung[1]
+		////////////////////////
+		//expand dots
+		//create a dot disjoint set and an input/output set for each dot
+		es=ExpandDots(nds,es,0);
+		////////////////////////
+		//preprocess the graph into a more convenient format
 		var node_map={},degs=[],es_topo=[],es_gather=[];
-		var n=this.nds.length,m=this.es.length;
+		var n=nds.length,m=es.length;
 		for(var i=0;i<n;i++){
-			node_map[this.nds[i].__id__]=i;
+			node_map[nds[i].__id__]=i;
 			degs[i]=0;
 			es_topo[i]=[];
 			es_gather[i]=[];
 		}
 		for(var i=0;i<m;i++){
-			var e=this.es[i];
+			var e=es[i];
 			var v0=node_map[e.id0];
 			var v1=node_map[e.id1];
 			es_topo[v0].push(v1);
@@ -204,23 +370,24 @@ var graph_prototype={
 		if(Q.length<n){
 			//error - select the in-loop nodes
 			for(var i=0;i<n;i++){
-				this.nds[i].m_is_selected=(degs[i]>0?1:0);
+				nds[i].m_is_selected=(degs[i]>0?1:0);
 			}
-			//todo: error message
+			//error message
+			console.log('dependency loop detected!')
 			return 0;
 		}
 		var port_value_map=[];
 		for(var i=0;i<n;i++){
-			var bc_i=this.nds[i].m_build_cache;
+			var bc_i=nds[i].m_build_cache;
 			if(!bc_i){
 				bc_i={};
-				this.nds[i].m_build_cache=bc_i;
+				nds[i].m_build_cache=bc_i;
 			}
 			port_value_map[i]=bc_i;
 		}
 		for(var i=0;i<Q.length;i++){
 			var v0=Q[i];
-			var ndi=this.nds[v0];
+			var ndi=nds[v0];
 			var need_build_i=(is_rebuild||ndi.m_need_rebuild);
 			if(ndi.m_is_disabled){continue;}
 			var ndcls=UI.GetNodeClass(cache,ndi.m_class);
@@ -228,7 +395,7 @@ var graph_prototype={
 			var es_v0=es_topo[v0];
 			for(var j=0;j<es_v0.length;j++){
 				var v1=es_v0[j];
-				this.nds[v1].m_need_rebuild=1;
+				nds[v1].m_need_rebuild=1;
 			}
 			ndi.m_need_rebuild=0;
 			if(ndcls){
@@ -240,7 +407,7 @@ var graph_prototype={
 					ndi.m_build_cache=pvmap_v0;
 					//gather connected input
 					var es_v0=es_gather[v0];
-					es_v0.sort(function(e0,e1){return this.nds[e0.v0].y<this.nds[e1.v0].y;}.bind(this))
+					es_v0.sort(function(e0,e1){return nds[e0.v0].y<nds[e1.v0].y;}.bind(this))
 					for(var j=0;j<es_v0.length;j++){
 						var s_output=port_value_map[es_v0[j].v0][es_v0[j].port0];
 						if(typeof(s_output)=='string'){
@@ -328,22 +495,37 @@ var PointDist=function(a,b){
 };
 var rproto_node={
 	OnMouseDown:function(event){
-		//select
-		UI.SetFocus(this.owner);UI.Refresh();
-		if(!(UI.IsPressed("LSHIFT")||UI.IsPressed("RSHIFT")||UI.IsPressed("LCTRL")||UI.IsPressed("RCTRL"))){
-			this.graph.SelectionClear();
-		}
-		this.nd.m_is_selected=!this.nd.m_is_selected;
-		UI.Refresh();
+		UI.SetFocus(this.owner);
 		///////////////////////////
 		this.m_drag_ctx={x:event.x,y:event.y, base_x:this.nd.x,base_y:this.nd.y};
+		if(this.nd.m_is_selected){
+			var mnds=[];
+			this.m_drag_ctx.move_nodes=mnds;
+			var nds=this.graph.nds;
+			for(var i=0;i<nds.length;i++){
+				if(nds[i].m_is_selected){
+					mnds.push({nd:nds[i],base_x:nds[i].x,base_y:nds[i].y})
+				}
+			}
+		}
 		UI.CaptureMouse(this);
+		UI.Refresh();
 	},
 	OnMouseMove:function(event){
 		if(!this.m_drag_ctx){return;}
-		var ndi=this.nd;
-		ndi.x=this.m_drag_ctx.base_x+ (event.x-this.m_drag_ctx.x);
-		ndi.y=this.m_drag_ctx.base_y+ (event.y-this.m_drag_ctx.y);
+		var delta_x=(event.x-this.m_drag_ctx.x);
+		var delta_y=(event.y-this.m_drag_ctx.y);
+		if(this.m_drag_ctx.move_nodes){
+			var mnds=this.m_drag_ctx.move_nodes;
+			for(var i=0;i<mnds.length;i++){
+				mnds[i].nd.x=mnds[i].base_x+ delta_x;
+				mnds[i].nd.y=mnds[i].base_y+ delta_y;
+			}
+		}else{
+			var ndi=this.nd;
+			ndi.x=this.m_drag_ctx.base_x+ delta_x;
+			ndi.y=this.m_drag_ctx.base_y+ delta_y;
+		}
 		UI.Refresh();
 	},
 	OnMouseUp:function(event){
@@ -353,6 +535,13 @@ var rproto_node={
 			if((this.m_drag_distance||0)>8){
 				//move would necessitate rebuild - potential order change
 				this.owner.graph.SignalEdit([this.nd]);
+			}else{
+				//if it didn't move, set selection
+				if(!(UI.IsPressed("LSHIFT")||UI.IsPressed("RSHIFT")||UI.IsPressed("LCTRL")||UI.IsPressed("RCTRL"))){
+					this.graph.SelectionClear();
+				}
+				this.nd.m_is_selected=!this.nd.m_is_selected;
+				UI.Refresh();
 			}
 		}
 		this.m_drag_ctx=undefined;
@@ -484,8 +673,16 @@ UI.GetNodeCache=function(cache,ndi){
 		}
 	}
 	var dims=UI.MeasureText(style.font_caption,ndi.m_caption||ndi.__id__);
+	var h_caption=style.caption_h;
+	if(ndi.m_class=='__dot__'){
+		wl=style.port_padding*2;
+		wr=style.port_padding*2;
+		dims.w=0;
+		dims.h=0;
+		h_caption=0;
+	}
 	var w_final=Math.max(dims.w+style.caption_padding*2, (wl-style.port_extrude)+(wr-style.port_extrude)+style.port_w_sep);
-	var h_final=style.caption_h+Math.max(nl,nr)*(style.port_h+style.port_h_sep)+style.port_h_sep;
+	var h_final=h_caption+Math.max(nl,nr)*(style.port_h+style.port_h_sep)+style.port_h_sep;
 	cache_item.m_rects=[];
 	cache_item.m_texts=[];
 	cache_item.m_regions=[];
@@ -513,7 +710,7 @@ UI.GetNodeCache=function(cache,ndi){
 		proto:rproto_node,
 	})
 	cache_item.m_texts.push({
-		dx:style.caption_padding,dy:(style.caption_h-UI.GetCharacterHeight(style.font_caption))*0.5,
+		dx:style.caption_padding,dy:(h_caption-UI.GetCharacterHeight(style.font_caption))*0.5,
 		font:style.font_caption,text:ndi.m_caption,color:style.caption_text_color
 	});
 	//multi-connect case - use node y for ordering with edge dragging
@@ -522,7 +719,7 @@ UI.GetNodeCache=function(cache,ndi){
 	var degs_ndi=cache.m_degs[ndi.__id__];
 	var xl=-style.port_extrude,xr=w_final+style.port_extrude-wr,
 		pxl=-0.5*style.port_extrude,pxr=w_final+0.5*style.port_extrude,
-		yl=style.caption_h,yr=style.caption_h, 
+		yl=h_caption,yr=h_caption, 
 		dyl=(h_final-yl-style.port_h*nl)/(nl+1),
 		dyr=(h_final-yr-style.port_h*nr)/(nr+1);
 	var port_padding_y=(style.port_h-UI.GetCharacterHeight(style.font_port))*0.5;
@@ -589,6 +786,9 @@ UI.GetNodeCache=function(cache,ndi){
 			});
 			yl+=style.port_h;
 		}
+	}
+	if(ndi.m_class=='__dot__'){
+		cache_item.m_texts=[];
 	}
 	//if(is_invalid_class){
 	//	cache_item.m_param_panel.push({create_class:ndi.m_class});
@@ -788,6 +988,143 @@ W.graphview_prototype={
 		}else{
 			return 0;
 		}
+	},
+	Group:function(){
+		//convert selected nodes into a sub-graph, store it to a file, then put the file back here
+		var cache=this.cache;
+		var nds=this.graph.nds;
+		var es=this.graph.es;
+		var gr=UI.CreateGraph();
+		var gr_nds=gr.nds;
+		var gr_es=gr.es;
+		var gr_reconnects=[];
+		var gr_ports=[];
+		var dot_cache={};
+		var port_name_map={};
+		var CreateDot=function(nd,port,side){
+			var skey=nd.__id__+'='+port;
+			var nd_dot=dot_cache[skey];
+			if(nd_dot){return nd_dot;}
+			nd_dot=gr.CreateNode("__dot__");
+			nd_dot.m_is_group_dot=1;
+			dot_cache[skey]=nd_dot;
+			if(side=='in'){
+				gr_es.push({
+					id0:nd.__id__,port0:port,
+					id1:nd_dot.__id__,port1:"in",
+				});
+			}else{
+				gr_es.push({
+					id0:nd_dot.__id__,port0:"out",
+					id1:nd.__id__,port1:port,
+				});
+			}
+			//create an outer port
+			var ndcls=UI.GetNodeClass(cache,nd.m_class);
+			var port_inner=ndcls.m_port_map[port];
+			var port_outer=JSON.parse(JSON.stringify(port_inner));
+			var cnt=0;
+			while(port_name_map[port_outer.id]){
+				cnt++;
+				port_outer.id=port_inner.id+cnt.toString();
+			}
+			port_name_map[port_outer.id]=1;
+			gr_ports.push(port_outer);
+			nd_dot.m_port_outer_id=port_outer.id
+			return nd_dot;
+		};
+		///////////////////
+		//build the boring data structures
+		var n=nds.length,m=es.length;
+		var node_map={};
+		for(var i=0;i<n;i++){
+			node_map[nds[i].__id__]=i;
+			if(nds[i].m_is_selected){
+				gr_nds.push(nds[i]);
+			}
+		}
+		//pick the group nodes
+		for(var i=0;i<m;i++){
+			var e=es[i];
+			var v0=node_map[e.id0];
+			var v1=node_map[e.id1];
+			if(nds[v0].m_is_selected){
+				if(nds[v1].m_is_selected){
+					//internal edge, just add it
+					gr_es.push(e);
+				}else{
+					//output edge: create dot, dot edge, record port
+					var nd_dot=CreateDot(nds[v0],e.port0,'in');
+					gr_reconnects.push({
+						//id0:nd_dot.__id__,port0:"out",
+						id1:e.id1,port1:e.port1,
+						port_outer:nd_dot.m_port_outer_id,
+						id_inner:nd_dot.__id__,
+					})
+				}
+			}else{
+				if(nds[v1].m_is_selected){
+					//input edge: create dot, dot edge, record port
+					var nd_dot=CreateDot(nds[v1],e.port1,'out');
+					gr_reconnects.push({
+						id0:e.id0,port0:e.port0,
+						//id1:nd_dot.__id__,port1:"in",
+						port_outer:nd_dot.m_port_outer_id,
+						id_inner:nd_dot.__id__,
+					})
+				}else{
+					//unrelated edge
+					//do nothing
+				}
+			}
+		}
+		var ndcls={
+			m_graph:gr,
+			m_reconnects:gr_reconnects,
+			m_ports:gr_ports,
+		};
+		ndcls.m_port_map={};
+		for(var i=0;i<ndcls.m_ports.length;i++){
+			var port_i=ndcls.m_ports[i];
+			ndcls.m_port_map[port_i.id]=port_i;
+		}
+		var nd_group=this.graph.CreateNode('group');
+		nd_group.m_class=ndcls;
+		var xtot=0,ytot=0,npt=0;
+		for(var i=0;i<gr_nds.length;i++){
+			var nd_i=gr_nds[i];
+			if(nd_i.x!=undefined&&nd_i.y!=undefined){
+				xtot+=nd_i.x;
+				ytot+=nd_i.y;
+				npt++;
+			}
+		}
+		npt=Math.max(npt,1);
+		nd_group.x=xtot/npt;
+		nd_group.y=ytot/npt;
+		nd_group.m_x0=nd_group.x;
+		nd_group.m_y0=nd_group.y;
+		//var nd_rebuilds=[nd_group];
+		for(var i=0;i<gr_reconnects.length;i++){
+			var cni=gr_reconnects[i];
+			if(cni.id0){
+				es.push({
+					id0:cni.id0,port0:cni.port0,
+					id1:nd_group.__id__,port1:cni.port_outer,
+				})
+			}else{
+				es.push({
+					id0:nd_group.__id__,port0:cni.port_outer,
+					id1:cni.id1,port1:cni.port1,
+				})
+				//nd_rebuilds.push(nds[node_map[cni.id1]]);
+			}
+		}
+		this.graph.DeleteSelection(1);
+		nd_group.m_is_selected=1;
+		//this.graph.SignalEdit(nd_rebuilds)
+		this.graph.SignalEdit([nd_group])
+		UI.Refresh();
 	},
 };
 W.GraphView=function(id,attrs){
@@ -1223,6 +1560,19 @@ W.GraphView=function(id,attrs){
 	}.bind(obj)})
 	menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:UI.nd_focus==obj,key:"SHIFT+CTRL+Z",action:function(){
 		this.Redo()
+	}.bind(obj)})
+	menu_edit.AddSeparator();
+	menu_edit.AddNormalItem({text:"&Group",enable_hotkey:UI.nd_focus==obj,key:"CTRL+G",action:function(){
+		this.Group()
+	}.bind(obj)})
+	menu_edit.AddNormalItem({text:"Ungroup",enable_hotkey:UI.nd_focus==obj,key:"CTRL+U",action:function(){
+		var ret=Ungroup(this.graph.nds,this.graph.es, this.graph.nds.filter(function(ndi){
+			return isGroup(ndi)&&ndi.m_is_selected;
+		}),1)
+		this.graph.nds=ret[0];
+		this.graph.es=ret[1];
+		this.graph.SignalEdit([]);
+		UI.Refresh();
 	}.bind(obj)})
 	menu_edit.AddNormalItem({text:"&Disable",icon:"释",enable_hotkey:UI.nd_focus==obj,key:"D",action:function(){
 		var graph=this.graph;

@@ -150,7 +150,6 @@ auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
 			else
 				continue
 		words=[StripLeadingSpaces(s) for s in sline[pport:].Tokenize(",")]
-		if words.n<2:continue
 		sname=words[0]
 		if obj_id2port:
 			obj_port=obj_id2port[sname].as(JSObject)
@@ -358,7 +357,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				}")
 		prev_viewport=new int[4]
 		glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
-		BATCH=65536/(sizeof(float)*4 *6)
+		BATCH=65536-(65536%(sizeof(float)*4 *6))
 		for i=0:BATCH:g_edge_vbo.n-1
 			real_batch=min(g_edge_vbo.n-i,BATCH)
 			ref=g_edge_vbo[i:i+real_batch-1].ConvertToAsBinary(i32)
@@ -371,7 +370,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			//g_vbo_tech.SetUniformColor("C",C)
 			g_vbo_tech.SetVertexPointer("P", 3,GL_FLOAT,0, 4*sizeof(float),0L)
 			g_vbo_tech.SetVertexPointer("C0", 4,GL_UNSIGNED_BYTE,1, 4*sizeof(float),12L)
-			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch/3)
+			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch/4)
 		return 0
 	}
 });
