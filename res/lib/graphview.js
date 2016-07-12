@@ -131,7 +131,7 @@ var ExpandDots=function(nds,es,is_ungroup){
 	var is_dot=[];
 	var dot_dad=[],dot_ins=[],dot_outs=[];
 	for(var i=0;i<nds.length;i++){
-		is_dot[i]=(nds[i].m_class=="__dot__");
+		is_dot[i]=(!isGroup(nds[i])&&nds[i].m_class=='__dot__');
 		if(is_dot[i]&&is_ungroup&&!nds[i].m_is_group_dot){
 			is_dot[i]=0;
 		}
@@ -213,6 +213,7 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 	}
 	//then put in the old graphs and connect the dots
 	var gport_map={};
+	var nds_gen=[];
 	for(var i=0;i<nds_ungroup.length;i++){
 		var nd_group=nds_ungroup[i];
 		var ndcls=nd_group.m_class;
@@ -228,7 +229,7 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 		for(var j=0;j<gr.nds.length;j++){
 			var ndj=gr.nds[j];
 			nds_new.push(ndj);
-			if(do_sel){ndj.m_is_selected=1;}
+			if(do_sel){ndj.m_is_selected=1;nds_gen.push(ndj);}
 			ndj.x+=dx;
 			ndj.y+=dy;
 		}
@@ -269,7 +270,7 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 		es_new=ExpandDots(nds_new,es_new,1);
 		nds_new=nds_new.filter(function(ndi){return !ndi.m_is_group_dot;})
 	}
-	return [nds_new,es_new];
+	return [nds_new,es_new,nds_gen];
 };
 var isGroup=function(ndi){return typeof(ndi.m_class)!='string';}
 var graph_prototype={
@@ -551,6 +552,24 @@ var rproto_node={
 		if((this.m_drag_distance||0)>8){return;}
 		if(event.clicks>=2){
 			//edit node file - put fn in parser
+			if(isGroup(this.nd)){
+				var obj=this.owner;
+				var ret=Ungroup(obj.graph.nds,obj.graph.es, [this.nd],1);
+				obj.graph.nds=ret[0];
+				obj.graph.es=ret[1];
+				obj.graph.SignalEdit(ret[2]);
+				UI.Refresh();
+				return;
+			}
+			if(this.nd.m_class!='__dot__'){
+				if(event.y-this.y<UI.default_styles.graph_view.node_style.caption_h){
+					//node renaming
+					this.owner.m_temp_ui="rename_node";
+					this.owner.m_temp_ui_desc={region:this};
+					UI.Refresh();
+					return;
+				}
+			}
 			var ndcls=UI.GetNodeClass(this.owner.cache,this.nd.m_class);
 			if(ndcls){
 				UI.OpenEditorWindow(ndcls.m_file_name);
@@ -674,7 +693,7 @@ UI.GetNodeCache=function(cache,ndi){
 	}
 	var dims=UI.MeasureText(style.font_caption,ndi.m_caption||ndi.__id__);
 	var h_caption=style.caption_h;
-	if(ndi.m_class=='__dot__'){
+	if(!isGroup(ndi)&&ndi.m_class=='__dot__'){
 		wl=style.port_padding*2;
 		wr=style.port_padding*2;
 		dims.w=0;
@@ -787,7 +806,7 @@ UI.GetNodeCache=function(cache,ndi){
 			yl+=style.port_h;
 		}
 	}
-	if(ndi.m_class=='__dot__'){
+	if(!isGroup(ndi)&&ndi.m_class=='__dot__'){
 		cache_item.m_texts=[];
 	}
 	//if(is_invalid_class){
@@ -1005,7 +1024,7 @@ W.graphview_prototype={
 			var skey=nd.__id__+'='+port;
 			var nd_dot=dot_cache[skey];
 			if(nd_dot){return nd_dot;}
-			nd_dot=gr.CreateNode("__dot__");
+			nd_dot=gr.CreateNode('__dot__');
 			nd_dot.m_is_group_dot=1;
 			dot_cache[skey]=nd_dot;
 			if(side=='in'){
@@ -1549,6 +1568,9 @@ W.GraphView=function(id,attrs){
 			UI.SetFocus(obj.newnode_edit);
 			UI.Refresh();
 		}
+	}else if(obj.m_temp_ui=="rename_node"){
+		var rg_node=obj.m_temp_ui_desc.region;
+		!? //todo
 	}else if(obj.m_temp_ui=="rename_port"){
 		var rg_port=obj.m_temp_ui_desc.region;
 		//todo
@@ -1571,7 +1593,7 @@ W.GraphView=function(id,attrs){
 		}),1)
 		this.graph.nds=ret[0];
 		this.graph.es=ret[1];
-		this.graph.SignalEdit([]);
+		this.graph.SignalEdit(ret[2]);
 		UI.Refresh();
 	}.bind(obj)})
 	menu_edit.AddNormalItem({text:"&Disable",icon:"释",enable_hotkey:UI.nd_focus==obj,key:"D",action:function(){
