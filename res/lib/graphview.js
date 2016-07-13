@@ -228,6 +228,8 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 		var dy=nd_group.y-nd_group.m_y0;
 		for(var j=0;j<gr.nds.length;j++){
 			var ndj=gr.nds[j];
+			//set m_last_group_name when ungrouping - the group node may have been renamed
+			ndj.m_last_group_name=nd_group.m_caption;
 			nds_new.push(ndj);
 			if(do_sel){ndj.m_is_selected=1;nds_gen.push(ndj);}
 			ndj.x+=dx;
@@ -551,6 +553,15 @@ var rproto_node={
 	OnClick:function(event){
 		if((this.m_drag_distance||0)>8){return;}
 		if(event.clicks>=2){
+			//rename case
+			if(isGroup(this.nd)||this.nd.m_class!='__dot__'){
+				var style=UI.default_styles.graph_view.node_style;
+				if(event.y-this.y<style.caption_h){
+					//node renaming
+					this.owner.RenameNode(this.nd)
+					return;
+				}
+			}
 			//edit node file - put fn in parser
 			if(isGroup(this.nd)){
 				var obj=this.owner;
@@ -560,15 +571,6 @@ var rproto_node={
 				obj.graph.SignalEdit(ret[2]);
 				UI.Refresh();
 				return;
-			}
-			if(this.nd.m_class!='__dot__'){
-				if(event.y-this.y<UI.default_styles.graph_view.node_style.caption_h){
-					//node renaming
-					this.owner.m_temp_ui="rename_node";
-					this.owner.m_temp_ui_desc={region:this};
-					UI.Refresh();
-					return;
-				}
 			}
 			var ndcls=UI.GetNodeClass(this.owner.cache,this.nd.m_class);
 			if(ndcls){
@@ -1056,11 +1058,18 @@ W.graphview_prototype={
 		//build the boring data structures
 		var n=nds.length,m=es.length;
 		var node_map={};
+		var group_name=undefined;
 		for(var i=0;i<n;i++){
 			node_map[nds[i].__id__]=i;
 			if(nds[i].m_is_selected){
 				gr_nds.push(nds[i]);
+				if(!group_name){
+					group_name=nds[i].m_last_group_name;
+				}
 			}
+		}
+		if(!group_name){
+			group_name='group';
 		}
 		//pick the group nodes
 		for(var i=0;i<m;i++){
@@ -1108,6 +1117,7 @@ W.graphview_prototype={
 			ndcls.m_port_map[port_i.id]=port_i;
 		}
 		var nd_group=this.graph.CreateNode('group');
+		nd_group.m_caption=group_name;
 		nd_group.m_class=ndcls;
 		var xtot=0,ytot=0,npt=0;
 		for(var i=0;i<gr_nds.length;i++){
@@ -1143,6 +1153,11 @@ W.graphview_prototype={
 		nd_group.m_is_selected=1;
 		//this.graph.SignalEdit(nd_rebuilds)
 		this.graph.SignalEdit([nd_group])
+		UI.Refresh();
+	},
+	RenameNode:function(nd){
+		this.m_temp_ui="rename_node";
+		this.m_temp_ui_desc={nd:nd};
 		UI.Refresh();
 	},
 };
@@ -1381,12 +1396,74 @@ W.GraphView=function(id,attrs){
 			border_width:obj.node_style.dragsel_border_width,
 		})
 	}
-	UI.PopSubWindow()
 	////////////
 	//render the temp UI - add-node edit
 	//it shouldn't be scaled
+	var RenderTempEditor=function(id,attrs){
+		var obj_prev=obj[id];
+		W.Edit(id,{
+			x:attrs.x,y:attrs.y,w:attrs.w,h:attrs.h,
+			font:attrs.font,
+			text:attrs.text,
+			is_single_line:1,right_side_autoscroll_margin:0.5,
+			precise_ctrl_lr_stop:0,
+			same_line_only_left_right:0,
+			owner:obj,
+			additional_hotkeys:[{key:"ESCAPE",action:function(){
+				//cancel the change
+				var obj=this.owner
+				obj.m_temp_ui=undefined;
+				UI.Refresh()
+			}}],
+			OnBlur:function(){
+				var obj=this.owner
+				obj.m_temp_ui=undefined;
+				UI.Refresh()
+			},
+			OnEnter:attrs.OnEnter,
+		});
+		if(!obj_prev){
+			UI.SetFocus(obj[id]);
+			obj[id].SetSelection(0,obj[id].ed.GetTextSize())
+			UI.Refresh();
+		}
+	};
+	//////////////////////////
+	if(obj.m_temp_ui=="rename_node"){
+		var node_style=UI.default_styles.graph_view.node_style;
+		var nd_renamed=obj.m_temp_ui_desc.nd;
+		var cache_item=UI.GetNodeCache(cache,nd_renamed);
+		var rc={
+			x:nd_renamed.x+tr.trans[0]/tr.scale+node_style.caption_padding,
+			y:nd_renamed.y+tr.trans[1]/tr.scale+(node_style.caption_h-UI.GetCharacterHeight(node_style.font_caption))*0.5,
+			w:cache_item.m_w-node_style.caption_padding*2,h:UI.GetCharacterHeight(node_style.font_caption),
+			color:nd_renamed.m_color||node_style.node_color_default,
+		};
+		UI.RoundRect(rc)
+		RenderTempEditor("rename_node_edit",{
+			x:rc.x,
+			y:rc.y,
+			w:rc.w,h:rc.h,
+			font:node_style.font_caption,
+			text:nd_renamed.m_caption,
+			OnEnter:function(){
+				var obj=this.owner;
+				obj.m_temp_ui_desc.nd.m_caption=this.ed.GetText();
+				obj.m_temp_ui=undefined;
+				obj.graph.SignalEdit([]);
+				obj.cache.nds={};
+				UI.Refresh();
+			}
+		});
+	}else if(obj.m_temp_ui=="rename_port"){
+		var rg_port=obj.m_temp_ui_desc.region;
+		//todo
+	}
+	UI.PopSubWindow()
+	//////////////////////////
 	if(obj.m_temp_ui=="add_node"){
 		//put it near the mouse
+		//todo: AC, OnChange explanation
 		var x_caret=obj.m_temp_ui_desc.x;
 		var y_caret=obj.m_temp_ui_desc.y;
 		var style_edit=obj.edit_style;
@@ -1403,27 +1480,10 @@ W.GraphView=function(id,attrs){
 			round:style_edit.edit_round,
 		})
 		var hc_editing=UI.GetCharacterHeight(style_edit.font_edit);
-		var obj_prev=obj.newnode_edit;
-		//todo: AC, OnChange explanation
-		W.Edit("newnode_edit",{
+		RenderTempEditor("newnode_edit",{
 			x:x_caret-style_edit.edit_padding,y:y_caret+(hc-hc_editing)*0.5,
 			w:style_edit.edit_w+style_edit.edit_padding*2,h:hc_editing,
 			font:style_edit.font_edit,
-			is_single_line:1,right_side_autoscroll_margin:0.5,
-			precise_ctrl_lr_stop:0,
-			same_line_only_left_right:0,
-			owner:obj,
-			additional_hotkeys:[{key:"ESCAPE",action:function(){
-				//cancel the change
-				var obj=this.owner
-				obj.m_temp_ui=undefined;
-				UI.Refresh()
-			}}],
-			OnBlur:function(){
-				var obj=this.owner
-				obj.m_temp_ui=undefined;
-				UI.Refresh()
-			},
 			OnEnter:function(){
 				//actually create the node, invalid class is fine - could just delete it later, or create the class
 				var obj=this.owner;
@@ -1562,20 +1622,13 @@ W.GraphView=function(id,attrs){
 				obj.m_temp_ui=undefined;
 				graph.SignalEdit([nd_new]);
 				UI.Refresh()
-			},
+			}
 		});
-		if(!obj_prev){
-			UI.SetFocus(obj.newnode_edit);
-			UI.Refresh();
-		}
-	}else if(obj.m_temp_ui=="rename_node"){
-		var rg_node=obj.m_temp_ui_desc.region;
-		!? //todo
-	}else if(obj.m_temp_ui=="rename_port"){
-		var rg_port=obj.m_temp_ui_desc.region;
-		//todo
 	}
 	//////////////////
+	var nd_sel=obj.graph.nds.filter(function(ndi){
+		return ndi.m_is_selected;
+	});
 	var menu_edit=UI.BigMenu("&Edit")
 	menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:UI.nd_focus==obj,key:"CTRL+Z",action:function(){
 		this.Undo()
@@ -1583,37 +1636,43 @@ W.GraphView=function(id,attrs){
 	menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:UI.nd_focus==obj,key:"SHIFT+CTRL+Z",action:function(){
 		this.Redo()
 	}.bind(obj)})
-	menu_edit.AddSeparator();
-	menu_edit.AddNormalItem({text:"&Group",enable_hotkey:UI.nd_focus==obj,key:"CTRL+G",action:function(){
-		this.Group()
-	}.bind(obj)})
-	menu_edit.AddNormalItem({text:"Ungroup",enable_hotkey:UI.nd_focus==obj,key:"CTRL+U",action:function(){
-		var ret=Ungroup(this.graph.nds,this.graph.es, this.graph.nds.filter(function(ndi){
-			return isGroup(ndi)&&ndi.m_is_selected;
-		}),1)
-		this.graph.nds=ret[0];
-		this.graph.es=ret[1];
-		this.graph.SignalEdit(ret[2]);
-		UI.Refresh();
-	}.bind(obj)})
-	menu_edit.AddNormalItem({text:"&Disable",icon:"释",enable_hotkey:UI.nd_focus==obj,key:"D",action:function(){
-		var graph=this.graph;
-		var is_all_disabled=1;
-		for(var i=0;i<graph.nds.length;i++){
-			if(graph.nds[i].m_is_selected&&!graph.nds[i].m_is_disabled){
-				is_all_disabled=0;
+	if(nd_sel.length>0){
+		menu_edit.AddSeparator();
+		menu_edit.AddNormalItem({text:"&Group",enable_hotkey:UI.nd_focus==obj,key:"CTRL+G",action:function(){
+			this.Group()
+		}.bind(obj)})
+		menu_edit.AddNormalItem({text:"Ungroup",enable_hotkey:UI.nd_focus==obj,key:"CTRL+U",action:function(){
+			var ret=Ungroup(this.graph.nds,this.graph.es, this.graph.nds.filter(function(ndi){
+				return isGroup(ndi)&&ndi.m_is_selected;
+			}),1)
+			this.graph.nds=ret[0];
+			this.graph.es=ret[1];
+			this.graph.SignalEdit(ret[2]);
+			UI.Refresh();
+		}.bind(obj)})
+		menu_edit.AddSeparator();
+		menu_edit.AddNormalItem({text:"Re&name",enable_hotkey:UI.nd_focus==obj,key:"F2",action:function(nd){
+			this.RenameNode(nd);
+		}.bind(obj,nd_sel[0])})
+		menu_edit.AddNormalItem({text:"&Disable",icon:"释",enable_hotkey:UI.nd_focus==obj,key:"D",action:function(){
+			var graph=this.graph;
+			var is_all_disabled=1;
+			for(var i=0;i<graph.nds.length;i++){
+				if(graph.nds[i].m_is_selected&&!graph.nds[i].m_is_disabled){
+					is_all_disabled=0;
+				}
 			}
-		}
-		var nds_toggled=[];
-		for(var i=0;i<graph.nds.length;i++){
-			if(graph.nds[i].m_is_selected){
-				graph.nds[i].m_is_disabled=!is_all_disabled;
-				nds_toggled.push(graph.nds[i]);
+			var nds_toggled=[];
+			for(var i=0;i<graph.nds.length;i++){
+				if(graph.nds[i].m_is_selected){
+					graph.nds[i].m_is_disabled=!is_all_disabled;
+					nds_toggled.push(graph.nds[i]);
+				}
 			}
-		}
-		graph.SignalEdit(nds_toggled);
-		UI.Refresh();
-	}.bind(obj)})
+			graph.SignalEdit(nds_toggled);
+			UI.Refresh();
+		}.bind(obj)})
+	}
 	menu_edit=undefined;
 	var menu_run=UI.BigMenu("&Run")
 	menu_run.AddNormalItem({
