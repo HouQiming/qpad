@@ -35,6 +35,29 @@ var GetMainFileName=function(fname){
 	return main_name;
 };
 
+var SearchClassFile=function(cache,sname){
+	for(var i=0;i<cache.search_paths.length;i++){
+		var spath=cache.search_paths[i];
+		var fnext=IO.CreateEnumFileContext(spath+'/'+sname+'.*',1);
+		var fs=[];
+		if(fnext){
+			for(;;){
+				var fi=fnext();
+				if(!fi){break;}
+				fs.push(IO.NormalizeFileName(fi.name));
+			}
+			fnext=undefined;
+		}
+		if(fs.length>1){
+			fs.sort();
+		}
+		if(fs.length>0){
+			return fs[0];
+		}
+	}
+	return undefined;
+};
+
 UI.GetNodeClass=function(cache,sname){
 	if(typeof(sname)!='string'){
 		return sname;
@@ -42,56 +65,32 @@ UI.GetNodeClass=function(cache,sname){
 	var holder=cache.m_classes_by_name[sname];
 	if(holder==undefined){
 		holder=null;
-		for(var i=0;i<cache.search_paths.length;i++){
-			var spath=cache.search_paths[i];
-			var fnext=IO.CreateEnumFileContext(spath+'/'+sname+'.*',3);
-			var fs=[];
-			if(fnext){
-				for(;;){
-					var fi=fnext();
-					if(!fi){break;}
-					fs.push(IO.NormalizeFileName(fi.name));
-				}
-				fnext=undefined;
+		var fn=SearchClassFile(cache,sname);
+		var snode=IO.ReadAll(fn);
+		if(snode){
+			var ndcls=undefined;
+			if(UI.GetFileNameExtension(fn).toLowerCase()=='zjs'){
+				ndcls=UI.ParseJSNode(snode);
+			}else{
+				ndcls=UI.ParseTextNode(snode);
 			}
-			if(fs.length>1){
-				fs.sort();
-			}
-			if(fs.length>0){
-				if(IO.DirExists(fs[0])){
-					//we're referencing another graph
-					//todo
-					break;
+			ndcls.m_file_name=IO.NormalizeFileName(fn);
+			holder={
+				m_ndcls:ndcls,
+				m_file_name:IO.NormalizeFileName(fn),
+			};
+			holder.m_file_save_time=(UI.g_ce_file_save_time[holder.m_file_name]||0);
+			ndcls.m_port_map={};
+			for(var i=0;i<ndcls.m_ports.length;i++){
+				var port_i=ndcls.m_ports[i];
+				ndcls.m_port_map[port_i.id]=port_i;
+				if(typeof(port_i.type)=="string"){
+					port_i.type=port_i.type.split(' ');
 				}else{
-					var snode=IO.ReadAll(fs[0]);
-					if(snode){
-						var ndcls=undefined;
-						if(UI.GetFileNameExtension(fs[0]).toLowerCase()=='zjs'){
-							ndcls=UI.ParseJSNode(snode);
-						}else{
-							ndcls=UI.ParseTextNode(snode);
-						}
-						ndcls.m_file_name=IO.NormalizeFileName(fs[0]);
-						holder={
-							m_ndcls:ndcls,
-							m_file_name:IO.NormalizeFileName(fs[0]),
-						};
-						holder.m_file_save_time=(UI.g_ce_file_save_time[holder.m_file_name]||0);
-						ndcls.m_port_map={};
-						for(var i=0;i<ndcls.m_ports.length;i++){
-							var port_i=ndcls.m_ports[i];
-							ndcls.m_port_map[port_i.id]=port_i;
-							if(typeof(port_i.type)=="string"){
-								port_i.type=port_i.type.split(' ');
-							}else{
-								port_i.type=[];
-							}
-							if(typeof(port_i.ui)=="string"){
-								port_i.ui=port_i.ui.split(' ');
-							}
-						}
-						break;
-					}
+					port_i.type=[];
+				}
+				if(typeof(port_i.ui)=="string"){
+					port_i.ui=port_i.ui.split(' ');
 				}
 			}
 		}
@@ -224,8 +223,8 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 			throw new Error('bad ungroup');
 			continue;
 		}
-		var dx=nd_group.x-nd_group.m_x0;
-		var dy=nd_group.y-nd_group.m_y0;
+		var dx=nd_group.x-ndcls.m_x0;
+		var dy=nd_group.y-ndcls.m_y0;
 		for(var j=0;j<gr.nds.length;j++){
 			var ndj=gr.nds[j];
 			//set m_last_group_name when ungrouping - the group node may have been renamed
@@ -239,7 +238,7 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 			es_new.push(gr.es[j]);
 		}
 		//the edges
-		gr_reconnects=ndcls.m_reconnects;
+		var gr_reconnects=ndcls.m_reconnects;
 		for(var j=0;j<gr_reconnects.length;j++){
 			var cnj=gr_reconnects[j];
 			gport_map[nd_group.__id__+'='+cnj.port_outer]=cnj.id_inner;
@@ -289,7 +288,7 @@ var graph_prototype={
 			m_renamed_ports:{},
 			m_ui_values:{},
 			m_class:class_name,
-			m_caption:class_name,
+			m_caption:typeof(class_name)=='string'?class_name:'group',
 			m_need_rebuild:1,
 		}
 		this.nds.push(ret);
@@ -817,6 +816,65 @@ UI.GetNodeCache=function(cache,ndi){
 	return cache_item;
 };
 
+var g_host_graph_cache={};
+var LoadGroupReference=function(s_group_name,s_group_file){
+	if(!s_group_file){return undefined;}
+	var fn=IO.NormalizeFileName(s_group_file);
+	var ret=g_host_graph_cache[fn];
+	var t_file=IO.GetFileTimestamp(fn);
+	if(!ret||ret.t!=t_file){
+		var gr=UI.LoadGraph(fn);
+		if(!gr){
+			return undefined;
+		}
+		ret={
+			groups:{},
+			t:t_file,
+		};
+		for(var i=0;i<gr.nds.length;i++){
+			var ndi=gr.nds[i];
+			if(isGroup(ndi)){
+				ret.groups[ndi.m_caption]=ndi;
+			}
+		}
+		g_host_graph_cache[fn]=ret;
+	}
+	return ret.groups[s_group_name];
+};
+var FixClonedGroupClass=function(ndcls){
+	var id_map_group=FixClonedGraph(ndcls.m_graph);
+	var gr_reconnects=ndcls.m_reconnects;
+	for(var j=0;j<gr_reconnects.length;j++){
+		var cnj=gr_reconnects[j];
+		if(cnj.id0){cnj.id0=id_map_group[cnj.id0];}
+		if(cnj.id1){cnj.id1=id_map_group[cnj.id1];}
+	}
+};
+var FixClonedGraph=function(gr){
+	var id_map={};
+	for(var i=0;i<gr.nds.length;i++){
+		var ndi=gr.nds[i];
+		var id_new=[g_developer.email, (new Date()).toUTCString(), g_per_run_id++].join("&");
+		id_map[ndi.__id__]=id_new;
+		ndi.__id__=id_new;
+		if(isGroup(ndi)){
+			FixClonedGroupClass(ndi.m_class);
+		}
+	}
+	for(var i=0;i<gr.es.length;i++){
+		var e=gr.es[i];
+		e.id0=id_map[e.id0];
+		e.id1=id_map[e.id1];
+	}
+	return id_map;
+};
+
+UI.CloneGraph=function(gr){
+	gr=JSON.parse(JSON.stringify(gr));
+	FixClonedGraph(gr);
+	return gr;
+}
+
 /*
 graph: persistent data
 cache: transient data
@@ -1131,8 +1189,8 @@ W.graphview_prototype={
 		npt=Math.max(npt,1);
 		nd_group.x=xtot/npt;
 		nd_group.y=ytot/npt;
-		nd_group.m_x0=nd_group.x;
-		nd_group.m_y0=nd_group.y;
+		ndcls.m_x0=nd_group.x;
+		ndcls.m_y0=nd_group.y;
 		//var nd_rebuilds=[nd_group];
 		for(var i=0;i<gr_reconnects.length;i++){
 			var cni=gr_reconnects[i];
@@ -1159,6 +1217,38 @@ W.graphview_prototype={
 		this.m_temp_ui="rename_node";
 		this.m_temp_ui_desc={nd:nd};
 		UI.Refresh();
+	},
+	Copy:function(){
+		var nds=this.graph.nds;
+		var es=this.graph.es;
+		var gr=UI.CreateGraph();
+		var sel_map={};
+		for(var i=0;i<nds.length;i++){
+			if(nds[i].m_is_selected){
+				gr.nds.push(nds[i]);
+				sel_map[nds[i].__id__]=1;
+			}
+		}
+		for(var i=0;i<es.length;i++){
+			if(sel_map[es[i].id0]&&sel_map[es[i].id1]){
+				gr.es.push(es[i]);
+			}
+		}
+		UI.SDL_SetClipboardText(JSON.stringify(gr));
+	},
+	Paste:function(){
+		var gr=undefined;
+		try{
+			gr=JSON.parse(UI.SDL_GetClipboardText());
+			FixClonedGraph(gr);
+		}catch(e){
+			console.log(e.stack);
+			return;
+		}
+		this.graph.SelectionClear();
+		Array.prototype.push.apply(this.graph.nds,gr.nds);
+		Array.prototype.push.apply(this.graph.es,gr.es);
+		return gr;
 	},
 };
 W.GraphView=function(id,attrs){
@@ -1490,7 +1580,22 @@ W.GraphView=function(id,attrs){
 				var graph=obj.graph;
 				var cache=obj.cache;
 				var stext_raw=this.ed.GetText();
-				if(stext_raw.indexOf('.')>=0){
+				var s_group_name=undefined;
+				var p_group_file=stext_raw.indexOf('@');
+				if(p_group_file>=0){
+					//group reference, pick by caption, cache the graph with date checks
+					var s_group_file=stext_raw.substr(p_group_file+1);
+					var s_group_name=stext_raw.substr(0,p_group_file);
+					var nd_group_ref=LoadGroupReference(s_group_name,SearchClassFile(cache,s_group_file));
+					if(nd_group_ref){
+						//duplicate the group class - mainly node ids in the graph
+						var ndcls_cloned=JSON.parse(JSON.stringify(nd_group_ref.m_class));
+						FixClonedGroupClass(ndcls_cloned);
+						//create node with ndcls_cloned - group node creation
+						stext_raw=ndcls_cloned;
+					}
+				}
+				if(typeof(stext_raw)=='string'&&stext_raw.indexOf('.')>=0){
 					//it's a file! a new class!
 					//create the file in znodes/
 					var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/znodes'
@@ -1504,6 +1609,9 @@ W.GraphView=function(id,attrs){
 					}
 				}
 				var nd_new=graph.CreateNode(stext_raw);
+				if(typeof(stext_raw)!='string'&&s_group_name){
+					nd_new.m_caption=s_group_name;
+				}
 				//////////////////////////////////////
 				//score-based auto-connect
 				//better selection key - use "distance-to-selection"
@@ -1635,6 +1743,23 @@ W.GraphView=function(id,attrs){
 	}.bind(obj)})
 	menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:UI.nd_focus==obj,key:"SHIFT+CTRL+Z",action:function(){
 		this.Redo()
+	}.bind(obj)})
+	menu_edit.AddSeparator();
+	menu_edit.AddNormalItem({text:"&Copy",icon:"拷",enable_hotkey:UI.nd_focus==obj,key:"CTRL+C",action:function(){
+		this.Copy();
+	}.bind(obj)})
+	menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",enable_hotkey:UI.nd_focus==obj,key:"CTRL+X",action:function(){
+		this.Copy();
+		this.DeleteSelection(0);
+	}.bind(obj)})
+	if(UI.SDL_HasClipboardText()){
+		menu_edit.AddNormalItem({text:"&Paste",icon:"粘",enable_hotkey:UI.nd_focus==obj,key:"CTRL+V",action:function(){
+			this.Paste();
+		}.bind(obj)})
+	}
+	menu_edit.AddNormalItem({text:"&Duplicate",enable_hotkey:UI.nd_focus==obj,key:"CTRL+D",action:function(){
+		this.Copy();
+		this.Paste();
 	}.bind(obj)})
 	if(nd_sel.length>0){
 		menu_edit.AddSeparator();
