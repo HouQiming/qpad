@@ -117,7 +117,7 @@ var g_edge_formats={
 			s_input=s_input.substr(0,s_input.length-1);
 		}
 		if(s_input&&s_target_indent){
-			return UI.ED_GetClipboardTextSmart(s_target_indent,s_input);
+			return UI.ED_GetClipboardTextSmart(s_target_indent,s_input)||s_input;
 		}else{
 			return s_input;
 		} 

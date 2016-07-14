@@ -630,7 +630,7 @@ UI.Application=function(id,attrs){
 	UI.Begin(attrs);
 		///////////////////
 		var app=UI.Begin(W.Window('app',{
-				title:'QPad',w:1280,h:720,
+				title:'Graph Editor',w:1280,h:720,
 				bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
 				flags:UI.SDL_WINDOW_MAXIMIZED|UI.SDL_WINDOW_RESIZABLE,
