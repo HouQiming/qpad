@@ -133,7 +133,7 @@ inline StripLeadingSpaces(string s)
 		p++
 	return s[p:]
 
-auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
+auto ParsePortDescs(JSObject ret,string scode)
 	//just ignore all errors
 	obj_ports=ret["m_ports"].as(JSObject)
 	p=obj_ports["length"].as(iptr)
@@ -151,13 +151,13 @@ auto ParsePortDescs(JSObject ret,JSObject obj_id2port,string scode)
 				continue
 		words=[StripLeadingSpaces(s) for s in sline[pport:].Tokenize(",")]
 		sname=words[0]
-		if obj_id2port:
-			obj_port=obj_id2port[sname].as(JSObject)
-			if Platform.BUILD=="debug":
-				if !obj_port:
-					Writeln('port not found: ',sname)
-		else
-			obj_port=JSObject.NULL
+		//if obj_id2port:
+		//	obj_port=obj_id2port[sname].as(JSObject)
+		//	if Platform.BUILD=="debug":
+		//		if !obj_port:
+		//			Writeln('port not found: ',sname)
+		//else
+		obj_port=JSObject.NULL
 		if !obj_port:
 			obj_port=JS.New()
 			obj_ports[p]=obj_port; p++
@@ -206,36 +206,37 @@ auto ParseJSNode(string scode)
 	obj_func=JS["eval"].Call(JSObject,"(function(){return "+scode+"})()")
 	///////////////
 	ports=[new string[] for i=0:1]
-	got=new int[string]
-	word_mode=0
-	for s_word,ch in EnumWords(scode)
-		if word_mode>0:
-			if !(got[s_word]&(1<<(word_mode-1))):
-				ports[word_mode-1].push(s_word)
-				got[s_word]|=(1<<(word_mode-1))
-			word_mode=0
-		else
-			word_mode=0
-			if ch=='.':
-				if s_word=='input':
-					word_mode=MODE_INPUT
-				else if s_word=='output':
-					word_mode=MODE_OUTPUT
+	//got=new int[string]
+	//word_mode=0
+	//for s_word,ch in EnumWords(scode)
+	//	if word_mode>0:
+	//		if !(got[s_word]&(1<<(word_mode-1))):
+	//			ports[word_mode-1].push(s_word)
+	//			got[s_word]|=(1<<(word_mode-1))
+	//		word_mode=0
+	//	else
+	//		word_mode=0
+	//		if ch=='.':
+	//			if s_word=='input':
+	//				word_mode=MODE_INPUT
+	//			else if s_word=='output':
+	//				word_mode=MODE_OUTPUT
 	//we still need @type for type labels
 	ret=JS.New()
 	ret["m_script"]=obj_func
 	obj_ports=JS.NewArray()
 	ret["m_ports"]=obj_ports
-	obj_id2port=JS.New()
-	p=0L
-	for i=0:1
-		for s in ports[i]
-			obj=JS.New()
-			obj_ports[p]=obj;p++
-			obj["id"]=s
-			obj["dir"]=(i==0?"input":"output")
-			obj_id2port[s]=obj
-	ParsePortDescs(ret,obj_id2port,scode)
+	//obj_id2port=JS.New()
+	//p=0L
+	//for i=0:1
+	//	for s in ports[i]
+	//		obj=JS.New()
+	//		obj_ports[p]=obj;p++
+	//		obj["id"]=s
+	//		obj["dir"]=(i==0?"input":"output")
+	//		obj_id2port[s]=obj
+	//ParsePortDescs(ret,obj_id2port,scode)
+	ParsePortDescs(ret,scode)
 	return JS.Return(ret)
 
 JS=new JSContext
@@ -271,7 +272,7 @@ auto ParseTextNode(string scode)
 	ret["m_blocks"]=obj_code_blocks
 	obj_ports=JS.NewArray()
 	ret["m_ports"]=obj_ports
-	ParsePortDescs(ret,JSObject.NULL,scode)
+	ParsePortDescs(ret,scode)
 	is_in_port=new int[string]
 	n_ports=obj_ports["length"].as(iptr)
 	for i=0:n_ports-1

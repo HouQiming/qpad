@@ -1,7 +1,7 @@
 function(input,output){
+	//@in=code,type=code
 	//@in=name,type=path string,ui=editbox,color=0xffb4771f
 	//@out=out_name,type=path string,color=0xffb4771f
-	//@in=code,type=code
 	for(var j=0;j<input.name.length;j++){
 		IO.CreateFile(IO.m_current_graph_path+'/'+input.name[j],input.code.join(''));
 	}

@@ -190,7 +190,8 @@ var ExpandDots=function(nds,es,is_ungroup){
 	}
 	return es_new;
 };
-var Ungroup=function(nds,es, nds_ungroup,do_sel){
+var BUILD_UNGROUP_SCALE=1.0/65536.0;//prevent inner y from influencing input order
+var Ungroup=function(nds,es, nds_ungroup,is_quiet){
 	//remove group nodes and restore the old connections
 	var nds_new=[];
 	var es_new=[];
@@ -202,7 +203,7 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 	for(var i=0;i<nds.length;i++){
 		if(!is_in_group[nds[i].__id__]){
 			nds_new.push(nds[i]);
-			if(do_sel){nds[i].m_is_selected=0;}
+			if(!is_quiet){nds[i].m_is_selected=0;}
 		}
 	}
 	for(var i=0;i<es.length;i++){
@@ -225,15 +226,20 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 		}
 		var dx=nd_group.x;
 		var dy=nd_group.y;
+		var node_map={};
 		for(var j=0;j<gr.nds.length;j++){
 			var ndj=gr.nds[j];
 			//set m_last_group_name when ungrouping - the group node may have been renamed
 			ndj.m_last_group_name=nd_group.m_caption;
 			ndj.m_need_rebuild=nd_group.m_need_rebuild;
 			nds_new.push(ndj);
-			if(do_sel){ndj.m_is_selected=1;nds_gen.push(ndj);}
+			if(!is_quiet){ndj.m_is_selected=1;nds_gen.push(ndj);}
+			ndj.x=ndj.m_group_dx;
+			ndj.y=ndj.m_group_dy;
+			if(is_quiet){ndj.x*=BUILD_UNGROUP_SCALE;ndj.y*=BUILD_UNGROUP_SCALE;}
 			ndj.x+=dx;
 			ndj.y+=dy;
+			node_map[ndj.__id__]=ndj;
 		}
 		for(var j=0;j<gr.es.length;j++){
 			es_new.push(gr.es[j]);
@@ -243,6 +249,17 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 		for(var j=0;j<gr_reconnects.length;j++){
 			var cnj=gr_reconnects[j];
 			gport_map[nd_group.__id__+'='+cnj.port_outer]=cnj.id_inner;
+		}
+		//propagate UI values - m_ui_port_map
+		var gr_ui_port_map=ndcls.m_ui_port_map;
+		if(gr_ui_port_map){
+			for(var j=0;j<gr_ui_port_map.length;j++){
+				var cnj=gr_ui_port_map[j];
+				var s_ui_value=nd_group.m_ui_values[cnj.port_outer];
+				if(s_ui_value){
+					node_map[cnj.id_inner].m_ui_values[cnj.port_inner]=s_ui_value;
+				}
+			}
 		}
 	}
 	//translate the dot connections
@@ -268,7 +285,7 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 		}
 	}
 	//finally remove the dots
-	if(do_sel){
+	if(!is_quiet){
 		es_new=ExpandDots(nds_new,es_new,1);
 		nds_new=nds_new.filter(function(ndi){return !ndi.m_is_group_dot;})
 	}
@@ -328,7 +345,7 @@ var graph_prototype={
 		var nds=this.nds;
 		////////////////////////
 		//expand groups
-		var ret_ung=Ungroup(nds,es,nds.filter(isGroup),0);
+		var ret_ung=Ungroup(nds,es,nds.filter(isGroup),1);
 		nds=ret_ung[0];
 		es=ret_ung[1]
 		for(var i=0;i<this.nds.length;i++){
@@ -571,7 +588,7 @@ var rproto_node={
 			//edit node file - put fn in parser
 			if(isGroup(this.nd)){
 				var obj=this.owner;
-				var ret=Ungroup(obj.graph.nds,obj.graph.es, [this.nd],1);
+				var ret=Ungroup(obj.graph.nds,obj.graph.es, [this.nd],0);
 				obj.graph.nds=ret[0];
 				obj.graph.es=ret[1];
 				obj.graph.SignalEdit(ret[2]);
@@ -855,6 +872,11 @@ var FixClonedGroupClass=function(ndcls){
 		var cnj=gr_reconnects[j];
 		cnj.id_inner=id_map_group[cnj.id_inner];
 	}
+	var gr_ui_port_map=ndcls.m_ui_port_map;
+	for(var j=0;j<gr_ui_port_map.length;j++){
+		var cnj=gr_ui_port_map[j];
+		cnj.id_inner=id_map_group[cnj.id_inner];
+	}
 };
 var FixClonedGraph=function(gr){
 	var id_map={};
@@ -1084,6 +1106,7 @@ W.graphview_prototype={
 		var gr_es=gr.es;
 		var gr_reconnects=[];
 		var gr_ports=[];
+		var gr_ui_port_map=[];
 		var dot_cache={};
 		var port_name_map={};
 		var CreateDot=function(nd,port,side){
@@ -1115,6 +1138,9 @@ W.graphview_prototype={
 			}
 			port_name_map[port_outer.id]=1;
 			gr_ports.push(port_outer);
+			if(port_inner.ui){
+				gr_ui_port_map.push({id_inner:nd.__id__,port_inner:port_inner.id,port_outer:port_outer.id});
+			}
 			nd_dot.m_port_outer_id=port_outer.id
 			return nd_dot;
 		};
@@ -1174,6 +1200,7 @@ W.graphview_prototype={
 			m_graph:gr,
 			m_reconnects:gr_reconnects,
 			m_ports:gr_ports,
+			m_ui_port_map:gr_ui_port_map,
 		};
 		ndcls.m_port_map={};
 		for(var i=0;i<ndcls.m_ports.length;i++){
@@ -1202,6 +1229,8 @@ W.graphview_prototype={
 			if(nd_i.x!=undefined&&nd_i.y!=undefined){
 				nd_i.x-=x0;
 				nd_i.y-=y0;
+				nd_i.m_group_dx=nd_i.x;
+				nd_i.m_group_dy=nd_i.y;
 			}
 		}
 		//var nd_rebuilds=[nd_group];
@@ -1343,7 +1372,7 @@ W.GraphView=function(id,attrs){
 	//render the nodes
 	//when we're connecting, we need to grey out all but type-connectable ones, use the .port tag on renderables
 	var is_connecting_edges=(obj.m_temp_ui=="edge");
-	var big_param_panel=[];
+	var need_ui=0;
 	var port_ref_drag_v0=undefined;
 	var port_ref_drag_v1=undefined;
 	var type_ref_drag_v0=undefined;
@@ -1437,14 +1466,10 @@ W.GraphView=function(id,attrs){
 		}
 		//create UI panel
 		if(ndi.m_is_selected&&cache_item.m_param_panel.length>0){
-			big_param_panel.push({caption:ndi.m_caption});
-			for(var i=0;i<cache_item.m_param_panel.length;i++){
-				big_param_panel.push(cache_item.m_param_panel[i]);
-			}
+			need_ui=1;
 		}
 	}
-	obj.m_big_param_panel=big_param_panel;
-	if(big_param_panel.length){
+	if(need_ui){
 		UI.OpenUtilTab("param_panel","quiet");
 	}
 	//render the links
@@ -1789,7 +1814,7 @@ W.GraphView=function(id,attrs){
 		menu_edit.AddNormalItem({text:"Ungroup",enable_hotkey:UI.nd_focus==obj,key:"CTRL+U",action:function(){
 			var ret=Ungroup(this.graph.nds,this.graph.es, this.graph.nds.filter(function(ndi){
 				return isGroup(ndi)&&ndi.m_is_selected;
-			}),1)
+			}),0)
 			this.graph.nds=ret[0];
 			this.graph.es=ret[1];
 			this.graph.SignalEdit(ret[2]);
@@ -1961,7 +1986,19 @@ W.ParamPanelPage=function(id,attrs){
 	if(!obj.graphview){
 		return obj;
 	}
-	var big_param_panel=obj.graphview.m_big_param_panel;
+	var graph=obj.graphview.graph;
+	var cache=obj.graphview.cache;
+	var big_param_panel=[];
+	for(var ni=0;ni<graph.nds.length;ni++){
+		var ndi=graph.nds[ni];
+		var cache_item=UI.GetNodeCache(cache,ndi);
+		if(ndi.m_is_selected&&cache_item.m_param_panel.length>0){
+			big_param_panel.push({caption:ndi.m_caption});
+			for(var i=0;i<cache_item.m_param_panel.length;i++){
+				big_param_panel.push(cache_item.m_param_panel[i]);
+			}
+		}
+	}
 	if(!big_param_panel||!big_param_panel.length){
 		W.Text("",{
 			x:0,y:0,anchor:obj,anchor_align:"center",anchor_valign:"center",
@@ -2023,7 +2060,7 @@ UI.RegisterUtilType("param_panel",function(){return UI.NewTab({
 		if(!this.main_widget){return 1;}
 		if(this==UI.top.app.document_area.active_tab){return 1;}
 		//todo: main widget update / selchange check
-		return 0;
+		return 1;
 	},
 	Save:function(){},
 	SaveMetaData:function(){},
