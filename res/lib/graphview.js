@@ -223,12 +223,13 @@ var Ungroup=function(nds,es, nds_ungroup,do_sel){
 			throw new Error('bad ungroup');
 			continue;
 		}
-		var dx=nd_group.x-ndcls.m_x0;
-		var dy=nd_group.y-ndcls.m_y0;
+		var dx=nd_group.x;
+		var dy=nd_group.y;
 		for(var j=0;j<gr.nds.length;j++){
 			var ndj=gr.nds[j];
 			//set m_last_group_name when ungrouping - the group node may have been renamed
 			ndj.m_last_group_name=nd_group.m_caption;
+			ndj.m_need_rebuild=nd_group.m_need_rebuild;
 			nds_new.push(ndj);
 			if(do_sel){ndj.m_is_selected=1;nds_gen.push(ndj);}
 			ndj.x+=dx;
@@ -330,6 +331,12 @@ var graph_prototype={
 		var ret_ung=Ungroup(nds,es,nds.filter(isGroup),0);
 		nds=ret_ung[0];
 		es=ret_ung[1]
+		for(var i=0;i<this.nds.length;i++){
+			if(isGroup(this.nds[i])){
+				//groups get expanded and their rebuild flags have to be reset manually
+				this.nds[i].m_need_rebuild=0;
+			}
+		}
 		////////////////////////
 		//expand dots
 		//create a dot disjoint set and an input/output set for each dot
@@ -846,8 +853,7 @@ var FixClonedGroupClass=function(ndcls){
 	var gr_reconnects=ndcls.m_reconnects;
 	for(var j=0;j<gr_reconnects.length;j++){
 		var cnj=gr_reconnects[j];
-		if(cnj.id0){cnj.id0=id_map_group[cnj.id0];}
-		if(cnj.id1){cnj.id1=id_map_group[cnj.id1];}
+		cnj.id_inner=id_map_group[cnj.id_inner];
 	}
 };
 var FixClonedGraph=function(gr){
@@ -1189,8 +1195,15 @@ W.graphview_prototype={
 		npt=Math.max(npt,1);
 		nd_group.x=xtot/npt;
 		nd_group.y=ytot/npt;
-		ndcls.m_x0=nd_group.x;
-		ndcls.m_y0=nd_group.y;
+		var x0=nd_group.x;
+		var y0=nd_group.y;
+		for(var i=0;i<gr_nds.length;i++){
+			var nd_i=gr_nds[i];
+			if(nd_i.x!=undefined&&nd_i.y!=undefined){
+				nd_i.x-=x0;
+				nd_i.y-=y0;
+			}
+		}
 		//var nd_rebuilds=[nd_group];
 		for(var i=0;i<gr_reconnects.length;i++){
 			var cni=gr_reconnects[i];
@@ -1199,11 +1212,13 @@ W.graphview_prototype={
 					id0:cni.id0,port0:cni.port0,
 					id1:nd_group.__id__,port1:cni.port_outer,
 				})
+				cni.id0=undefined;cni.port0=undefined;
 			}else{
 				es.push({
 					id0:nd_group.__id__,port0:cni.port_outer,
 					id1:cni.id1,port1:cni.port1,
 				})
+				cni.id1=undefined;cni.port1=undefined;
 				//nd_rebuilds.push(nds[node_map[cni.id1]]);
 			}
 		}
@@ -1248,6 +1263,7 @@ W.graphview_prototype={
 		this.graph.SelectionClear();
 		Array.prototype.push.apply(this.graph.nds,gr.nds);
 		Array.prototype.push.apply(this.graph.es,gr.es);
+		this.graph.SignalEdit(gr.nds)
 		return gr;
 	},
 };
@@ -1256,12 +1272,13 @@ W.GraphView=function(id,attrs){
 	var graph=obj.graph;
 	var cache=obj.cache;
 	if(!cache){
+		var s_file_dir=UI.GetPathFromFilename(obj.m_file_name);
 		cache={
 			nds:{},
 			m_classes_by_name:{},
 			m_undo_queue:[JSON.stringify(graph)],
 			m_redo_queue:[],
-			search_paths:[UI.m_node_dir,UI.GetPathFromFilename(obj.m_file_name)+'/znodes'],
+			search_paths:[UI.m_node_dir,s_file_dir,s_file_dir+'/znodes'],
 		};
 		obj.cache=cache;
 		obj.m_saved_point=1;
@@ -1443,6 +1460,9 @@ W.GraphView=function(id,attrs){
 	}
 	for(var ei=0;ei<graph.es.length;ei++){
 		var e=graph.es[ei];
+		if(!port_pos_map[e.id0]||!port_pos_map[e.id1]){
+			continue;
+		}
 		var pos0=port_pos_map[e.id0][e.port0];
 		var pos1=port_pos_map[e.id1][e.port1];
 		if(pos0&&pos1){
@@ -1670,7 +1690,7 @@ W.GraphView=function(id,attrs){
 						}
 						var type_key_best=1e9;
 						var port_best=undefined;
-						for(var i=0;i<graph.nds.length;i++){
+						for(var i=0;i<graph.nds.length-1;i++){
 							var ndi=graph.nds[i];
 							var ndcls=UI.GetNodeClass(cache,ndi.m_class);
 							var type_key=1e10;
@@ -1750,7 +1770,7 @@ W.GraphView=function(id,attrs){
 	}.bind(obj)})
 	menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",enable_hotkey:UI.nd_focus==obj,key:"CTRL+X",action:function(){
 		this.Copy();
-		this.DeleteSelection(0);
+		this.graph.DeleteSelection(0);
 	}.bind(obj)})
 	if(UI.SDL_HasClipboardText()){
 		menu_edit.AddNormalItem({text:"&Paste",icon:"粘",enable_hotkey:UI.nd_focus==obj,key:"CTRL+V",action:function(){
@@ -1998,6 +2018,12 @@ UI.RegisterUtilType("param_panel",function(){return UI.NewTab({
 			UI.m_invalid_util_tabs.push(this.__global_tab_id);
 		}
 		return body;
+	},
+	NeedRendering:function(){
+		if(!this.main_widget){return 1;}
+		if(this==UI.top.app.document_area.active_tab){return 1;}
+		//todo: main widget update / selchange check
+		return 0;
 	},
 	Save:function(){},
 	SaveMetaData:function(){},

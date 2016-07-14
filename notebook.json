@@ -9,9 +9,9 @@
     2016,
     6,
     13,
-    14,
-    37,
-    27,
+    17,
+    0,
+    44,
     4
    ],
    "m_has_any_error": 0,
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\n(test) reuse groups in example graphs as classes\n\tmuch less clutter\n\tneed help with class searching\n\t\tgroup_caption@file_name\n\t\tassume: in-group nodes won't change for no reason\n\t\t\teven for the group-as-class case\nmodule metadata\n\tper-module concepts\n\t\tconflict / search\n\t\tlinks\n\tdefault values for ports\n\t\tfunction prototype and ...\n\t\tor not ports - JSON-like options:{\n\t\t\tmethod:'POST',\n\t\t\turi:url,\n\t\t\tbody:Buffer.concat(buf_package),\n\t\t\tencoding:null,\n\t\t}\n\t@ref=\n\t\tfor in-port default values\n\t\tor just write values for in-ports like the out-ports\nmake newly-created classes connect to all dangling in-ports on selected nodes\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\n\t\tas a \"minimized mode\"?\n\t\tor a thumbnail?\n\tauto-rebuild preview nodes\n\t\tnuke-like previews / widgets\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
+   "m_text_in": "# TODO LIST\nmodule metadata\n\tper-module tags\n\t\tconflict / search\n\t\tlinks\n\tdefault values for ports\n\t\tfunction prototype and ...\n\t\tor not ports - JSON-like options:{\n\t\t\tmethod:'POST',\n\t\t\turi:url,\n\t\t\tbody:Buffer.concat(buf_package),\n\t\t\tencoding:null,\n\t\t}\n\t@ref=\n\t\tfor in-port default values\n\t\tor just write values for in-ports like the out-ports\nmake newly-created classes connect to all dangling in-ports on selected nodes\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\n\t\tas a \"minimized mode\"?\n\t\tor a thumbnail?\n\tauto-rebuild preview nodes\n\t\tnuke-like previews / widgets\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,
