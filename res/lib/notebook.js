@@ -195,7 +195,7 @@ W.notebook_prototype={
 			//doc_out.ResetSaveDiff();
 			procs[i]=cell_i.m_proc;cell_i.m_proc=undefined;
 		}
-		var s=JSON.stringify({cells:this.m_cells})
+		var s=JSON.stringify({cells:this.m_cells},null,1)
 		var sz_std=Duktape.__byte_length(s);
 		var sz_written=IO.CreateFile(this.file_name,s);
 		this.m_loaded_time=IO.GetFileTimestamp(this.file_name);

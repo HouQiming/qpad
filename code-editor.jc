@@ -4295,7 +4295,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_FormatRichText"]=function(JSContext JS){
 		//leave objects for later
 		auto hyp=JS.Param(0).as(CHyphenator)
-		auto sblock=JS.Param(1).as(string)
+		auto sblock=JS.Param(1).as(string).Replace(["\r",""])
 		auto tab_width=JS.Param(2).or(4)
 		auto w_line=double2fixed(JS.Param(3).as(double))
 		auto js_styles=JS.Param(4).as(JSObject)
@@ -4339,7 +4339,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					rjobs.push(TRenderJob(){
 						x:fixed2float(x),
 						y:fixed2float(y-(ccnt1==ccnt0+1&&sblock[ccnt0]=='\n'?0:styles.m_styles[style_id].raise_height)),
-						style_id:style_id,ccnt0:ccnt0,ccnt1:ccnt1})
+						style_id:style_id,ccnt0:ccnt0,ccnt1:ccnt1-(sblock[ccnt1-1]=='\n')})
 					for ch in Utf8Chars(sblock[ccnt0:ccnt1-1])
 						x+=styles.charWidth(style_id,ch)
 					prev_style_id=style_id
