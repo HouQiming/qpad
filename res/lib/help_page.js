@@ -150,7 +150,7 @@ W.HelpPage=function(id,attrs){
 			text:UI._("Search")})
 	}
 	var spath_repo="<none>";
-	if(obj.editor_widget){
+	if(obj.editor_widget&&obj.editor_widget.file_name){
 		spath_repo=UI.GetEditorProject(obj.editor_widget.file_name);
 	}
 	if(spath_repo!=obj.current_repo){

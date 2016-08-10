@@ -3,18 +3,18 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n",
-   "m_text_out": "",
+   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\nTypeError: cannot read property 'match' of undefined\r\n    at [anon] (duk_hobject_props.c:2265) internal\r\n    at [anon] (res/lib/global_doc:20)\r\n    at [anon] (res/lib/code_editor:3208)\r\n    at [anon] (res/lib/code_editor:3247)\r\n    at [anon] (res/lib/help_page:154)\r\n    at [anon] (res/lib/help_page:549) preventsyield\r\n    at call () native strict preventsyield\r\n    at [anon] (res/lib/subwin:922)\r\n    at [anon] (res/lib/subwin:804)\r\n    at [anon] (res/lib/subwin:1010)\r\n    at [anon] (res/lib/subwin:1151)\r\n    [...]\r\nTypeError: cannot read property 'match' of undefined\r\n    at [anon] (duk_hobject_props.c:2265) internal\r\n    at [anon] (res/lib/global_doc:20)\r\n    at [anon] (res/lib/code_editor:3208)\r\n    at [anon] (res/lib/code_editor:3247)\r\n    at [anon] (res/lib/help_page:154)\r\n    at [anon] (res/lib/help_page:549) preventsyield\r\n    at call () native strict preventsyield\r\n    at [anon] (res/lib/subwin:922)\r\n    at [anon] (res/lib/subwin:804)\r\n    at [anon] (res/lib/subwin:1010)\r\n    at [anon] (res/lib/subwin:1151)\r\n    [...]\r\n",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
     7,
     9,
-    14,
-    9,
-    8,
+    18,
+    48,
+    54,
     3
    ],
-   "m_has_any_error": 0,
+   "m_has_any_error": 1,
    "m_current_path": "c:/tp/z",
    "m_button_name": "Debug"
   },

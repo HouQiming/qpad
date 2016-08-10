@@ -78,6 +78,27 @@ var SearchClassFile=function(cache,sname){
 	return undefined;
 };
 
+UI.GetPrivateClassList=function(cache){
+	var list=cache.m_private_node_list;
+	if(!list){
+		list=[];
+		for(var i=0;i<cache.search_paths.length;i++){
+			var spath=cache.search_paths[i];
+			var fnext=IO.CreateEnumFileContext(spath+'/*',1);
+			if(fnext){
+				for(;;){
+					var fi=fnext();
+					if(!fi){break;}
+					list.push(UI.GetMainFileName(fi.name));
+				}
+				fnext=undefined;
+			}
+		}
+		cache.m_private_node_list=list;
+	}
+	return list;
+};
+
 UI.GetNodeClass=function(cache,sname){
 	if(typeof(sname)!='string'){
 		return sname;
@@ -2185,13 +2206,20 @@ W.PackagePage=function(id,attrs){
 		for(var i=0;i<UI.g_packages.length;i++){
 			if(packs_refed_map[UI.g_packages[i].name]){continue;}
 			var s_i=UI.g_packages[i].name.toLowerCase();
+			var s_desc_i=(UI.g_packages[i].desc||'').toLowerCase();
 			var is_bad=0;
 			var hl_ranges=[];
+			var hl_ranges_desc=[];
 			for(var j=0;j<s_searches.length;j++){
 				var p=s_i.indexOf(s_searches[j]);
 				if(p<0){
-					is_bad=1;
-					break
+					var p=s_desc_i.indexOf(s_searches[j]);
+					if(p<0){
+						is_bad=1;
+						break
+					}
+					hl_ranges_desc.push(p,p+s_searches[j].length);
+					continue;
 				}
 				hl_ranges.push(p,p+s_searches[j].length);
 			}
@@ -2201,22 +2229,8 @@ W.PackagePage=function(id,attrs){
 					s_package:UI.g_packages[i].name,
 					s_desc:UI.g_packages[i].m_description,
 					hl_ranges:hl_ranges,
+					hl_ranges_desc:hl_ranges_desc,
 				});
-			}
-		}
-		//create-node option
-		if(s_searches.length==1){
-			if(s_search_text.indexOf('.')>=0){
-				items.push({
-					s_create:s_search_text,
-				});
-			}else{
-				//todo: *search* private nodes
-				if(UI.GetNodeClass(obj.graphview.cache,s_searches[0])){
-					items.push({
-						s_create:s_search_text,
-					});
-				}
 			}
 		}
 		//nodes of already-referenced packages
@@ -2227,35 +2241,91 @@ W.PackagePage=function(id,attrs){
 			var groups=ParsePackage(nd_package);
 			for(var i=0;i<groups.length;i++){
 				var s_i=groups[i].name.toLowerCase();
+				var s_desc_i=(groups[i].desc||'').toLowerCase();
+				if(s_i[0]=='@'){
+					s_i=s_i.substr(1);
+				}
 				var is_bad=0;
 				var hl_ranges=[];
+				var hl_ranges_desc=[];
 				for(var j=0;j<s_searches.length;j++){
 					var p=s_i.indexOf(s_searches[j]);
 					if(p<0){
-						is_bad=1;
-						break
+						var p=s_desc_i.indexOf(s_searches[j]);
+						if(p<0){
+							is_bad=1;
+							break
+						}
+						hl_ranges_desc.push(p,p+s_searches[j].length);
+						continue;
 					}
 					hl_ranges.push(p,p+s_searches[j].length);
 				}
 				if(!is_bad){
-					if(s_i[0]=='@'){
+					if(groups[i].name[0]=='@'){
 						items.push({
 							s_package:s_package,
-							s_template:s_i,
+							s_template:groups[i].name,
 							s_desc:groups[i].desc,
 							hl_ranges:hl_ranges,
+							hl_ranges_desc:hl_ranges_desc,
 						});
 					}else{
 						items.push({
 							s_package:s_package,
-							s_group:s_i,
+							s_group:groups[i].name,
 							s_desc:groups[i].desc,
 							hl_ranges:hl_ranges,
+							hl_ranges_desc:hl_ranges_desc,
 						});
 					}
 				}
 			}
 		}
+		//private nodes
+		var pnode_list=UI.GetPrivateClassList(obj.graphview.cache);
+		for(var i=0;i<pnode_list.length;i++){
+			var s_i=pnode_list[i].toLowerCase();
+			//var s_desc_i='private nodes'
+			var is_bad=0;
+			var hl_ranges=[];
+			//var hl_ranges_desc=[];
+			for(var j=0;j<s_searches.length;j++){
+				var p=s_i.indexOf(s_searches[j]);
+				if(p<0){
+					//var p=s_desc_i.indexOf(s_searches[j]);
+					//if(p<0){
+					//	is_bad=1;
+					//	break;
+					//}
+					//hl_ranges_desc.push(p,p+s_searches[j].length);
+					//continue;
+					is_bad=1;
+					break;
+				}
+				hl_ranges.push(p,p+s_searches[j].length);
+			}
+			if(!is_bad){
+				items.push({
+					s_create:pnode_list[i],
+					hl_ranges:hl_ranges,
+					//hl_ranges_desc:hl_ranges_desc,
+				});
+			}
+		}
+		//create-node option
+		if(s_searches.length==1){
+			if(s_search_text.indexOf('.')>=0){
+				items.push({
+					s_create:s_search_text,
+				});
+			}
+		}
+		//postprocessing
+		for(var i=0;i<items.length;i++){
+			items[i].h=UI.default_styles.package_item.h;
+		}
+		obj.package_list=undefined;
 	}
 	//just show a list of candidates, with keyboard browsing -- listview
 	UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
@@ -2263,6 +2333,7 @@ W.PackagePage=function(id,attrs){
 		x:obj.x,y:obj.y+obj.h_find_bar,w:obj.w,h:obj.h-obj.h_find_bar,
 		dimension:'y',layout_spacing:8,layout_align:'fill',
 		no_clipping:1,
+		mouse_wheel_speed:80,
 		items:obj.found_items,
 		item_template:{
 			object_type:W.PackageItem,
@@ -2476,20 +2547,20 @@ W.PackageItem=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"package_item",W.PackageItem_prototype);
 	UI.Begin(obj)
 		UI.RoundRect({
-			x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2+obj.shadow_size,h:obj.h+obj.shadow_size,
+			x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2-12+obj.shadow_size,h:obj.h+obj.shadow_size,
 			border_width:-obj.shadow_size,round:obj.shadow_size,color:obj.shadow_color})
 		var name_font=obj.name_font;
 		var name_font_bold=obj.name_font_bold;
 		var h_icon=UI.GetCharacterHeight(obj.icon_font);
 		//coulddo: show a description of selected nodes
 		UI.RoundRect({
-			x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2,h:obj.h,
+			x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2-12,h:obj.h,
 			color:this.bgcolor,
 		})
 		if(obj.selected){
 			var sel_bgcolor=obj.sel_bgcolor;
 			UI.RoundRect({
-				x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2,h:obj.h,
+				x:obj.x+obj.padding,y:obj.y,w:obj.w-12-obj.padding*2,h:obj.h,
 				border_color:sel_bgcolor,border_width:obj.sel_border_width})
 		}
 		var s_icon='夹';
@@ -2507,15 +2578,16 @@ W.PackageItem=function(id,attrs){
 				s_title=obj.s_package;
 			}
 		}else{
-			s_icon='新';
 			s_title=obj.s_create;
 			if(obj.s_create.indexOf('.')>=0){
+				s_icon='新';
 				if(UI.GetFileNameExtension(obj.s_create).toLowerCase()=='zjs'){
 					s_hint=UI._('New script');
 				}else{
 					s_hint=UI._('New code snippet');
 				}
 			}else{
+				s_icon='プ';
 				s_hint=UI._('Private node');
 			}
 		}
@@ -2536,6 +2608,18 @@ W.PackageItem=function(id,attrs){
 					W.Text("",{x:x,y:obj.y+4,
 						font:name_font_bold,text:s_title.substr(p0,p1-p0),
 						color:obj.name_color})
+				}
+			}
+		}
+		if(obj.hl_ranges_desc){
+			for(var i=0;i<obj.hl_ranges_desc.length;i+=2){
+				var p0=obj.hl_ranges_desc[i+0];
+				var p1=obj.hl_ranges_desc[i+1];
+				if(p0<p1){
+					var x=obj.x+obj.padding+56+UI.MeasureText(obj.hint_font,s_hint.substr(0,p0)).w
+					W.Text("",{x:x,y:obj.y+4+28,
+						font:obj.hint_font_bold,text:s_hint.substr(p0,p1-p0),
+						color:obj.hint_color})
 				}
 			}
 		}
