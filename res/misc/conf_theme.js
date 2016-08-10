@@ -1183,7 +1183,7 @@ UI.CustomTheme=function(){
 			style_package:{
 				dx:-4,
 				dy:-4,
-				w:320,
+				w:480,
 				h:480,
 			},
 		},

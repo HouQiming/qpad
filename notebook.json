@@ -3,15 +3,15 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n",
-   "m_text_out": "",
+   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\n",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
     7,
     9,
-    18,
-    52,
-    1,
+    21,
+    20,
+    22,
     3
    ],
    "m_has_any_error": 0,
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\n(test) package management system\n\tpackage metadata\n\t\ttags should have been shared\n\t\tput them in a md file\n\t\t\twith a shared description\n\t\t\tand list group/node names there\n\t\tand the dependencies\n\t\t---\n\t\tspecial package metadata node\n\tgroup metadata\n\t\tpreview nodes have to be in each group\n\t\tdescription... is clunky that way\n\t\tpack in caption\n\tuse @ syntax for non-group nodes\n\tper-module tags\n\t\tconflict / relevant\nstore update info in referenced groups\n\twhich package, which caption\nrender param widgets inside nodes\n\talso inline-ify the code editing UI\nruntime dataflow\n\ttop-bottom knobs?\n\tjust a \"var\" connection type that automatically generates unique ids\nreference code snippet\n\tin-package code nodes that can be added as a template\n\tcaption-tagged\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created classes connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\n\t\tas a \"minimized mode\"?\n\t\tor a thumbnail?\n\tauto-rebuild preview nodes\n\t\tnuke-like previews / widgets\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
+   "m_text_in": "# TODO LIST\nbad param name binding inside nested groups\nhotkey for adding dots.\nstore update info in referenced groups\n\twhich package, which caption\nUI overhaul\n\tmove names out of knobs\n\trender param widgets inside nodes\n\t\talso inline-ify the code editing UI\n\tdedicated \"preview\" nodes\n(test) @out format=var \nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,

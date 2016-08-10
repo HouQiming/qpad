@@ -384,16 +384,24 @@ var graph_prototype={
 		IO.SetCurrentDirectory(IO.m_current_graph_path);
 		var es=this.es;
 		var nds=this.nds;
+		var uvid=0;
 		////////////////////////
 		//expand groups
-		var ret_ung=Ungroup(nds,es,nds.filter(isGroup),1);
-		nds=ret_ung[0];
-		es=ret_ung[1]
-		for(var i=0;i<this.nds.length;i++){
-			if(isGroup(this.nds[i])){
-				//groups get expanded and their rebuild flags have to be reset manually
-				this.nds[i].m_need_rebuild=0;
+		for(;;){
+			var ret_ung=Ungroup(nds,es,nds.filter(isGroup),1);
+			var has_group=0;
+			for(var i=0;i<nds.length;i++){
+				if(isGroup(nds[i])){
+					//groups get expanded and their rebuild flags have to be reset manually
+					nds[i].m_need_rebuild=0;
+					has_group=1;
+				}
 			}
+			if(!has_group){
+				break;
+			}
+			nds=ret_ung[0];
+			es=ret_ung[1]
 		}
 		////////////////////////
 		//expand dots
@@ -509,11 +517,11 @@ var graph_prototype={
 						for(var id in pvmap_v0){
 							pvmap_v0_s[id]=pvmap_v0[id].join('');
 						}
-						var output_formats={};
+						var input_formats={};
 						for(var j=0;j<ndcls.m_ports.length;j++){
 							var port_j=ndcls.m_ports[j];
 							if(port_j.dir=='input'&&port_j.format){
-								output_formats[port_j.id]=port_j.format;
+								input_formats[port_j.id]=port_j.format;
 							}
 						}
 						for(var j=0;j<ndcls.m_blocks.length;j+=2){
@@ -523,7 +531,7 @@ var graph_prototype={
 							for(var k=0;k<blocks_j.length;k++){
 								var s_block_jk=blocks_j[k];
 								if(k&1){
-									var f_format=output_formats[s_block_jk];
+									var f_format=input_formats[s_block_jk];
 									if(f_format){
 										f_format=g_edge_formats[f_format];
 									}
@@ -536,6 +544,14 @@ var graph_prototype={
 								blocks_ret.push(s_block_jk);
 							}
 							pvmap_v0[id]=blocks_ret.join('');
+						}
+						//variable generator
+						for(var j=0;j<ndcls.m_ports.length;j++){
+							var port_j=ndcls.m_ports[j];
+							if(port_j.dir=='output'&&port_j.format=='var'){
+								pvmap_v0[port_j.id]='zV'+uvid.toString();
+								uvid++;
+							}
 						}
 					}
 				}
@@ -776,7 +792,9 @@ UI.GetNodeCache=function(cache,ndi){
 		dims.h=0;
 		h_caption=0;
 	}
-	if(!s_desc){
+	if(s_desc){
+		dims.w=Math.max(dims.w,UI.MeasureText(style.font_desc,s_desc).w);
+	}else{
 		h_desc=0;
 	}
 	var w_final=Math.max(dims.w+style.caption_padding*2, (wl-style.port_extrude)+(wr-style.port_extrude)+style.port_w_sep);
@@ -1676,7 +1694,7 @@ W.GraphView=function(id,attrs){
 	//////////////////////////
 	if(obj.m_temp_ui=="add_node"){
 		//put it near the mouse
-		var x_caret=obj.m_temp_ui_desc.x;
+		var x_caret=Math.min(obj.m_temp_ui_desc.x,obj.x+obj.w-obj.style_package.w-4);
 		var y_caret=Math.min(obj.m_temp_ui_desc.y,obj.y+obj.h-obj.style_package.h-4);
 		var old_pack_page=obj.pack_page;
 		W.PackagePage('pack_page',{
@@ -2053,6 +2071,9 @@ var ReindexPackages=function(){
 		for(;;){
 			var fi=fnext();
 			if(!fi){break;}
+			if(UI.GetMainFileName(fi.name).toLowerCase()=='build'){
+				continue;
+			}
 			packs.push(IO.NormalizeFileName(fi.name));
 		}
 		fnext=undefined;
@@ -2384,7 +2405,7 @@ W.PackageItem_prototype={
 					break;
 				}
 			}
-			s_file_template=LoadGroupReference(s_group_name,s_template);
+			s_file_template=LoadGroupReference(this.s_template,UI.g_packages_by_name[this.s_package].fn_graph);
 		}else if(this.s_group){
 			//group reference, pick by caption, cache the graph with date checks
 			var s_group_file=UI.g_packages_by_name[this.s_package].fn_graph;
@@ -2563,16 +2584,19 @@ W.PackageItem=function(id,attrs){
 				x:obj.x+obj.padding,y:obj.y,w:obj.w-12-obj.padding*2,h:obj.h,
 				border_color:sel_bgcolor,border_width:obj.sel_border_width})
 		}
+		UI.PushCliprect(obj.x+obj.padding,obj.y,obj.w-obj.padding*2-12,obj.h)
 		var s_icon='夹';
-		var s_title='';
+		var s_title='',s_title2=undefined;
 		var s_hint=(obj.s_desc||'');
 		if(obj.s_package){
 			if(obj.s_group){
 				s_icon='も';
 				s_title=obj.s_group;
+				s_title2='@'+obj.s_package;
 			}else if(obj.s_template){
-				s_icon='プ';
+				s_icon='新';
 				s_title=obj.s_template.substr(1);
+				s_title2='@'+obj.s_package;
 			}else{
 				s_icon='夹';
 				s_title=obj.s_package;
@@ -2596,6 +2620,11 @@ W.PackageItem=function(id,attrs){
 		W.Text("",{x:obj.x+obj.padding+56,y:obj.y+4,
 			font:name_font,text:s_title,
 			color:obj.name_color})
+		if(s_title2){
+			W.Text("",{x:obj.x+obj.padding+56+UI.MeasureText(name_font,s_title).w+8,y:obj.y+4,
+				font:name_font,text:s_title2,
+				color:obj.hint_color})
+		}
 		W.Text("",{x:obj.x+obj.padding+56,y:obj.y+4+28,
 			font:obj.hint_font,text:s_hint,
 			color:obj.hint_color})
@@ -2623,6 +2652,7 @@ W.PackageItem=function(id,attrs){
 				}
 			}
 		}
+		UI.PopCliprect();
 	UI.End()
 	return obj
 }
