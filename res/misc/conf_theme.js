@@ -1144,9 +1144,12 @@ UI.CustomTheme=function(){
 				port_text_color:0xffffffff,//0xff444444,
 				//////////
 				font_caption:UI.Font(UI.font_name,20),
+				font_desc:UI.Font(UI.font_name,16,-50),
 				caption_padding:6,
-				caption_h:24,
+				caption_h:20,
+				caption_h_desc:16,
 				caption_text_color:0xff444444,
+				caption_desc_color:0xff7f7f7f,
 				//////////
 				node_round:6,
 				node_color_default:0xffffffff,
@@ -1215,6 +1218,8 @@ UI.CustomTheme=function(){
 			name_font:UI.Font(UI.font_name,24,-50),
 			name_font_bold:UI.Font(UI.font_name,24,100),
 			name_color:L?0xff000000:0xffe8e8e8,
+			hint_font:UI.Font(UI.font_name,20,-50),
+			hint_color:L?0xff7f7f7f:0xffaaaaaa,
 			sel_name_color:L?0xff000000:0xffe8e8e8,
 			shadow_size:8,
 			shadow_color:0xaa000000,

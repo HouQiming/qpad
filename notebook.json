@@ -3,16 +3,16 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n",
-   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\n",
+   "m_text_out": "",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
-    6,
-    13,
-    23,
-    35,
-    31,
-    4
+    7,
+    9,
+    14,
+    9,
+    8,
+    3
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/z",
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\npackage management system\n\tpackage.json-like dependency list\n\t\t.m_depends\n\tbase class files should be available without package\n\tpackage searching / browsing\n\t\tsystem-level package repo dirs\n\t\tfat packages covering broad topics\n\t\t\t\"node.js\"... or something\n\t\tignore version control for now\n\t\tpackage-level icon\n\t\t--\n\t\tcreate a \"nodejs\" package\n\t\tdo a makeshift ui first\n\t\t\tuse the \"help\" code\n\tmultiple groups per package\n\teach package could include a bunch of node files\n\tpackage metadata\n\t\ttags should have been shared\n\t\tput them in a md file\n\t\t\twith a shared description\n\t\t\tand list group/node names there\n\t\tand the dependencies\n\tgroup metadata\n\t\tpreview nodes have to be in each group\n\t\tdescription... is clunky that way\n\tuse @ syntax for non-group nodes\nrender param widgets inside nodes\nruntime dataflow\n\ttop-bottom knobs?\n\tjust a \"var\" connection type that automatically generates unique ids\ngroups\n\tfinding group-referenced classes\n\t\tif we place the group host in znodes, those would be in znodes/znodes and cannot be accessed by the referer\n\t\tnode-baked extra class search path\n\t\t\twith future manual update / ... support\n\t\trestructure it to the npm style\n\tmake groups the only form of external dependency\n\t\tcould put metadata and preview and ... in group-metadata nodes\nmodule metadata\n\tper-module tags\n\t\tconflict / search\n\t\tlinks\n\tdefault values for ports\n\t\tfunction prototype and ...\n\t\tor not ports - JSON-like options:{\n\t\t\tmethod:'POST',\n\t\t\turi:url,\n\t\t\tbody:Buffer.concat(buf_package),\n\t\t\tencoding:null,\n\t\t}\n\t@ref=\n\t\tfor in-port default values\n\t\tor just write values for in-ports like the out-ports\n\tor just use a metadata node in groups\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created classes connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\n\t\tas a \"minimized mode\"?\n\t\tor a thumbnail?\n\tauto-rebuild preview nodes\n\t\tnuke-like previews / widgets\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
+   "m_text_in": "# TODO LIST\n(test) package management system\n\tpackage metadata\n\t\ttags should have been shared\n\t\tput them in a md file\n\t\t\twith a shared description\n\t\t\tand list group/node names there\n\t\tand the dependencies\n\t\t---\n\t\tspecial package metadata node\n\tgroup metadata\n\t\tpreview nodes have to be in each group\n\t\tdescription... is clunky that way\n\t\tpack in caption\n\tuse @ syntax for non-group nodes\n\tper-module tags\n\t\tconflict / relevant\nstore update info in referenced groups\n\twhich package, which caption\nrender param widgets inside nodes\n\talso inline-ify the code editing UI\nruntime dataflow\n\ttop-bottom knobs?\n\tjust a \"var\" connection type that automatically generates unique ids\nreference code snippet\n\tin-package code nodes that can be added as a template\n\tcaption-tagged\nnew node interface in the panel\n\tnot just completion, also show node details\n\ta node palette when nothing is selected\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created classes connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\nbetter node presentation\n\twe only need the port names when\n\t\tmouseover\n\t\tdragging port\n\tcould display a MD normally\n\t\tas a \"minimized mode\"?\n\t\tor a thumbnail?\n\tauto-rebuild preview nodes\n\t\tnuke-like previews / widgets\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,

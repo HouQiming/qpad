@@ -35,6 +35,26 @@ var GetMainFileName=function(fname){
 	return main_name;
 };
 
+var SearchClassFileSimple=function(spath,sname){
+	var fnext=IO.CreateEnumFileContext(spath+'/'+sname+'.*',1);
+	var fs=[];
+	if(fnext){
+		for(;;){
+			var fi=fnext();
+			if(!fi){break;}
+			fs.push(IO.NormalizeFileName(fi.name));
+		}
+		fnext=undefined;
+	}
+	if(fs.length>1){
+		fs.sort();
+	}
+	if(fs.length>0){
+		return fs[0];
+	}
+	return undefined;
+};
+
 var SearchClassFile=function(cache,sname){
 	for(var i=0;i<cache.search_paths.length;i++){
 		var spath=cache.search_paths[i];
@@ -580,7 +600,7 @@ var rproto_node={
 			//rename case
 			if(isGroup(this.nd)||this.nd.m_class!='__dot__'){
 				var style=UI.default_styles.graph_view.node_style;
-				if(event.y-this.y<style.caption_h){
+				if(event.y-this.y<style.caption_h+style.caption_padding){
 					//node renaming
 					this.owner.RenameNode(this.nd)
 					return;
@@ -718,8 +738,16 @@ UI.GetNodeCache=function(cache,ndi){
 			nl++;
 		}
 	}
-	var dims=UI.MeasureText(style.font_caption,ndi.m_caption||ndi.__id__);
+	var s_caption=(ndi.m_caption||ndi.__id__);
+	var s_desc='';
+	var pcolon=s_caption.indexOf(': ');
+	if(pcolon>=0){
+		s_desc=s_caption.substr(pcolon+2);
+		s_caption=s_caption.substr(0,pcolon);
+	}
+	var dims=UI.MeasureText(style.font_caption,s_caption);
 	var h_caption=style.caption_h;
+	var h_desc=style.caption_h_desc;
 	if(!isGroup(ndi)&&ndi.m_class=='__dot__'){
 		wl=style.port_padding*2;
 		wr=style.port_padding*2;
@@ -727,8 +755,11 @@ UI.GetNodeCache=function(cache,ndi){
 		dims.h=0;
 		h_caption=0;
 	}
+	if(!s_desc){
+		h_desc=0;
+	}
 	var w_final=Math.max(dims.w+style.caption_padding*2, (wl-style.port_extrude)+(wr-style.port_extrude)+style.port_w_sep);
-	var h_final=h_caption+Math.max(nl,nr)*(style.port_h+style.port_h_sep)+style.port_h_sep;
+	var h_final=h_caption+h_desc+Math.max(nl,nr)*(style.port_h+style.port_h_sep)+style.port_h_sep;
 	cache_item.m_rects=[];
 	cache_item.m_texts=[];
 	cache_item.m_regions=[];
@@ -755,17 +786,28 @@ UI.GetNodeCache=function(cache,ndi){
 		nd:ndi,
 		proto:rproto_node,
 	})
+	var y_caption=0;
 	cache_item.m_texts.push({
 		dx:style.caption_padding,dy:(h_caption-UI.GetCharacterHeight(style.font_caption))*0.5,
-		font:style.font_caption,text:ndi.m_caption,color:style.caption_text_color
+		font:style.font_caption,text:s_caption,color:style.caption_text_color
 	});
+	y_caption+=h_caption;
+	if(s_desc){
+		//render node description
+		cache_item.m_texts.push({
+			dx:style.caption_padding,dy:y_caption+(h_desc-UI.GetCharacterHeight(style.font_desc))*0.5,
+			font:style.font_desc,text:s_desc,color:style.caption_desc_color
+		});
+		y_caption+=h_desc;
+	}
 	//multi-connect case - use node y for ordering with edge dragging
 	//if one really needs it, one could use helper boards
 	//generate editor UI
+	//todo: inline UI
 	var degs_ndi=cache.m_degs[ndi.__id__];
 	var xl=-style.port_extrude,xr=w_final+style.port_extrude-wr,
 		pxl=-0.5*style.port_extrude,pxr=w_final+0.5*style.port_extrude,
-		yl=h_caption,yr=h_caption, 
+		yl=y_caption,yr=y_caption,
 		dyl=(h_final-yl-style.port_h*nl)/(nl+1),
 		dyr=(h_final-yr-style.port_h*nr)/(nr+1);
 	var port_padding_y=(style.port_h-UI.GetCharacterHeight(style.font_port))*0.5;
@@ -860,7 +902,20 @@ var LoadGroupReference=function(s_group_name,s_group_file){
 		for(var i=0;i<gr.nds.length;i++){
 			var ndi=gr.nds[i];
 			if(isGroup(ndi)){
-				ret.groups[ndi.m_caption]=ndi;
+				var s_caption_i=ndi.m_caption;
+				var pcolon=s_caption_i.indexOf(': ');
+				if(pcolon>=0){
+					s_caption_i=s_caption_i.substr(0,pcolon);
+				}
+				ret.groups[s_caption_i]=ndi;
+			}else if(ndi.m_caption[0]=='@'){
+				var s_caption_i=ndi.m_caption;
+				var pcolon=s_caption_i.indexOf(': ');
+				if(pcolon>=0){
+					s_caption_i=s_caption_i.substr(0,pcolon);
+				}
+				//file template - save file name in node class - simplified SearchClassFile
+				ret.groups[s_caption_i]=SearchClassFileSimple(UI.GetPathFromFilename(fn),ndi.m_class);
 			}
 		}
 		g_host_graph_cache[fn]=ret;
@@ -1998,11 +2053,13 @@ var ReindexPackages=function(){
 	});
 };
 
-var GetPackageNodes=function(nd_package){
+ReindexPackages();
+
+var ParsePackage=function(nd_package){
 	if(!nd_package.nodes){
 		//just grab all their top-level groups
 		var graph_fns=[];
-		var fnext=IO.CreateEnumFileContext(nd_package.sdir+'/*.zg',1);
+		var fnext=IO.CreateEnumFileContext(nd_package.dir+'/*.zg',1);
 		if(fnext){
 			for(;;){
 				var fi=fnext();
@@ -2013,16 +2070,40 @@ var GetPackageNodes=function(nd_package){
 		}
 		graph_fns.sort();
 		nd_package.nodes=[];
+		nd_package.m_description='';
 		if(graph_fns.length>0){
 			if(graph_fns.length>1){
-				console.log(['warning: package "',nd_package.name,'" contains more than one graphs'].join(''));
+				console.log(['warning: package "',nd_package.name,'" contains more than one graphs, picking "',graph_fns[0],'"'].join(''));
 			}
 			var graph=UI.LoadGraph(graph_fns[0]);
-			for(var i=0;i<graph.m_nds.length;i++){
-				var nd_i=graph.m_nds[i];
+			nd_package.fn_graph=graph_fns[0];
+			for(var i=0;i<graph.nds.length;i++){
+				var nd_i=graph.nds[i];
 				if(isGroup(nd_i)){
+					//reusable group
 					//for use with LoadGroupReference
-					nd_package.nodes.push(nd_i.m_caption)
+					nd_package.nodes.push(nd_i.m_caption);
+				}else if(nd_i.m_caption=='metadata'){
+					nd_package.m_description=(nd_i.m_ui_values['description']||nd_package.m_description);
+				}else if(nd_i.m_caption[0]=='@'){
+					//example code snippet
+					nd_package.nodes.push(nd_i.m_caption);
+				}
+			}
+			//caption-packed description
+			for(var i=0;i<nd_package.nodes.length;i++){
+				var s_caption_i=nd_package.nodes[i];
+				var pcolon=s_caption_i.indexOf(': ');
+				if(pcolon>=0){
+					nd_package.nodes[i]={
+						name:s_caption_i.substr(0,pcolon),
+						desc:s_caption_i.substr(pcolon+2),
+					};
+				}else{
+					nd_package.nodes[i]={
+						name:s_caption_i,
+						desc:'',
+					};
 				}
 			}
 		}else{
@@ -2115,26 +2196,37 @@ W.PackagePage=function(id,attrs){
 				hl_ranges.push(p,p+s_searches[j].length);
 			}
 			if(!is_bad){
+				ParsePackage(UI.g_packages[i]);
 				items.push({
-					s_package:UI.g_packages[i],
+					s_package:UI.g_packages[i].name,
+					s_desc:UI.g_packages[i].m_description,
 					hl_ranges:hl_ranges,
 				});
 			}
 		}
 		//create-node option
-		if(s_searches.length==1&&s_search_text.indexOf('.')>=0){
-			items.push({
-				s_create:s_search_text,
-			});
+		if(s_searches.length==1){
+			if(s_search_text.indexOf('.')>=0){
+				items.push({
+					s_create:s_search_text,
+				});
+			}else{
+				//todo: *search* private nodes
+				if(UI.GetNodeClass(obj.graphview.cache,s_searches[0])){
+					items.push({
+						s_create:s_search_text,
+					});
+				}
+			}
 		}
 		//nodes of already-referenced packages
 		for(var pi=0;pi<packs_refed.length;pi++){
-			var s_package=packs_refed[i];
+			var s_package=packs_refed[pi];
 			var nd_package=UI.g_packages_by_name[s_package];
 			if(!nd_package){continue;}
-			var groups=GetPackageNodes(nd_package);
+			var groups=ParsePackage(nd_package);
 			for(var i=0;i<groups.length;i++){
-				var s_i=groups[i].toLowerCase();
+				var s_i=groups[i].name.toLowerCase();
 				var is_bad=0;
 				var hl_ranges=[];
 				for(var j=0;j<s_searches.length;j++){
@@ -2146,11 +2238,21 @@ W.PackagePage=function(id,attrs){
 					hl_ranges.push(p,p+s_searches[j].length);
 				}
 				if(!is_bad){
-					items.push({
-						s_package:s_package,
-						s_group:s_i,
-						hl_ranges:hl_ranges,
-					});
+					if(s_i[0]=='@'){
+						items.push({
+							s_package:s_package,
+							s_template:s_i,
+							s_desc:groups[i].desc,
+							hl_ranges:hl_ranges,
+						});
+					}else{
+						items.push({
+							s_package:s_package,
+							s_group:s_i,
+							s_desc:groups[i].desc,
+							hl_ranges:hl_ranges,
+						});
+					}
 				}
 			}
 		}
@@ -2183,23 +2285,40 @@ W.PackageItem_prototype={
 		var obj=this.owner.graphview;
 		var graph=obj.graph;
 		var cache=obj.cache;
-		if(!this.s_create&&!this.s_group){
+		if(this.s_package&&!this.s_group&&!this.s_template){
 			//we're just adding a package
 			//we stay in the adding mode, wipe the text, but keep the focus
 			//it's not even an edit by itself
 			graph.m_depends.push(this.s_package);
 			var plist=this.owner;
-			plist.find_bar_edit.ed.Edit([0,plist.find_bar_edit.ed.GetTextSize(),null]);
+			var size=plist.find_bar_edit.ed.GetTextSize();
+			if(size){
+				plist.find_bar_edit.ed.Edit([0,size,null]);
+			}
 			plist.InvalidateContent();
 			UI.Refresh();
 			return;
 		}
 		var stext_raw=this.s_create;
-		if(!this.s_create){
+		var s_file_template=undefined;
+		if(this.s_template){
+			//add a number, copy the file
+			var s_tname=this.s_template.substr(1);
+			var s_tname0=UI.GetMainFileName(s_tname);
+			var s_tname1=UI.GetFileNameExtension(s_tname);
+			for(var seq=0;;seq++){
+				var fname=[sdir,'/',s_tname0,seq,'.',s_tname1].join('');
+				if(!IO.FileExists(fname)){
+					stext_raw=[s_tname0,seq,'.',s_tname1].join('');
+					break;
+				}
+			}
+			s_file_template=LoadGroupReference(s_group_name,s_template);
+		}else if(this.s_group){
 			//group reference, pick by caption, cache the graph with date checks
-			var s_group_file=UI.g_packages_by_name[this.s_package];
+			var s_group_file=UI.g_packages_by_name[this.s_package].fn_graph;
 			var s_group_name=this.s_group;
-			var nd_group_ref=LoadGroupReference(s_group_name,SearchClassFile(cache,s_group_file));
+			var nd_group_ref=LoadGroupReference(s_group_name,s_group_file);
 			if(nd_group_ref){
 				//duplicate the group class - mainly node ids in the graph
 				var ndcls_cloned=JSON.parse(JSON.stringify(nd_group_ref.m_class));
@@ -2208,18 +2327,23 @@ W.PackageItem_prototype={
 				stext_raw=ndcls_cloned;
 			}
 		}
+		var is_file=0
 		if(typeof(stext_raw)=='string'&&stext_raw.indexOf('.')>=0){
 			//it's a file! a new class!
 			//create the file in znodes/
 			var sdir=UI.GetPathFromFilename(obj.m_file_name);
-			IO.CreateDirectory(sdir)
-			if(!IO.DirExists(sdir)){
-				stext_raw=UI._('Unable to create the znodes directory');
-			}else{
-				UI.OpenEditorWindow(sdir+'/'+stext_raw);
-				//we still need the node
-				stext_raw=UI.RemoveExtension(stext_raw);
+			//IO.CreateDirectory(sdir)
+			//if(!IO.DirExists(sdir)){
+			//	stext_raw=UI._('Unable to create the znodes directory');
+			//}else{
+			if(s_file_template&&!IO.FileExists(sdir+'/'+stext_raw)){
+				IO.CreateFile(sdir+'/'+stext_raw,IO.ReadAll(s_file_template));
 			}
+			UI.OpenEditorWindow(sdir+'/'+stext_raw);
+			//we still need the node
+			stext_raw=UI.RemoveExtension(stext_raw);
+			//}
+			is_file=1;
 		}
 		var nd_new=graph.CreateNode(stext_raw);
 		if(typeof(stext_raw)!='string'&&s_group_name){
@@ -2318,7 +2442,10 @@ W.PackageItem_prototype={
 				}
 			}
 		}
-		if(al_n){
+		if(is_file){
+			nd_new.x=(obj.m_temp_ui_desc.x-graph.tr.trans[0])/graph.tr.scale;
+			nd_new.y=(obj.m_temp_ui_desc.y-graph.tr.trans[1])/graph.tr.scale;
+		}else if(al_n){
 			//connection-based auto-layout: x_max+margin, y_average
 			nd_new.x=al_x_max+32;
 			nd_new.y=al_y_avg/al_n;
@@ -2355,7 +2482,6 @@ W.PackageItem=function(id,attrs){
 		var name_font_bold=obj.name_font_bold;
 		var h_icon=UI.GetCharacterHeight(obj.icon_font);
 		//coulddo: show a description of selected nodes
-		//todo: show as cards, do heights
 		UI.RoundRect({
 			x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2,h:obj.h,
 			color:this.bgcolor,
@@ -2368,10 +2494,14 @@ W.PackageItem=function(id,attrs){
 		}
 		var s_icon='夹';
 		var s_title='';
+		var s_hint=(obj.s_desc||'');
 		if(obj.s_package){
 			if(obj.s_group){
 				s_icon='も';
 				s_title=obj.s_group;
+			}else if(obj.s_template){
+				s_icon='プ';
+				s_title=obj.s_template.substr(1);
 			}else{
 				s_icon='夹';
 				s_title=obj.s_package;
@@ -2379,21 +2509,33 @@ W.PackageItem=function(id,attrs){
 		}else{
 			s_icon='新';
 			s_title=obj.s_create;
+			if(obj.s_create.indexOf('.')>=0){
+				if(UI.GetFileNameExtension(obj.s_create).toLowerCase()=='zjs'){
+					s_hint=UI._('New script');
+				}else{
+					s_hint=UI._('New code snippet');
+				}
+			}else{
+				s_hint=UI._('Private node');
+			}
 		}
 		UI.DrawChar(obj.icon_font,obj.x+obj.padding+4,obj.y+(obj.h-h_icon)*0.5,
 			obj.icon_color,s_icon.charCodeAt(0));
-		W.Text("",{x:obj.x+obj.padding+64,y:obj.y+4,
+		W.Text("",{x:obj.x+obj.padding+56,y:obj.y+4,
 			font:name_font,text:s_title,
-			color:obj.selected?obj.sel_name_color:obj.name_color})
+			color:obj.name_color})
+		W.Text("",{x:obj.x+obj.padding+56,y:obj.y+4+28,
+			font:obj.hint_font,text:s_hint,
+			color:obj.hint_color})
 		if(obj.hl_ranges){
 			for(var i=0;i<obj.hl_ranges.length;i+=2){
 				var p0=obj.hl_ranges[i+0];
 				var p1=obj.hl_ranges[i+1];
 				if(p0<p1){
-					var x=obj.x+obj.padding+64+UI.MeasureText(name_font,s_title.substr(0,p0)).w
+					var x=obj.x+obj.padding+56+UI.MeasureText(name_font,s_title.substr(0,p0)).w
 					W.Text("",{x:x,y:obj.y+4,
 						font:name_font_bold,text:s_title.substr(p0,p1-p0),
-						color:obj.selected?obj.sel_name_color:obj.name_color})
+						color:obj.name_color})
 				}
 			}
 		}
