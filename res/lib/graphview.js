@@ -510,6 +510,7 @@ UI.LoadGraph=function(fn){
 	var ret=JSON.parse(sdata);
 	if(!ret.nds){ret.nds=[];}
 	if(!ret.es){ret.es=[];}
+	if(!ret.m_depends){ret.m_depends=[];}
 	ret.__proto__=graph_prototype;
 	return ret;
 };
@@ -677,6 +678,7 @@ UI.CreateGraph=function(){
 	var ret={
 		nds:[],
 		es:[],
+		m_depends:[],
 	};
 	ret.__proto__=graph_prototype;
 	return ret;
@@ -1307,7 +1309,7 @@ W.GraphView=function(id,attrs){
 			m_classes_by_name:{},
 			m_undo_queue:[JSON.stringify(graph)],
 			m_redo_queue:[],
-			search_paths:[UI.m_node_dir,s_file_dir,s_file_dir+'/znodes'],
+			search_paths:[UI.m_node_dir,s_file_dir],
 		};
 		obj.cache=cache;
 		obj.m_saved_point=1;
@@ -1598,185 +1600,18 @@ W.GraphView=function(id,attrs){
 	//////////////////////////
 	if(obj.m_temp_ui=="add_node"){
 		//put it near the mouse
-		//todo: AC, OnChange explanation
 		var x_caret=obj.m_temp_ui_desc.x;
-		var y_caret=obj.m_temp_ui_desc.y;
-		var style_edit=obj.edit_style;
-		var hc=UI.GetCharacterHeight(style_edit.font_edit)+8;
-		UI.RoundRect({
-			x:x_caret-style_edit.edit_padding-style_edit.edit_border_width,y:y_caret,
-			w:style_edit.edit_w+(style_edit.edit_padding+style_edit.edit_border_width)*2+style_edit.edit_shadow_size,h:hc+style_edit.edit_shadow_size,
-			color:style_edit.edit_shadow_color,border_width:-style_edit.edit_shadow_size,
-			round:style_edit.edit_shadow_size,
-		})
-		UI.RoundRect({
-			x:x_caret-style_edit.edit_padding-style_edit.edit_border_width,y:y_caret,w:style_edit.edit_w+(style_edit.edit_padding+style_edit.edit_border_width)*2,h:hc,
-			color:style_edit.edit_bgcolor,border_width:style_edit.edit_border_width,border_color:style_edit.edit_border_color,
-			round:style_edit.edit_round,
-		})
-		var hc_editing=UI.GetCharacterHeight(style_edit.font_edit);
-		RenderTempEditor("newnode_edit",{
-			x:x_caret-style_edit.edit_padding,y:y_caret+(hc-hc_editing)*0.5,
-			w:style_edit.edit_w+style_edit.edit_padding*2,h:hc_editing,
-			font:style_edit.font_edit,
-			OnEnter:function(){
-				//actually create the node, invalid class is fine - could just delete it later, or create the class
-				var obj=this.owner;
-				var graph=obj.graph;
-				var cache=obj.cache;
-				var stext_raw=this.ed.GetText();
-				var s_group_name=undefined;
-				var p_group_file=stext_raw.indexOf('@');
-				if(p_group_file>=0){
-					//group reference, pick by caption, cache the graph with date checks
-					var s_group_file=stext_raw.substr(p_group_file+1);
-					var s_group_name=stext_raw.substr(0,p_group_file);
-					var nd_group_ref=LoadGroupReference(s_group_name,SearchClassFile(cache,s_group_file));
-					if(nd_group_ref){
-						//duplicate the group class - mainly node ids in the graph
-						var ndcls_cloned=JSON.parse(JSON.stringify(nd_group_ref.m_class));
-						FixClonedGroupClass(ndcls_cloned);
-						//create node with ndcls_cloned - group node creation
-						stext_raw=ndcls_cloned;
-					}
-				}
-				if(typeof(stext_raw)=='string'&&stext_raw.indexOf('.')>=0){
-					//it's a file! a new class!
-					//create the file in znodes/
-					var sdir=UI.GetPathFromFilename(obj.m_file_name)+'/znodes'
-					IO.CreateDirectory(sdir)
-					if(!IO.DirExists(sdir)){
-						stext_raw=UI._('Unable to create the znodes directory');
-					}else{
-						UI.OpenEditorWindow(sdir+'/'+stext_raw);
-						//we still need the node
-						stext_raw=UI.RemoveExtension(stext_raw);
-					}
-				}
-				var nd_new=graph.CreateNode(stext_raw);
-				if(typeof(stext_raw)!='string'&&s_group_name){
-					nd_new.m_caption=s_group_name;
-				}
-				//////////////////////////////////////
-				//score-based auto-connect
-				//better selection key - use "distance-to-selection"
-				var node_map={};
-				var es_uni=[];
-				var Q=[];
-				var dist_to_sel=[];
-				for(var i=0;i<graph.nds.length;i++){
-					if(graph.nds[i].m_is_selected){
-						Q.push(i);
-						dist_to_sel[i]=0;
-					}
-					node_map[graph.nds[i].__id__]=i;
-					es_uni[i]=[];
-				}
-				for(var i=0;i<graph.es.length;i++){
-					var e=graph.es[i];
-					var v0=node_map[e.id0];
-					var v1=node_map[e.id1];
-					es_uni[v0].push(v1);
-					es_uni[v1].push(v0);
-				}
-				//BFS for dist-to-sel
-				var head=0;
-				for(var dist=0;head<Q.length;dist++){
-					for(var tail=Q.length;head<tail;head++){
-						var v0=Q[head];
-						var vs_next=es_uni[v0];
-						for(var i=0;i<vs_next.length;i++){
-							var v1=vs_next[i];
-							if(dist_to_sel[v1]==undefined){
-								dist_to_sel[v1]=dist+1;
-								Q.push(v1);
-							}
-						}
-					}
-				}
-				//for the unconnected...
-				for(var i=0;i<graph.nds.length;i++){
-					if(dist_to_sel[i]==undefined){
-						dist_to_sel[i]=graph.nds.length;
-					}
-				}
-				//enum and test all ports
-				//keys: matched_type_id selection key x
-				//do auto-layout in the same loop
-				var ndcls_new=UI.GetNodeClass(cache,nd_new.m_class);
-				if(ndcls_new&&ndcls_new.m_ports){
-					var al_x_max=-1e10,al_y_avg=0,al_n=0;
-					for(var pi=0;pi<ndcls_new.m_ports.length;pi++){
-						var port_pi=ndcls_new.m_ports[pi];
-						if(port_pi.dir!='output'){continue;}
-						var type_ordering={};
-						for(var i=0;i<port_pi.type.length;i++){
-							type_ordering[port_pi.type[i]]=i+1;
-						}
-						var type_key_best=1e9;
-						var port_best=undefined;
-						for(var i=0;i<graph.nds.length-1;i++){
-							var ndi=graph.nds[i];
-							var ndcls=UI.GetNodeClass(cache,ndi.m_class);
-							var type_key=1e10;
-							var id_best=undefined;
-							for(var j=0;j<ndcls.m_ports.length;j++){
-								var port_j=ndcls.m_ports[j];
-								var type_j=port_j.type;
-								if(port_j.dir!='input'){continue;}
-								for(var tj=0;tj<type_j.length;tj++){
-									if(type_key>type_ordering[type_j[tj]]+tj){
-										type_key=type_ordering[type_j[tj]]+tj;
-										id_best=port_j.id;
-									}
-								}
-							}
-							if(id_best&&(type_key_best>type_key||type_key_best==type_key&&(
-							dist_to_sel[port_best.ndid]>dist_to_sel[i]||dist_to_sel[port_best.ndid]==dist_to_sel[i]&&(
-							port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y)))){
-								type_key_best=type_key;
-								port_best={nd:ndi,ndid:i,port:id_best};
-							}
-						}
-						if(port_best){
-							graph.es.push({
-								id0:nd_new.__id__, port0:port_pi.id,
-								id1:port_best.nd.__id__, port1:port_best.port,
-							})
-							var cache_item=UI.GetNodeCache(cache,port_best.nd);
-							al_x_max=Math.max(al_x_max,port_best.nd.x+cache_item.m_w);
-							al_y_avg+=port_best.nd.y;
-							al_n++;
-						}
-					}
-				}
-				if(al_n){
-					//connection-based auto-layout: x_max+margin, y_average
-					nd_new.x=al_x_max+32;
-					nd_new.y=al_y_avg/al_n;
-				}else{
-					//by default, add it "down"
-					var y_max=0,x_y_max=0;
-					for(var i=0;i<graph.nds.length;i++){
-						var cache_item=UI.GetNodeCache(cache,graph.nds[i]);
-						var y_i=graph.nds[i].y+(cache_item.m_h||0);
-						if(y_max<y_i||y_max==y_i&&x_y_max<graph.nds[i].x){
-							x_y_max=graph.nds[i].x;
-							y_max=y_i;
-						}
-					}
-					nd_new.x=x_y_max;
-					nd_new.y=y_max+8;
-				}
-				for(var i=0;i<graph.nds.length;i++){
-					graph.nds[i].m_is_selected=0;
-				}
-				nd_new.m_is_selected=1;
-				obj.m_temp_ui=undefined;
-				graph.SignalEdit([nd_new]);
-				UI.Refresh()
-			}
+		var y_caret=Math.min(obj.m_temp_ui_desc.y,obj.y+obj.h-obj.style_package.h-4);
+		var old_pack_page=obj.pack_page;
+		W.PackagePage('pack_page',{
+			'graphview':obj,
+			x:x_caret-obj.style_package.dx,y:y_caret-obj.style_package.dy,
+			w:obj.style_package.w,
+			h:obj.style_package.h,
 		});
+		if(!old_pack_page){
+			UI.SetFocus(obj.pack_page.find_bar_edit);
+		}
 	}
 	//////////////////
 	var nd_sel=obj.graph.nds.filter(function(ndi){
@@ -2044,7 +1879,9 @@ UI.RegisterUtilType("param_panel",function(){return UI.NewTab({
 		UI.context_parent.body=this.util_widget;
 		var tab_frontmost=UI.GetFrontMostEditorTab();
 		var obj_real=(tab_frontmost&&tab_frontmost.document_type=="graph"&&tab_frontmost.main_widget);
-		var body=W.ParamPanelPage('body',{
+		var body;
+		//use obj_real flag to tell the modes apart
+		body=W.ParamPanelPage('body',{
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'graphview':obj_real,
 			'activated':this==UI.top.app.document_area.active_tab,
@@ -2072,3 +1909,494 @@ UI.g_ce_file_save_time={};
 UI.OnCodeEditorSave=function(fn){
 	UI.g_ce_file_save_time[fn]=++UI.g_ce_save_time;
 };
+
+///////////////////////////////
+W.PackagePage_prototype={
+	InvalidateContent:function(){
+		this.found_items=undefined;
+		UI.Refresh()
+	},
+};
+var fpackagepage_findbar_plugin=function(){
+	//todo: AC, OnChange explanation
+	this.AddEventHandler('ESC',function(){
+		var obj=this.owner
+		//var tab_frontmost=UI.GetFrontMostEditorTab();
+		//if(tab_frontmost){
+		//	UI.top.app.document_area.SetTab(tab_frontmost.__global_tab_id)
+		//}
+		//UI.top.app.document_area.CloseTab(obj.owner_tab.__global_tab_id)
+		obj.graphview.m_temp_ui=undefined;
+		UI.Refresh()
+	})
+	this.OnMouseWheel=function(event){
+		var obj=this.owner
+		obj.OnMouseWheel(event)
+	}
+	this.AddEventHandler('change',function(){
+		//close the current file
+		var obj=this.owner;
+		obj.InvalidateContent()
+		UI.Refresh()
+	})
+	var fpassthrough=function(key,event){
+		var obj=this.owner
+		if(obj.package_list){
+			obj.package_list.OnKeyDown(event)
+		}
+	}
+	this.AddEventHandler('RETURN RETURN2',function(key,event){
+		var obj=this.owner
+		//if(obj.text){
+		//	obj.InvalidateContent();
+		//	UI.Refresh()
+		//}else 
+		if(obj.package_list){
+			obj.package_list.OnKeyDown(event)
+		}
+	})
+	this.AddEventHandler('UP',fpassthrough)
+	this.AddEventHandler('DOWN',fpassthrough)
+	this.AddEventHandler('PGUP',fpassthrough)
+	this.AddEventHandler('PGDN',fpassthrough)
+};
+
+UI.g_packages=[];
+UI.g_packages_by_name={};
+var ReindexPackages=function(){
+	//here we *only* search for packages, not individual nodes
+	//UI.m_node_dir
+	//var search_paths=(UI.m_ui_metadata["<search_paths>"]||[]);
+	var spath=IO.ProcessUnixFileName("~/.zpacks");
+	if(!IO.DirExists(spath)){
+		IO.CreateDirectory(spath);
+	}
+	var fnext=IO.CreateEnumFileContext(spath+'/*',2);
+	var packs=[];
+	if(fnext){
+		for(;;){
+			var fi=fnext();
+			if(!fi){break;}
+			packs.push(IO.NormalizeFileName(fi.name));
+		}
+		fnext=undefined;
+	}
+	packs.sort(function(a,b){
+		var s0=UI.GetMainFileName(a).toLowerCase();
+		var s1=UI.GetMainFileName(b).toLowerCase();
+		return s0<s1?-1:(s0==s1?0:1);
+	});
+	//parse each package... on-demand
+	UI.g_packages_by_name={};
+	UI.g_packages=packs.map(function(sdir){
+		var ret={
+			name:UI.GetMainFileName(sdir).toLowerCase(),
+			dir:sdir,
+		};
+		UI.g_packages_by_name[ret.name]=ret;
+		return ret;
+	});
+};
+
+var GetPackageNodes=function(nd_package){
+	if(!nd_package.nodes){
+		//just grab all their top-level groups
+		var graph_fns=[];
+		var fnext=IO.CreateEnumFileContext(nd_package.sdir+'/*.zg',1);
+		if(fnext){
+			for(;;){
+				var fi=fnext();
+				if(!fi){break;}
+				graph_fns.push(IO.NormalizeFileName(fi.name));
+			}
+			fnext=undefined;
+		}
+		graph_fns.sort();
+		nd_package.nodes=[];
+		if(graph_fns.length>0){
+			if(graph_fns.length>1){
+				console.log(['warning: package "',nd_package.name,'" contains more than one graphs'].join(''));
+			}
+			var graph=UI.LoadGraph(graph_fns[0]);
+			for(var i=0;i<graph.m_nds.length;i++){
+				var nd_i=graph.m_nds[i];
+				if(isGroup(nd_i)){
+					//for use with LoadGroupReference
+					nd_package.nodes.push(nd_i.m_caption)
+				}
+			}
+		}else{
+			console.log(['error: package "',nd_package.name,'" does not contain any graph'].join(''));
+		}
+	}
+	return nd_package.nodes;
+};
+
+W.PackagePage=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"package_page",W.PackagePage_prototype);
+	UI.Begin(obj)
+	UI.RoundRect({
+		x:obj.x-obj.shadow_size,y:obj.y-obj.shadow_size,
+		w:obj.w+obj.shadow_size*2,h:obj.h+obj.shadow_size*2,
+		color:obj.shadow_color,
+		border_width:-obj.shadow_size,
+		round:obj.shadow_size});
+	UI.RoundRect(obj)
+	W.PureRegion(id,obj)
+	UI.RoundRect({
+		x:obj.x,y:obj.y,
+		w:obj.w,h:obj.h_find_bar,
+		color:obj.bgcolor});
+	//coulddo: show current project
+	var w_buttons=0;
+	W.Button("refresh_button",{
+		x:w_buttons,y:0,h:obj.h_find_bar,
+		value:obj.selected,padding:8,
+		font:UI.icon_font_20,
+		text:obj.text?"撤":"刷",
+		tooltip:obj.text?"Back":"Refresh",// - F5
+		anchor:'parent',anchor_align:'right',anchor_valign:'up',
+		OnClick:function(){
+			this.InvalidateContent();
+			ReindexPackages();
+			UI.Refresh()
+		}.bind(obj)
+	})
+	w_buttons+=obj.refresh_button.w
+	var rect_bar=UI.RoundRect({
+		x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
+		w:obj.w-w_buttons-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
+		color:obj.find_bar_color,
+		round:obj.find_bar_round})
+	UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
+		obj.find_bar_hint_color,'s'.charCodeAt(0))
+	var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
+	var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
+	W.Edit("find_bar_edit",{
+		style:obj.find_bar_editor_style,
+		x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+		owner:obj,
+		precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+		same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
+		plugins:[fpackagepage_findbar_plugin],
+		default_focus:2,
+		tab_width:UI.GetOption("tab_width",4),
+	});
+	if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
+		W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+			font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
+			text:UI._("Add node")})
+	}
+	if(!obj.found_items){
+		var s_search_text=obj.find_bar_edit.ed.GetText();
+		var items=[];
+		obj.found_items=items;
+		var s_searches=s_search_text.toLowerCase().split(' ');
+		//////////
+		//use plain old name search
+		//search for unreferenced packages
+		var graphview=obj.graphview;
+		var packs_refed=graphview.graph.m_depends;
+		var packs_refed_map={};
+		for(var i=0;i<packs_refed.length;i++){
+			packs_refed_map[packs_refed[i]]=1;
+		}
+		for(var i=0;i<UI.g_packages.length;i++){
+			if(packs_refed_map[UI.g_packages[i].name]){continue;}
+			var s_i=UI.g_packages[i].name.toLowerCase();
+			var is_bad=0;
+			var hl_ranges=[];
+			for(var j=0;j<s_searches.length;j++){
+				var p=s_i.indexOf(s_searches[j]);
+				if(p<0){
+					is_bad=1;
+					break
+				}
+				hl_ranges.push(p,p+s_searches[j].length);
+			}
+			if(!is_bad){
+				items.push({
+					s_package:UI.g_packages[i],
+					hl_ranges:hl_ranges,
+				});
+			}
+		}
+		//create-node option
+		if(s_searches.length==1&&s_search_text.indexOf('.')>=0){
+			items.push({
+				s_create:s_search_text,
+			});
+		}
+		//nodes of already-referenced packages
+		for(var pi=0;pi<packs_refed.length;pi++){
+			var s_package=packs_refed[i];
+			var nd_package=UI.g_packages_by_name[s_package];
+			if(!nd_package){continue;}
+			var groups=GetPackageNodes(nd_package);
+			for(var i=0;i<groups.length;i++){
+				var s_i=groups[i].toLowerCase();
+				var is_bad=0;
+				var hl_ranges=[];
+				for(var j=0;j<s_searches.length;j++){
+					var p=s_i.indexOf(s_searches[j]);
+					if(p<0){
+						is_bad=1;
+						break
+					}
+					hl_ranges.push(p,p+s_searches[j].length);
+				}
+				if(!is_bad){
+					items.push({
+						s_package:s_package,
+						s_group:s_i,
+						hl_ranges:hl_ranges,
+					});
+				}
+			}
+		}
+	}
+	//just show a list of candidates, with keyboard browsing -- listview
+	UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
+	W.ListView('package_list',{
+		x:obj.x,y:obj.y+obj.h_find_bar,w:obj.w,h:obj.h-obj.h_find_bar,
+		dimension:'y',layout_spacing:8,layout_align:'fill',
+		no_clipping:1,
+		items:obj.found_items,
+		item_template:{
+			object_type:W.PackageItem,
+			owner:obj,
+		}})
+	UI.RoundRect({
+		x:obj.x-obj.top_hint_shadow_size, y:obj.y+obj.h_find_bar-obj.top_hint_shadow_size, 
+		w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+		round:obj.top_hint_shadow_size,
+		border_width:-obj.top_hint_shadow_size,
+		color:obj.top_hint_shadow_color})
+	UI.PopCliprect();
+	UI.End()
+	return obj
+};
+
+W.PackageItem_prototype={
+	OnDblClick:function(){
+		//actually create the node, invalid class is fine - could just delete it later, or create the class
+		var obj=this.owner.graphview;
+		var graph=obj.graph;
+		var cache=obj.cache;
+		if(!this.s_create&&!this.s_group){
+			//we're just adding a package
+			//we stay in the adding mode, wipe the text, but keep the focus
+			//it's not even an edit by itself
+			graph.m_depends.push(this.s_package);
+			var plist=this.owner;
+			plist.find_bar_edit.ed.Edit([0,plist.find_bar_edit.ed.GetTextSize(),null]);
+			plist.InvalidateContent();
+			UI.Refresh();
+			return;
+		}
+		var stext_raw=this.s_create;
+		if(!this.s_create){
+			//group reference, pick by caption, cache the graph with date checks
+			var s_group_file=UI.g_packages_by_name[this.s_package];
+			var s_group_name=this.s_group;
+			var nd_group_ref=LoadGroupReference(s_group_name,SearchClassFile(cache,s_group_file));
+			if(nd_group_ref){
+				//duplicate the group class - mainly node ids in the graph
+				var ndcls_cloned=JSON.parse(JSON.stringify(nd_group_ref.m_class));
+				FixClonedGroupClass(ndcls_cloned);
+				//create node with ndcls_cloned - group node creation
+				stext_raw=ndcls_cloned;
+			}
+		}
+		if(typeof(stext_raw)=='string'&&stext_raw.indexOf('.')>=0){
+			//it's a file! a new class!
+			//create the file in znodes/
+			var sdir=UI.GetPathFromFilename(obj.m_file_name);
+			IO.CreateDirectory(sdir)
+			if(!IO.DirExists(sdir)){
+				stext_raw=UI._('Unable to create the znodes directory');
+			}else{
+				UI.OpenEditorWindow(sdir+'/'+stext_raw);
+				//we still need the node
+				stext_raw=UI.RemoveExtension(stext_raw);
+			}
+		}
+		var nd_new=graph.CreateNode(stext_raw);
+		if(typeof(stext_raw)!='string'&&s_group_name){
+			nd_new.m_caption=s_group_name;
+		}
+		//////////////////////////////////////
+		//score-based auto-connect
+		//better selection key - use "distance-to-selection"
+		var node_map={};
+		var es_uni=[];
+		var Q=[];
+		var dist_to_sel=[];
+		for(var i=0;i<graph.nds.length;i++){
+			if(graph.nds[i].m_is_selected){
+				Q.push(i);
+				dist_to_sel[i]=0;
+			}
+			node_map[graph.nds[i].__id__]=i;
+			es_uni[i]=[];
+		}
+		for(var i=0;i<graph.es.length;i++){
+			var e=graph.es[i];
+			var v0=node_map[e.id0];
+			var v1=node_map[e.id1];
+			es_uni[v0].push(v1);
+			es_uni[v1].push(v0);
+		}
+		//BFS for dist-to-sel
+		var head=0;
+		for(var dist=0;head<Q.length;dist++){
+			for(var tail=Q.length;head<tail;head++){
+				var v0=Q[head];
+				var vs_next=es_uni[v0];
+				for(var i=0;i<vs_next.length;i++){
+					var v1=vs_next[i];
+					if(dist_to_sel[v1]==undefined){
+						dist_to_sel[v1]=dist+1;
+						Q.push(v1);
+					}
+				}
+			}
+		}
+		//for the unconnected...
+		for(var i=0;i<graph.nds.length;i++){
+			if(dist_to_sel[i]==undefined){
+				dist_to_sel[i]=graph.nds.length;
+			}
+		}
+		//enum and test all ports
+		//keys: matched_type_id selection key x
+		//do auto-layout in the same loop
+		var ndcls_new=UI.GetNodeClass(cache,nd_new.m_class);
+		if(ndcls_new&&ndcls_new.m_ports){
+			var al_x_max=-1e10,al_y_avg=0,al_n=0;
+			for(var pi=0;pi<ndcls_new.m_ports.length;pi++){
+				var port_pi=ndcls_new.m_ports[pi];
+				if(port_pi.dir!='output'){continue;}
+				var type_ordering={};
+				for(var i=0;i<port_pi.type.length;i++){
+					type_ordering[port_pi.type[i]]=i+1;
+				}
+				var type_key_best=1e9;
+				var port_best=undefined;
+				for(var i=0;i<graph.nds.length-1;i++){
+					var ndi=graph.nds[i];
+					var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+					var type_key=1e10;
+					var id_best=undefined;
+					for(var j=0;j<ndcls.m_ports.length;j++){
+						var port_j=ndcls.m_ports[j];
+						var type_j=port_j.type;
+						if(port_j.dir!='input'){continue;}
+						for(var tj=0;tj<type_j.length;tj++){
+							if(type_key>type_ordering[type_j[tj]]+tj){
+								type_key=type_ordering[type_j[tj]]+tj;
+								id_best=port_j.id;
+							}
+						}
+					}
+					if(id_best&&(type_key_best>type_key||type_key_best==type_key&&(
+					dist_to_sel[port_best.ndid]>dist_to_sel[i]||dist_to_sel[port_best.ndid]==dist_to_sel[i]&&(
+					port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y)))){
+						type_key_best=type_key;
+						port_best={nd:ndi,ndid:i,port:id_best};
+					}
+				}
+				if(port_best){
+					graph.es.push({
+						id0:nd_new.__id__, port0:port_pi.id,
+						id1:port_best.nd.__id__, port1:port_best.port,
+					})
+					var cache_item=UI.GetNodeCache(cache,port_best.nd);
+					al_x_max=Math.max(al_x_max,port_best.nd.x+cache_item.m_w);
+					al_y_avg+=port_best.nd.y;
+					al_n++;
+				}
+			}
+		}
+		if(al_n){
+			//connection-based auto-layout: x_max+margin, y_average
+			nd_new.x=al_x_max+32;
+			nd_new.y=al_y_avg/al_n;
+		}else{
+			//by default, add it "down"
+			var y_max=0,x_y_max=0;
+			for(var i=0;i<graph.nds.length;i++){
+				var cache_item=UI.GetNodeCache(cache,graph.nds[i]);
+				var y_i=graph.nds[i].y+(cache_item.m_h||0);
+				if(y_max<y_i||y_max==y_i&&x_y_max<graph.nds[i].x){
+					x_y_max=graph.nds[i].x;
+					y_max=y_i;
+				}
+			}
+			nd_new.x=x_y_max;
+			nd_new.y=y_max+8;
+		}
+		for(var i=0;i<graph.nds.length;i++){
+			graph.nds[i].m_is_selected=0;
+		}
+		nd_new.m_is_selected=1;
+		obj.m_temp_ui=undefined;
+		graph.SignalEdit([nd_new]);
+		UI.Refresh()
+	},
+};
+W.PackageItem=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"package_item",W.PackageItem_prototype);
+	UI.Begin(obj)
+		UI.RoundRect({
+			x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2+obj.shadow_size,h:obj.h+obj.shadow_size,
+			border_width:-obj.shadow_size,round:obj.shadow_size,color:obj.shadow_color})
+		var name_font=obj.name_font;
+		var name_font_bold=obj.name_font_bold;
+		var h_icon=UI.GetCharacterHeight(obj.icon_font);
+		//coulddo: show a description of selected nodes
+		//todo: show as cards, do heights
+		UI.RoundRect({
+			x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2,h:obj.h,
+			color:this.bgcolor,
+		})
+		if(obj.selected){
+			var sel_bgcolor=obj.sel_bgcolor;
+			UI.RoundRect({
+				x:obj.x+obj.padding,y:obj.y,w:obj.w-obj.padding*2,h:obj.h,
+				border_color:sel_bgcolor,border_width:obj.sel_border_width})
+		}
+		var s_icon='夹';
+		var s_title='';
+		if(obj.s_package){
+			if(obj.s_group){
+				s_icon='も';
+				s_title=obj.s_group;
+			}else{
+				s_icon='夹';
+				s_title=obj.s_package;
+			}
+		}else{
+			s_icon='新';
+			s_title=obj.s_create;
+		}
+		UI.DrawChar(obj.icon_font,obj.x+obj.padding+4,obj.y+(obj.h-h_icon)*0.5,
+			obj.icon_color,s_icon.charCodeAt(0));
+		W.Text("",{x:obj.x+obj.padding+64,y:obj.y+4,
+			font:name_font,text:s_title,
+			color:obj.selected?obj.sel_name_color:obj.name_color})
+		if(obj.hl_ranges){
+			for(var i=0;i<obj.hl_ranges.length;i+=2){
+				var p0=obj.hl_ranges[i+0];
+				var p1=obj.hl_ranges[i+1];
+				if(p0<p1){
+					var x=obj.x+obj.padding+64+UI.MeasureText(name_font,s_title.substr(0,p0)).w
+					W.Text("",{x:x,y:obj.y+4,
+						font:name_font_bold,text:s_title.substr(p0,p1-p0),
+						color:obj.selected?obj.sel_name_color:obj.name_color})
+				}
+			}
+		}
+	UI.End()
+	return obj
+}

@@ -1128,7 +1128,7 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterBuildEnv("TeX/LaTeX",{
 	name:"pdftexify",
 	CreateBuildScript:function(fname,doc){
-		var fname_pdf=UI.RemoveExtension(fname)
+		var fname_pdf=UI.RemoveExtension(fname)+'.pdf';
 		var cmdline_viewer=[
 				"SumatraPDF","-reuse-instance",fname_pdf,
 				"-inverse-search",'"'+IO.m_my_name+'" "%f" --seek %l'];
