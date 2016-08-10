@@ -1511,6 +1511,7 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 }
 
 var g_is_parse_more_running=0;
+var g_need_reparse_dangling_deps=0;
 var PARSING_SECONDS_PER_FRAME=0.1;
 var CallParseMore=function(){
 	if(g_is_parse_more_running){return;}
@@ -1541,6 +1542,13 @@ var CallParseMore=function(){
 				//}
 			}else{
 				g_is_parse_more_running=0;
+				if(g_need_reparse_dangling_deps){
+					//avoid parse-git-parse loops: only do ED_ReparseDanglingDeps once after all other files have been parsed
+					g_need_reparse_dangling_deps=0;
+					if(UI.ED_ReparseDanglingDeps()){
+						CallParseMore()
+					}
+				}
 				break;
 			}
 			var tick1=Duktape.__ui_get_tick()
@@ -3140,6 +3148,7 @@ var QueueProjectParser=function(f){
 		f();
 	}
 };
+var g_repo_ever_parsed={}; //per-session cache to prevent excessive *file* reparsing
 var ParseGit=function(spath){
 	if(g_repo_list[spath]){return;}
 	var my_repo={name:spath,is_parsing:1,files:[]}
@@ -3163,8 +3172,15 @@ var ParseGit=function(spath){
 			my_repo.files.push(fname)
 		}.bind(undefined,g_repo_from_file),function(){
 			//some dangling dependencies may have been resolved
-			if(UI.ED_ReparseDanglingDeps()){
-				CallParseMore()
+			if(!g_repo_ever_parsed[spath]){
+				g_repo_ever_parsed[spath]=1;
+				if(g_is_parse_more_running){
+					g_need_reparse_dangling_deps=1;
+				}else{
+					if(UI.ED_ReparseDanglingDeps()){
+						CallParseMore()
+					}
+				}
 			}
 			//"git status --short --ignored"
 			//IO.RunTool(["git","ls-files","--modified"],spath, ".*",function(match){
