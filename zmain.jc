@@ -374,6 +374,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch/4)
 		return 0
 	}
+	auto RecursiveCopy(string dir_src,string dir_tar)
+		System.IO.CreateDirectory(dir_tar)
+		if !System.IO.DirExists(dir_tar):return 0
+		for fn,fi in System.IO.EnumFiles(dir_src+'/*',System.IO.ENUM_FILE|System.IO.ENUM_DIR)
+			pslash=fn.LastIndexOf('/')
+			fn_tar=dir_tar+"/"+fn[pslash+1:]
+			if fi.is_dir():
+				if !RecursiveCopy(fn,fn_tar):return 0
+			else
+				if !System.IO.CopyFile(fn,fn_tar):return 0
+		return 1
+	JS_UI["RecursiveCopy"]=function(JSContext JS){
+		dir_src=JS.Param(0).as(string)
+		dir_tar=JS.Param(1).as(string)
+		return JS.Return(RecursiveCopy(dir_src,dir_tar))
+	}
 });
 
 (function(){

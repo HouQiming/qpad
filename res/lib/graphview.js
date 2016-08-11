@@ -35,8 +35,9 @@ var GetMainFileName=function(fname){
 	return main_name;
 };
 
-var SearchClassFileSimple=function(spath,sname){
-	var fnext=IO.CreateEnumFileContext(spath+'/'+sname+'.*',1);
+var readdir=function(sname,flags){
+	var fs=[];
+	var fnext=IO.CreateEnumFileContext(sname,flags);
 	var fs=[];
 	if(fnext){
 		for(;;){
@@ -46,6 +47,11 @@ var SearchClassFileSimple=function(spath,sname){
 		}
 		fnext=undefined;
 	}
+	return fs;
+};
+
+var SearchClassFileSimple=function(spath,sname){
+	var fs=readdir(spath+'/'+sname+'.*',1);
 	if(fs.length>1){
 		fs.sort();
 	}
@@ -58,16 +64,7 @@ var SearchClassFileSimple=function(spath,sname){
 var SearchClassFile=function(cache,sname){
 	for(var i=0;i<cache.search_paths.length;i++){
 		var spath=cache.search_paths[i];
-		var fnext=IO.CreateEnumFileContext(spath+'/'+sname+'.*',1);
-		var fs=[];
-		if(fnext){
-			for(;;){
-				var fi=fnext();
-				if(!fi){break;}
-				fs.push(IO.NormalizeFileName(fi.name));
-			}
-			fnext=undefined;
-		}
+		var fs=readdir(spath+'/'+sname+'.*',1);
 		if(fs.length>1){
 			fs.sort();
 		}
@@ -89,7 +86,9 @@ UI.GetPrivateClassList=function(cache){
 				for(;;){
 					var fi=fnext();
 					if(!fi){break;}
-					list.push(UI.GetMainFileName(fi.name));
+					if(UI.GetFileNameExtension(fi.name).toLowerCase()!='zg'){
+						list.push(UI.GetMainFileName(fi.name));
+					}
 				}
 				fnext=undefined;
 			}
@@ -574,7 +573,7 @@ UI.LoadGraph=function(fn){
 	var ret=JSON.parse(sdata);
 	if(!ret.nds){ret.nds=[];}
 	if(!ret.es){ret.es=[];}
-	if(!ret.m_depends){ret.m_depends=[];}
+	//if(!ret.m_depends){ret.m_depends=[];}
 	ret.__proto__=graph_prototype;
 	return ret;
 };
@@ -746,7 +745,7 @@ UI.CreateGraph=function(){
 	var ret={
 		nds:[],
 		es:[],
-		m_depends:[],
+		//m_depends:[],
 	};
 	ret.__proto__=graph_prototype;
 	return ret;
@@ -1520,6 +1519,8 @@ W.GraphView=function(id,attrs){
 			m_classes_by_name:{},
 			m_undo_queue:[JSON.stringify(graph)],
 			m_redo_queue:[],
+			m_local_packages:{},
+			m_file_dir:s_file_dir,
 			search_paths:[UI.m_node_dir,s_file_dir],
 		};
 		obj.cache=cache;
@@ -2218,10 +2219,27 @@ var ReindexPackages=function(){
 		return ret;
 	});
 };
-
 ReindexPackages();
 
+var GetPackageByName=function(cache,s_package){
+	var nd_package=cache.m_local_packages[s_package];
+	if(nd_package==undefined){
+		var sdir=cache.m_file_dir+'/zpacks/'+s_package;
+		if(IO.DirExists(sdir)){
+			nd_package={
+				name:s_package,
+				dir:sdir,
+			}
+		}else{
+			nd_package=null;
+		}
+		cache.m_local_packages[s_package]=nd_package;
+	}
+	return nd_package||UI.g_packages_by_name[s_package];
+};
+
 var ParsePackage=function(nd_package){
+	if(!nd_package){return;}
 	if(!nd_package.nodes){
 		//just grab all their top-level groups
 		var graph_fns=[];
@@ -2343,7 +2361,8 @@ W.PackagePage=function(id,attrs){
 		//use plain old name search
 		//search for unreferenced packages
 		var graphview=obj.graphview;
-		var packs_refed=graphview.graph.m_depends;
+		//var packs_refed=graphview.graph.m_depends;
+		var packs_refed=readdir(UI.GetPathFromFilename(obj.graphview.m_file_name)+'/zpacks/*',2).map(function(fn){return UI.GetMainFileName(fn);});
 		var packs_refed_map={};
 		for(var i=0;i<packs_refed.length;i++){
 			packs_refed_map[packs_refed[i]]=1;
@@ -2381,7 +2400,7 @@ W.PackagePage=function(id,attrs){
 		//nodes of already-referenced packages
 		for(var pi=0;pi<packs_refed.length;pi++){
 			var s_package=packs_refed[pi];
-			var nd_package=UI.g_packages_by_name[s_package];
+			var nd_package=GetPackageByName(obj.graphview.cache,s_package);
 			if(!nd_package){continue;}
 			var groups=ParsePackage(nd_package);
 			for(var i=0;i<groups.length;i++){
@@ -2504,7 +2523,11 @@ W.PackageItem_prototype={
 		if(this.s_package&&!this.s_group&&!this.s_template){
 			//we're just adding a package
 			//we stay in the adding mode, wipe the text, but keep the focus
-			graph.m_depends.push(this.s_package);
+			//graph.m_depends.push(this.s_package);
+			var sdir_zpacks=UI.GetPathFromFilename(obj.m_file_name)+'/zpacks';
+			IO.CreateDirectory(sdir_zpacks);
+			UI.RecursiveCopy(UI.g_packages_by_name[this.s_package].dir,sdir_zpacks+'/'+this.s_package);
+			/////////////////
 			var plist=this.owner;
 			var size=plist.find_bar_edit.ed.GetTextSize();
 			if(size){
@@ -2517,6 +2540,8 @@ W.PackageItem_prototype={
 		}
 		var stext_raw=this.s_create;
 		var s_file_template=undefined;
+		var nd_package=GetPackageByName(cache,this.s_package);
+		ParsePackage(nd_package);
 		if(this.s_template){
 			//add a number, copy the file
 			var s_tname=this.s_template.substr(1);
@@ -2529,10 +2554,10 @@ W.PackageItem_prototype={
 					break;
 				}
 			}
-			s_file_template=LoadGroupReference(this.s_template,UI.g_packages_by_name[this.s_package].fn_graph);
+			s_file_template=LoadGroupReference(this.s_template,nd_package.fn_graph);
 		}else if(this.s_group){
 			//group reference, pick by caption, cache the graph with date checks
-			var s_group_file=UI.g_packages_by_name[this.s_package].fn_graph;
+			var s_group_file=nd_package.fn_graph;
 			var s_group_name=this.s_group;
 			var nd_group_ref=LoadGroupReference(s_group_name,s_group_file);
 			if(nd_group_ref){

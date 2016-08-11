@@ -1,0 +1,9 @@
+function(input,output){
+	//@in=args,type=string
+	//@in=cmdline,type=string,ui=editbox,color=0xffb4771f
+	var cmdline=input.cmdline.join('').split(' ');
+	for(var j=0;j<input.args.length;j++){
+		cmdline.push(input.args[j]);
+	}
+	IO.RunProcess(cmdline,IO.m_current_graph_path+'/../build',1);
+};
