@@ -732,10 +732,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto show=JS.Param(2).or(1)
 		n=shell_args["length"].as(iptr)
 		args=[shell_args[i].as(string) for i=0:n-1]
-		pproc=System.Processes.Run(args,spath,show,"new_job,new_console")
+		pproc=System.Processes.Run(args,spath,show,show&2?"new_job":"new_job,new_console")
 		if !pproc:
 			//job object creation may fail
-			pproc=System.Processes.Run(args,spath,show,"new_console")
+			pproc=System.Processes.Run(args,spath,show,show&2?"":"new_console")
 		if !pproc:
 			return 0
 		return JS.Return(new CProcessWrapper(){proc:pproc})

@@ -5,5 +5,5 @@ function(input,output){
 	for(var j=0;j<input.args.length;j++){
 		cmdline.push(input.args[j]);
 	}
-	IO.RunProcess(cmdline,IO.m_current_graph_path+'/../build',1);
+	IO.RunProcess(cmdline,IO.m_build_path,1);
 };

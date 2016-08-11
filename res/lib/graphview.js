@@ -50,8 +50,8 @@ var readdir=function(sname,flags){
 	return fs;
 };
 
-var SearchClassFileSimple=function(spath,sname){
-	var fs=readdir(spath+'/'+sname+'.*',1);
+var SearchClassFileSimple=function(sname){
+	var fs=readdir(sname+'.*',1);
 	if(fs.length>1){
 		fs.sort();
 	}
@@ -64,13 +64,8 @@ var SearchClassFileSimple=function(spath,sname){
 var SearchClassFile=function(cache,sname){
 	for(var i=0;i<cache.search_paths.length;i++){
 		var spath=cache.search_paths[i];
-		var fs=readdir(spath+'/'+sname+'.*',1);
-		if(fs.length>1){
-			fs.sort();
-		}
-		if(fs.length>0){
-			return fs[0];
-		}
+		var fn=SearchClassFileSimple(spath+'/'+sname);
+		if(fn){return fn;}
 	}
 	return undefined;
 };
@@ -98,14 +93,21 @@ UI.GetPrivateClassList=function(cache){
 	return list;
 };
 
-UI.GetNodeClass=function(cache,sname){
+UI.GetNodeClass=function(cache,nd){
+	var s_dir=(nd.m_package_dir||'');
+	var sname=nd.m_class;
 	if(typeof(sname)!='string'){
 		return sname;
 	}
-	var holder=cache.m_classes_by_name[sname];
+	var holder=cache.m_classes_by_name[s_dir+sname];
 	if(holder==undefined){
 		holder=null;
-		var fn=SearchClassFile(cache,sname);
+		var fn=undefined;
+		if(s_dir){
+			//console.log('GetNodeClass',sname,cache.m_file_dir+'/'+s_dir+sname);
+			fn=SearchClassFileSimple(cache.m_file_dir+'/'+s_dir+sname);
+		}
+		if(!fn){fn=SearchClassFile(cache,sname);}
 		var snode=IO.ReadAll(fn);
 		if(snode){
 			var ndcls=undefined;
@@ -146,7 +148,7 @@ var g_edge_formats={
 		return s_input.replace(/\r?\n[ \t]*/g,'');
 	},
 	jsstring:function(arr_output,s_input){
-		return JSON.stringify(s_input).substr(1,sret.length-2);
+		return JSON.stringify(s_input);
 	},
 	indented:function(arr_output,s_input){
 		var s_target_indent='';
@@ -282,6 +284,8 @@ var Ungroup=function(nds,es, nds_ungroup,is_quiet){
 			if(is_quiet){ndj.x*=BUILD_UNGROUP_SCALE;ndj.y*=BUILD_UNGROUP_SCALE;}
 			ndj.x+=dx;
 			ndj.y+=dy;
+			ndj.m_package_dir=(nd_group.m_package_dir||'')+(ndj.m_group_package_dir||'');
+			ndj.m_is_disabled=(nd_group.m_is_disabled||ndj.m_group_is_disabled);
 			node_map[ndj.__id__]=ndj;
 		}
 		for(var j=0;j<gr.es.length;j++){
@@ -382,8 +386,11 @@ var graph_prototype={
 		}
 	},
 	Build:function(sbasepath,cache,is_rebuild){
-		IO.m_current_graph_path=sbasepath;
-		IO.SetCurrentDirectory(IO.m_current_graph_path);
+		IO.m_build_path=sbasepath;
+		//console.log(sbasepath);
+		//console.log();
+		IO.SetCurrentDirectory(sbasepath);
+		//IO.Shell(['cd']);
 		var es=this.es;
 		var nds=this.nds;
 		var uvid=0;
@@ -471,7 +478,7 @@ var graph_prototype={
 			var ndi=nds[v0];
 			var need_build_i=(is_rebuild||ndi.m_need_rebuild);
 			if(ndi.m_is_disabled){continue;}
-			var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+			var ndcls=UI.GetNodeClass(cache,ndi);
 			//reset/propagate need_rebuild
 			var es_v0=es_topo[v0];
 			for(var j=0;j<es_v0.length;j++){
@@ -663,7 +670,7 @@ var rproto_node={
 				UI.Refresh();
 				return;
 			}
-			var ndcls=UI.GetNodeClass(this.owner.cache,this.nd.m_class);
+			var ndcls=UI.GetNodeClass(this.owner.cache,this.nd);
 			if(ndcls){
 				UI.OpenEditorWindow(ndcls.m_file_name);
 			}
@@ -761,7 +768,7 @@ UI.GetNodeCache=function(cache,ndi){
 		ndi.m_ui_values={};
 	}
 	//get the node's class
-	var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+	var ndcls=UI.GetNodeClass(cache,ndi);
 	//var is_invalid_class=0;
 	if(!ndcls){
 		//assume empty class when rendering before it's loaded, do not cache the result
@@ -974,7 +981,7 @@ var LoadGroupReference=function(s_group_name,s_group_file){
 					s_caption_i=s_caption_i.substr(0,pcolon);
 				}
 				//file template - save file name in node class - simplified SearchClassFile
-				ret.groups[s_caption_i]=SearchClassFileSimple(UI.GetPathFromFilename(fn),ndi.m_class);
+				ret.groups[s_caption_i]=SearchClassFileSimple(UI.GetPathFromFilename(fn)+'/'+ndi.m_class);
 			}
 		}
 		g_host_graph_cache[fn]=ret;
@@ -1244,7 +1251,7 @@ W.graphview_prototype={
 				});
 			}
 			//create an outer port
-			var ndcls=UI.GetNodeClass(cache,nd.m_class);
+			var ndcls=UI.GetNodeClass(cache,nd);
 			var port_inner=ndcls.m_port_map[port];
 			//console.log(JSON.stringify(ndcls.m_port_map),port)
 			var port_outer=JSON.parse(JSON.stringify(port_inner));
@@ -1349,6 +1356,8 @@ W.graphview_prototype={
 				nd_i.m_group_dx=nd_i.x;
 				nd_i.m_group_dy=nd_i.y;
 			}
+			nd_i.m_group_package_dir=nd_i.m_package_dir;
+			nd_i.m_group_is_disabled=nd_i.m_is_disabled;
 		}
 		//var nd_rebuilds=[nd_group];
 		for(var i=0;i<gr_reconnects.length;i++){
@@ -1439,7 +1448,6 @@ W.graphview_prototype={
 		var cache=this.cache;
 		var sbasepath=UI.GetPathFromFilename(this.m_file_name)+'/../build'
 		IO.CreateDirectory(sbasepath)
-		IO.m_current_graph_path=sbasepath;
 		this.graph.Build(sbasepath,cache,is_rebuild);
 	},
 	QuickPreview:function(id){
@@ -1462,7 +1470,7 @@ W.graphview_prototype={
 		var nd_sel=nd_sels[0];
 		////////
 		//port matching
-		var ndcls_view=UI.GetNodeClass(this.cache,nd_view.m_class);
+		var ndcls_view=UI.GetNodeClass(this.cache,nd_view);
 		var port1=undefined;
 		var type_ref=undefined;
 		for(var pi=0;pi<ndcls_view.m_ports.length;pi++){
@@ -1480,7 +1488,7 @@ W.graphview_prototype={
 		}
 		var port0=undefined;
 		var tidx_min=undefined;
-		var ndcls_sel=UI.GetNodeClass(this.cache,nd_sel.m_class);
+		var ndcls_sel=UI.GetNodeClass(this.cache,nd_sel);
 		for(var pi=0;pi<ndcls_sel.m_ports.length;pi++){
 			var tidx_pi=undefined;
 			var port_pi=ndcls_sel.m_ports[pi];
@@ -2589,6 +2597,8 @@ W.PackageItem_prototype={
 		var nd_new=graph.CreateNode(stext_raw);
 		if(typeof(stext_raw)!='string'&&s_group_name){
 			nd_new.m_caption=s_group_name;
+			//prepend the package dir
+			nd_new.m_package_dir='zpacks/'+this.s_package+'/'+(nd_new.m_package_dir||'');
 		}
 		//////////////////////////////////////
 		//score-based auto-connect
@@ -2636,12 +2646,12 @@ W.PackageItem_prototype={
 		//enum and test all ports
 		//keys: matched_type_id selection key x
 		//do auto-layout in the same loop
-		var ndcls_new=UI.GetNodeClass(cache,nd_new.m_class);
+		var ndcls_new=UI.GetNodeClass(cache,nd_new);
 		if(ndcls_new&&ndcls_new.m_ports){
 			var al_x_max=-1e10,al_y_avg=0,al_n=0;
 			for(var pi=0;pi<ndcls_new.m_ports.length;pi++){
 				var port_pi=ndcls_new.m_ports[pi];
-				if(port_pi.dir!='output'){continue;}
+				//if(port_pi.dir!='output'){continue;}
 				var type_ordering={};
 				for(var i=0;i<port_pi.type.length;i++){
 					type_ordering[port_pi.type[i]]=i+1;
@@ -2650,13 +2660,13 @@ W.PackageItem_prototype={
 				var port_best=undefined;
 				for(var i=0;i<graph.nds.length-1;i++){
 					var ndi=graph.nds[i];
-					var ndcls=UI.GetNodeClass(cache,ndi.m_class);
+					var ndcls=UI.GetNodeClass(cache,ndi);
 					var type_key=1e10;
 					var id_best=undefined;
 					for(var j=0;j<ndcls.m_ports.length;j++){
 						var port_j=ndcls.m_ports[j];
 						var type_j=port_j.type;
-						if(port_j.dir!='input'){continue;}
+						if(port_j.dir==port_pi.dir){continue;}
 						for(var tj=0;tj<type_j.length;tj++){
 							if(type_key>type_ordering[type_j[tj]]+tj){
 								type_key=type_ordering[type_j[tj]]+tj;
@@ -2672,14 +2682,21 @@ W.PackageItem_prototype={
 					}
 				}
 				if(port_best){
-					graph.es.push({
-						id0:nd_new.__id__, port0:port_pi.id,
-						id1:port_best.nd.__id__, port1:port_best.port,
-					})
-					var cache_item=UI.GetNodeCache(cache,port_best.nd);
-					al_x_max=Math.max(al_x_max,port_best.nd.x+cache_item.m_w);
-					al_y_avg+=port_best.nd.y;
-					al_n++;
+					if(port_pi.dir=='output'){
+						graph.es.push({
+							id0:nd_new.__id__, port0:port_pi.id,
+							id1:port_best.nd.__id__, port1:port_best.port,
+						})
+						var cache_item=UI.GetNodeCache(cache,port_best.nd);
+						al_x_max=Math.max(al_x_max,port_best.nd.x+cache_item.m_w);
+						al_y_avg+=port_best.nd.y;
+						al_n++;
+					}else{
+						graph.es.push({
+							id0:port_best.nd.__id__, port0:port_best.port,
+							id1:nd_new.__id__, port1:port_pi.id,
+						})
+					}
 				}
 			}
 		}
