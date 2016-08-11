@@ -1453,6 +1453,12 @@ W.graphview_prototype={
 	QuickPreview:function(id){
 		var graph=this.graph;
 		var re_caption=new RegExp("view "+id.toString()+".*","i");
+		var is_view={};
+		graph.nds.filter(function(ndi){
+			return ndi.m_caption.match(/view [0-9].*/i);
+		}).forEach(function(ndi){
+			is_view[ndi.__id__]=1;
+		});
 		var nd_views=graph.nds.filter(function(ndi){
 			return ndi.m_caption.match(re_caption);
 		});
@@ -1505,7 +1511,7 @@ W.graphview_prototype={
 		}
 		////////
 		graph.es=graph.es.filter(function(edgei){
-			return edgei.id1!=nd_view.__id__;
+			return !(edgei.id1==nd_view.__id__||(edgei.id0==nd_sel.__id__&&is_view[edgei.id1]));
 		})
 		graph.es.push({
 			id0:nd_sel.__id__,port0:port0,

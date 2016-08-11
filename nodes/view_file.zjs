@@ -1,0 +1,8 @@
+function(input,output){
+	//@in=name,type=path string
+	if(!input.name.length){return;}
+	for(var j=0;j<input.name.length;j++){
+		UI.OpenEditorWindow(input.name[j]);
+	}
+	UI.OnApplicationSwitch();
+};

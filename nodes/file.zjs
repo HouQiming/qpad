@@ -3,7 +3,7 @@ function(input,output){
 	//@in=name,type=path string,ui=editbox,color=0xffb4771f
 	//@out=out_name,type=path string,color=0xffb4771f
 	for(var j=0;j<input.name.length;j++){
-		IO.CreateFile(IO.m_current_graph_path+'/'+input.name[j],input.code.join(''));
+		IO.CreateFile(IO.m_build_path+'/'+input.name[j],input.code.join(''));
 	}
 	output.out_name=(input.name[0]||'');
 };
