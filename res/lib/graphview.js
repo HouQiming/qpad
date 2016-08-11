@@ -1230,12 +1230,19 @@ W.graphview_prototype={
 		var gr_reconnects=[];
 		var gr_ports=[];
 		var gr_ui_port_map=[];
+		var gr_ui_values={};
 		var dot_cache={};
 		var port_name_map={};
 		var CreateDot=function(nd,port,side){
 			var skey=nd.__id__+'='+port;
 			var nd_dot=dot_cache[skey];
 			if(nd_dot){return nd_dot;}
+			//create an outer port
+			var ndcls=UI.GetNodeClass(cache,nd);
+			var port_inner=ndcls.m_port_map[port];
+			if(!port_inner){
+				return undefined;
+			}
 			nd_dot=gr.CreateNode('__dot__');
 			nd_dot.m_is_group_dot=1;
 			dot_cache[skey]=nd_dot;
@@ -1250,9 +1257,6 @@ W.graphview_prototype={
 					id1:nd.__id__,port1:port,
 				});
 			}
-			//create an outer port
-			var ndcls=UI.GetNodeClass(cache,nd);
-			var port_inner=ndcls.m_port_map[port];
 			//console.log(JSON.stringify(ndcls.m_port_map),port)
 			var port_outer=JSON.parse(JSON.stringify(port_inner));
 			var cnt=0;
@@ -1266,6 +1270,7 @@ W.graphview_prototype={
 				gr_ui_port_map.push({id_inner:nd.__id__,port_inner:port_inner.id,port_outer:port_outer.id});
 			}
 			nd_dot.m_port_outer_id=port_outer.id
+			gr_ui_values[port_outer.id]=nd.m_ui_values[port];
 			return nd_dot;
 		};
 		///////////////////
@@ -1285,7 +1290,8 @@ W.graphview_prototype={
 		if(!group_name){
 			group_name='group';
 		}
-		//pick the group nodes
+		//translate relevant ports and pick the group nodes
+		//the connected-to-outside ports
 		for(var i=0;i<m;i++){
 			var e=es[i];
 			var v0=node_map[e.id0];
@@ -1297,29 +1303,52 @@ W.graphview_prototype={
 				}else{
 					//output edge: create dot, dot edge, record port
 					var nd_dot=CreateDot(nds[v0],e.port0,'in');
-					gr_reconnects.push({
-						//id0:nd_dot.__id__,port0:"out",
-						id1:e.id1,port1:e.port1,
-						port_outer:nd_dot.m_port_outer_id,
-						id_inner:nd_dot.__id__,
-					})
+					if(nd_dot){
+						gr_reconnects.push({
+							//id0:nd_dot.__id__,port0:"out",
+							id1:e.id1,port1:e.port1,
+							port_outer:nd_dot.m_port_outer_id,
+							id_inner:nd_dot.__id__,
+						})
+					}
 				}
 			}else{
 				if(nds[v1].m_is_selected){
 					//input edge: create dot, dot edge, record port
 					var nd_dot=CreateDot(nds[v1],e.port1,'out');
-					gr_reconnects.push({
-						id0:e.id0,port0:e.port0,
-						//id1:nd_dot.__id__,port1:"in",
-						port_outer:nd_dot.m_port_outer_id,
-						id_inner:nd_dot.__id__,
-					})
+					if(nd_dot){
+						gr_reconnects.push({
+							id0:e.id0,port0:e.port0,
+							//id1:nd_dot.__id__,port1:"in",
+							port_outer:nd_dot.m_port_outer_id,
+							id_inner:nd_dot.__id__,
+						})
+					}
 				}else{
 					//unrelated edge
 					//do nothing
 				}
 			}
 		}
+		//find the dangling ports
+		var has_internal_edge={};
+		for(var i=0;i<gr_es.length;i++){
+			has_internal_edge[gr_es[i].id0+'='+gr_es[i].port0]=1;
+			has_internal_edge[gr_es[i].id1+'='+gr_es[i].port1]=1;
+		}
+		for(var i=0;i<n;i++){
+			if(nds[i].m_is_selected){
+				var ndclsi=UI.GetNodeClass(cache,nds[i]);
+				var id_ndi=nds[i].__id__;
+				for(var pi=0;pi<ndclsi.m_ports.length;pi++){
+					var port_i=ndclsi.m_ports[pi];
+					if(!has_internal_edge[id_ndi+'='+port_i.id]){
+						CreateDot(nds[i],port_i.id,port_i.dir=='input'?'out':'in');
+					}
+				}
+			}
+		}
+		//build the group class
 		var ndcls={
 			m_graph:gr,
 			m_reconnects:gr_reconnects,
@@ -1334,6 +1363,7 @@ W.graphview_prototype={
 		var nd_group=this.graph.CreateNode('group');
 		nd_group.m_caption=group_name;
 		nd_group.m_class=ndcls;
+		nd_group.m_ui_values=gr_ui_values;
 		var xtot=0,ytot=0,npt=0;
 		for(var i=0;i<gr_nds.length;i++){
 			var nd_i=gr_nds[i];
@@ -1410,7 +1440,29 @@ W.graphview_prototype={
 		var gr=undefined;
 		try{
 			gr=JSON.parse(UI.SDL_GetClipboardText());
-			FixClonedGraph(gr);
+			var is_pasted={};
+			for(var i=0;i<gr.nds.length;i++){
+				is_pasted[gr.nds[i].__id__]=1;
+			}
+			var id_map=FixClonedGraph(gr);
+			//if it's same-graph copy-paste, try to dup the external edges
+			var es=this.graph.es;
+			var m0=es.length;
+			//we're *adding edges* in the loop, and we shouldn't process those added edges
+			for(var i=0;i<m0;i++){
+				var e=es[i];
+				if(is_pasted[e.id0]&&!is_pasted[e.id1]){
+					es.push({
+						id0:id_map[e.id0],port0:e.port0,
+						id1:e.id1,port1:e.port1,
+					})
+				}else if(!is_pasted[e.id0]&&is_pasted[e.id1]){
+					es.push({
+						id0:e.id0,port0:e.port0,
+						id1:id_map[e.id1],port1:e.port1,
+					})
+				}
+			}
 		}catch(e){
 			console.log(e.stack);
 			return;
