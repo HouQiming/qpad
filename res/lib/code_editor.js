@@ -4470,7 +4470,7 @@ W.FileBrowserPage=function(id,attrs){
 						files.push({git_repo_to_list:spath_repo, search_text:s_search_text,
 							relevance:FILE_RELEVANCE_REPO_SCORE,hist_ord:-1})
 					}
-					var projects=UI.m_ui_metadata["<projects>"];
+					var projects=(UI.m_ui_metadata["<projects>"]||[]);
 					for(var i=0;i<projects.length;i++){
 						var spath_repo_i=projects[i];
 						if(!UI.m_current_file_list.m_listed_git_repos[spath_repo_i]){

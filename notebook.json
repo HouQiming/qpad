@@ -8,11 +8,11 @@
    "m_completion_time": [
     2016,
     7,
-    9,
-    21,
-    20,
-    22,
-    3
+    10,
+    14,
+    4,
+    5,
+    4
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/z",
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\nbad param name binding inside nested groups\nhotkey for adding dots.\nstore update info in referenced groups\n\twhich package, which caption\nUI overhaul\n\tmove names out of knobs\n\trender param widgets inside nodes\n\t\talso inline-ify the code editing UI\n\tdedicated \"preview\" nodes\n(test) @out format=var \nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
+   "m_text_in": "# TODO LIST\napply it to something\n\ttry-hard downloader\npackage system\n\t*their* private nodes\n\tnode.js-like copying instead of m_depends\ndefault param values\nbidirectional autoconnect\nadd-dot on single-node selection\n\tconnect to the least-connected port\n(test) @out format=var \nstore update info in referenced groups\n\twhich package, which caption\nUI overhaul\n\tmove names out of knobs\n\trender param widgets inside nodes\n\t\talso inline-ify the code editing UI\n\tdedicated \"preview\" nodes\n\tbetter coloring\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\nun-depending packages\n\tpackage node?",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,

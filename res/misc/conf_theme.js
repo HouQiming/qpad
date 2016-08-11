@@ -1140,7 +1140,10 @@ UI.CustomTheme=function(){
 				port_round:4,
 				port_h:18,
 				port_h_sep:4,
-				port_color:C,//0xff8adfb2,
+				port_color:0xff2ca033,//0xff8adfb2,
+				port_color_ui:0xffb4771f,
+				port_color_string:0xff007fff,
+				port_color_var:0xff9a3d6a,
 				port_text_color:0xffffffff,//0xff444444,
 				//////////
 				font_caption:UI.Font(UI.font_name,20),
