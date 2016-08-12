@@ -1135,6 +1135,7 @@ UI.CustomTheme=function(){
 				font_port:UI.Font(UI.font_name,16),
 				port_w_sep:16,
 				port_w_min:16,
+				port_w_ui_min:128,
 				port_padding:4,
 				port_extrude:8,
 				port_round:4,
@@ -1155,7 +1156,11 @@ UI.CustomTheme=function(){
 				caption_desc_color:0xff7f7f7f,
 				//////////
 				node_round:6,
-				node_color_default:0xffffffff,
+				node_color_default:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0x7fffffff}],//0xffffffff,
+				node_color_private:[{x:0,y:0,color:0xffe3cea6},{x:0,y:1,color:0x7fffffff}],
+				node_color_pack_priv:[{x:0,y:0,color:0xff999afb},{x:0,y:1,color:0x7fffffff}],
+				node_border_color:0xff444444,
+				node_border_width:1,
 				node_selection_color:0xff2ca033,
 				node_selection_width:4,
 				node_rebuild_bar_height:3,
@@ -1165,6 +1170,9 @@ UI.CustomTheme=function(){
 				dragsel_bgcolor:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				dragsel_border_color:C,
 				dragsel_border_width:0,
+			},
+			ui_style:{
+				font_widgets:UI.Font(UI.font_name,16),
 			},
 			edge_style:{
 				color:0xff444444,

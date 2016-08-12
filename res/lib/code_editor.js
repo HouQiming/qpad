@@ -6864,6 +6864,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			}
 		}
 	}
+	return obj_tab;
 }
 
 UI.OpenForCommandLine=function(cmdline_opens){
