@@ -303,7 +303,7 @@ var Ungroup=function(nds,es, nds_ungroup,is_quiet){
 			for(var j=0;j<gr_ui_port_map.length;j++){
 				var cnj=gr_ui_port_map[j];
 				var s_ui_value=nd_group.m_ui_values[cnj.port_outer];
-				if(s_ui_value){
+				if(s_ui_value!=undefined){
 					node_map[cnj.id_inner].m_ui_values[cnj.port_inner]=s_ui_value;
 				}
 			}
@@ -1700,7 +1700,7 @@ W.GraphView=function(id,attrs){
 						color:0,
 					});
 				}
-				if(ndi.m_need_rebuild){
+				if(ndi.m_need_rebuild&&!(!isGroup(ndi)&&ndi.m_class=='__dot__')){
 					//render to-build indicator
 					item_i.x=x+item_i.dx;
 					item_i.y=y+item_i.dy;
@@ -2836,7 +2836,7 @@ W.PackageItem=function(id,attrs){
 				}
 			}else{
 				s_icon='プ';
-				s_hint=UI._('Private node');
+				s_hint=UI._('Native node');
 			}
 		}
 		UI.DrawChar(obj.icon_font,obj.x+obj.padding+4,obj.y+(obj.h-h_icon)*0.5,
