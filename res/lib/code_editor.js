@@ -1519,6 +1519,7 @@ var CallParseMore=function(){
 		var tick0=Duktape.__ui_get_tick()
 		for(;;){
 			var ret=UI.ED_ParseMore()
+			//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),'UI.ED_ParseMore()');
 			if(ret){
 				var doc=UI.g_editor_from_file[ret.file_name];
 				if(doc){
@@ -1554,6 +1555,7 @@ var CallParseMore=function(){
 			var tick1=Duktape.__ui_get_tick()
 			//print(Duktape.__ui_seconds_between_ticks(tick0,tick1))
 			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>PARSING_SECONDS_PER_FRAME||UI.TestEventInPollJob()){
+				//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),UI.TestEventInPollJob()?'event':'timeout');
 				UI.NextTick(fcallmore)
 				break;
 			}
@@ -4746,14 +4748,15 @@ UI.ED_ParseMore_callback=function(fn){
 		var fn_main=UI.GetMainFileName(fn);
 		var exts=[".c",".cpp",".cxx",".cc",".C",".m",".cu"]
 		for(var i=0;i<exts.length;i++){
-			var fn_c=UI.ED_SearchIncludeFile(fn,fn_main+exts[i],ret)
-			if(fn_c){UI.ED_ParserQueueFile(fn_c)}
+			var fn_c=UI.ED_SearchIncludeFile(fn,fn_main+exts[i],ret,1)
+			if(fn_c){UI.ED_ParserQueueFile(fn_c);break;}
 		}
 	}
 	return ret
 }
 
-UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
+UI.ED_SearchIncludeFile=function(fn_base,fn_include,options,is_base_only){
+	//console.log('UI.ED_SearchIncludeFile',fn_base,fn_include);
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		fn_include=fn_include.toLowerCase().replace(/\\/g,"/")
 	}
@@ -4782,7 +4785,7 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 		}
 		return '';
 	}
-	var fn_include_length=fn_include.length
+	var fn_include_length=fn_include.length;
 	//base path
 	var spath=UI.GetPathFromFilename(fn_base)
 	var fn=(spath+"/"+fn_include);
@@ -4805,6 +4808,7 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options){
 			}
 		}
 	}
+	if(is_base_only){return '';}
 	//standard include paths
 	if(options.include_paths){
 		var paths=options.include_paths
@@ -7513,6 +7517,16 @@ UI.AddProjectDir=function(spath){
 	}else{
 		UI.ExplicitFileOpen()
 	}
+	var tab=UI.FindUtilTab("file_browser",0);
+	if(tab){
+		var obj=tab.util_widget;
+		if(obj){
+			obj.m_file_list=undefined
+			obj.m_try_to_focus=undefined;
+			UI.RefreshAllTabs()
+		}
+	}
+	UI.RefreshAllTabs();
 };
 
 UI.RemoveProjectDir=function(spath){

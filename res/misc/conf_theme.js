@@ -645,7 +645,7 @@ UI.CustomTheme=function(){
 			font:UI.Font(UI.font_name,20,0),
 			icon_color:L?0xff000000:0xffe8e8e8,
 			icon_font:UI.Font('res/fonts/iconfnt.ttf,!',20),
-			icon:'告',
+			//icon:'告',
 			//////////
 			k_shake:400,
 			damping_shake:8,

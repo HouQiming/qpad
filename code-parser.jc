@@ -185,6 +185,8 @@ TOK_AND_EQ=int('q')
 TOK_XOR_EQ=int('r')
 TOK_LSHIFT_EQ=int('s')
 TOK_RSHIFT_EQ=int('t')
+////////////////
+TOK_COMMENT=int('u')
 g_id_include=getid("#include")
 g_id_define=getid("#define")
 g_id_typedef=getid("typedef")
@@ -625,6 +627,11 @@ auto tokenize(string sdata,int g_ignore_indents)
 					ptr++
 				if last_significant_newline_position==toks.n:
 					last_line_comment_position=toks.n
+				//merge comments to avoid perf issues during token neib lookup
+				if toks.n>0&&toks.back().tok==TOK_COMMENT:
+					toks[toks.n-1].epos1=ptr+1
+				else
+					push_token(TOK_COMMENT,int(efeed0),int(ptr+1))
 				//parseComment(feed,efeed0,ptr+1)
 				continue
 			if ch=='*':{
@@ -637,6 +644,11 @@ auto tokenize(string sdata,int g_ignore_indents)
 					ptr++
 					if ch=='/'&&c=='*':break;
 					c=ch;
+				//merge comments to avoid perf issues during token neib lookup
+				if toks.n>0&&toks.back().tok==TOK_COMMENT:
+					toks[toks.n-1].epos1=ptr
+				else
+					push_token(TOK_COMMENT,int(efeed0),int(ptr))
 				//parseComment(feed,efeed0,ptr)
 				continue
 			}
@@ -983,6 +995,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		int m_function_id
 		int m_param_id
 		int m_ptok_function_id
+		int m_ptok_last_comment
+		int m_last_var_id
 	struct TScopeEntry
 		int ptok0
 		int pdecls
@@ -996,6 +1010,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	all_key_decls=new TKeyDeclItem[]
 	function_id=0
 	ptok_function_id=-1
+	ptok_last_comment=-1
+	last_var_id=0
 	param_id=0
 	scopes.push(TScopeEntry(){ptok0:-1})
 	popScope=inline(){
@@ -1020,7 +1036,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	all_prototypes=new int[]
 	p_prototypes=new int2[]
 	MAX_PROTOTYPE_TOKS=1024
-	parsePrototype=function(int function_id,int ptok){
+	parsePrototype=function(int function_id,int ptok,iptr ptok_last_comment){
 		auto blevel=0
 		auto param_id=0
 		auto p0=int(all_prototypes.n)
@@ -1051,13 +1067,37 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				is_done=1
 				break
 		if !is_done:
+			//it's invalid, roll back
 			all_prototypes.resize(iptr(p0))
 		else
+			//todo: parse ptok_last_comment based on the current prototype
 			all_prototypes[p0]=int(all_prototypes.n)-p0-1
 			p_prototypes.push(int2(function_id,p0))
 	}
 	for i=0:toks.n-1
 		tok_i=toks[i].tok
+		inline prevToken()
+			auto p=i-1
+			auto ret=int(';')
+			if p>=0L:
+				ret=toks[p].tok
+				if ret==TOK_COMMENT:
+					ret=int(';')
+					p--
+					if p>=0L:
+						ret=toks[p].tok
+			return ret
+		inline nextToken()
+			auto p=i+1
+			auto ret=int(';')
+			if p<toks.n:
+				ret=toks[p].tok
+				if ret==TOK_COMMENT:
+					ret=int(';')
+					p++
+					if p<toks.n:
+						ret=toks[p].tok
+			return ret
 		switch(tok_i){
 		default:
 			if (tok_i&TOK_TYPE_MASK)==TOK_ID:
@@ -1068,13 +1108,13 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				/////////
 				//#include, #define, typedef
 				if tok_i==TOK_ID+g_id_include:
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
 						idfn_include=tok1-TOK_STRING
 						searchDepFile(idfn_include,int(i+1))
 				else if tok_i==TOK_ID+g_id_require:
 					//JS require
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
 					if tok1=='(':
 						tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
 						if (tok2&TOK_TYPE_MASK)==TOK_STRING:
@@ -1085,13 +1125,13 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							searchDepFile(idfn_require,int(i+2))
 				else if tok_i==TOK_ID+g_id_import:
 					//JC import
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
 						idfn_import=getid(cite_raw(iptr(toks[i+1].epos0+1),iptr(toks[i+1].epos1-1)))
 						searchDepFile(idfn_import,int(i+1))
 				else if tok_i==TOK_ID+g_id_define:
 					//do nothing, next id does it
-					//just discount it as decl
+					//just disqualify it as decl
 				else if tok_i==TOK_ID+g_id_typedef:
 					scopes[scopes.n-1].in_typedef=i8(1)
 				else if tok_i==TOK_ID+g_id_if||tok_i==TOK_ID+g_id_while:
@@ -1101,8 +1141,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					/////////
 					//decl
 					sc=scopes[scopes.n-1]
-					tok0=(i>0?toks[i-1].tok:int(';'))
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok0=prevToken()
+					tok1=nextToken()
 					if (tok1&TOK_TYPE_MASK)==TOK_ID&&!keyword_map[tok1-TOK_ID]:
 						//followed by another non-keyword id, not a decl
 						break
@@ -1165,15 +1205,43 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 										all_key_decls.push(TKeyDeclItem(){
 											id_type:id+KEY_DECL_FUNCTION,
 											epos0:toks[i].epos0})
+									else
+										last_var_id=id
 									if is_function==1:
-										parsePrototype(id,int(i+3))
+										parsePrototype(id,int(i+3),ptok_last_comment)
+							ptok_last_comment=-1L
+			break
+		case TOK_COMMENT:
+			ptok_last_comment=i
+			epos_var_comment=-1L
+			if last_var_id:
+				epos0=toks[i].epos0
+				epos1=toks[i].epos1
+				for j=epos0:min(epos1,epos0+2)-1
+					if sdataz[j]=='<':
+						epos_var_comment=j+1
+						break
+					else if sdataz[j]=='\n':
+						epos_var_comment=-1L
+						break
+			if epos_var_comment>=0L:
+				//it's a doxygen item for last_var_id
+				//could use ED_QueryDecl in query-all mode to get a list of documented vars at a scope
+				//it could be a separate query - QueryDocumentedVarAtScope
+				!?
 			break
 		case '(','[','{':
-			ss.push(TStkEntry(){m_function_id:function_id,m_ptok_function_id:ptok_function_id,m_param_id:param_id})
+			ss.push(TStkEntry(){
+				m_function_id:function_id,
+				m_ptok_function_id:ptok_function_id,
+				m_param_id:param_id,
+				m_ptok_last_comment:ptok_last_comment,
+				m_last_var_id:last_var_id,
+			})
 			function_id=0
 			ptok_function_id=-1
 			if tok_i=='('&&i>0:
-				tok0=toks[i-1].tok
+				tok0=prevToken()
 				if (tok0&TOK_TYPE_MASK)==TOK_ID:
 					id=tok0-TOK_ID
 					//&&!(i>=2&&toks[i-2].tok==TOK_ID+g_id_in)
@@ -1192,7 +1260,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			if ss.n:
 				if function_id&&tok_i==')':
 					//ID(...){ testing
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
 					if (tok1=='{'||tok1==';'&&is_header)&&ptok_function_id>=0:
 						//this should go through even if there was a . before the name
 						all_key_decls.push(TKeyDeclItem(){
@@ -1202,8 +1270,11 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				se=ss.pop()
 				function_id=se.m_function_id
 				ptok_function_id=se.m_ptok_function_id
+				ptok_last_comment=se.m_ptok_last_comment
+				last_var_id=se.m_last_var_id
 				param_id=se.m_param_id
 			if tok_i=='}':
+				ptok_last_comment=-1L
 				if scopes.n>1:
 					//process the decls - sort, unique
 					popScope()
@@ -1224,8 +1295,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			break
 		case '.':
 			if i>0&&i<toks.n-1:
-				tok0=toks[i-1].tok
-				tok2=toks[i+1].tok
+				tok0=prevToken()
+				tok2=nextToken()
 				if (tok0&TOK_TYPE_MASK)==TOK_ID&&(tok2&TOK_TYPE_MASK)==TOK_ID:
 					name_dot_entries.push(int2(tok0-TOK_ID,tok2-TOK_ID))
 			break
@@ -1234,6 +1305,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				scopes[scopes.n-1].in_assignment=i8(1)
 			break
 		case ';':
+			ptok_last_comment=-1L
 			if scopes.n:
 				scopes[scopes.n-1].in_assignment=i8(0)
 				scopes[scopes.n-1].in_typedef=i8(0)
