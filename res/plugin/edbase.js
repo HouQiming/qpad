@@ -128,6 +128,8 @@ Language.Register({
 	name:'Jacy',parser:"C",
 	extensions:['jc','spap'],
 	indent_as_parenthesis:1,
+	has_post_ctor_initializer:1,
+	auto_include:['__builtin.jc'],
 	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
 	rules:function(lang){
@@ -196,6 +198,7 @@ Language.Register({
 Language.Register({
 	name:'BSGP',parser:"C",
 	extensions:['i'],
+	auto_include:['system.i'],
 	has_dlist_type:1,
 	has_pointer_ops:1,
 	indent_as_parenthesis:1,
@@ -213,6 +216,7 @@ Language.Register({
 Language.Register({
 	name:'CUDA',parser:"C",
 	extensions:['cu','cuh'],
+	auto_include:['cuda.h'],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2,'__global__':1,'__device__':1,'__host__':1},
 	has_pointer_ops:1,
 	file_icon_color:0xff9a3d6a,
