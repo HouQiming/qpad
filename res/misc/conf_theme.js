@@ -629,16 +629,25 @@ UI.CustomTheme=function(){
 			round:4,
 			styles:[
 				{font:UI.Font(UI.font_name,20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8},
+				/////////////////
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xffb4771f:0xffe3cea6},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff2ca033:0xff8adfb2},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff1c1ae3:0xff999afb},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff007fff:0xff6fbffd},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff9a3d6a:0xffd6b2ca},
+				/////////////////
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xffb4771f:0xffe3cea6},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff2ca033:0xff8adfb2},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff1c1ae3:0xff999afb},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff007fff:0xff6fbffd},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff9a3d6a:0xffd6b2ca},
+				/////////////////
+				{font:UI.Font(UI.font_name,20,-50),paragraph_space:16,color:L?0xff7f7f7f:0xffaaaaaa}, //grey
+				{font:UI.Font(UI.font_name,16,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
+				{font:UI.Font(UI.font_name,16,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
+				{font:UI.Font(UI.font_name,16,200),paragraph_space:12,color:L?0xffb4771f:0xffe3cea6}, //bold colored small
+				//{font:UI.Font("res/fonts/inconsolata.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //code
+				//{font:UI.Font("res/fonts/opensansi.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //italic
 			],
 			progress_color:C_sel,
 			text_color:L?0xff000000:0xffe8e8e8,

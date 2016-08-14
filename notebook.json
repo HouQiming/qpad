@@ -2,17 +2,17 @@
  "cells": [
   {
    "m_language": "Windows BAT",
-   "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code qpad.jc --run\n",
-   "m_text_out": "",
+   "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code -awin64 qpad.jc --run\n",
+   "m_text_out": "s7res.c\r\n   Creating library ./bin/win64/qpad.lib and object ./bin/win64/qpad.exp\r\n",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
     7,
-    12,
-    19,
-    16,
-    1,
-    6
+    13,
+    14,
+    40,
+    56,
+    0
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\ndoxygen doc support\n\tfirst line, with or without \\brief\n\t@param or \\param\n\t@return or \\return\n\t< ... for variables / members\n\t\tassume unique id\n\t--\n\tassociate function documentation structure with p_prototypes\n\tput var documentation in a separate by-scope lookup\n\t\tthe goal is to *list all of them*\nmulti-knob gradient\nkeep case when replacing in case insensitive mode\nHTML tag AC\nbad scrolling and initial-run handling for \\r\nctrl+f3 on empty sel in binary file\nlanguage of empty files\nupdate homepage\nshow advanced fhint at cursor, and align the param\nterminal / mobile keyboard support\nmac\n\ttooltip hotkey translation, zoom hotkey, tab-switch hotkey\n\tinstall: copy to /Applications\n\tsystem menu\nsmart code reference\n\tspecify \"training data\" files\n\t\tsame-git-same-ext files\n\tsearch for code snippets matching a current location\n\t\tfcall with similar args\n\t\tdot with similar names\n\t\tideally... we should get the closest ones\n\t\t\t\"explanation\" of AC candidates\n\t\t\tlike in MS Japanese IME\njc: better completion - methods from unfamiliar class, unreached code, constants, ...\nbinary file speed issue?\nnew release\n\tlinux source .tar.gz\n\t\tbuild-it-yourself release\nmultiple windows of the same file\nfull notebook search\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nsave notebook wrapping status\nlinks in help\nrunning a markdown: open as help page?\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nmaximizing notebooks\nfunction hint on *existing* calls - which parameter are you changing right now?\nindent\n\tauto detect space / tab indent\nplugin loading\nhelp\n\timage searching\n\tscript error notification\ndragging a window to occupy \"tips\" fully\ncode beautifier\n\thelp code auto beautification\nnotebook ctrl+m focus\ndiff / undo on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\ntentative focus refresh: infinite loop risk\nctrl+d at EOL\ndblclick at notebook eol\nporting\n\tlinux alt+tab\n\tlinux instance detection\n\t\tint pid_file = open(\"/var/run/whatever.pid\", O_CREAT | O_RDWR, 0666);\n\t\tint rc = flock(pid_file, LOCK_EX | LOCK_NB);\n\t\tif(rc) {\n\t\t    if(EWOULDBLOCK == errno)\n\t\t        ; // another instance is running\n\t\t}\n\t\telse {\n\t\t    // this is the first instance\n\t\t}\n\tunix search path for jc\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nctrl+mousewheel\n\tper-tab scale? make it global\nmouse centric interaction\n\ttoolbar in menu bar\nctrl+g mode\n\tgoto button to trigger it on the tophint\n\tneed must-appear\nshort and simple theme color palette\nput plugins in ~/.qpad\nmake top hint / notification dodge\n\tMouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nfor() is not a function\nfileindex gc vs parse queue\nrendering\n\ttrue AA for roundrect\ngit diff viewer\nauto-include files\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nvery narrow file list...\nbad parser result after multiple saves\n\tcould be diff tracker bug\nbinary editor\n\tduk buffer size limit\ngeneric HTML rendering?\n\tcheerio - looks managable\n\tneed module conversion: npm to duktape\n\t\tdid it with browserify\n\t\tit magically works in duktape with a minor modification\ndedicated mobile/mobile-like UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n",
+   "m_text_in": "# TODO LIST\nid explanation in AC\n\tby-id queries like prototype\ncontext-specific help like @qpadvar\n\tW.Button, etc.\nx_indent support in rich text\nmulti-knob gradient\nkeep case when replacing in case insensitive mode\nHTML tag AC\nbad scrolling and initial-run handling for \\r\nctrl+f3 on empty sel in binary file\nlanguage of empty files\nupdate homepage\nshow advanced fhint at cursor, and align the param\nterminal / mobile keyboard support\nmac\n\ttooltip hotkey translation, zoom hotkey, tab-switch hotkey\n\tinstall: copy to /Applications\n\tsystem menu\nsmart code reference\n\tspecify \"training data\" files\n\t\tsame-git-same-ext files\n\tsearch for code snippets matching a current location\n\t\tfcall with similar args\n\t\tdot with similar names\n\t\tideally... we should get the closest ones\n\t\t\t\"explanation\" of AC candidates\n\t\t\tlike in MS Japanese IME\njc: better completion - methods from unfamiliar class, unreached code, constants, ...\nbinary file speed issue?\nnew release\n\tlinux source .tar.gz\n\t\tbuild-it-yourself release\nmultiple windows of the same file\nfull notebook search\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nsave notebook wrapping status\nlinks in help\nrunning a markdown: open as help page?\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nmaximizing notebooks\nfunction hint on *existing* calls - which parameter are you changing right now?\nindent\n\tauto detect space / tab indent\nplugin loading\nhelp\n\timage searching\n\tscript error notification\ndragging a window to occupy \"tips\" fully\ncode beautifier\n\thelp code auto beautification\nnotebook ctrl+m focus\ndiff / undo on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\ntentative focus refresh: infinite loop risk\nctrl+d at EOL\ndblclick at notebook eol\nporting\n\tlinux alt+tab\n\tlinux instance detection\n\t\tint pid_file = open(\"/var/run/whatever.pid\", O_CREAT | O_RDWR, 0666);\n\t\tint rc = flock(pid_file, LOCK_EX | LOCK_NB);\n\t\tif(rc) {\n\t\t    if(EWOULDBLOCK == errno)\n\t\t        ; // another instance is running\n\t\t}\n\t\telse {\n\t\t    // this is the first instance\n\t\t}\n\tunix search path for jc\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nctrl+mousewheel\n\tper-tab scale? make it global\nmouse centric interaction\n\ttoolbar in menu bar\nctrl+g mode\n\tgoto button to trigger it on the tophint\n\tneed must-appear\nshort and simple theme color palette\nput plugins in ~/.qpad\nmake top hint / notification dodge\n\tMouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nfor() is not a function\nfileindex gc vs parse queue\nrendering\n\ttrue AA for roundrect\ngit diff viewer\nauto-include files\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nvery narrow file list...\nbad parser result after multiple saves\n\tcould be diff tracker bug\nbinary editor\n\tduk buffer size limit\ngeneric HTML rendering?\n\tcheerio - looks managable\n\tneed module conversion: npm to duktape\n\t\tdid it with browserify\n\t\tit magically works in duktape with a minor modification\ndedicated mobile/mobile-like UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,
@@ -37,25 +37,25 @@
   {
    "m_language": "Markdown",
    "m_text_in": "Search result",
-   "m_text_out": "c:/tp/qpad/code-parser.jc:54177..54189: ED_QueryDecl\nc:/tp/qpad/res/lib/code_editor.js:221328..221340: ED_QueryDecl\n",
+   "m_text_out": "c:/tp/qpad/code-parser.jc:64185..64206: ED_QueryPrototypeByID\nc:/tp/qpad/res/lib/code_editor.js:23222..23243: ED_QueryPrototypeByID\n",
    "m_has_any_error": 1,
    "m_cell_id": 2
   },
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for 'c:/tp/qpad/qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 c:/tp/qpad/qpad.jc\njc -brelease -awin32 c:/tp/qpad/qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
-   "m_text_out": "s7main.c\r\nstb_truetype.c\r\n   Creating library c:/tp/qpad/bin/win64_release/qpad.lib and object c:/tp/qpad/bin/win64_release/qpad.exp\r\ns7main.c\r\nstb_truetype.c\r\n   Creating library c:/tp/qpad/bin/win32_release/qpad.lib and object c:/tp/qpad/bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4300800 bytes (4200 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1545514 bytes (1510 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4561920 bytes (4455 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1625605 bytes (1588 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
+   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library c:/tp/qpad/bin/win64_release/qpad.lib and object c:/tp/qpad/bin/win64_release/qpad.exp\r\ns7main.c\r\n   Creating library c:/tp/qpad/bin/win32_release/qpad.lib and object c:/tp/qpad/bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4306432 bytes (4206 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1547613 bytes (1512 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4568576 bytes (4462 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1629117 bytes (1591 KiB)\r\nEverything is Ok\r\nc:\\software\\cmder\\bin\\qpad_old.exe\r\nAccess is denied.\r\nA duplicate file name exists, or the file\r\ncannot be found.\r\n        1 file(s) copied.\r\n",
    "m_cell_id": 3,
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_completion_time": [
     2016,
     7,
-    9,
+    12,
     19,
-    24,
-    19,
-    3
+    45,
+    38,
+    6
    ],
    "m_button_name": "Release"
   },

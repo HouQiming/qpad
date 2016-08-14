@@ -629,9 +629,9 @@ auto tokenize(string sdata,int g_ignore_indents)
 					last_line_comment_position=toks.n
 				//merge comments to avoid perf issues during token neib lookup
 				if toks.n>0&&toks.back().tok==TOK_COMMENT:
-					toks[toks.n-1].epos1=ptr+1
+					toks[toks.n-1].epos1=int(ptr+1)
 				else
-					push_token(TOK_COMMENT,int(efeed0),int(ptr+1))
+					push_token(TOK_COMMENT,int(efeed0),int(ptr))
 				//parseComment(feed,efeed0,ptr+1)
 				continue
 			if ch=='*':{
@@ -646,9 +646,9 @@ auto tokenize(string sdata,int g_ignore_indents)
 					c=ch;
 				//merge comments to avoid perf issues during token neib lookup
 				if toks.n>0&&toks.back().tok==TOK_COMMENT:
-					toks[toks.n-1].epos1=ptr
+					toks[toks.n-1].epos1=int(ptr)
 				else
-					push_token(TOK_COMMENT,int(efeed0),int(ptr))
+					push_token(TOK_COMMENT,int(efeed0),int(ptr-2))
 				//parseComment(feed,efeed0,ptr)
 				continue
 			}
@@ -857,9 +857,11 @@ struct TDeclItem
 struct TPrototypeItem
 	int id
 	iptr ptr_prototype
+	iptr ptr_fidx
 struct TDocedVariable
+	int epos_scope
 	int id
-	int pdoc
+	int2 pdoc
 KEY_DECL_CLASS=TOK_TYPE*1
 KEY_DECL_FUNCTION=TOK_TYPE*0
 KEY_DECL_MACRO=TOK_TYPE*2
@@ -1063,11 +1065,55 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			//it's invalid, roll back
 			all_prototypes.resize(iptr(p0))
 		else
-			//todo: parse ptok_last_comment based on the current prototype
 			all_prototypes[p0]=int(all_prototypes.n)-p0-1
+			is_documented=0
+			if ptok_last_comment>=0:
+				//parse ptok_last_comment based on the current prototype
+				auto pbrief=int2(-1,-1)
+				auto preturn=int2(-1,-1)
+				auto pcomment0=toks[ptok_last_comment].epos0
+				auto pcomment1=toks[ptok_last_comment].epos1
+				auto param_id_map=int[int].NULL
+				auto n0=all_prototypes.n
+				auto n_params=int(n0-p0-1)
+				for i=pcomment0:pcomment1-1
+					if !(sdataz[i]=='@'||sdataz[i]=='\\'):continue
+					if __basic_api.memcmp(__pointer(sdataz.d+i+1),"brief",5)==0&&i+6<pcomment1:
+						pbrief=PoolDoxygenComment(sdataz[i+6:pcomment1-1])
+						if !param_id_map:
+							//allocate the param documentation space and init param id map
+							param_id_map=new int[int]
+							for j=p0+1:n0-1
+								param_id_map[all_prototypes[j]]=int(j-p0)
+							all_prototypes.resize(n0+(n_params+2)*2)
+					else if __basic_api.memcmp(__pointer(sdataz.d+i+1),"return",6)==0&&i+7<pcomment1:
+						preturn=PoolDoxygenComment(sdataz[i+7:pcomment1-1])
+					else if __basic_api.memcmp(__pointer(sdataz.d+i+1),"param",5)==0:
+						if param_id_map:
+							auto pid0=i+6
+							while pid0<pcomment1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+								pid0++
+							auto pid1=pid0
+							while pid1<pcomment1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+								pid1++
+							auto id_param=getid(sdataz[pid0:pid1-1])
+							param_ord=param_id_map[id_param]
+							if param_ord>0&&pid1<pcomment1:
+								doc_str=PoolDoxygenComment(sdataz[pid1:pcomment1-1])
+								all_prototypes[n0+4+(param_ord-1)*2+0]=doc_str.x
+								all_prototypes[n0+4+(param_ord-1)*2+1]=doc_str.y
+				if pbrief.x>=0:
+					//Writeln(getIdString(function_id),' ',pbrief,' ',preturn)
+					all_prototypes[n0 +0]=pbrief.x
+					all_prototypes[n0 +1]=pbrief.y
+					all_prototypes[n0 +2]=preturn.x
+					all_prototypes[n0 +3]=preturn.y
+					is_documented=1
+			if !is_documented:
+				all_prototypes.push(-1)
 			p_prototypes.push(int2(function_id,p0))
 	}
-	PoolDoxygenComment=function(string s,iptr p){
+	PoolDoxygenComment=function(string s){
 		//remove ^[ \t]+[*], take the first tex-like paragraph at p
 		auto ret=doc_string_pool.n
 		is_line_head=1
@@ -1081,18 +1127,21 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					is_line_head=1
 					continue
 			else if is_line_head:
-				if ch=='*':
+				if ch=='*'&&is_line_head==1:
 					is_line_head=2
 					continue
 				if ch==' '||ch=='\t':
 					continue
+				if (ch=='\\'||ch=='@'):
+					//command at line head = end of paragraph
+					break
 				is_line_head=0
 			else
 				if ch==' '&&doc_string_pool.n&&doc_string_pool.back()==' ':
 					continue
 			doc_string_pool.push(ch)
-		doc_string_pool.push(char(0))
-		return int(ret)
+		//doc_string_pool.push(char(0))
+		return int2(int(ret),int(doc_string_pool.n))
 	}
 	scopes.push(TScopeEntry(){ptok0:-1})
 	popScope=inline(){
@@ -1253,22 +1302,44 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 											id_type:id+KEY_DECL_FUNCTION,
 											epos0:toks[i].epos0})
 									else
-										if ptok_last_comment>=0L:
-											//doxygen < seems to be mainly for members
-											//just use \brief / @brief before a variable
-											//hopefully it will be used more sparingly
-											s_comment=cite_raw(toks[ptok_last_comment].epos0,toks[ptok_last_comment].epos1)
-											pbrief=s_comment.IndexOf('brief')
-											if pbrief>0&&(s_comment[pbrief-1]=='@'||s_comment[pbrief-1]=='\\'):
-												//add a query-able variable
-												all_doc_vars.push(TDocedVariable(){id:id,pdoc:PoolDoxygenComment(s_comment,pbrief+5)})
+										//if ptok_last_comment>=0L:
+										//	//doxygen < seems to be mainly for members
+										//	//just use \brief / @brief before a variable
+										//	//hopefully it will be used more sparingly
+										//	s_comment=cite_raw(toks[ptok_last_comment].epos0,toks[ptok_last_comment].epos1)
+										//	pbrief=s_comment.IndexOf('brief')
+										//	if pbrief>0&&(s_comment[pbrief-1]=='@'||s_comment[pbrief-1]=='\\'):
+										//		//add a query-able variable
+										//		all_doc_vars.push(TDocedVariable(){
+										//			epos_scope:scopes.back().ptok0<0?0:toks[scopes.back().ptok0].epos0,
+										//			id:id,
+										//			pdoc:PoolDoxygenComment(s_comment[pbrief+5:])})
 										//last_var_id=id
 									//if is_function==1:
 									//	parsePrototype(id,int(i+3),ptok_last_comment)
-							ptok_last_comment=-1L
+							//function case: shouldn't count as documented var, 
+							//also, we should be careful with the multi-decl cases...
+							//ptok_last_comment=-1L
 			break
 		case TOK_COMMENT:
 			ptok_last_comment=i
+			epos0=toks[i].epos0
+			epos1=toks[i].epos1
+			for j=epos0:min(epos1,epos0+3)-1
+				if sdataz[j]=='@'&&__basic_api.memcmp(__pointer(sdataz.d+j+1),"qpadvar",7)==0:
+					//@qpad variable visibility
+					auto pid0=j+8
+					while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+						pid0++
+					auto pid1=pid0
+					while pid1<epos1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+						pid1++
+					if pid1<epos1:
+						all_doc_vars.push(TDocedVariable(){
+							epos_scope:scopes.back().ptok0<0?0:toks[scopes.back().ptok0].epos0,
+							id:getid(sdataz[pid0:pid1-1]),
+							pdoc:PoolDoxygenComment(sdataz[pid1:epos1-1])})
+					break
 			//epos_var_comment=-1L
 			//if last_var_id:
 			//	epos0=toks[i].epos0
@@ -1352,7 +1423,11 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							all_key_decls.push(TKeyDeclItem(){
 								id_type:function_id+KEY_DECL_FUNCTION,
 								epos0:toks[ptok_function_id].epos0})
-							parsePrototype(function_id,ptok_function_id+1,ptok_last_comment)
+							ptok_function_bracket=PNextToken(ptok_function_id)
+							while ptok_function_bracket<i&&toks[ptok_function_bracket].tok!='(':
+								ptok_function_bracket=PNextToken(ptok_function_bracket)
+							parsePrototype(function_id,ptok_function_bracket,ss.back().m_ptok_last_comment)
+							ss[ss.n-1].m_ptok_last_comment=-1
 				se=ss.pop()
 				function_id=se.m_function_id
 				ptok_function_id=se.m_ptok_function_id
@@ -1391,7 +1466,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				scopes[scopes.n-1].in_assignment=i8(1)
 			break
 		case ';':
-			ptok_last_comment=-1L
+			if ptok_last_comment!=i-1:
+				ptok_last_comment=-1L
 			if scopes.n:
 				scopes[scopes.n-1].in_assignment=i8(0)
 				scopes[scopes.n-1].in_typedef=i8(0)
@@ -1432,6 +1508,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			ppm_pool.push(int2(id,int(duplicates.getForEachRepeatCount())))
 		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
 	all_decls.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
+	all_doc_vars.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
 	//all_key_decls.Sortby(inline(di){return (u64(di.id_type)<<32)+u64(di.epos0)})
 	all_key_decls.Sortby(byMember("epos0"))
 	if has_dangling_deps:
@@ -1607,7 +1684,7 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 	g_key_decl_files[idfn]=kdf
 	return kdf
 
-auto BuildColorTable(CFileIndex fidx)
+auto PrecomputeIndices(CFileIndex fidx)
 	if !fidx.m_all_key_decls:
 		return
 	//!fidx.m_all_dep_files_considered&&
@@ -1622,8 +1699,13 @@ auto BuildColorTable(CFileIndex fidx)
 		auto p_prototypes=fidx.m_p_prototypes
 		if p_prototypes:
 			auto base_addr=fidx.m_all_prototypes.d
+			auto base_addr2=iptr(fidx)
 			foreach pproto in p_prototypes
-				temp_p_prototypes.push(TPrototypeItem(){id:pproto.x,ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int)})
+				temp_p_prototypes.push(TPrototypeItem(){
+					id:pproto.x,
+					ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int),
+					ptr_fidx:base_addr2,
+				})
 		if fidx.m_dep_files:
 			arv=new int[int]
 			auto dfs(int idfn_dep)
@@ -1644,11 +1726,16 @@ auto BuildColorTable(CFileIndex fidx)
 				auto p_prototypes=kdfile.fidx.m_p_prototypes
 				if p_prototypes:
 					auto base_addr=kdfile.fidx.m_all_prototypes.d
+					auto base_addr2=iptr(kdfile.fidx)
 					foreach pproto in p_prototypes
-						temp_p_prototypes.push(TPrototypeItem(){id:pproto.x,ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int)})
+						temp_p_prototypes.push(TPrototypeItem(){
+							id:pproto.x,
+							ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int),
+							ptr_fidx:base_addr2,
+						})
 				foreach idfn_dep in kdfile.fidx.m_dep_files
 					dfs(idfn_dep)
-			//Writeln('BuildColorTable ',g_color_table_time)
+			//Writeln('PrecomputeIndices ',g_color_table_time)
 			foreach idfn_dep in fidx.m_dep_files
 				dfs(idfn_dep)
 		//fidx.m_all_dep_files_considered=all_dep_files_considered
@@ -1822,7 +1909,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if s_prefix.n:
 			//common prefix here - if we have a common prefix, make it the only candidate and *mark* it as *continue after confirmation*
 			SearchPrefix(fidx.m_ids,1.f)
-			BuildColorTable(fidx)
+			PrecomputeIndices(fidx)
 			if fidx.m_temp_ids&&fidx.m_temp_ids.n:
 				SearchPrefix(fidx.m_temp_ids,1.f)
 			if cands.n:
@@ -2076,33 +2163,74 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		fidx=doc["m_file_index"].as(CFileIndex)
 		ed=doc["ed"].as(CEditableText)
 		s_id=JS.Param(1).as(string)
-		if !fidx||!fidx.m_temp_p_prototypes:return 0
+		if !fidx||!fidx.m_all_key_decls:return 0
 		if !ed:return JS.ReturnError("invalid editor object")
 		if !s_id||!s_id.n:return 0
-		BuildColorTable(fidx)
+		PrecomputeIndices(fidx)
+		if !fidx.m_temp_p_prototypes:return 0
 		id=getid(s_id)
 		p=fidx.m_temp_p_prototypes.InlineBisect(inline(pproto){return pproto.id<id})
 		if uptr(p)<uptr(fidx.m_temp_p_prototypes.n):
 			pproto=fidx.m_temp_p_prototypes[p]
 			if pproto.id==id:
-				id_unknown=getid("?")
+				id_unknown=getid("...")
+				ret_desc=JS.New()
 				ret=JS.NewArray()
 				n=0
 				for(;p<fidx.m_temp_p_prototypes.n;p++)
 					if fidx.m_temp_p_prototypes[p].id!=id:break
 					ptr_prototype=fidx.m_temp_p_prototypes[p].ptr_prototype
 					n_args=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
-					ret_n=JS.NewArray()
+					ret_p=JS.New()
+					ret_proto=JS.NewArray()
+					ret_p["proto"]=ret_proto
 					for i=0:n_args-1
 						id_i=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
 						if !id_i:
 							id_i=id_unknown
-						ret_n[i]=getIdString(id_i)
-					ret[n++]=ret_n
+						ret_proto[i]=getIdString(id_i)
+					if __memory(int,ptr_prototype)>=0:
+						//Writeln(ptr_prototype)
+						//for i=0:3
+						//	Writeln(i,' ',__memory(int,ptr_prototype+i*4));
+						fidx2=__cast(CFileIndex,fidx.m_temp_p_prototypes[p].ptr_fidx)
+						ret_p["m_brief"]=(fidx2.m_doc_string_pool[__memory(int,ptr_prototype):__memory(int,ptr_prototype+sizeof(int))-1])
+						ptr_prototype+=sizeof(int)*2
+						if __memory(int,ptr_prototype)>=0:
+							ret_p["m_return"]=(fidx2.m_doc_string_pool[__memory(int,ptr_prototype):__memory(int,ptr_prototype+sizeof(int))-1]);
+						ptr_prototype+=sizeof(int)*2
+						ret_param_docs=JS.NewArray()
+						for i=0:n_args-1
+							pstr0=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
+							pstr1=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
+							if pstr0<pstr1:
+								ret_param_docs[i]=fidx2.m_doc_string_pool[pstr0:pstr1-1]
+						ret_p["m_param_docs"]=ret_param_docs
+					ret[n++]=ret_p
+				ret_desc["prototype"]=ret
 				return JS.Return(ret)
 		return 0
 	}
-	//todo: querying m_doc_string_pool, m_doc_vars
+	JS_UI["ED_QueryDocVarByScope"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		ccnti_scope=JS.Param(1).as(int)
+		if !fidx||!fidx.m_all_key_decls:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		if !fidx.m_doc_vars:return 0
+		all_doc_vars=fidx.m_doc_vars
+		ret=JS.NewArray()
+		n=0
+		p=all_doc_vars.InlineBisect(inline(di){return di.epos_scope<ccnti_scope})
+		for i=p:all_doc_vars.n-1
+			di=all_doc_vars[i]
+			if di.epos_scope!=ccnti_scope:break
+			ret[n+0]=getIdString(di.id)
+			ret[n+1]=fidx.m_doc_string_pool[di.pdoc.x:di.pdoc.y-1]
+			n+=2
+		return JS.Return(ret)
+	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
 		if !ed:return JS.ReturnError("invalid editor object")

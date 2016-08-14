@@ -1697,7 +1697,7 @@ UI.RegisterEditorPlugin(function(){
 	this.m_outer_scope_queue=[]
 	var fouter_scope=function(){
 		var ed=this.ed;
-		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt);
+		var ccnt_new=this.FindOuterLevel(this.sel1.ccnt).ccnt_editor;
 		if(ccnt_new>=0){
 			this.m_outer_scope_queue.push(this.sel1.ccnt)
 			this.m_outer_scope_queue_just_pushed=ccnt_new

@@ -710,7 +710,7 @@ class CLayouter_programmer
 		s_word=new string
 		file_index=m_file_index
 		if file_index:
-			BuildColorTable(file_index)
+			PrecomputeIndices(file_index)
 			color_table=file_index.m_temp_color_table
 		else
 			color_table=int[int].NULL

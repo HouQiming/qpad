@@ -43,3 +43,7 @@ Press ESC again to restore it.
 You can use “Search” - “Go to...” to call up a list of functions and classes. You can search for a particular one using its name or abbreviation.
 
 You can also type a line number to go to a certain line. The line number can be an expression like `10000-9000+234`.
+
+#@プ@ Sticker for Key Variables
+
+You can add comments like `//@qpadvar kv A variable used for important things` in your program. QPad will show the relevant information in a sticker whenever your cursor falls in the same scope as the comment.
