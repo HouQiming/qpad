@@ -1,5 +1,6 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
+UI.RICHTEXT_COMMAND_INDENT_HERE=0x107ffe;
 UI.RICHTEXT_COMMAND_RUBBER_SPACE=0x107fff;
 UI.RICHTEXT_COMMAND_SET_STYLE=0x108000;
 

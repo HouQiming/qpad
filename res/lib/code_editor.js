@@ -797,7 +797,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 						a_proto.push(
 							'\n',
 							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+12),
-							'    ',prototypes[i].m_brief);
+							'   ',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),prototypes[i].m_brief);
 					}
 					if(prototypes[i].m_param_docs){
 						var is_first=1;
@@ -808,7 +808,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 									a_proto.push(
 										'\n',
 										UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+13),
-										'    ',UI._('Parameters'))
+										'   ',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),UI._('Parameters'))
 									is_first=0;
 								}
 								a_proto.push(
@@ -816,7 +816,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 									UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+(j==n_commas_before?14:13)),
 									'        ',proto_acceptable[j],
 									UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+12),
-									'  ',
+									'  ',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),
 									s_param_doc);
 							}
 						}
@@ -825,7 +825,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 						a_proto.push(
 							'\n',
 							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+13),
-							'    ',UI._('Returns'),
+							'   ',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),UI._('Returns'),
 							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+12),
 							'  ',
 							prototypes[i].m_return);
@@ -4959,7 +4959,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 							'\n');
 						id_in_file=0;
 					}
-					a_msg_brief.push('    ')
+					a_msg_brief.push('   ')
 					id_in_file++;
 					if(id_in_file>1||i+1<briefs.length&&briefs[i+1].file==briefs[i].file){
 						a_msg_brief.push(
@@ -4967,7 +4967,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 							id_in_file<=20?String.fromCharCode(0x245f+id_in_file):id_in_file.toString()+'.',' ',
 							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0))
 					}
-					a_msg_brief.push(briefs[i].brief,'\n');
+					a_msg_brief.push(UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),briefs[i].brief,'\n');
 				}
 				var s_brief_text=a_msg_brief.join('');
 				prt_msg_brief={

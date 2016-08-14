@@ -552,6 +552,7 @@ class CEmbededObject
 	}
 
 COMMAND_INSERT_OBJECT=0x100000
+COMMAND_INDENT_HERE=0x107ffe
 COMMAND_RUBBER_SPACE=0x107fff
 COMMAND_SET_STYLE=0x108000
 COMMAND_END=0x110000
@@ -578,6 +579,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int en
 	//create the "words"
 	style_id=0
 	p_last_word=0L
+	indent_point=0L
 	words=new int3[]
 	no_hyp_points=new int[]
 	foreach ch,I,I_next in Utf8Chars(s)
@@ -596,7 +598,9 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int en
 				if p_last_hyphen<I-p_last_word:
 					words.push(int3(style_id,int(p_last_word+p_last_hyphen),int(I)))
 			if ch>=COMMAND_INSERT_OBJECT&&ch<COMMAND_END&&enable_meta_chars:
-				if ch==COMMAND_RUBBER_SPACE:
+				if ch==COMMAND_INDENT_HERE:
+					indent_point=words.n
+				else if ch==COMMAND_RUBBER_SPACE:
 					words.push(int3(-2,0,int(I)))
 				else if ch<COMMAND_SET_STYLE:
 					obj_id=ch-COMMAND_INSERT_OBJECT
@@ -623,7 +627,10 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int en
 	hc=0LL
 	y_baseline=0LL
 	current_style_id=-1
-	foreach word_i in words
+	indent_point_atom=0L
+	foreach word_i,WI in words
+		if indent_point==WI:
+			indent_point_atom=atoms.n
 		if word_i.x==-1:
 			//object
 			obj_id=word_i.y
@@ -748,12 +755,12 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int en
 				tail_kerning:tail_kerning,bol_badness:bol_badness,eol_badness:eol_badness,w_extra_eol:w_extra_eol,
 				style_id:style_id, pword0:word_i.y,pword1:word_i.z
 			})
-	return (atoms,tail_style_id)
+	return (atoms,tail_style_id,indent_point_atom)
 
 inline GenerateTextLayout(
 CStyleHolder styles,
 string s,TLayoutAtom[] atoms,int[] line_breaks,int tail_style_id,
-int offset_base,i64 w_line,int has_tail_newline,int has_invisibles,
+int offset_base,i64 x_indent,i64 w_line,int has_tail_newline,int has_invisibles,
 generateCharRange,
 generateSpace,
 generateLine,
@@ -820,7 +827,7 @@ generateObject)
 		if atoms[p_last].flags&FLAG_HYPHENATE_AFTER:
 			w+=styles.charWidth(atoms[p_last].style_id,int('-'))
 		n_paddables-=n_trailing_paddables
-		w_tail=max(w_line-w,0LL)
+		w_tail=max(w_line-(li==0?0LL:x_indent)-w,0LL)
 		if li==line_breaks.n-2&&n_paddables.x==0:w_tail=0LL
 		w_pad=0LL
 		w_rem=0
