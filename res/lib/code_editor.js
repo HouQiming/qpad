@@ -86,6 +86,7 @@ var NewACContext=function(ret){
 	ret.m_display_items=[];
 	ret.m_n_cands=(ret.m_accands?ret.m_accands.length:0);
 	ret.m_x_current=UI.default_styles.code_editor.accands_padding*0.5;
+	ret.m_brief_cache={};
 	ret.m_selection=0;
 	return ret;
 };
@@ -807,7 +808,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 									a_proto.push(
 										'\n',
 										UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+13),
-										'    Parameters')
+										'    ',UI._('Parameters'))
 									is_first=0;
 								}
 								a_proto.push(
@@ -824,7 +825,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 						a_proto.push(
 							'\n',
 							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+13),
-							'    Returns',
+							'    ',UI._('Returns'),
 							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+12),
 							'  ',
 							prototypes[i].m_return);
@@ -4941,6 +4942,46 @@ var g_regexp_folding_templates=['[ \t]+','[0-9]+','[0-9a-fA-F]+','[.0-9efEF+-]+'
 var RenderACCands=function(obj,w_obj_area,h_obj_area){
 	var doc=obj.doc;
 	var acctx=doc.m_ac_context;
+	var prt_msg_brief=undefined;
+	var x_selected=undefined;
+	if(doc.m_ac_context&&doc.m_ac_activated){
+		var dii=acctx.GetDisplayItem(acctx.m_selection);
+		var prt_msg_brief=acctx.m_brief_cache[dii.name];
+		if(prt_msg_brief==undefined){
+			var briefs=UI.ED_QueryBriefsByID(doc,dii.name);
+			if(briefs&&briefs.length){
+				var a_msg_brief=[];
+				var id_in_file=0;
+				for(var i=0;i<briefs.length;i++){
+					if(!i||briefs[i].file!=briefs[i-1].file){
+						a_msg_brief.push(
+							UI.Format('In @1:',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1)+UI.GetSmartTabName(briefs[i].file)+UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0)),
+							'\n');
+						id_in_file=0;
+					}
+					a_msg_brief.push('    ')
+					id_in_file++;
+					if(id_in_file>1||i+1<briefs.length&&briefs[i+1].file==briefs[i].file){
+						a_msg_brief.push(
+							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
+							id_in_file<=20?String.fromCharCode(0x245f+id_in_file):id_in_file.toString()+'.',' ',
+							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0))
+					}
+					a_msg_brief.push(briefs[i].brief,'\n');
+				}
+				var s_brief_text=a_msg_brief.join('');
+				prt_msg_brief={
+					prt:UI.ED_FormatRichText(
+						Language.GetHyphenator(UI.m_ui_language),
+						s_brief_text,4,obj.accands_w_brief,obj.accands_styles),
+					text:s_brief_text,
+				};
+			}else{
+				prt_msg_brief=null;
+			}
+			acctx.m_brief_cache[dii.name]=prt_msg_brief;
+		}
+	}
 	var ac_w_needed=0
 	while(acctx.m_display_items.length<acctx.m_scroll_i){
 		acctx.GetDisplayItem(acctx.m_display_items.length)
@@ -4999,6 +5040,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 				w:dii.w+obj.accands_sel_padding*2+w_hint_char,h:hc_accands+obj.accands_sel_padding*2,
 				color:obj.accands_sel_bgcolor,
 			})
+			x_selected=x_item;
 		}
 		W.Text("",{x:x_item,y:y_accands_text,
 			font:obj.accands_font,text:dii.name,
@@ -5012,6 +5054,27 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 		}
 	}
 	UI.PopCliprect()
+	//render the documentation part
+	if(prt_msg_brief&&x_selected!=undefined){
+		var y_brief=y_accands+obj.h_accands+obj.accands_sel_padding;
+		var w_brief=prt_msg_brief.prt.m_w_line+obj.accands_sel_padding*4;
+		var h_brief=prt_msg_brief.prt.m_h_text+obj.accands_sel_padding*4;
+		UI.RoundRect({
+			x:x_selected-obj.accands_shadow_size, y:y_brief,
+			w:w_brief+obj.accands_shadow_size*2, h:h_brief+obj.accands_shadow_size,
+			round:obj.accands_shadow_size,
+			border_width:-obj.accands_shadow_size,
+			color:obj.accands_shadow_color})
+		UI.RoundRect({
+			x:x_selected, y:y_brief,
+			w:w_brief, h:h_brief,
+			border_width:obj.accands_border_width,
+			border_color:obj.accands_border_color,
+			round:obj.accands_round,
+			color:obj.accands_bgcolor})
+		UI.ED_RenderRichText(prt_msg_brief.prt,prt_msg_brief.text,
+			x_selected+obj.accands_sel_padding*2,y_brief+obj.accands_sel_padding*2)
+	}
 };
 
 UI.RegisterEditorPlugin(function(){

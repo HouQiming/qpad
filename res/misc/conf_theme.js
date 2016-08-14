@@ -556,7 +556,7 @@ UI.CustomTheme=function(){
 			accands_sel_padding:2,
 			accands_shadow_color:C_shadow_dark_aware,
 			accands_shadow_size:8,
-			accands_bgcolor:L?0xffffffff:0xff555555,
+			accands_bgcolor:L?0xccffffff:0xcc555555,
 			accands_round:4,
 			accands_border_width:0,
 			accands_border_color:0xff000000,
@@ -564,6 +564,11 @@ UI.CustomTheme=function(){
 			accands_text_sel_color:L?0xffffffff:0xffe8e8e8,
 			accands_sel_bgcolor:C,
 			accands_n_shown:5,
+			accands_w_brief:256,
+			accands_styles:[
+				{font:UI.Font(UI.font_name,18,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
+				{font:UI.Font(UI.font_name,18,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
+			],
 			autoedit_button_size:24,
 			autoedit_button_padding:2,
 			//w_accands:512,
@@ -645,7 +650,7 @@ UI.CustomTheme=function(){
 				{font:UI.Font(UI.font_name,20,-50),paragraph_space:16,color:L?0xff7f7f7f:0xffaaaaaa}, //grey
 				{font:UI.Font(UI.font_name,16,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
 				{font:UI.Font(UI.font_name,16,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
-				{font:UI.Font(UI.font_name,16,200),paragraph_space:12,color:L?0xffb4771f:0xffe3cea6}, //bold colored small
+				{font:UI.Font(UI.font_name,16,200),paragraph_space:12,color:L?0xffb4771f:0xffe3cea6}, //very bold colored small
 				//{font:UI.Font("res/fonts/inconsolata.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //code
 				//{font:UI.Font("res/fonts/opensansi.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //italic
 			],
