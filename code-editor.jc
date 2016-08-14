@@ -4194,20 +4194,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				continue
 			if sline.StartsWith("* ")||sline.StartsWith("- ")||sline.StartsWith("+ "):
 				//lists
-				//todo: left padding in style
 				if sret.n&&sret.back()!='\n':sret.push('\n')
 				sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_LIST)
 				sret.PushUnicode(0x2022)
 				sret.PushUnicode(0x00a0)
+				sret.PushUnicode(COMMAND_INDENT_HERE)
 				FormatNormalText(sline[2:],STYLE_ID_LIST)
 				continue
 			if sline.StartsWith("> ")
 				//quotes
-				//todo: left padding in style
 				if sret.n&&sret.back()!='\n':sret.push('\n')
 				if sline.n==3:
 					sret.push('\n')
 				else
+					sret.PushUnicode(0x00a0)
+					sret.PushUnicode(0x00a0)
+					sret.PushUnicode(COMMAND_INDENT_HERE)
 					sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_QUOTE)
 					FormatNormalText(sline[2:sline.n-2],STYLE_ID_QUOTE)
 				continue
