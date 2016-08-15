@@ -29,12 +29,12 @@ auto WrapTextSimple(CHyphenator hyp,string sblock, TFont font,i64 w_line, int m_
 	ret=new i64[]
 	foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 		n0=ret.n
-		(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,m_tab_width,w_line,0,styles,CEmbededObject[].NULL)
+		(atoms,tail_style_id,indent_point_atom)=TextToLayoutAtom(hyp,s,m_tab_width,w_line,0,styles,CEmbededObject[].NULL)
 		line_breaks=GreedyLayoutGeneral(atoms,w_line)
 		GenerateTextLayout(
 			styles,
 			s,atoms,line_breaks,tail_style_id,
-			int(I),w_line,s.EndsWith("\n"),0,
+			int(I),0LL,w_line,s.EndsWith("\n"),0,
 			inline(int style_id, int ccnt0,int ccnt1){
 				//char range
 				assert(ccnt0>=0&&ccnt1>ccnt0)
@@ -710,7 +710,7 @@ class CLayouter_programmer
 		s_word=new string
 		file_index=m_file_index
 		if file_index:
-			BuildColorTable(file_index)
+			PrecomputeIndices(file_index)
 			color_table=file_index.m_temp_color_table
 		else
 			color_table=int[int].NULL
@@ -4194,20 +4194,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				continue
 			if sline.StartsWith("* ")||sline.StartsWith("- ")||sline.StartsWith("+ "):
 				//lists
-				//todo: left padding in style
 				if sret.n&&sret.back()!='\n':sret.push('\n')
 				sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_LIST)
 				sret.PushUnicode(0x2022)
 				sret.PushUnicode(0x00a0)
+				sret.PushUnicode(COMMAND_INDENT_HERE)
 				FormatNormalText(sline[2:],STYLE_ID_LIST)
 				continue
 			if sline.StartsWith("> ")
 				//quotes
-				//todo: left padding in style
 				if sret.n&&sret.back()!='\n':sret.push('\n')
 				if sline.n==3:
 					sret.push('\n')
 				else
+					sret.PushUnicode(0x00a0)
+					sret.PushUnicode(0x00a0)
+					sret.PushUnicode(COMMAND_INDENT_HERE)
 					sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_QUOTE)
 					FormatNormalText(sline[2:sline.n-2],STYLE_ID_QUOTE)
 				continue
@@ -4327,12 +4329,21 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		prev_style_id=0
 		rjobs=new TRenderJob[]
 		foreach s,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
-			(atoms,tail_style_id)=TextToLayoutAtom(hyp,s,tab_width,w_line,1, styles,objs_native)
-			line_breaks=GreedyLayoutGeneral(atoms,w_line)
+			(atoms,tail_style_id,indent_point_atom)=TextToLayoutAtom(hyp,s,tab_width,w_line,1, styles,objs_native)
+			x_indent=0LL
+			for i=0:indent_point_atom-1
+				x_indent+=atoms[i].w+atoms[i].tail_kerning
+			if x_indent>w_line/3:
+				x_indent=0LL
+				indent_point_atom=0L
+			line_breaks=GreedyLayoutGeneral(atoms[indent_point_atom:],w_line-x_indent)
+			for i=1:line_breaks.n-1
+				line_breaks[i]+=indent_point_atom
+			x_next=0LL
 			GenerateTextLayout(
 				styles,
 				s,atoms,line_breaks,tail_style_id,
-				int(I),w_line,s.EndsWith("\n"),1,
+				int(I),x_indent,w_line,s.EndsWith("\n"),1,
 				inline(int style_id, int ccnt0,int ccnt1){
 					//char range
 					assert(ccnt0>=0&&ccnt1>ccnt0)
@@ -4349,13 +4360,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					x+=dw
 				},
 				inline(i64 h_up,i64 h_line,int aflag_ccnt){
+					//new line
 					if hyphen_next:
 						rjobs.push(TRenderJob(){
 							x:fixed2float(x),
 							y:fixed2float(y-styles.m_styles[tail_style_id].raise_height),
 							style_id:prev_style_id,ccnt0:-1,ccnt1:-1})
-					x=0LL
+					x=x_next
 					y=y_next
+					x_next=x_indent
 					y_next=y+h_line
 					hyphen_next=!!(aflag_ccnt&ATOM_FLAG_HYPHEN)
 					y+=h_up

@@ -555,7 +555,7 @@ UI.CustomTheme=function(){
 			accands_sel_padding:2,
 			accands_shadow_color:C_shadow_dark_aware,
 			accands_shadow_size:8,
-			accands_bgcolor:L?0xffffffff:0xff555555,
+			accands_bgcolor:L?0xccffffff:0xcc555555,
 			accands_round:4,
 			accands_border_width:0,
 			accands_border_color:0xff000000,
@@ -563,6 +563,11 @@ UI.CustomTheme=function(){
 			accands_text_sel_color:L?0xffffffff:0xffe8e8e8,
 			accands_sel_bgcolor:C,
 			accands_n_shown:5,
+			accands_w_brief:256,
+			accands_styles:[
+				{font:UI.Font(UI.font_name,18,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
+				{font:UI.Font(UI.font_name,18,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
+			],
 			autoedit_button_size:24,
 			autoedit_button_padding:2,
 			//w_accands:512,
@@ -628,23 +633,32 @@ UI.CustomTheme=function(){
 			round:4,
 			styles:[
 				{font:UI.Font(UI.font_name,20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8},
+				/////////////////
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xffb4771f:0xffe3cea6},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff2ca033:0xff8adfb2},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff1c1ae3:0xff999afb},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff007fff:0xff6fbffd},
 				{font:UI.Font(UI.font_name,20,100),paragraph_space:16,color:L?0xff9a3d6a:0xffd6b2ca},
+				/////////////////
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xffb4771f:0xffe3cea6},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff2ca033:0xff8adfb2},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff1c1ae3:0xff999afb},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff007fff:0xff6fbffd},
 				{font:UI.Font(UI.font_name,20,200),paragraph_space:16,color:L?0xff9a3d6a:0xffd6b2ca},
+				/////////////////
+				{font:UI.Font(UI.font_name,20,-50),paragraph_space:16,color:L?0xff7f7f7f:0xffaaaaaa}, //grey
+				{font:UI.Font(UI.font_name,16,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
+				{font:UI.Font(UI.font_name,16,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
+				{font:UI.Font(UI.font_name,16,200),paragraph_space:12,color:L?0xffb4771f:0xffe3cea6}, //very bold colored small
+				//{font:UI.Font("res/fonts/inconsolata.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //code
+				//{font:UI.Font("res/fonts/opensansi.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //italic
 			],
 			progress_color:C_sel,
 			text_color:L?0xff000000:0xffe8e8e8,
 			font:UI.Font(UI.font_name,20,0),
 			icon_color:L?0xff000000:0xffe8e8e8,
 			icon_font:UI.Font('res/fonts/iconfnt.ttf,!',20),
-			icon:'告',
+			//icon:'告',
 			//////////
 			k_shake:400,
 			damping_shake:8,

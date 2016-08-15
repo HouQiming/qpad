@@ -185,12 +185,14 @@ TOK_AND_EQ=int('q')
 TOK_XOR_EQ=int('r')
 TOK_LSHIFT_EQ=int('s')
 TOK_RSHIFT_EQ=int('t')
+////////////////
+TOK_COMMENT=int('u')
 g_id_include=getid("#include")
 g_id_define=getid("#define")
 g_id_typedef=getid("typedef")
 g_id_require=getid("require")
 g_id_import=getid("import")
-//g_id_in=getid("in")
+g_id_in=getid("in")
 g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 struct TToken
 	int tok
@@ -610,7 +612,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 			//	toks.push(TToken(){'tok':TOK_CONST+getid_const(const_type(CTYPE_INT,8),i64(str[0])),'epos0':int(efeed0)-1,'epos1':int(ptr)})
 			//else
 			//toks.push(TToken(){'tok':TOK_STRING+getid(str),'epos0':int(efeed0)-1,'epos1':int(ptr)})
-			push_token(TOK_STRING,int(efeed0)-1,int(ptr))
+			push_token(TOK_STRING,int(efeed0),int(ptr)-1)
 			//todo: python tri-quote strings
 			continue
 		//comments
@@ -625,6 +627,11 @@ auto tokenize(string sdata,int g_ignore_indents)
 					ptr++
 				if last_significant_newline_position==toks.n:
 					last_line_comment_position=toks.n
+				//merge comments to avoid perf issues during token neib lookup
+				if toks.n>0&&toks.back().tok==TOK_COMMENT:
+					toks[toks.n-1].epos1=int(ptr+1)
+				else
+					push_token(TOK_COMMENT,int(efeed0),int(ptr))
 				//parseComment(feed,efeed0,ptr+1)
 				continue
 			if ch=='*':{
@@ -637,6 +644,11 @@ auto tokenize(string sdata,int g_ignore_indents)
 					ptr++
 					if ch=='/'&&c=='*':break;
 					c=ch;
+				//merge comments to avoid perf issues during token neib lookup
+				if toks.n>0&&toks.back().tok==TOK_COMMENT:
+					toks[toks.n-1].epos1=int(ptr)
+				else
+					push_token(TOK_COMMENT,int(efeed0),int(ptr-2))
 				//parseComment(feed,efeed0,ptr)
 				continue
 			}
@@ -737,7 +749,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 									if c==c0:break
 								str.push(char(c))
 							//need the id for include
-							push_token(TOK_STRING+getid(str),int(efeed0)-1,int(ptr))
+							push_token(TOK_STRING+getid(str),int(efeed0),int(ptr)-1)
 					push_token(int(';'),int(bk_ptr-1),int(bk_ptr))
 				else if __basic_api.memcmp(__pointer(feed.d+pword),__pointer(s_define.d),s_define.n)==0:
 					//#define
@@ -845,6 +857,20 @@ struct TDeclItem
 struct TPrototypeItem
 	int id
 	iptr ptr_prototype
+	iptr ptr_fidx
+struct TDocedVariable
+	int epos_scope
+	int id
+	int2 pdoc
+struct TIDBrief
+	int epos_comment
+	int id
+	int2 pdoc
+struct TIDBriefWithFile
+	iptr ptr_fidx
+	int epos_comment
+	int id
+	int2 pdoc
 KEY_DECL_CLASS=TOK_TYPE*1
 KEY_DECL_FUNCTION=TOK_TYPE*0
 KEY_DECL_MACRO=TOK_TYPE*2
@@ -854,6 +880,7 @@ struct TKeyDeclItem
 	int id_type
 	int epos0
 class CFileIndex
+	int m_idfn
 	//basic model, predict from variable. func()
 	int2[] m_ids
 	int2[] m_ppm_pool
@@ -864,7 +891,10 @@ class CFileIndex
 	TKeyDeclItem[] m_all_key_decls
 	int[] m_all_prototypes
 	int2[] m_p_prototypes
+	TIDBrief[] m_id_briefs
 	int[] m_toplevel_ids
+	string m_doc_string_pool
+	TDocedVariable[] m_doc_vars
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
 	//dependency
@@ -877,6 +907,7 @@ class CFileIndex
 	int2[] m_temp_ids
 	iptr m_temp_color_table_time //~g_color_table_time
 	TPrototypeItem[] m_temp_p_prototypes
+	TIDBriefWithFile[] m_temp_id_briefs
 	JS_hasDecls=function(JSContext JS){
 		return JS.Return(!!m_all_decls)
 	}
@@ -935,6 +966,8 @@ g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
+	has_post_ctor_initializer=options["has_post_ctor_initializer"].or(0)
+	has_pointer_ops=options["has_pointer_ops"].or(0)
 	//enable_semantics=options["enable_semantics"].or(0)
 	fn_base=getIdString(idfn_base)
 	pdot=fn_base.LastIndexOf('.')
@@ -978,11 +1011,18 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			g_in_parse_queue[idfn_found]=1
 			g_c_like_parse_queue.push(idfn_found)
 		dep_file_name_tokens.push(int3(toks[ptok].epos0,toks[ptok].epos1,idfn_found))
+	a_auto_include=options["auto_include"].as(JSObject)
+	if a_auto_include:
+		n_auto_include=a_auto_include["length"].as(iptr)
+		for i=0:n_auto_include-1
+			searchDepFile(getid(a_auto_include[i].as(string)),0)
 	///////////////////
 	struct TStkEntry
 		int m_function_id
 		int m_param_id
 		int m_ptok_function_id
+		int m_ptok_last_comment
+		int m_last_var_id
 	struct TScopeEntry
 		int ptok0
 		int pdecls
@@ -994,33 +1034,18 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	sc_decls=new int2[]
 	all_decls=new TDeclItem[]
 	all_key_decls=new TKeyDeclItem[]
+	doc_string_pool=new string
+	all_doc_vars=new TDocedVariable[]
 	function_id=0
 	ptok_function_id=-1
 	param_id=0
-	scopes.push(TScopeEntry(){ptok0:-1})
-	popScope=inline(){
-		auto sc=scopes.pop()
-		if sc.pdecls<sc_decls.n:
-			auto epos0=(sc.ptok0<0?0:toks[sc.ptok0].epos0)
-			for j=sc.pdecls:sc_decls.n-1
-				auto id=sc_decls[j].x
-				if !g_symbols[id].decl_slot:
-					g_symbols[id].decl_slot=1
-					ptok_decl=sc_decls[j].y
-					//epos1:toks[ptok_decl].epos1
-					all_decls.push(TDeclItem(){
-						epos_scope:epos0,
-						id:id,
-						epos0:toks[ptok_decl].epos0})
-			for j=sc.pdecls:sc_decls.n-1
-				auto id=sc_decls[j].x
-				g_symbols[id].decl_slot=0
-		sc_decls.resize(sc.pdecls)
-	}
+	ptok_last_comment=-1
+	last_var_id=0
 	all_prototypes=new int[]
 	p_prototypes=new int2[]
+	id_briefs=new TIDBrief[]
 	MAX_PROTOTYPE_TOKS=1024
-	parsePrototype=function(int function_id,int ptok){
+	parsePrototype=function(int function_id,int ptok,iptr ptok_last_comment){
 		auto blevel=0
 		auto param_id=0
 		auto p0=int(all_prototypes.n)
@@ -1051,13 +1076,137 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				is_done=1
 				break
 		if !is_done:
+			//it's invalid, roll back
 			all_prototypes.resize(iptr(p0))
 		else
 			all_prototypes[p0]=int(all_prototypes.n)-p0-1
+			is_documented=0
+			if ptok_last_comment>=0:
+				//parse ptok_last_comment based on the current prototype
+				auto pbrief=int2(-1,-1)
+				auto preturn=int2(-1,-1)
+				auto pcomment0=toks[ptok_last_comment].epos0
+				auto pcomment1=toks[ptok_last_comment].epos1
+				auto param_id_map=int[int].NULL
+				auto n0=all_prototypes.n
+				auto n_params=int(n0-p0-1)
+				for i=pcomment0:pcomment1-1
+					if !(sdataz[i]=='@'||sdataz[i]=='\\'):continue
+					if !param_id_map:
+						//allocate the param documentation space and init param id map
+						param_id_map=new int[int]
+						for j=p0+1:n0-1
+							param_id_map[all_prototypes[j]]=int(j-p0)
+						all_prototypes.resize(n0+(n_params+2)*2)
+					if __basic_api.memcmp(__pointer(sdataz.d+i+1),"brief",5)==0&&i+6<pcomment1:
+						pbrief=PoolDoxygenComment(sdataz[i+6:pcomment1-1])
+					else if __basic_api.memcmp(__pointer(sdataz.d+i+1),"return",6)==0&&i+7<pcomment1:
+						preturn=PoolDoxygenComment(sdataz[i+7:pcomment1-1])
+					else if __basic_api.memcmp(__pointer(sdataz.d+i+1),"param",5)==0:
+						if param_id_map:
+							auto pid0=i+6
+							while pid0<pcomment1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+								pid0++
+							auto pid1=pid0
+							while pid1<pcomment1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+								pid1++
+							auto id_param=getid(sdataz[pid0:pid1-1])
+							param_ord=param_id_map[id_param]
+							if param_ord>0&&pid1<pcomment1:
+								doc_str=PoolDoxygenComment(sdataz[pid1:pcomment1-1])
+								all_prototypes[n0+4+(param_ord-1)*2+0]=doc_str.x
+								all_prototypes[n0+4+(param_ord-1)*2+1]=doc_str.y
+				if param_id_map&&pbrief.x<0:
+					auto pid0=pcomment0+3
+					while pid0<pcomment1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+						pid0++
+					if pid0<pcomment1:
+						pbrief=PoolDoxygenComment(sdataz[pid0:pcomment1-1])
+				if pbrief.x>=0:
+					//Writeln(getIdString(function_id),' ',pbrief,' ',preturn)
+					all_prototypes[n0 +0]=pbrief.x
+					all_prototypes[n0 +1]=pbrief.y
+					all_prototypes[n0 +2]=preturn.x
+					all_prototypes[n0 +3]=preturn.y
+					is_documented=1
+			if !is_documented:
+				all_prototypes.push(-1)
 			p_prototypes.push(int2(function_id,p0))
+	}
+	PoolDoxygenComment=function(string s){
+		//remove ^[ \t]+[*], take the first tex-like paragraph at p
+		auto ret=doc_string_pool.n
+		is_line_head=1
+		for ch in s
+			if ch=='\n':
+				if is_line_head:
+					break
+				else
+					if !(doc_string_pool.n&&doc_string_pool.back()==' '):
+						doc_string_pool.push(' ')
+					is_line_head=1
+					continue
+			else if is_line_head:
+				if ch=='*'&&is_line_head==1:
+					is_line_head=2
+					continue
+				if ch==' '||ch=='\t':
+					continue
+				if (ch=='\\'||ch=='@'):
+					//command at line head = end of paragraph
+					break
+				is_line_head=0
+			else
+				if ch==' '&&doc_string_pool.n&&doc_string_pool.back()==' ':
+					continue
+			doc_string_pool.push(ch)
+		//doc_string_pool.push(char(0))
+		return int2(int(ret),int(doc_string_pool.n))
+	}
+	scopes.push(TScopeEntry(){ptok0:-1})
+	popScope=inline(){
+		auto sc=scopes.pop()
+		if sc.pdecls<sc_decls.n:
+			auto epos0=(sc.ptok0<0?0:toks[sc.ptok0].epos0)
+			for j=sc.pdecls:sc_decls.n-1
+				auto id=sc_decls[j].x
+				if !g_symbols[id].decl_slot:
+					g_symbols[id].decl_slot=1
+					ptok_decl=sc_decls[j].y
+					//epos1:toks[ptok_decl].epos1
+					all_decls.push(TDeclItem(){
+						epos_scope:epos0,
+						id:id,
+						epos0:toks[ptok_decl].epos0})
+			for j=sc.pdecls:sc_decls.n-1
+				auto id=sc_decls[j].x
+				g_symbols[id].decl_slot=0
+		sc_decls.resize(sc.pdecls)
 	}
 	for i=0:toks.n-1
 		tok_i=toks[i].tok
+		inline PPrevToken(i)
+			auto p=i-1
+			if p>=0L:
+				auto ret=toks[p].tok
+				if ret==TOK_COMMENT:
+					p--
+			return p
+		inline PNextToken(i)
+			auto p=i+1
+			if p<toks.n:
+				auto ret=toks[p].tok
+				if ret==TOK_COMMENT:
+					p++
+			return p
+		inline fetchTokenSafe(p)
+			auto ret=int(';')
+			if uptr(p)<uptr(toks.n):ret=toks[p].tok
+			return ret
+		inline prevToken()
+			return fetchTokenSafe(PPrevToken(i))
+		inline nextToken()
+			return fetchTokenSafe(PNextToken(i))
 		switch(tok_i){
 		default:
 			if (tok_i&TOK_TYPE_MASK)==TOK_ID:
@@ -1068,41 +1217,48 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				/////////
 				//#include, #define, typedef
 				if tok_i==TOK_ID+g_id_include:
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
 						idfn_include=tok1-TOK_STRING
-						searchDepFile(idfn_include,int(i+1))
+						searchDepFile(idfn_include,int(PNextToken(i)))
 				else if tok_i==TOK_ID+g_id_require:
 					//JS require
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
 					if tok1=='(':
-						tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
+						i_plus_2=PNextToken(PNextToken(i))
+						tok2=fetchTokenSafe(i_plus_2)
 						if (tok2&TOK_TYPE_MASK)==TOK_STRING:
-							s_require=cite_raw(iptr(toks[i+2].epos0+1),iptr(toks[i+2].epos1-1))
+							s_require=cite_raw(iptr(toks[i_plus_2].epos0),iptr(toks[i_plus_2].epos1))
 							idfn_require=getid(s_require+".js")
-							searchDepFile(idfn_require,int(i+2))
+							searchDepFile(idfn_require,int(i_plus_2))
 							idfn_require=getid("js_module@"+s_require)
-							searchDepFile(idfn_require,int(i+2))
+							searchDepFile(idfn_require,int(i_plus_2))
 				else if tok_i==TOK_ID+g_id_import:
 					//JC import
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
+					i_plus_1=PNextToken(i)
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
-						idfn_import=getid(cite_raw(iptr(toks[i+1].epos0+1),iptr(toks[i+1].epos1-1)))
-						searchDepFile(idfn_import,int(i+1))
+						idfn_import=getid(cite_raw(iptr(toks[i_plus_1].epos0),iptr(toks[i_plus_1].epos1)))
+						searchDepFile(idfn_import,int(i_plus_1))
 				else if tok_i==TOK_ID+g_id_define:
 					//do nothing, next id does it
-					//just discount it as decl
+					//just disqualify it as decl
 				else if tok_i==TOK_ID+g_id_typedef:
 					scopes[scopes.n-1].in_typedef=i8(1)
 				else if tok_i==TOK_ID+g_id_if||tok_i==TOK_ID+g_id_while:
 					//if or while is equivalent to assignment: right side is dumb expr
 					scopes[scopes.n-1].in_assignment|=i8(2)
+				else if tok_i==TOK_ID+g_id_in:
+					//in `for var in`, var is a decl. After `in`, though, it's a dumb expr
+					tok0=prevToken()
+					if (tok0&TOK_TYPE_MASK)==TOK_ID:
+						scopes[scopes.n-1].in_assignment|=i8(2)
 				else if scopes.n:
 					/////////
 					//decl
 					sc=scopes[scopes.n-1]
-					tok0=(i>0?toks[i-1].tok:int(';'))
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok0=prevToken()
+					tok1=nextToken()
 					if (tok1&TOK_TYPE_MASK)==TOK_ID&&!keyword_map[tok1-TOK_ID]:
 						//followed by another non-keyword id, not a decl
 						break
@@ -1111,15 +1267,16 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						if tok0=='.'&&tok1=='=':
 							//exception case: XXX.XXX=function(){}
 							is_function=0
-							tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
+							tok2=fetchTokenSafe(PNextToken(PNextToken(i)))
 							foreach id_func in g_function_ids
 								if tok2!=TOK_ID+id_func:continue
 								is_function=1
 								break
 							if is_function:
 								tok0=int(';')
-						//((tok1&TOK_TYPE_MASK)==TOK_ID||tok1=='*'||tok1=='['||tok1=='('||tok1=='&')
-						if !(tok0==';'&&tok1!='=')&&(tok1!='['||(tok0&TOK_TYPE_MASK)==TOK_ID)&&tok0!='.'&&tok1!='.'&&!keyword_map[id]:
+						if(!(tok0==';'&&tok1!='=')&&(tok1!='['||(tok0&TOK_TYPE_MASK)==TOK_ID)&&
+						tok0!='.'&&tok1!='.'&&!keyword_map[id]&&
+						!(has_pointer_ops&&((tok1&TOK_TYPE_MASK)==TOK_ID||tok1=='*'||tok1=='&')))
 							//declaration
 							sc_decls.push(int2(id,int(i)))
 							//important-ish check
@@ -1137,7 +1294,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 										//check whether it's a C-like declaration (using 'struct foo' as type) or a forward declaration, or a template param
 										if tok1=='*'||tok1==';'||tok1==','||tok1=='>'||tok1==TOK_GG:continue
 										if (tok1&TOK_TYPE_MASK)==TOK_ID:
-											tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
+											tok2=fetchTokenSafe(PNextToken(PNextToken(i)))
 											if tok2==','||tok2==';'||tok2=='=':
 												//guilty
 												continue
@@ -1152,11 +1309,11 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 									is_function=0
 									if tok1=='='||tok1==':'
 										//ID =/: function/inline/...
-										tok2=(i<toks.n-2?toks[i+2].tok:int(';'))
-										foreach id_func in g_function_ids
-											if tok2!=TOK_ID+id_func:continue
-											is_function=1
-											break
+										//tok2=fetchTokenSafe(PNextToken(PNextToken(i)))
+										//foreach id_func in g_function_ids
+										//	if tok2!=TOK_ID+id_func:continue
+										//	is_function=1
+										//	break
 										if tok0==')'&&tok1==':'&&tok2=='(':
 											//)ID:( -- objective C
 											is_function=2
@@ -1165,22 +1322,116 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 										all_key_decls.push(TKeyDeclItem(){
 											id_type:id+KEY_DECL_FUNCTION,
 											epos0:toks[i].epos0})
-									if is_function==1:
-										parsePrototype(id,int(i+3))
+									//else
+									//if is_function==1:
+									//	parsePrototype(id,int(i+3),ptok_last_comment)
+							//function case: shouldn't count as documented var, 
+							//also, we should be careful with the multi-decl cases...
+							//ptok_last_comment=-1L
+							if ptok_last_comment>=0L:
+								//doxygen < seems to be mainly for members
+								//just use \brief / @brief before a variable
+								//hopefully it will be used more sparingly
+								s_comment=cite_raw(toks[ptok_last_comment].epos0,toks[ptok_last_comment].epos1)
+								pbrief=s_comment.IndexOf('brief')
+								if pbrief>0&&(s_comment[pbrief-1]=='@'||s_comment[pbrief-1]=='\\'):
+									//add a query-able variable
+									//all_doc_vars.push(TDocedVariable(){
+									//	epos_scope:scopes.back().ptok0<0?0:toks[scopes.back().ptok0].epos0,
+									//	id:id,
+									//	pdoc:PoolDoxygenComment(s_comment[pbrief+5:])})
+									id_briefs.push(TIDBrief(){
+										epos_comment:toks[ptok_last_comment].epos0,
+										id:id,
+										pdoc:PoolDoxygenComment(s_comment[pbrief+5:])})
+							last_var_id=id
+			break
+		case TOK_COMMENT:
+			ptok_last_comment=i
+			epos0=toks[i].epos0
+			epos1=toks[i].epos1
+			for j=epos0:min(epos1,epos0+3)-1
+				if sdataz[j]=='@'&&__basic_api.memcmp(__pointer(sdataz.d+j+1),"qpadvar",7)==0:
+					//@qpad variable visibility
+					auto pid0=j+8
+					while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+						pid0++
+					auto pid1=pid0
+					while pid1<epos1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+						pid1++
+					if pid1<epos1:
+						all_doc_vars.push(TDocedVariable(){
+							epos_scope:scopes.back().ptok0<0?0:toks[scopes.back().ptok0].epos0,
+							id:getid(sdataz[pid0:pid1-1]),
+							pdoc:PoolDoxygenComment(sdataz[pid1:epos1-1])})
+					break
+			epos_var_comment=-1L
+			epos0=toks[i].epos0
+			epos1=toks[i].epos1
+			for j=epos0:min(epos1,epos0+3)-1
+				if sdataz[j]=='<':
+					epos_var_comment=j+1
+					break
+				else if sdataz[j]=='\n':
+					epos_var_comment=-1L
+					break
+			if epos_var_comment>=0L:
+				if !last_var_id:
+					ptok0=PPrevToken(i)
+					tok0=fetchTokenSafe(ptok0)
+					if tok0==','||tok0==';':
+						tok_id=fetchTokenSafe(PPrevToken(ptok0))
+						if (tok_id&TOK_TYPE_MASK)==TOK_ID:
+							last_var_id=tok_id-TOK_ID
+				if last_var_id:
+					id_briefs.push(TIDBrief(){
+						epos_comment:toks[i].epos0,
+						id:id,
+						pdoc:PoolDoxygenComment(sdataz[epos_var_comment:toks[i].epos1-1])})
 			break
 		case '(','[','{':
-			ss.push(TStkEntry(){m_function_id:function_id,m_ptok_function_id:ptok_function_id,m_param_id:param_id})
+			ss.push(TStkEntry(){
+				m_function_id:function_id,
+				m_ptok_function_id:ptok_function_id,
+				m_param_id:param_id,
+				m_ptok_last_comment:ptok_last_comment,
+				m_last_var_id:last_var_id,
+			})
 			function_id=0
 			ptok_function_id=-1
+			ptok_last_comment=-1
+			last_var_id=0
 			if tok_i=='('&&i>0:
-				tok0=toks[i-1].tok
+				tok0=prevToken()
 				if (tok0&TOK_TYPE_MASK)==TOK_ID:
 					id=tok0-TOK_ID
-					//&&!(i>=2&&toks[i-2].tok==TOK_ID+g_id_in)
-					if !keyword_map[id]:
+					is_keyword_function=0
+					foreach id_func in g_function_ids
+						if id==id_func:
+							is_keyword_function=1
+							break
+					if is_keyword_function:
+						function_id=id
+						ptok_function_id=int(PPrevToken(i))
+						pequ=PPrevToken(ptok_function_id)
+						tok_equ=fetchTokenSafe(pequ)
+						if tok_equ=='='||tok_equ==':':
+							pequ_source=PPrevToken(pequ)
+							tok_source=fetchTokenSafe(pequ_source)
+							if (tok_source&TOK_TYPE_MASK)==TOK_ID:
+								ptok_function_id=pequ_source
+								function_id=tok_source-TOK_ID
+							else if tok_source==']'&&tok_equ=='=':
+								pequ_source=PPrevToken(pequ_source)
+								tok_source=fetchTokenSafe(pequ_source)
+								if tok_source==TOK_STRING:
+									function_id=getid(cite_raw(toks[pequ_source].epos0,toks[pequ_source].epos1))
+									ptok_function_id=pequ_source
+					else if !keyword_map[id]:
+						//`function_id` doubles as param_id, so we always need to set it
 						function_id=id
 						if !scopes||!scopes[scopes.n-1].in_assignment:
-							ptok_function_id=int(i-1)
+							ptok_function_id=int(PPrevToken(i))
 			param_id=0
 			///////////
 			if tok_i=='{':
@@ -1192,18 +1443,34 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			if ss.n:
 				if function_id&&tok_i==')':
 					//ID(...){ testing
-					tok1=(i<toks.n-1?toks[i+1].tok:int(';'))
+					tok1=nextToken()
 					if (tok1=='{'||tok1==';'&&is_header)&&ptok_function_id>=0:
 						//this should go through even if there was a . before the name
-						all_key_decls.push(TKeyDeclItem(){
-							id_type:function_id+KEY_DECL_FUNCTION,
-							epos0:toks[ptok_function_id].epos0})
-						parsePrototype(function_id,ptok_function_id+1)
+						fid_is_valid=1
+						if has_post_ctor_initializer:
+							p_after_bracket0=PNextToken(PNextToken(i))
+							p_after_bracket1=PNextToken(p_after_bracket0)
+							tmask_ab0=(toks[p_after_bracket0].tok&TOK_TYPE_MASK)
+							if p_after_bracket1<toks.n&&(tmask_ab0==TOK_ID||tmask_ab0==TOK_STRING)&&toks[p_after_bracket1].tok==':':
+								//it's an initializer...
+								fid_is_valid=0
+						if fid_is_valid:
+							all_key_decls.push(TKeyDeclItem(){
+								id_type:function_id+KEY_DECL_FUNCTION,
+								epos0:toks[ptok_function_id].epos0})
+							ptok_function_bracket=PNextToken(ptok_function_id)
+							while ptok_function_bracket<i&&toks[ptok_function_bracket].tok!='(':
+								ptok_function_bracket=PNextToken(ptok_function_bracket)
+							parsePrototype(function_id,ptok_function_bracket,ss.back().m_ptok_last_comment)
+							ss[ss.n-1].m_ptok_last_comment=-1
 				se=ss.pop()
 				function_id=se.m_function_id
 				ptok_function_id=se.m_ptok_function_id
+				ptok_last_comment=se.m_ptok_last_comment
+				last_var_id=se.m_last_var_id
 				param_id=se.m_param_id
 			if tok_i=='}':
+				ptok_last_comment=-1L
 				if scopes.n>1:
 					//process the decls - sort, unique
 					popScope()
@@ -1224,8 +1491,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			break
 		case '.':
 			if i>0&&i<toks.n-1:
-				tok0=toks[i-1].tok
-				tok2=toks[i+1].tok
+				tok0=prevToken()
+				tok2=nextToken()
 				if (tok0&TOK_TYPE_MASK)==TOK_ID&&(tok2&TOK_TYPE_MASK)==TOK_ID:
 					name_dot_entries.push(int2(tok0-TOK_ID,tok2-TOK_ID))
 			break
@@ -1234,6 +1501,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				scopes[scopes.n-1].in_assignment=i8(1)
 			break
 		case ';':
+			if ptok_last_comment!=i-1:
+				ptok_last_comment=-1L
 			if scopes.n:
 				scopes[scopes.n-1].in_assignment=i8(0)
 				scopes[scopes.n-1].in_typedef=i8(0)
@@ -1274,6 +1543,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			ppm_pool.push(int2(id,int(duplicates.getForEachRepeatCount())))
 		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
 	all_decls.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
+	all_doc_vars.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
 	//all_key_decls.Sortby(inline(di){return (u64(di.id_type)<<32)+u64(di.epos0)})
 	all_key_decls.Sortby(byMember("epos0"))
 	if has_dangling_deps:
@@ -1292,6 +1562,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		m_all_prototypes:all_prototypes,
 		m_p_prototypes:p_prototypes,
 		m_toplevel_ids:toplevel_ids,
+		m_doc_string_pool:doc_string_pool,
+		m_doc_vars:all_doc_vars,
+		m_id_briefs:id_briefs,
 	}
 
 auto parseAsText(string sdata,JSObject options)
@@ -1447,7 +1720,7 @@ auto ApplyKeyDecls(int idfn,TKeyDeclItem[] all_key_decls,u64 timestamp)
 	g_key_decl_files[idfn]=kdf
 	return kdf
 
-auto BuildColorTable(CFileIndex fidx)
+auto PrecomputeIndices(CFileIndex fidx)
 	if !fidx.m_all_key_decls:
 		return
 	//!fidx.m_all_dep_files_considered&&
@@ -1455,6 +1728,7 @@ auto BuildColorTable(CFileIndex fidx)
 		kd_ids=new int[]
 		temp_color_table=new int[int]
 		temp_p_prototypes=new TPrototypeItem[]
+		temp_id_briefs=new TIDBriefWithFile[]
 		//all_dep_files_considered=1
 		for kd in fidx.m_all_key_decls
 			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
@@ -1462,8 +1736,22 @@ auto BuildColorTable(CFileIndex fidx)
 		auto p_prototypes=fidx.m_p_prototypes
 		if p_prototypes:
 			auto base_addr=fidx.m_all_prototypes.d
+			auto base_addr2=iptr(fidx)
 			foreach pproto in p_prototypes
-				temp_p_prototypes.push(TPrototypeItem(){id:pproto.x,ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int)})
+				temp_p_prototypes.push(TPrototypeItem(){
+					id:pproto.x,
+					ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int),
+					ptr_fidx:base_addr2,
+				})
+		auto id_briefs=fidx.m_id_briefs
+		if id_briefs:
+			for idb in id_briefs
+				temp_id_briefs.push(TIDBriefWithFile(){
+					ptr_fidx:iptr(fidx),
+					epos_comment:idb.epos_comment,
+					id:idb.id,
+					pdoc:idb.pdoc,
+				})
 		if fidx.m_dep_files:
 			arv=new int[int]
 			auto dfs(int idfn_dep)
@@ -1484,11 +1772,25 @@ auto BuildColorTable(CFileIndex fidx)
 				auto p_prototypes=kdfile.fidx.m_p_prototypes
 				if p_prototypes:
 					auto base_addr=kdfile.fidx.m_all_prototypes.d
+					auto base_addr2=iptr(kdfile.fidx)
 					foreach pproto in p_prototypes
-						temp_p_prototypes.push(TPrototypeItem(){id:pproto.x,ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int)})
+						temp_p_prototypes.push(TPrototypeItem(){
+							id:pproto.x,
+							ptr_prototype:base_addr+iptr(pproto.y)*sizeof(int),
+							ptr_fidx:base_addr2,
+						})
+				auto id_briefs=kdfile.fidx.m_id_briefs
+				if id_briefs:
+					for idb in id_briefs
+						temp_id_briefs.push(TIDBriefWithFile(){
+							ptr_fidx:iptr(kdfile.fidx),
+							epos_comment:idb.epos_comment,
+							id:idb.id,
+							pdoc:idb.pdoc,
+						})
 				foreach idfn_dep in kdfile.fidx.m_dep_files
 					dfs(idfn_dep)
-			//Writeln('BuildColorTable ',g_color_table_time)
+			//Writeln('PrecomputeIndices ',g_color_table_time)
 			foreach idfn_dep in fidx.m_dep_files
 				dfs(idfn_dep)
 		//fidx.m_all_dep_files_considered=all_dep_files_considered
@@ -1498,8 +1800,12 @@ auto BuildColorTable(CFileIndex fidx)
 		temp_p_prototypes.Sort(inline(a,b){
 			return a.id<b.id||a.id==b.id&&a.ptr_prototype<b.ptr_prototype
 		})
+		temp_id_briefs.Sort(inline(a,b){
+			return a.id<b.id||a.id==b.id&&(a.ptr_fidx<b.ptr_fidx||a.ptr_fidx==b.ptr_fidx&&a.epos_comment<b.epos_comment)
+		})
 		fidx.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
 		fidx.m_temp_p_prototypes=temp_p_prototypes
+		fidx.m_temp_id_briefs=temp_id_briefs
 
 MAX_PARSABLE_SIZE=1LL<<24
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
@@ -1556,6 +1862,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					ret=parseAsCLike(JS,idfn,sdata,options)
 				else
 					ret=parseAsText(sdata,options)
+				ret.m_idfn=idfn
 				//Writeln('parse ',idfn,' ',getIdString(idfn),' ',!!ret.m_all_key_decls)
 				if ret.m_all_key_decls:
 					kdf=ApplyKeyDecls(idfn,ret.m_all_key_decls,timestamp)
@@ -1662,7 +1969,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if s_prefix.n:
 			//common prefix here - if we have a common prefix, make it the only candidate and *mark* it as *continue after confirmation*
 			SearchPrefix(fidx.m_ids,1.f)
-			BuildColorTable(fidx)
+			PrecomputeIndices(fidx)
 			if fidx.m_temp_ids&&fidx.m_temp_ids.n:
 				SearchPrefix(fidx.m_temp_ids,1.f)
 			if cands.n:
@@ -1907,7 +2214,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		p=fidx.m_dep_file_name_tokens.InlineBisect(inline(a){return a.x<=ccnt})-1
 		if p>=0L:
 			tokinfo=fidx.m_dep_file_name_tokens[p]
-			if tokinfo.x<=ccnt&&ccnt<tokinfo.y:
+			if tokinfo.x<=ccnt&&ccnt<=tokinfo.y:
 				return JS.Return(getIdString(tokinfo.z))
 		return 0
 	}
@@ -1916,31 +2223,99 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		fidx=doc["m_file_index"].as(CFileIndex)
 		ed=doc["ed"].as(CEditableText)
 		s_id=JS.Param(1).as(string)
-		if !fidx||!fidx.m_temp_p_prototypes:return 0
+		if !fidx||!fidx.m_all_key_decls:return 0
 		if !ed:return JS.ReturnError("invalid editor object")
 		if !s_id||!s_id.n:return 0
-		BuildColorTable(fidx)
+		PrecomputeIndices(fidx)
+		if !fidx.m_temp_p_prototypes:return 0
 		id=getid(s_id)
 		p=fidx.m_temp_p_prototypes.InlineBisect(inline(pproto){return pproto.id<id})
 		if uptr(p)<uptr(fidx.m_temp_p_prototypes.n):
 			pproto=fidx.m_temp_p_prototypes[p]
 			if pproto.id==id:
-				id_unknown=getid("?")
+				id_unknown=getid("...")
+				ret_desc=JS.New()
 				ret=JS.NewArray()
 				n=0
 				for(;p<fidx.m_temp_p_prototypes.n;p++)
 					if fidx.m_temp_p_prototypes[p].id!=id:break
 					ptr_prototype=fidx.m_temp_p_prototypes[p].ptr_prototype
 					n_args=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
-					ret_n=JS.NewArray()
+					ret_p=JS.New()
+					ret_proto=JS.NewArray()
+					ret_p["proto"]=ret_proto
 					for i=0:n_args-1
 						id_i=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
 						if !id_i:
 							id_i=id_unknown
-						ret_n[i]=getIdString(id_i)
-					ret[n++]=ret_n
+						ret_proto[i]=getIdString(id_i)
+					if __memory(int,ptr_prototype)>=0:
+						//Writeln(ptr_prototype)
+						//for i=0:3
+						//	Writeln(i,' ',__memory(int,ptr_prototype+i*4));
+						fidx2=__cast(CFileIndex,fidx.m_temp_p_prototypes[p].ptr_fidx)
+						ret_p["m_brief"]=(fidx2.m_doc_string_pool[__memory(int,ptr_prototype):__memory(int,ptr_prototype+sizeof(int))-1])
+						ptr_prototype+=sizeof(int)*2
+						if __memory(int,ptr_prototype)>=0:
+							ret_p["m_return"]=(fidx2.m_doc_string_pool[__memory(int,ptr_prototype):__memory(int,ptr_prototype+sizeof(int))-1]);
+						ptr_prototype+=sizeof(int)*2
+						ret_param_docs=JS.NewArray()
+						for i=0:n_args-1
+							pstr0=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
+							pstr1=__memory(int,ptr_prototype);ptr_prototype+=sizeof(int)
+							if pstr0<pstr1:
+								ret_param_docs[i]=fidx2.m_doc_string_pool[pstr0:pstr1-1]
+						ret_p["m_param_docs"]=ret_param_docs
+					ret[n++]=ret_p
+				ret_desc["prototype"]=ret
 				return JS.Return(ret)
 		return 0
+	}
+	JS_UI["ED_QueryBriefsByID"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		s_id=JS.Param(1).as(string)
+		if !fidx||!fidx.m_all_key_decls:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		if !s_id||!s_id.n:return 0
+		PrecomputeIndices(fidx)
+		if !fidx.m_temp_id_briefs:return 0
+		id=getid(s_id)
+		p=fidx.m_temp_id_briefs.InlineBisect(inline(pproto){return pproto.id<id})
+		ret=JS.NewArray()
+		n=0
+		while uptr(p)<uptr(fidx.m_temp_id_briefs.n)&&fidx.m_temp_id_briefs[p].id==id:
+			//coulddo: line # from epos... could use epos for seek anyway
+			idb=fidx.m_temp_id_briefs[p]
+			ret_desc=JS.New()
+			fidx2=__cast(CFileIndex,idb.ptr_fidx)
+			ret_desc["file"]=getIdString(fidx2.m_idfn)
+			ret_desc["epos"]=idb.epos_comment
+			ret_desc["brief"]=fidx2.m_doc_string_pool[idb.pdoc.x:idb.pdoc.y-1]
+			ret[n++]=ret_desc
+			p++
+		return JS.Return(ret)
+	}
+	JS_UI["ED_QueryDocVarByScope"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		ccnti_scope=JS.Param(1).as(int)
+		if !fidx||!fidx.m_all_key_decls:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		if !fidx.m_doc_vars:return 0
+		all_doc_vars=fidx.m_doc_vars
+		ret=JS.NewArray()
+		n=0
+		p=all_doc_vars.InlineBisect(inline(di){return di.epos_scope<ccnti_scope})
+		for i=p:all_doc_vars.n-1
+			di=all_doc_vars[i]
+			if di.epos_scope!=ccnti_scope:break
+			ret[n+0]=getIdString(di.id)
+			ret[n+1]=fidx.m_doc_string_pool[di.pdoc.x:di.pdoc.y-1]
+			n+=2
+		return JS.Return(ret)
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
