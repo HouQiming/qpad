@@ -125,6 +125,7 @@ UI.GetNodeClass=function(cache,nd){
 			ndcls.m_port_map={};
 			for(var i=0;i<ndcls.m_ports.length;i++){
 				var port_i=ndcls.m_ports[i];
+				port_i.m_sort_y=i;
 				ndcls.m_port_map[port_i.id]=port_i;
 				if(typeof(port_i.type)=="string"){
 					port_i.type=port_i.type.split(' ');
@@ -830,7 +831,7 @@ UI.GetNodeCache=function(cache,ndi){
 	cache_item.m_texts=[];
 	cache_item.m_regions=[];
 	cache_item.m_param_widgets=[];
-	cache_item.m_param_panel=[];
+	//cache_item.m_param_panel=[];
 	cache_item.m_w=w_final;
 	cache_item.m_h=h_final;
 	//cache_item.m_rects.push({
@@ -909,7 +910,7 @@ UI.GetNodeCache=function(cache,ndi){
 			yr+=dyr;
 			if(port_i.ui&&(!degs_ndi||!degs_ndi[port_i.id])){
 				//generate node UI for non-connected port
-				cache_item.m_param_panel.push({nd:ndi, name:name, port:port_i.id, port_ref:port_i, ui:port_i.ui});
+				//cache_item.m_param_panel.push({nd:ndi, name:name, port:port_i.id, port_ref:port_i, ui:port_i.ui});
 				cache_item.m_param_widgets.push({
 					dx:xl+wl+4,dy:yr,
 					w:xr+wr-(dims.w+style.port_padding*2)-(xl+wl)-8,
@@ -1091,7 +1092,7 @@ W.graphview_prototype={
 				best_eid=e.eid;
 			}
 		}
-		if(best_eid==undefined){
+		if(best_eid==undefined||event.button!=UI.SDL_BUTTON_LEFT){
 			//bg dragging
 			this.m_drag_ctx={mode:"translation",x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.graph.tr))};
 			if(event.button==UI.SDL_BUTTON_LEFT){
@@ -1293,6 +1294,7 @@ W.graphview_prototype={
 			}
 			port_name_map[port_outer.id]=1;
 			gr_ports.push(port_outer);
+			port_outer.m_sort_y=nd.y+port_inner.m_sort_y;
 			if(port_inner.ui){
 				gr_ui_port_map.push({id_inner:nd.__id__,port_inner:port_inner.id,port_outer:port_outer.id});
 			}
@@ -1375,6 +1377,7 @@ W.graphview_prototype={
 				}
 			}
 		}
+		gr_ports.sort(function(a,b){return a.m_sort_y-b.m_sort_y});
 		//build the group class
 		var ndcls={
 			m_graph:gr,
@@ -1385,6 +1388,7 @@ W.graphview_prototype={
 		ndcls.m_port_map={};
 		for(var i=0;i<ndcls.m_ports.length;i++){
 			var port_i=ndcls.m_ports[i];
+			port_i.m_sort_y=i;
 			ndcls.m_port_map[port_i.id]=port_i;
 		}
 		var nd_group=this.graph.CreateNode('group');
@@ -1781,13 +1785,13 @@ W.GraphView=function(id,attrs){
 			}
 		}
 		//create UI panel
-		if(ndi.m_is_selected&&cache_item.m_param_panel.length>0){
-			need_ui=1;
-		}
+		//if(ndi.m_is_selected&&cache_item.m_param_panel.length>0){
+		//	need_ui=1;
+		//}
 	}
-	if(need_ui){
-		UI.OpenUtilTab("param_panel","quiet");
-	}
+	//if(need_ui){
+	//	UI.OpenUtilTab("param_panel","quiet");
+	//}
 	//render the links
 	var port_pos_map={};
 	for(var i=0;i<obj.m_proxy_ports.length;i++){
@@ -1995,6 +1999,10 @@ W.GraphView=function(id,attrs){
 	menu_edit.AddNormalItem({text:UI._("Insert dot"),enable_hotkey:UI.nd_focus==obj,key:".",action:function(){
 		obj.InsertDot();
 	}.bind(obj)})
+	if(UI.nd_focus==obj){
+		W.Hotkey("",{key:'ESC',action:function(){UI.top.app.document_area.ToggleMaximizeMode();UI.Refresh();}});
+		W.Hotkey("",{key:'SPACE',action:function(){UI.top.app.document_area.ToggleMaximizeMode();UI.Refresh();}});
+	}
 	if(nd_sel.length>0){
 		menu_edit.AddSeparator();
 		for(var i=1;i<=4;i++){
@@ -2143,93 +2151,6 @@ var g_panel_ui_widgets={
 		});
 	},
 };
-W.ParamPanelPage=function(id,attrs){
-	var obj=UI.StdWidget(id,attrs,"graph_param_panel",W.graphview_prototype);
-	if(!obj.graphview){
-		return obj;
-	}
-	var graph=obj.graphview.graph;
-	var cache=obj.graphview.cache;
-	var big_param_panel=[];
-	for(var ni=0;ni<graph.nds.length;ni++){
-		var ndi=graph.nds[ni];
-		var cache_item=UI.GetNodeCache(cache,ndi);
-		if(ndi.m_is_selected&&cache_item.m_param_panel.length>0){
-			big_param_panel.push({caption:ndi.m_caption});
-			for(var i=0;i<cache_item.m_param_panel.length;i++){
-				big_param_panel.push(cache_item.m_param_panel[i]);
-			}
-		}
-	}
-	if(!big_param_panel||!big_param_panel.length){
-		W.Text("",{
-			x:0,y:0,anchor:obj,anchor_align:"center",anchor_valign:"center",
-			font:obj.message_style.font,text:UI._("No parameters available"),
-			color:obj.message_style.text_color,
-		})
-		return obj;
-	}
-	UI.Begin(obj)
-		var y_current=obj.y;
-		var style=obj.ui_style;
-		var dy_label=(style.spacing_widget-UI.GetCharacterHeight(style.font_label))*0.5;
-		for(var i=0;i<big_param_panel.length;i++){
-			var item_i=big_param_panel[i];
-			if(item_i.caption!=undefined){
-				//caption
-				if(i){
-					y_current+=style.spacing_node;
-				}
-				var dim=UI.MeasureText(style.font_caption,item_i.caption);
-				UI.RoundRect({x:obj.x+8,y:y_current+(dim.h-2)*0.5,w:obj.w-16,h:2,color:style.caption_color})
-				UI.RoundRect({x:obj.x+30,y:y_current+(dim.h-8)*0.5,w:dim.w+8,h:8,color:obj.color})
-				W.Text("",{x:obj.x+34,y:y_current,font:style.font_caption,text:item_i.caption,color:style.caption_color});
-				y_current+=style.spacing_caption;
-			}else if(item_i.ui){
-				var dim=W.Text("",{x:obj.x+16,y:y_current+dy_label,font:style.font_label,text:item_i.name,color:style.widget_color});
-				var fwidget=g_panel_ui_widgets[item_i.ui[0].toLowerCase()];
-				if(fwidget){
-					fwidget.call(item_i,obj.graphview, obj.x+16+dim.w+8,y_current,obj.w-24-dim.w-16,style.spacing_widget);
-				}
-				y_current+=style.spacing_widget;
-			}
-		}
-	UI.End()
-	return obj;
-};
-
-UI.RegisterUtilType("param_panel",function(){return UI.NewTab({
-	title:UI._("Parameters"),
-	area_name:"h_tools",
-	body:function(){
-		//frontmost doc
-		UI.context_parent.body=this.util_widget;
-		var tab_frontmost=UI.GetFrontMostEditorTab();
-		var obj_real=(tab_frontmost&&tab_frontmost.document_type=="graph"&&tab_frontmost.main_widget);
-		var body;
-		//use obj_real flag to tell the modes apart
-		body=W.ParamPanelPage('body',{
-			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
-			'graphview':obj_real,
-			'activated':this==UI.top.app.document_area.active_tab,
-			'x':0,'y':0,
-		});
-		this.util_widget=body;
-		if(!obj_real){
-			UI.m_invalid_util_tabs.push(this.__global_tab_id);
-		}
-		return body;
-	},
-	NeedRendering:function(){
-		if(!this.main_widget){return 1;}
-		if(this==UI.top.app.document_area.active_tab){return 1;}
-		//todo: main widget update / selchange check
-		return 1;
-	},
-	Save:function(){},
-	SaveMetaData:function(){},
-	OnDestroy:function(){},
-})});
 
 UI.g_ce_save_time=0;
 UI.g_ce_file_save_time={};
