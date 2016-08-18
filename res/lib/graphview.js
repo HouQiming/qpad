@@ -1,6 +1,7 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/global_doc");
+require("res/lib/code_editor");
 
 ///////////////////////////
 //load global config
@@ -595,6 +596,15 @@ var PointDist=function(a,b){
 	var dy=(a.y-b.y);
 	return Math.sqrt(dx*dx+dy*dy);
 };
+var OpenNodeEditorTab=function(obj,fn,nd){
+	var edtab=UI.OpenEditorWindow(fn,function(){
+		this.owner.m_graphview_ref=obj;
+		this.owner.m_graphview_ndref=nd;
+		this.owner.m_graphview_stickers=undefined;
+	});
+	edtab.area_name='v_tools';
+}
+
 var rproto_node={
 	OnMouseDown:function(event){
 		UI.SetFocus(this.owner);
@@ -677,8 +687,7 @@ var rproto_node={
 			}
 			var ndcls=UI.GetNodeClass(this.owner.cache,this.nd);
 			if(ndcls){
-				var edtab=UI.OpenEditorWindow(ndcls.m_file_name);
-				edtab.area_name='v_tools';
+				OpenNodeEditorTab(this.owner,ndcls.m_file_name,this.nd);
 			}
 		}
 	},
@@ -1603,6 +1612,39 @@ W.graphview_prototype={
 		graph.SignalEdit([nd_view]);
 		this.Build(0);
 		UI.Refresh();
+	},
+	GetStickerMap:function(){
+		//per-in-port sticker listing
+		var graph=this.graph;
+		var cache=this.cache;
+		//if(cache.m_sticker_map){
+		//	return cache.m_sticker_map;
+		//}
+		//cache.m_sticker_map={};
+		var sticker_map0={};
+		for(var i=0;i<graph.nds.length;i++){
+			var ndi=graph.nds[i];
+			var ndcls=UI.GetNodeClass(cache,ndi);
+			if(!ndcls){continue;}
+			for(var j=0;j<ndcls.m_ports.length;j++){
+				if(!ndcls.m_ports[j].stickers){continue;}
+				if(ndcls.m_ports[j].dir!='input'){continue;}
+				var skey=ndi.__id__+'='+ndcls.m_ports[j].id;
+				sticker_map0[skey]=ndcls.m_ports[j].stickers;
+			}
+		}
+		var sticker_map={};
+		for(var i=0;i<graph.es.length;i++){
+			var e=graph.es[i];
+			var stickers_i=sticker_map0[e.id1+'='+e.port1];
+			if(stickers_i){
+				if(!sticker_map[e.id0]){
+					sticker_map[e.id0]=[];
+				}
+				sticker_map[e.id0]=sticker_map[e.id0].concat(stickers_i);
+			}
+		}
+		return sticker_map;
 	},
 };
 W.GraphView=function(id,attrs){
@@ -2597,6 +2639,7 @@ W.PackageItem_prototype={
 				stext_raw=ndcls_cloned;
 			}
 		}
+		var nd_new=graph.CreateNode(stext_raw);
 		var is_file=0;
 		if(typeof(stext_raw)=='string'&&stext_raw.indexOf('.')>=0){
 			//it's a file! a new class!
@@ -2609,14 +2652,12 @@ W.PackageItem_prototype={
 			if(s_file_template&&!IO.FileExists(sdir+'/'+stext_raw)){
 				IO.CreateFile(sdir+'/'+stext_raw,IO.ReadAll(s_file_template));
 			}
-			var edtab=UI.OpenEditorWindow(sdir+'/'+stext_raw);
-			edtab.area_name='v_tools';
+			OpenNodeEditorTab(obj,sdir+'/'+stext_raw,nd_new);
 			//we still need the node
 			stext_raw=UI.RemoveExtension(stext_raw);
 			//}
 			is_file=1;
 		}
-		var nd_new=graph.CreateNode(stext_raw);
 		if(typeof(stext_raw)!='string'&&s_group_name){
 			nd_new.m_caption=s_group_name;
 			//prepend the package dir

@@ -137,6 +137,7 @@ auto ParsePortDescs(JSObject ret,string scode)
 	//just ignore all errors
 	obj_ports=ret["m_ports"].as(JSObject)
 	p=obj_ports["length"].as(iptr)
+	prev_port=JSObject.NULL
 	for sline in scode.Tokenize("\r\n")
 		isin=1
 		pport=sline.IndexOf('@in=')
@@ -148,6 +149,19 @@ auto ParsePortDescs(JSObject ret,string scode)
 				pport+=5
 				isin=0
 			else
+				psticker=sline.IndexOf('@sticker=')
+				if psticker>=0:
+					psticker+=9
+					ssticker=sline[psticker:]
+					pspace=ssticker.IndexOf(' ')
+					if pspace>=0:
+						astickers=prev_port["stickers"].as(JSObject)
+						if !astickers:
+							astickers=JS.NewArray()
+							prev_port["stickers"]=astickers
+						n0=astickers["length"].as(iptr)
+						astickers[n0]=ssticker[:pspace-1]
+						astickers[n0+1]=ssticker[pspace+1:]
 				continue
 		words=[StripLeadingSpaces(s) for s in sline[pport:].Tokenize(",")]
 		sname=words[0]
@@ -176,6 +190,7 @@ auto ParsePortDescs(JSObject ret,string scode)
 					obj_port[s_key]=s_value.as(double)
 			else
 				obj_port[s_key]=s_value
+		prev_port=obj_port
 
 EnumWords=inline(scode){
 	return {forEach:inline(fbody){
@@ -249,7 +264,7 @@ auto ParseTextNode(string scode)
 	for sline,I in scode.TokenizeEx("\r\n",scode.TOKENIZE_ALLOW_EMPTY|scode.TOKENIZE_INCLUDE_SEPARATOR)
 		pport=sline.IndexOf('@out=')
 		if pport<0:
-			if sline.IndexOf('@in=')<0:
+			if sline.IndexOf('@in=')<0&&sline.IndexOf('@sticker=')<0:
 				sblock.push(sline)
 			continue
 		else

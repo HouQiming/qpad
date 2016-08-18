@@ -3,16 +3,16 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n",
-   "m_text_out": "",
+   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\n",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
     7,
-    12,
-    12,
-    9,
-    32,
-    6
+    17,
+    20,
+    49,
+    49,
+    4
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/z",
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\napply it to something\n\tport the btc trader trainer\n\ttry-hard downloader\n\"conventional\" variable names as a property on code input pins\n\tapp@express, btc_state@btc, ...\n\tshow those variables in a \"context hint\" window or something\n\tcould show something else\n\t--\n\t\"context hint\" could really be useful - context utility functions\n\t\tcontext documentation... in md, could combine with AC\n\t\tidentifier-indexed documentation\n\ta persistent notification\n\t\twhen an id is typed, filter by it\n\t\t\tprovide fhint for functions\n\thints are input-specific...\n\t\tfor each input, add the hints from each surrounding output block\n\t\t\tthey may *duplicate*\n\t\tcall qpad parser in ParseTextNode\n\t\tcached dfs list of dependant nodes\n\tdoxygen doc support in qpad, then just do graph-based depends\n\t---\n\tdfs @qpadvar propagation\n\t\tAPI to add whole-file @qpadvar\ndedicated preview nodes\n\tpreview output for zjs script\n\t\tmd / qpad rendering functions\n\tor external application\ndebugging\n\tredirected run like qpad notebooks\n\t\tcan count as a preview node\n\tline info mapping\n(test) @out format=var \nUI overhaul\n\tarea labels\n\tput nodes on top of edges\n\tpackage updating UI\n\t\tpackage-groups: original caption\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\nun-depending packages\n\tpackage node?",
+   "m_text_in": "# TODO LIST\napply it to something\n\tport the btc trader trainer\n\ttry-hard downloader\ndebugging / syncing\n\tredirected run like qpad notebooks\n\t\tcan count as a preview node\n\tline info mapping\n\t3-way merge for direct output editing\n\t\tkeep a *copy* of the generated files\ndedicated preview nodes\n\tpreview output for zjs script\n\t\tmd / qpad rendering functions\n\tor invoke some external application\n\tonly those needing editing UIs should be inside\n(test) @out format=var\nUI overhaul\n\tarea labels\n\tput nodes on top of edges\n\tpackage updating UI\n\t\tpackage-groups: original caption\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\nun-depending packages\n\tpackage node?",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,

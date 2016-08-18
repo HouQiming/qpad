@@ -5078,6 +5078,43 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 	}
 };
 
+var ComputeGraphViewStickers=function(graphview,nd){
+	var graph=graphview.graph;
+	var es={},arv={};
+	var nd_chain=[];
+	for(var i=0;i<graph.es.length;i++){
+		var id0=graph.es[i].id0;
+		var id1=graph.es[i].id1;
+		if(!es[id1]){
+			es[id1]=[];
+		}
+		es[id1].push(id0);
+	}
+	var dfs=function(id){
+		if(arv[id]){return;}
+		arv[id]=1;
+		var es_id=es[id];
+		if(es_id){
+			for(var i=0;i<es_id.length;i++){
+				dfs(es_id[i]);
+			}
+		}
+		nd_chain.push(id);
+	};
+	dfs(nd.__id__);
+	////////////////
+	var sticker_map=graphview.GetStickerMap();
+	var ret=[];
+	for(var i=0;i<nd_chain.length;i++){
+		var stickers_i=sticker_map[nd_chain[i]];
+		if(!stickers_i){continue;}
+		for(var j=0;j<stickers_i.length;j++){
+			ret.push(stickers_i[j]);
+		}
+	}
+	return ret;
+};
+
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"){return;}
 	var fupdate_tab=function(){
@@ -5231,6 +5268,13 @@ W.CodeEditor=function(id,attrs){
 				var key_decl_check_frontier=0;
 				var i_tot=0;
 				var show_var_hint=UI.TestOption("show_var_hint");
+				if(show_var_hint&&obj.m_graphview_ref&&obj.m_graphview_stickers==undefined){
+					//precompute graphview stickers
+					obj.m_graphview_stickers=ComputeGraphViewStickers(obj.m_graphview_ref,obj.m_graphview_ndref);
+				}
+				if(obj.m_graphview_stickers){
+					all_docvars=obj.m_graphview_stickers;
+				}
 				for(;;){
 					var ccnti=ccnt
 					var fol_ret=doc.FindOuterLevel(ccnti);
