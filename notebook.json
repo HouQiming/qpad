@@ -9,9 +9,9 @@
     2016,
     7,
     17,
-    20,
+    22,
     49,
-    49,
+    8,
     4
    ],
    "m_has_any_error": 0,
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\napply it to something\n\tport the btc trader trainer\n\ttry-hard downloader\ndebugging / syncing\n\tredirected run like qpad notebooks\n\t\tcan count as a preview node\n\tline info mapping\n\t3-way merge for direct output editing\n\t\tkeep a *copy* of the generated files\ndedicated preview nodes\n\tpreview output for zjs script\n\t\tmd / qpad rendering functions\n\tor invoke some external application\n\tonly those needing editing UIs should be inside\n(test) @out format=var\nUI overhaul\n\tarea labels\n\tput nodes on top of edges\n\tpackage updating UI\n\t\tpackage-groups: original caption\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\nun-depending packages\n\tpackage node?",
+   "m_text_in": "# TODO LIST\napply it to something\n\tport the btc trader trainer\n\ttry-hard downloader\nzg files in history\ndebugging / syncing\n\tredirected run like qpad notebooks\n\t\tcan count as a preview node\n\tline info mapping\n\t3-way merge for direct output editing\n\t\tkeep a *copy* of each generated file\n\t\tthen use diff-based merge\n\t\tassume \"indent\" formatter, no general support\n\t\t\tdefault \"code\" to \"indent\"\n\tjust leave markers, then map back and dedent the blocks\n\t\ta special, default code indenter\nqpad shortcut for adding ports\nadd artificial dependency to the graph\n\tor add empty filler node, then edit the *result* file\ndedicated preview nodes\n\tpreview output for zjs script\n\t\tmd / qpad rendering functions\n\tor invoke some external application\n\tonly those needing editing UIs should be inside\n\t---\n\tbetter run the thing in the final system\n(test) @out format=var\nUI overhaul\n\tarea labels\n\tput nodes on top of edges\n\tpackage updating UI\n\t\tpackage-groups: original caption\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\nun-depending packages\n\tpackage node?",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,

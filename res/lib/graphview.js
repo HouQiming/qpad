@@ -152,7 +152,7 @@ var g_edge_formats={
 	jsstring:function(arr_output,s_input){
 		return JSON.stringify(s_input);
 	},
-	indented:function(arr_output,s_input){
+	indented:function(arr_output,s_input,nd,port){
 		var s_target_indent='';
 		var s_context=arr_output.length?arr_output[arr_output.length-1]:'';
 		var p_newline=s_context.lastIndexOf('\n');
@@ -164,7 +164,15 @@ var g_edge_formats={
 			s_input=s_input.substr(0,s_input.length-1);
 		}
 		if(s_input&&s_target_indent){
-			return UI.ED_GetClipboardTextSmart(s_target_indent,s_input)||s_input;
+			!? //syncing tags - should apply it on the *output* end
+			var s_indented=UI.ED_GetClipboardTextSmart(s_target_indent,s_input);
+			var s_tagprefix=(port.tagprefix||'//');
+			if(!s_indented){
+				s_indented=s_input;
+				s_target_indent='';
+			}
+			return [s_target_indent,s_tagprefix,'@sync_push=',ndi.__id__,'\n',s_input,'\n',
+				s_target_indent,s_tagprefix,'@sync_pop=',ndi.__id__].join('');
 		}else{
 			return s_input;
 		} 
@@ -228,6 +236,7 @@ var ExpandDots=function(nds,es,is_ungroup){
 		var outs=dot_outs[i];
 		for(var j0=0;j0<ins.length;j0++){
 			for(var j1=0;j1<outs.length;j1++){
+				if(!nds[ins[j0].v]||!nds[outs[j1].v]){continue;}
 				es_new.push({
 					id0:nds[ins[j0].v].__id__,port0:ins[j0].port,
 					id1:nds[outs[j1].v].__id__,port1:outs[j1].port,
@@ -433,6 +442,7 @@ var graph_prototype={
 			var e=es[i];
 			var v0=node_map[e.id0];
 			var v1=node_map[e.id1];
+			if(v0==undefined||v1==undefined){continue;}
 			es_topo[v0].push(v1);
 			es_gather[v1].push({v0:v0,port0:e.port0,port1:e.port1});
 			degs[v1]++;
@@ -540,7 +550,7 @@ var graph_prototype={
 						for(var j=0;j<ndcls.m_ports.length;j++){
 							var port_j=ndcls.m_ports[j];
 							if(port_j.dir=='input'&&port_j.format){
-								input_formats[port_j.id]=port_j.format;
+								input_formats[port_j.id]=[port_j.format,port_j];
 							}
 						}
 						for(var j=0;j<ndcls.m_blocks.length;j+=2){
@@ -550,14 +560,15 @@ var graph_prototype={
 							for(var k=0;k<blocks_j.length;k++){
 								var s_block_jk=blocks_j[k];
 								if(k&1){
-									var f_format=input_formats[s_block_jk];
-									if(f_format){
-										f_format=g_edge_formats[f_format];
+									var format_params=input_formats[s_block_jk];
+									var f_format=undefined;
+									if(format_params){
+										f_format=g_edge_formats[format_params[0]];
 									}
 									s_block_jk=pvmap_v0_s[s_block_jk];
 									if(f_format){
 										//format input ports
-										s_block_jk=f_format(blocks_ret,s_block_jk);
+										s_block_jk=f_format(blocks_ret,s_block_jk,ndi,format_params[1]/*port_j*/);
 									}
 								}
 								blocks_ret.push(s_block_jk);
