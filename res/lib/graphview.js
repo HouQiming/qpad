@@ -118,6 +118,7 @@ UI.GetNodeClass=function(cache,nd){
 				ndcls=UI.ParseTextNode(snode);
 			}
 			ndcls.m_file_name=IO.NormalizeFileName(fn);
+			ndcls.m_class_name=sname;
 			holder={
 				m_ndcls:ndcls,
 				m_file_name:IO.NormalizeFileName(fn),
@@ -164,15 +165,15 @@ var g_edge_formats={
 			s_input=s_input.substr(0,s_input.length-1);
 		}
 		if(s_input&&s_target_indent){
-			!? //syncing tags - should apply it on the *output* end
 			var s_indented=UI.ED_GetClipboardTextSmart(s_target_indent,s_input);
-			var s_tagprefix=(port.tagprefix||'//');
+			//var s_tagprefix=(port.tagprefix||'//');
 			if(!s_indented){
 				s_indented=s_input;
-				s_target_indent='';
+				//s_target_indent='';
 			}
-			return [s_target_indent,s_tagprefix,'@sync_push=',ndi.__id__,'\n',s_input,'\n',
-				s_target_indent,s_tagprefix,'@sync_pop=',ndi.__id__].join('');
+			//return [s_target_indent,s_tagprefix,'@sync_push=',ndi.__id__,'\n',s_input,'\n',
+			//	s_target_indent,s_tagprefix,'@sync_pop=',ndi.__id__].join('');
+			return s_indented;
 		}else{
 			return s_input;
 		} 
@@ -539,7 +540,7 @@ var graph_prototype={
 						try{
 							ndcls.m_script.call(null,pvmap_v0,pvmap_v0);
 						}catch(err){
-							console.log(err.stack);
+							console.log(ndcls.m_file_name,err.stack);
 						}
 					}else if(ndcls.m_blocks){
 						var pvmap_v0_s={};
@@ -547,10 +548,14 @@ var graph_prototype={
 							pvmap_v0_s[id]=pvmap_v0[id].join('');
 						}
 						var input_formats={};
+						var output_need_synctag={};
 						for(var j=0;j<ndcls.m_ports.length;j++){
 							var port_j=ndcls.m_ports[j];
 							if(port_j.dir=='input'&&port_j.format){
 								input_formats[port_j.id]=[port_j.format,port_j];
+							}
+							if(port_j.dir=='output'){
+								output_need_synctag[port_j.id]=(port_j.format?0:(port_j.tagprefix||'//'));
 							}
 						}
 						for(var j=0;j<ndcls.m_blocks.length;j+=2){
@@ -565,10 +570,28 @@ var graph_prototype={
 									if(format_params){
 										f_format=g_edge_formats[format_params[0]];
 									}
-									s_block_jk=pvmap_v0_s[s_block_jk];
+									var s_input_port=s_block_jk;
+									var need_inline_sync_wrap=0;
+									s_block_jk=pvmap_v0_s[s_input_port];
+									if(output_need_synctag[id]){
+										if(!format_params||format_params[0]=='indented'){
+											//insert the input knob tag - line version
+											s_block_jk=[output_need_synctag[id],'@sync_in=',output_need_synctag[id].length,' ',s_input_port,'\n',s_block_jk].join('');
+										}else{
+											if(output_need_synctag[id]=='//'){
+												//insert the input knob tag - inline version
+												need_inline_sync_wrap=1;
+											}else{
+												//coulddo: non-C mid-line sync tags
+											}
+										}
+									}
 									if(f_format){
 										//format input ports
 										s_block_jk=f_format(blocks_ret,s_block_jk,ndi,format_params[1]/*port_j*/);
+									}
+									if(need_inline_sync_wrap){
+										s_block_jk=['/*[',s_input_port,'*/',s_block_jk,'/*]*/',].join('');
 									}
 								}
 								blocks_ret.push(s_block_jk);
@@ -578,9 +601,23 @@ var graph_prototype={
 						//variable generator
 						for(var j=0;j<ndcls.m_ports.length;j++){
 							var port_j=ndcls.m_ports[j];
-							if(port_j.dir=='output'&&port_j.format=='var'){
-								pvmap_v0[port_j.id]='zV'+uvid.toString();
-								uvid++;
+							if(port_j.dir=='output'&&port_j.format){
+								if(port_j.format=='var'){
+									pvmap_v0[port_j.id]='zV'+uvid.toString();
+									uvid++;
+								}
+							}
+							if(port_j.dir=='output'&&output_need_synctag[port_j.id]&&pvmap_v0[port_j.id]){
+								//we can't use file names here - they are *absolute*
+								//node-port
+								var s_prefix=output_need_synctag[port_j.id];
+								var s_original=pvmap_v0[port_j.id];
+								//console.log(ndcls.m_class_name,port_j.id,!!s_original)
+								pvmap_v0[port_j.id]=[
+									s_prefix,'@sync_push=',ndi.__id__,'?',port_j.id,'\n',
+									s_original,(s_original[s_original.length-1]=='\n'?'':'\n'),
+									s_prefix,'@sync_pop=',ndi.__id__,'?',port_j.id,
+								].join('');
 							}
 						}
 					}
@@ -1079,6 +1116,7 @@ graph: persistent data
 cache: transient data
 */
 W.graphview_prototype={
+	m_is_graph_view:1,
 	//this region is outside the scale
 	OnMouseDown:function(event){
 		UI.SetFocus(this);
@@ -1220,6 +1258,7 @@ W.graphview_prototype={
 	Save:function(){
 		this.graph.Save(this.m_file_name);
 		this.m_saved_point=(this.cache&&this.cache.m_undo_queue.length||0);
+		UI.BumpHistory(this.m_file_name)
 	},
 	NeedSave:function(){
 		return this.m_saved_point!=(this.cache&&this.cache.m_undo_queue.length||0);
@@ -1548,10 +1587,31 @@ W.graphview_prototype={
 		UI.Refresh();
 	},
 	Build:function(is_rebuild){
+		var nds=this.graph.nds;
+		var nd_metadata=undefined;
+		for(var i=0;i<nds.length;i++){
+			if(nds[i].m_caption=='metadata'){
+				nd_metadata=nds[i];
+				break;
+			}
+		}
+		var s_build_dir_name=(nd_metadata['build_dir']||'build');
 		var cache=this.cache;
-		var sbasepath=UI.GetPathFromFilename(this.m_file_name)+'/../build'
-		IO.CreateDirectory(sbasepath)
+		var sbasepath=UI.GetPathFromFilename(this.m_file_name)+'/..'+(s_build_dir_name?'/'+s_build_dir_name:'');
+		IO.CreateDirectory(sbasepath);
+		cache.m_generated_files=[];
+		IO.m_generated_files=cache.m_generated_files;
 		this.graph.Build(sbasepath,cache,is_rebuild);
+		IO.m_generated_files=undefined;
+		////////////////////////////////
+		//process the generated file list
+		cache.m_presync_timestamps={};
+		for(var i=0;i<cache.m_generated_files.length;i++){
+			var fn=cache.m_generated_files[i];
+			fn=IO.NormalizeFileName(fn);
+			cache.m_presync_timestamps[fn]=IO.GetFileTimestamp(fn);
+			cache.m_generated_files[i]=fn;
+		}
 	},
 	QuickPreview:function(id){
 		var graph=this.graph;
@@ -1656,6 +1716,91 @@ W.graphview_prototype={
 			}
 		}
 		return sticker_map;
+	},
+	SyncFromFinalCode:function(fn){
+		var sync_jobs=[];
+		try{
+			sync_jobs=UI.ParseSyncTags(fn);
+		}catch(e){
+			console.log(e.stack);
+			return 0;
+		}
+		if(!sync_jobs){
+			return 0;
+		}
+		var cache=this.cache;
+		var nds=this.graph.nds;
+		var node_map={};
+		var dfs=function(ndi){
+			if(isGroup(ndi)){
+				var ndcls=UI.GetNodeClass(cache,ndi);
+				if(ndcls&&ndcls.m_graph){
+					var nds=ndcls&&ndcls.m_graph.nds;
+					for(var i=0;i<nds.length;i++){
+						dfs(nds[i]);
+					}
+				}
+			}else{
+				node_map[ndi.__id__]=ndi;
+			}
+		};
+		for(var i=0;i<nds.length;i++){
+			dfs(nds[i]);
+		}
+		for(var i=0;i<sync_jobs.length;i++){
+			var job_i=sync_jobs[i];
+			var ndi=node_map[job_i.m_id];
+			if(!ndi){
+				continue;
+			}
+			var ndcls=UI.GetNodeClass(cache,ndi);
+			if(!ndcls){
+				continue;
+			}
+			var fn_i=ndcls.m_file_name;
+			//coulddo: in case *both sides* have changes...
+			//recreate the file in port order, then create a diff
+			var port2code={};
+			for(var j=0;j<job_i.m_port_jobs.length;j+=2){
+				var sport=job_i.m_port_jobs[j];
+				var scode=job_i.m_port_jobs[j+1];
+				if(port2code[sport]&&port2code[sport]!=scode){
+					//todo: give a notification after opening the window, choose the version that *doesn't match the original* ... in native
+					console.log(['ambiguous code for port "',sport,'" of class "',ndi.m_class,'"'].join(''))
+				}
+				port2code[sport]=scode;
+			}
+			///////////////////////
+			//open the editor window
+			var edtab=UI.OpenEditorWindow(fn_i,(function(obj,ndi,port2code){
+				return function(){
+					this.owner.m_graphview_ref=obj;
+					this.owner.m_graphview_ndref=ndi;
+					this.owner.m_graphview_stickers=undefined;
+					///////////////////
+					UI.SyncOneFile(this.ed,port2code);
+				}
+			})(this,ndi,port2code),"quiet");
+			edtab.area_name='v_tools';
+		}
+		return 1;
+	},
+	CheckSyncableFile:function(fn){
+		var cache=this.cache;
+		if(!cache.m_presync_timestamps){return;}
+		var tstamp_old=cache.m_presync_timestamps[fn];
+		if(!tstamp_old){return;}
+		var tstamp_new=IO.GetFileTimestamp(fn);
+		if(tstamp_old==tstamp_new){return;}
+		cache.m_presync_timestamps[fn]=tstamp_new;
+		this.SyncFromFinalCode(fn);
+	},
+	CheckAllSyncableFiles:function(){
+		var fs=this.cache.m_generated_files;
+		if(!fs){return;}
+		for(var i=0;i<fs.length;i++){
+			this.CheckSyncableFile(fs[i]);
+		}
 	},
 };
 W.GraphView=function(id,attrs){

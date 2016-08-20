@@ -1,3 +1,4 @@
 function(input,output){
 	//@in=description,type:string,ui=editbox,color=0xffb4771f
+	//@in=build_dir,type:string,ui=editbox,default=build
 };

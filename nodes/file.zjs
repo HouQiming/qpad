@@ -4,6 +4,7 @@ function(input,output){
 	//@out=out_name,type=path string,color=0xffb4771f
 	for(var j=0;j<input.name.length;j++){
 		IO.CreateFile(IO.m_build_path+'/'+input.name[j],input.code.join(''));
+		IO.m_generated_files.push(IO.m_build_path+'/'+input.name[j]);
 	}
 	output.out_name=(input.name[0]||'');
 };

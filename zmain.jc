@@ -309,6 +309,11 @@ auto ParseTextNode(string scode)
 		obj_code_blocks[i]=obj_block
 	return JS.Return(ret)
 
+auto CountLeadingSpaces(string s)
+	for i=0:s.n-1
+		if s[i]!=' '&&s[i]!='\t':return i
+	return s.n
+
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ParseJSNode"]=function(JSContext JS)
 		scode=JS.Param(0).as(string)
@@ -404,6 +409,192 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		dir_src=JS.Param(0).as(string)
 		dir_tar=JS.Param(1).as(string)
 		return JS.Return(RecursiveCopy(dir_src,dir_tar))
+	}
+	JS_UI["ParseSyncTags"]=function(JSContext JS){
+		auto fn=JS.Param(0).as(string)
+		auto scode=System.IO.ReadAll(fn)
+		if !scode:
+			return JS.Return('cannot read the file')
+		struct TSyncStackItem
+			string id,port
+			string buf
+			int pindent,strip_next
+		auto stk=new TSyncStackItem[]
+		auto sync_jobs=new TSyncStackItem[]
+		for sline in scode.TokenizeEx("\r\n",scode.TOKENIZE_ALLOW_EMPTY|scode.TOKENIZE_INCLUDE_SEPARATOR)
+			psync=sline.IndexOf('@sync_')
+			if psync>=0:
+				sync_op=0
+				if sline[psync+6:].StartsWith('in='):
+					//input knob, insert as is, *WITHOUT THE NEWLINE*
+					if stk.n:
+						s_port=sline[psync+9:]
+						if s_port.n&&s_port.back()=='\n':
+							s_port.n--
+						if s_port.n&&s_port.back()=='\r':
+							s_port.n--
+						pspace=s_port.IndexOf(' ')
+						if pspace>=0:
+							pt=psync-s_port[:pspace-1].as(int)
+							if pt>=0&&pt<psync:
+								//indent plus port name
+								sindent=sline[:pt-1]
+								stk[stk.n-1].buf.push(sindent[min(stk[stk.n-1].pindent,CountLeadingSpaces(sindent)):])
+								stk[stk.n-1].buf.push(s_port[pspace+1:])
+								stk[stk.n-1].strip_next=1
+								continue
+				else if sline[psync+6:].StartsWith('push='):
+					sync_op=1
+				else if sline[psync+6:].StartsWith('pop='):
+					sync_op=-1
+				if sync_op!=0:
+					ssyncdata=sline[psync+(sync_op>0?11:10):]
+					pportid=ssyncdata.IndexOf('?')
+					if pportid>=0:
+						s_node=ssyncdata[:pportid-1]
+						s_port=ssyncdata[pportid+1:]
+						if s_port.n&&s_port.back()=='\n':
+							s_port.n--
+						if s_port.n&&s_port.back()=='\r':
+							s_port.n--
+						if sync_op==1:
+							stk.push(TSyncStackItem(){
+								id:s_node,port:s_port,
+								buf:new string,
+								pindent:CountLeadingSpaces(sline)
+							})
+						else
+							//in pop, s_port contains another = and we need to keep whatever coming after it, with the newline
+							//pequ=s_port.IndexOf('=')
+							//if pequ>=0:
+							//	if stk.n:
+							//		stk[stk.n-1].buf.push(ssyncdata[pportid+1+pequ+1:])
+							//	s_port=s_port[:pequ-1]
+							if !stk.n:return JS.Return(FormatAsText("'",sline[psync:],"' does't match any sync_push"))
+							si=stk.pop()
+							s_node0=si.id
+							s_port0=si.port
+							if s_node0!=s_node||s_port0!=s_port:
+								return JS.Return(FormatAsText("'",sline[psync:],"' does't match '@sync_push="+s_node0+"="+s_port0+"'"))
+							//create jobs on pop... no real difference though
+							sync_jobs.push(si)
+						continue
+			if stk.n:
+				//parse mid-line sync tags
+				auto s=sline[min(stk[stk.n-1].strip_next?0x7fffffff:stk[stk.n-1].pindent,CountLeadingSpaces(sline)):]
+				auto buf=stk[stk.n-1].buf
+				stk[stk.n-1].strip_next=0
+				for(;;){
+					pmidline_tag=s.IndexOf("/*[")
+					if pmidline_tag<0:
+						buf.push(s)
+						break
+					//////
+					buf.push(s[:pmidline_tag-1])
+					s=s[pmidline_tag+3:]
+					pmidline_tag=s.IndexOf("*/")
+					if pmidline_tag<0:
+						buf.push("/*[")
+						continue
+					//////
+					buf.push(s[:pmidline_tag-1])
+					s=s[pmidline_tag+2:]
+					pmidline_tag=s.IndexOf('/*]*/')
+					if pmidline_tag<0:
+						buf.push("*/")
+						continue
+					s=s[pmidline_tag+5:]
+				}
+		if stk.n:
+			si=stk.pop()
+			s_node0=si.id
+			s_port0=si.port
+			return JS.Return(FormatAsText("'@sync_push="+s_node0+"="+s_port0+"' has no matching push"))
+		sync_jobs.Sort(inline(a,b){return a.id<b.id||a.id==b.id&&a.port<b.port})
+		//merge with existing in-file data, apply the changes to unsaved editor windows
+		auto ret=JS.NewArray();
+		auto lg_ret=0
+		for id,grp in sync_jobs.Groupby(byMember("id"))
+			ret_i=JS.New()
+			ret_i["m_id"]=id
+			obj_port_jobs=JS.NewArray()
+			ret_i["m_port_jobs"]=obj_port_jobs
+			nobj=0
+			for si in grp
+				obj_port_jobs[nobj++]=si.port
+				obj_port_jobs[nobj++]=si.buf
+			ret[lg_ret++]=ret_i
+		return JS.Return(ret)
+	}
+	JS_UI["SyncOneFile"]=function(JSContext JS){
+		ed=JS.Param(0).as(TextBox.detail.CEditableText)
+		if !ed:return 0
+		port2code=JS.Param(1).as(JSObject)
+		if !port2code:return 0
+		////////////////////////////
+		//per-line port reconstruction
+		scode=ed.GetText(0LL,ed.GetTextSize())
+		scode_new=new string
+		do_echo=0
+		for sline,I in scode.TokenizeEx("\r\n",scode.TOKENIZE_ALLOW_EMPTY|scode.TOKENIZE_INCLUDE_SEPARATOR)
+			//preserve the @in and @sticker stuff
+			if sline.IndexOf('@in=')>=0||sline.IndexOf('@sticker=')>=0:
+				scode_new.push(sline)
+				continue
+			else 
+				pport=sline.IndexOf('@out=')
+				if pport>=0:
+					scode_new.push(sline)
+					//reconstruct from the sync job... if we could find the port
+					s_portname=sline[pport+5:]
+					pcomma=s_portname.IndexOf(',')
+					if pcomma>=0:
+						s_portname.n=pcomma
+					s_code=port2code[s_portname].as(string)
+					if s_code:
+						scode_new.push(s_code)
+						if s_code.n&&s_code.back()!='\n':
+							scode_new.push('\n')
+						do_echo=0
+					else
+						do_echo=1
+				else
+					if do_echo:scode_new.push(sline)
+		////////////////////////////
+		dmp_diff_to_i64_list=__c_function(int,"dmp_diff_to_i64_list","dmp.h","c_files","dmp.c")
+		dmp_diff_new=__c_function(int,"dmp_diff_new","dmp.h","c_files","dmp.c")
+		dmp_diff_free=__c_function(int,"dmp_diff_free","dmp.h","c_files","dmp.c")
+		diff=NULL
+		dmp_diff_new(&diff,NULL, scode,scode.n, scode_new,scode_new.n);
+		if !diff:return 0
+		n=dmp_diff_to_i64_list(diff,NULL)
+		rawdiff=new i64[n]
+		n=dmp_diff_to_i64_list(diff,rawdiff)
+		assert(n==rawdiff.n)
+		dmp_diff_free(diff)
+		diff=NULL
+		////////////////////////////
+		ops=new TextBox.detail.TEditop[]
+		for i=0:3:rawdiff.n-3
+			if rawdiff[i+2]:
+				//insert
+				ops.push(TextBox.detail.TEditop(){
+					ccnt:rawdiff[i+0],
+					sz:0LL,
+					s:scode_new[iptr(rawdiff[i+2])-scode_new.d:iptr(rawdiff[i+2]+rawdiff[i+1])-scode_new.d-1]
+				})
+			else
+				//delete
+				ops.push(TextBox.detail.TEditop(){
+					ccnt:rawdiff[i+0],
+					sz:rawdiff[i+1],
+				})
+		if ops.n:
+			ed.Edit(ops)
+		//we need to keep scode_new until here - there are references inside it... well, it's represented as slices
+		//scode_new.discard()
+		scode.discard();
+		return JS.Return(1)
 	}
 });
 

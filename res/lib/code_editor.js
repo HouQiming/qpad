@@ -480,6 +480,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	ParseFile:function(){
 		if(this.m_is_preview){return;}
 		UI.BumpHistory(this.m_file_name)
+		///////////////////////
+		//graphview: sync-from-final-code check
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			var obj_tab=UI.g_all_document_windows[i]
+			if(obj_tab.main_widget&&obj_tab.main_widget.m_is_graph_view){
+				obj_tab.main_widget.CheckSyncableFile(this.m_file_name);
+			}
+		}
+		///////////////////////
 		var sz=this.ed.GetTextSize()
 		if(sz>MAX_PARSABLE||!UI.TestOption("enable_parser")){
 			return;
@@ -7127,6 +7136,14 @@ UI.OnApplicationSwitch=function(){
 				}
 				//loaded time
 			}
+		}
+	}
+	///////////////////////
+	//graphview: sync-from-final-code check
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var obj_tab=UI.g_all_document_windows[i]
+		if(obj_tab.main_widget&&obj_tab.main_widget.m_is_graph_view){
+			obj_tab.main_widget.CheckAllSyncableFiles();
 		}
 	}
 }
