@@ -1599,18 +1599,19 @@ W.graphview_prototype={
 		var cache=this.cache;
 		var sbasepath=UI.GetPathFromFilename(this.m_file_name)+'/..'+(s_build_dir_name?'/'+s_build_dir_name:'');
 		IO.CreateDirectory(sbasepath);
-		cache.m_generated_files=[];
-		IO.m_generated_files=cache.m_generated_files;
+		var graph=this.graph;
+		graph.m_generated_files=[];
+		IO.m_generated_files=graph.m_generated_files;
 		this.graph.Build(sbasepath,cache,is_rebuild);
 		IO.m_generated_files=undefined;
 		////////////////////////////////
 		//process the generated file list
-		cache.m_presync_timestamps={};
-		for(var i=0;i<cache.m_generated_files.length;i++){
-			var fn=cache.m_generated_files[i];
+		graph.m_presync_status={};
+		for(var i=0;i<graph.m_generated_files.length;i++){
+			var fn=graph.m_generated_files[i];
 			fn=IO.NormalizeFileName(fn);
-			cache.m_presync_timestamps[fn]=IO.GetFileTimestamp(fn);
-			cache.m_generated_files[i]=fn;
+			graph.m_presync_status[fn]={tstamp:IO.GetFileTimestamp(fn),sha1:UI.GetFileDigest(fn)};
+			graph.m_generated_files[i]=fn;
 		}
 	},
 	QuickPreview:function(id){
@@ -1782,21 +1783,30 @@ W.graphview_prototype={
 				}
 			})(this,ndi,port2code),"quiet");
 			edtab.area_name='v_tools';
+			//make sure we create the doc immediately
+			var bk_parent=UI.context_parent;
+			UI.m_is_temp_mock_render=1;
+			UI.context_parent={x:0,y:0,w:1920,h:1080,__children:[]};
+			edtab.body()
+			UI.context_parent=bk_parent;
+			UI.m_is_temp_mock_render=undefined;
 		}
 		return 1;
 	},
 	CheckSyncableFile:function(fn){
-		var cache=this.cache;
-		if(!cache.m_presync_timestamps){return;}
-		var tstamp_old=cache.m_presync_timestamps[fn];
-		if(!tstamp_old){return;}
+		var graph=this.graph;
+		if(!graph.m_presync_status){return;}
+		var status_old=graph.m_presync_status[fn];
+		if(!status_old){return;}
 		var tstamp_new=IO.GetFileTimestamp(fn);
-		if(tstamp_old==tstamp_new){return;}
-		cache.m_presync_timestamps[fn]=tstamp_new;
+		if(status_old.tstamp==tstamp_new){return;}
+		var hash_new=UI.GetFileDigest(fn);
+		if(status_old.sha1==hash_new){return;}
+		graph.m_presync_status[fn]={tstamp:tstamp_new,sha1:hash_new};
 		this.SyncFromFinalCode(fn);
 	},
 	CheckAllSyncableFiles:function(){
-		var fs=this.cache.m_generated_files;
+		var fs=this.graph.m_generated_files;
 		if(!fs){return;}
 		for(var i=0;i<fs.length;i++){
 			this.CheckSyncableFile(fs[i]);

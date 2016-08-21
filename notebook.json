@@ -3,16 +3,16 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nrem set LANG=zh_CN.utf8\njc --readable_c_code zmain.jc --run\n",
-   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\ninstalling npm packages:  [\"npm\",\"link\",\"nodejs-websocket\",\"co\",\"request-promise\",\"thunkify\"]\r\nc:\\tp\\btc\\node_modules\\co -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\co\nc:\\tp\\btc\\node_modules\\thunkify -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\thunkify\nc:\\tp\\btc\\node_modules\\nodejs-websocket -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\nodejs-websocket\nc:\\tp\\btc\\node_modules\\request-promise -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\request-promise\ninstalling npm packages:  [\"npm\",\"link\",\"co\",\"nodejs-websocket\",\"thunkify\",\"request-promise\"]\r\nc:\\tp\\btc\\node_modules\\co -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\co\nc:\\tp\\btc\\node_modules\\thunkify -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\thunkify\nc:\\tp\\btc\\node_modules\\request-promise -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\request-promise\nc:\\tp\\btc\\node_modules\\nodejs-websocket -> C:\\Users\\HQM\\AppData\\Roaming\\npm\\node_modules\\nodejs-websocket\n",
+   "m_text_out": "s7res.c\r\n   Creating library ./bin/win32/zmain.lib and object ./bin/win32/zmain.exp\r\n",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
     7,
-    19,
-    17,
-    15,
-    30,
-    6
+    20,
+    20,
+    14,
+    18,
+    0
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/z",
@@ -20,7 +20,7 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\ntag-based syncing\n\tactually call SyncFromFinalCode\n\t\thook editor window saves on graph-generated files\n\t\tcheck graph rebuild status and only sync when it's \"fine\"\nqpad shortcut for adding ports\n\tctrl+] ctrl+[, with menu items\n\tlanguage-based defaults like type=js_code code,format=indent\nredirected run\n\napplying to existing projects\n- choose-able build output dir\n- \"dismantling aid\" in qpad\n\t\napply it to something\n\tport the btc trader trainer\n\ttry-hard downloader\n\tfastcopy-based backup\n\tcustom IME for phone qpad\ndedicated preview nodes\n\tpreview output for zjs script\n\t\tmd / qpad rendering functions\n\tor invoke some external application\n\tonly those needing editing UIs should be inside\n\t---\n\tbetter run the thing in the final system\n(test) @out format=var\nUI overhaul\n\tarea labels\n\tput nodes on top of edges\n\tpackage updating UI\n\t\tpackage-groups: original caption\n\t\tshow package dependency as nodes\n\t\tcould also un-depending packages\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\n\t--\n\tuse top-bottom execution flow\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
+   "m_text_in": "# TODO LIST\napplying to existing projects\n- choose-able build output dir\n- \"dismantling aid\" in qpad\n- the qiniu project\n- the btc trader trainer\n\t\nredirected run for debugging\n\tuse existing build / run systems... notebook\n\napply it to something\n\ttry-hard downloader\n\tfastcopy-based backup\n\tcustom IME for phone qpad\ndedicated preview nodes\n\tpreview output for zjs script\n\t\tmd / qpad rendering functions\n\tor invoke some external application\n\tonly those needing editing UIs should be inside\n\t---\n\tbetter run the thing in the final system\n(test) @out format=var\nUI overhaul\n\tarea labels\n\tput nodes on top of edges\n\tpackage updating UI\n\t\tpackage-groups: original caption\n\t\tshow package dependency as nodes\n\t\tcould also un-depending packages\nnode y ordering:\n\tonly set rebuild flag when ordering actually changes\n\tuse edge y to account for dots\n\twhen build-ungrouping, scale down inner node y values\n\t--\n\tuse top-bottom execution flow\nmake newly-created code snippets connect to all dangling in-ports on selected nodes\ndefault interface layout: put the code editor window somewhere more convenient\ndrag-node-to-edge\ngit merging:\n\thttps://github.com/dominictarr/xdiff\nre-purpose the graph editor for shader editor?\n\tpreview-only node class\n",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,

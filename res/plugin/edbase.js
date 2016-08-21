@@ -243,6 +243,10 @@ Language.Register({
 	extensions:['js','json'],
 	file_icon_color:0xffb4771f,
 	file_icon:'プ',
+	port_template:{
+		'in':"//@in=___,type=js_code code,format=indented",
+		'out':"//@out=___,type=js_code code",
+	},
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		//match (/, but only count the '/' part as the token
@@ -3212,5 +3216,57 @@ UI.RegisterEditorPlugin(function(){
 				return encodeURIComponent(smatch);
 			})})
 		menu_convert=undefined;
+	})
+})
+
+/////////////////////////////////
+var InsertPort=function(doc,s){
+	var p_space=s.indexOf('___');
+	var s0=s.slice(0,p_space);
+	var dccnt_cur=Duktape.__byte_length(s0);
+	var sinsert=s0+s.slice(p_space+3)+'\n';
+	////////////////////////////
+	var sel=doc.GetSelection();
+	var ed=doc.ed;
+	var ccnt_corrected=doc.GetEnhancedHome(sel[1]);
+	var ccnt_lh=doc.SeekLC(doc.GetLC(ccnt_corrected)[0],0)
+	var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
+	if(s_target_indent==undefined){
+		s_target_indent='';
+	}
+	var ccnt_new=ccnt_corrected;
+	doc.HookedEdit([ccnt_corrected,0,sinsert])
+	doc.CallOnChange()
+	ccnt_new=ccnt_new+dccnt_cur;
+	doc.SetCaretTo(ccnt_new);
+	UI.Refresh()
+};
+UI.RegisterEditorPlugin(function(){
+	//port aid
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('menu',function(){
+		var lang=this.plugin_language_desc
+		if(!lang.port_template){
+			return;
+		}
+		var menu_tools=UI.BigMenu("&Tools")
+		var tab_width=UI.GetOption("tab_width",4);
+		menu_tools.AddSeparator();
+		//port_template
+		if(lang.port_template.out){
+			menu_tools.AddNormalItem({text:"Add output port",enable_hotkey:1,key:"CTRL+[",action:function(){
+				var lang=this.plugin_language_desc;
+				var s=lang.port_template.out;
+				InsertPort(this,s);
+			}.bind(this)})
+		}
+		if(lang.port_template.in){
+			menu_tools.AddNormalItem({text:"Add input port",enable_hotkey:1,key:"CTRL+]",action:function(){
+				var lang=this.plugin_language_desc;
+				var s=lang.port_template.in;
+				InsertPort(this,s);
+			}.bind(this)})
+		}
+		menu_tools=undefined;
 	})
 })

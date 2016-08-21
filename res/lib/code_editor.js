@@ -5675,6 +5675,14 @@ W.CodeEditor=function(id,attrs){
 					was_bound_elsewhere=1;
 				}
 				doc.owner=obj;
+				if(UI.m_is_temp_mock_render){
+					if(!doc.ed){
+						if(!doc.w){doc.w=obj.w;}
+						if(!doc.h){doc.h=obj.h;}
+						doc.Init();
+					}
+					return obj;
+				}
 				var h_editor=h_obj_area-h_top_find;
 				if(doc.ed&&UI.TestOption("show_x_scroll_bar")&&h_editor>obj.w_scroll_bar){
 					var x_max=doc.GetHorizontalSpan()+UI.GetCharacterAdvance(doc.font,32);

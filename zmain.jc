@@ -596,6 +596,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		scode.discard();
 		return JS.Return(1)
 	}
+	JS_UI["GetFileDigest"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		sdata=System.IO.ReadAll(fn)
+		if sdata:
+			return JS.Return(SHA1Digest(sdata))
+		else
+			return 0
+	}
 });
 
 (function(){
