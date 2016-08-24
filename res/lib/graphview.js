@@ -1595,7 +1595,7 @@ W.graphview_prototype={
 				break;
 			}
 		}
-		var s_build_dir_name=(nd_metadata['build_dir']||'build');
+		var s_build_dir_name=(nd_metadata&&nd_metadata['build_dir']||'build');
 		var cache=this.cache;
 		var sbasepath=UI.GetPathFromFilename(this.m_file_name)+'/..'+(s_build_dir_name?'/'+s_build_dir_name:'');
 		IO.CreateDirectory(sbasepath);

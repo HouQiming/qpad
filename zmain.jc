@@ -150,7 +150,7 @@ auto ParsePortDescs(JSObject ret,string scode)
 				isin=0
 			else
 				psticker=sline.IndexOf('@sticker=')
-				if psticker>=0:
+				if psticker>=0&&prev_port:
 					psticker+=9
 					ssticker=sline[psticker:]
 					pspace=ssticker.IndexOf(' ')
@@ -429,10 +429,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					//input knob, insert as is, *WITHOUT THE NEWLINE*
 					if stk.n:
 						s_port=sline[psync+9:]
-						if s_port.n&&s_port.back()=='\n':
-							s_port.n--
-						if s_port.n&&s_port.back()=='\r':
-							s_port.n--
+						//if s_port.n&&s_port.back()=='\n':
+						//	s_port.n--
+						//if s_port.n&&s_port.back()=='\r':
+						//	s_port.n--
 						pspace=s_port.IndexOf(' ')
 						if pspace>=0:
 							pt=psync-s_port[:pspace-1].as(int)
@@ -458,6 +458,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						if s_port.n&&s_port.back()=='\r':
 							s_port.n--
 						if sync_op==1:
+							if stk.n&&stk[stk.n-1].strip_next==1:
+								stk[stk.n-1].strip_next=2
+								last_buf=stk[stk.n-1].buf
+								if last_buf.n&&last_buf.back()=='\n':
+									last_buf.pop()
+									if last_buf.n&&last_buf.back()=='\r':
+										last_buf.pop()
 							stk.push(TSyncStackItem(){
 								id:s_node,port:s_port,
 								buf:new string,
@@ -481,7 +488,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						continue
 			if stk.n:
 				//parse mid-line sync tags
-				auto s=sline[min(stk[stk.n-1].strip_next?0x7fffffff:stk[stk.n-1].pindent,CountLeadingSpaces(sline)):]
+				auto s=sline[min(stk[stk.n-1].strip_next==2?0x7fffffff:stk[stk.n-1].pindent,CountLeadingSpaces(sline)):]
 				auto buf=stk[stk.n-1].buf
 				stk[stk.n-1].strip_next=0
 				for(;;){
@@ -565,7 +572,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		dmp_diff_new=__c_function(int,"dmp_diff_new","dmp.h","c_files","dmp.c")
 		dmp_diff_free=__c_function(int,"dmp_diff_free","dmp.h","c_files","dmp.c")
 		diff=NULL
-		dmp_diff_new(&diff,NULL, scode,scode.n, scode_new,scode_new.n);
+		dmp_diff_new(__C(__pointer,"(dmp_diff**)@1",&diff),NULL, scode,scode.n, scode_new,scode_new.n);
 		if !diff:return 0
 		n=dmp_diff_to_i64_list(diff,NULL)
 		rawdiff=new i64[n]

@@ -98,6 +98,10 @@ Language.Register({
 	has_pointer_ops:1,
 	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
+	port_template:{
+		'in':"//@in=___,type=c_code code,format=indented",
+		'out':"//@out=___,type=c_code code",
+	},
 	rules:function(lang){
 		return f_C_like(lang,{
 			keyword:['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'],
@@ -132,6 +136,10 @@ Language.Register({
 	auto_include:['__builtin.jc'],
 	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
+	port_template:{
+		'in':"//@in=___,type=jc_code code,format=indented",
+		'out':"//@out=___,type=jc_code code",
+	},
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false','while'],
