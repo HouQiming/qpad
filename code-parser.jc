@@ -629,7 +629,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 					last_line_comment_position=toks.n
 				//merge comments to avoid perf issues during token neib lookup
 				if toks.n>0&&toks.back().tok==TOK_COMMENT:
-					toks[toks.n-1].epos1=int(ptr+1)
+					toks[toks.n-1].epos1=int(ptr)
 				else
 					push_token(TOK_COMMENT,int(efeed0),int(ptr))
 				//parseComment(feed,efeed0,ptr+1)
@@ -646,7 +646,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 					c=ch;
 				//merge comments to avoid perf issues during token neib lookup
 				if toks.n>0&&toks.back().tok==TOK_COMMENT:
-					toks[toks.n-1].epos1=int(ptr)
+					toks[toks.n-1].epos1=int(ptr-2)
 				else
 					push_token(TOK_COMMENT,int(efeed0),int(ptr-2))
 				//parseComment(feed,efeed0,ptr)
@@ -1159,6 +1159,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			else
 				if ch==' '&&doc_string_pool.n&&doc_string_pool.back()==' ':
 					continue
+				if doc_string_pool.back()=='*'&&ch=='/':
+					doc_string_pool.pop();
+					break
 			doc_string_pool.push(ch)
 		//doc_string_pool.push(char(0))
 		return int2(int(ret),int(doc_string_pool.n))

@@ -2931,7 +2931,8 @@ W.CodeEditorWidget_prototype={
 		}
 		attrs.alpha=1
 		//if(!is_quiet){attrs.dx_shake=this.dx_shake_notification}
-		ns.push(attrs)
+		ns=[attrs].concat(ns);
+		this.m_notifications=ns;
 		if(this.m_owner){
 			this.m_owner.m_is_rendering_good=0;
 		}
@@ -5592,7 +5593,8 @@ W.CodeEditor=function(id,attrs){
 								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
 								all_docvars[i],
 								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+11),
-								': ',
+								'  ',
+								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),
 								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0),
 								all_docvars[i+1],'\n')
 						}
@@ -7222,7 +7224,17 @@ UI.RegisterEditorPlugin(function(){
 				return;
 			}
 			//try to reload
-			if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
+			if(this.owner.file_name.indexOf('<')>=0&&!Language.GetDescObjectByName(name).is_binary){
+				//new file
+				this.owner.SaveMetaData("forced");
+				var s_text_bak=this.ed.GetText();
+				this.owner.Reload();
+				this.owner.doc=UI.OpenCodeEditorDocument(this.owner.file_name,this.owner.m_is_preview,name);
+				this.owner.doc.Init();
+				if(s_text_bak){
+					this.owner.doc.ed.Edit([0,0,s_text_bak]);
+				}
+			}else if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
 				//make a notification
 				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file for the language change to take effect"})
 				this.saved_point=-1;
@@ -7558,7 +7570,7 @@ UI.NewOptionsTab=function(){
 //////////////////////////////////////////////
 //multi-file editing
 UI.g_editor_from_file={};
-UI.OpenCodeEditorDocument=function(fn,is_preview){
+UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	if(fn&&fn.substr(0,1)!='*'){
 		fn=IO.NormalizeFileName(fn);
 	}
@@ -7577,7 +7589,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview){
 	}
 	var s_ext=UI.GetFileNameExtension(fn)
 	//need an initialization-time wrap width
-	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
+	var language_id=(language_id_override||loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
 	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||1024):0);
 	if(is_preview){
 		wrap_width=1024;

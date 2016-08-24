@@ -3,24 +3,24 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code -awin64 qpad.jc --run\n",
-   "m_text_out": "",
+   "m_text_out": "s7main.c\r\n   Creating library ./bin/win64/qpad.lib and object ./bin/win64/qpad.exp\r\nvarying vec2 uv;\r\nvarying vec4 C;\r\nattribute vec2 P;\r\nattribute vec2 uv_vert;\r\nattribute vec4 C_vert;\r\nuniform vec4 scale;\r\nuniform vec2 trans;\r\n\r\n\t\t\t\t\tvoid main(){\r\n\t\t\t\t\t\tvec2 P_scr=P*scale.xy;\r\n\t\t\t\t\t\tuv=uv_vert*scale.zw;\r\n\t\t\t\t\t\tC=vec4(pow(C_vert.xyz,vec3(2.2000000)),C_vert.w);\r\n\t\t\t\t\t\tgl_Position=vec4(P_scr.x+trans.x,P_scr.y+trans.y,1.0,1.0);\r\n\t\t\t\t\t}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec2 uv;\r\nvarying vec4 C;\r\nuniform sampler2D tex0;\r\nvoid main(){gl_FragColor=vec4(1.0,1.0,1.0,texture2D(tex0,uv).w)*C;}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec2 st;\r\nattribute vec2 P_quad;\r\n\r\n\t\tvoid main(){\r\n\t\t\tgl_Position=vec4(P_quad*2.0-1.0,1.0,1.0);\r\n\t\t\tst=P_quad;\r\n\t\t}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec2 st;\r\nuniform vec2 scale;\r\nuniform sampler2D tex0;\r\nvoid main(){\r\n\t\t\t\t\tvec4 C=texture2D(tex0,st*scale,0.0);\r\n\t\t\t\t\tgl_FragColor=vec4(pow(C.xyz,vec3(0.4545454)),C.w);\r\n\t\t\t\t}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec4 C;\r\nattribute vec2 P;\r\nattribute vec4 C_vert;\r\nuniform vec2 scale;\r\n\r\n\t\tvoid main(){\r\n\t\t\tvec2 P_scr=P*scale;\r\n\t\t\tC=vec4(pow(C_vert.xyz,vec3(2.2000000)),C_vert.w);\r\n\t\t\tgl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);\r\n\t\t}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec4 C;\r\nvoid main(){gl_FragColor=C;}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec2 st;\r\nattribute vec2 P_quad;\r\n\r\n\t\tvoid main(){\r\n\t\t\tgl_Position=vec4(P_quad*2.0-1.0,1.0,1.0);\r\n\t\t\tst=P_quad;\r\n\t\t}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec2 st;\r\nuniform sampler2D tex0;\r\nuniform vec2 base;\r\nuniform vec2 size;\r\n\r\n\t\t\t\tvoid main(){\r\n\t\t\t\t\tgl_FragColor=texture2D(tex0,base+st*size);\r\n\t\t\t\t}\r\n\t\t\t\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec4 C;\r\nvarying float u;\r\nattribute vec2 P;\r\nattribute vec4 C_vert;\r\nattribute float u_vert;\r\nuniform vec2 scale;\r\n\r\n\t\t\tvoid main(){\r\n\t\t\t\tvec2 P_scr=P*scale;\r\n\t\t\t\tC=vec4(pow(C_vert.xyz,vec3(2.2000000)),C_vert.w);\r\n\t\t\t\tgl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);\r\n\t\t\t\tu=u_vert;\r\n\t\t\t}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\nvarying vec4 C;\r\nvarying float u;\r\nuniform sampler2D tex0;\r\nvoid main(){gl_FragColor=vec4(1.0,1.0,1.0,texture2D(tex0,vec2(u,0.5)).w)*C;}\r\n\u0000=============== warning ==============\r\nWARNING: 0:2: '' :  #version directive missing\r\n\r\n\r\n",
    "m_cell_id": 0,
    "m_completion_time": [
     2016,
     7,
-    13,
-    17,
-    42,
-    31,
-    0
+    23,
+    21,
+    15,
+    14,
+    3
    ],
-   "m_has_any_error": 0,
+   "m_has_any_error": 1,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug"
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\ncontext-specific help like @qpadvar\n\tW.Button\n\tmember of classed-typed param\n\tmember names in jc struct ctor\n\ttypical funarg values?\nmulti-knob gradient\nkeep case when replacing in case insensitive mode\nHTML tag AC\nbad scrolling and initial-run handling for \\r\nctrl+f3 on empty sel in binary file\nlanguage of empty files\nupdate homepage\nshow advanced fhint at cursor, and align the param\nterminal / mobile keyboard support\nmac\n\ttooltip hotkey translation, zoom hotkey, tab-switch hotkey\n\tinstall: copy to /Applications\n\tsystem menu\nsmart code reference\n\tspecify \"training data\" files\n\t\tsame-git-same-ext files\n\tsearch for code snippets matching a current location\n\t\tfcall with similar args\n\t\tdot with similar names\n\t\tideally... we should get the closest ones\n\t\t\t\"explanation\" of AC candidates\n\t\t\tlike in MS Japanese IME\njc: better completion - methods from unfamiliar class, unreached code, constants, ...\nbinary file speed issue?\nnew release\n\tlinux source .tar.gz\n\t\tbuild-it-yourself release\nmultiple windows of the same file\nfull notebook search\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nsave notebook wrapping status\nlinks in help\nrunning a markdown: open as help page?\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nmaximizing notebooks\nfunction hint on *existing* calls - which parameter are you changing right now?\nindent\n\tauto detect space / tab indent\nplugin loading\nhelp\n\timage searching\n\tscript error notification\ndragging a window to occupy \"tips\" fully\ncode beautifier\n\thelp code auto beautification\nnotebook ctrl+m focus\ndiff / undo on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\ntentative focus refresh: infinite loop risk\nctrl+d at EOL\ndblclick at notebook eol\nporting\n\tlinux alt+tab\n\tlinux instance detection\n\t\tint pid_file = open(\"/var/run/whatever.pid\", O_CREAT | O_RDWR, 0666);\n\t\tint rc = flock(pid_file, LOCK_EX | LOCK_NB);\n\t\tif(rc) {\n\t\t    if(EWOULDBLOCK == errno)\n\t\t        ; // another instance is running\n\t\t}\n\t\telse {\n\t\t    // this is the first instance\n\t\t}\n\tunix search path for jc\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nctrl+mousewheel\n\tper-tab scale? make it global\nmouse centric interaction\n\ttoolbar in menu bar\nctrl+g mode\n\tgoto button to trigger it on the tophint\n\tneed must-appear\nshort and simple theme color palette\nput plugins in ~/.qpad\nmake top hint / notification dodge\n\tMouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nfor() is not a function\nfileindex gc vs parse queue\nrendering\n\ttrue AA for roundrect\ngit diff viewer\nauto-include files\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nvery narrow file list...\nbad parser result after multiple saves\n\tcould be diff tracker bug\nbinary editor\n\tduk buffer size limit\ngeneric HTML rendering?\n\tcheerio - looks managable\n\tneed module conversion: npm to duktape\n\t\tdid it with browserify\n\t\tit magically works in duktape with a minor modification\ndedicated mobile/mobile-like UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n",
+   "m_text_in": "# TODO LIST\ndir translation in ssh\n\tjust #line it\nC/C++ ctrl+f5 not working\nunescaping URL query string\npeek definition\n\trender an overlay of that editorwindow around the id in question\nthose */ problems\n\tSDL_TEXTINPUT in SDL.c\n\tit's the comment merging\nmarkdown list support in doxygen\n\twhich needs more advanced indent\ncontext-specific help like @qpadvar\n\tW.Button\n\tmember of classed-typed param\n\tmember names in jc struct ctor\n\ttypical funarg values?\nmulti-language documentation: \\~\nmulti-knob gradient\n\tcould use clip to implement it\nkeep case when replacing in case insensitive mode\nHTML tag AC\nbad scrolling and initial-run handling for \\r\nctrl+f3 on empty sel in binary file\nupdate homepage\nterminal / mobile keyboard support\nmac\n\ttooltip hotkey translation, zoom hotkey, tab-switch hotkey\n\tinstall: copy to /Applications\n\tsystem menu\njc: better completion - methods from unfamiliar class, unreached code, constants, ...\nbinary file speed issue?\nnew release\n\tlinux source .tar.gz\n\t\tbuild-it-yourself release\nmultiple windows of the same file\nfull notebook search\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nsave notebook wrapping status\nlinks in help\nrunning a markdown: open as help page?\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nmaximizing notebooks\nfunction hint on *existing* calls - which parameter are you changing right now?\nindent\n\tauto detect space / tab indent\nplugin loading\nhelp\n\timage searching\n\tscript error notification\ndragging a window to occupy \"tips\" fully\ncode beautifier\n\thelp code auto beautification\nnotebook ctrl+m focus\ndiff / undo on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\ntentative focus refresh: infinite loop risk\nctrl+d at EOL\ndblclick at notebook eol\nporting\n\tlinux alt+tab\n\tlinux instance detection\n\t\tint pid_file = open(\"/var/run/whatever.pid\", O_CREAT | O_RDWR, 0666);\n\t\tint rc = flock(pid_file, LOCK_EX | LOCK_NB);\n\t\tif(rc) {\n\t\t    if(EWOULDBLOCK == errno)\n\t\t        ; // another instance is running\n\t\t}\n\t\telse {\n\t\t    // this is the first instance\n\t\t}\n\tunix search path for jc\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nctrl+mousewheel\n\tper-tab scale? make it global\nmouse centric interaction\n\ttoolbar in menu bar\nctrl+g mode\n\tgoto button to trigger it on the tophint\n\tneed must-appear\nshort and simple theme color palette\nput plugins in ~/.qpad\nmake top hint / notification dodge\n\tMouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nfor() is not a function\nfileindex gc vs parse queue\nrendering\n\ttrue AA for roundrect\ngit diff viewer\nauto-include files\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nvery narrow file list...\nbad parser result after multiple saves\n\tcould be diff tracker bug\nbinary editor\n\tduk buffer size limit\ngeneric HTML rendering?\n\tcheerio - looks managable\n\tneed module conversion: npm to duktape\n\t\tdid it with browserify\n\t\tit magically works in duktape with a minor modification\ndedicated mobile/mobile-like UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n",
    "m_text_out": "",
    "m_cell_id": 1,
    "m_has_any_error": 0,
@@ -37,25 +37,25 @@
   {
    "m_language": "Markdown",
    "m_text_in": "Search result",
-   "m_text_out": "c:/tp/qpad/res/lib/bin_editor.js:2815..2841: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/bin_editor.js:2896..2922: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/bin_editor.js:20759..20785: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/bin_editor.js:21064..21090: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/bin_editor.js:34181..34207: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/bin_editor.js:47373..47399: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/bin_editor.js:49037..49063: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:24856..24882: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:25000..25026: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:25129..25155: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:25263..25289: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:25394..25420: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:25762..25788: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:26126..26152: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:26301..26327: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:26436..26462: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:26632..26658: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:26731..26757: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:26864..26890: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:163228..163254: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:163322..163348: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:163580..163606: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:163739..163765: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:188131..188157: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:188223..188249: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:188306..188332: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/code_editor.js:196478..196504: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/subwin.js:106..132: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/subwin.js:67388..67414: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/subwin.js:67453..67479: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/subwin.js:67587..67613: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/subwin.js:67652..67678: RICHTEXT_COMMAND_SET_STYLE\nc:/tp/qpad/res/lib/subwin.js:67841..67867: RICHTEXT_COMMAND_SET_STYLE\n",
+   "m_text_out": "c:/tp/qpad/bin-editor.jc:10750..10760: SetUniform\nc:/tp/qpad/code-editor.jc:107470..107480: SetUniform\nc:/tp/qpad/code-editor.jc:126156..126166: SetUniform\nc:/tp/qpad/code-editor.jc:142018..142028: SetUniform\nc:/tp/qpad/code-editor.jc:142114..142124: SetUniform\nc:/tp/qpad/ooc-mipmap.jc:4601..4611: SetUniform\nc:/tp/qpad/res/plugin/edbase.js:53702..53712: setuniform\n",
    "m_has_any_error": 1,
    "m_cell_id": 2
   },
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for 'c:/tp/qpad/qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 c:/tp/qpad/qpad.jc\njc -brelease -awin32 c:/tp/qpad/qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
-   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library c:/tp/qpad/bin/win64_release/qpad.lib and object c:/tp/qpad/bin/win64_release/qpad.exp\r\ns7main.c\r\n   Creating library c:/tp/qpad/bin/win32_release/qpad.lib and object c:/tp/qpad/bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4306432 bytes (4206 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1547613 bytes (1512 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4568576 bytes (4462 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1629117 bytes (1591 KiB)\r\nEverything is Ok\r\nc:\\software\\cmder\\bin\\qpad_old.exe\r\nAccess is denied.\r\nA duplicate file name exists, or the file\r\ncannot be found.\r\n        1 file(s) copied.\r\n",
+   "m_text_out": "",
    "m_cell_id": 3,
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_completion_time": [
     2016,
     7,
-    12,
-    19,
-    45,
-    38,
-    6
+    22,
+    15,
+    3,
+    25,
+    2
    ],
    "m_button_name": "Release"
   },
@@ -68,12 +68,12 @@
    "m_current_path": "c:/tp/qpad",
    "m_completion_time": [
     2016,
-    5,
-    5,
-    18,
-    49,
+    7,
     13,
-    1
+    17,
+    47,
+    2,
+    0
    ],
    "m_button_name": "Translate"
   }

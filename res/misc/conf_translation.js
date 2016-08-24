@@ -283,6 +283,9 @@
 			"No more '@1' below, found @2":"下面没有别的'@1'了，共@2个",
 			"Automatically close stale tabs":"自动关闭很久没用的窗格",
 			"Highlight same-project tabs":"高亮同一工程的窗格",
+			"Parameters":"参数",
+			"Returns":"返回值",
+			"In @1:":"在@1中：",
 			///////////////////
 			"Display":"显示",
 			"Controls":"操作",
