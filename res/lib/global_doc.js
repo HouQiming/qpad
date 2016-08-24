@@ -74,7 +74,23 @@ UI.m_ui_metadata={};
 	}
 })();
 UI.SaveMetaData=function(){
-	IO.CreateFile(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata))
+	//use EDSaver_Open to avoid dataloss on bad shutdown
+	var ed=UI.CreateEditor({font:UI.Font(UI.font_name,20,0)});
+	ed.Edit([0,0,JSON.stringify(UI.m_ui_metadata)]);
+	var ctx=UI.EDSaver_Open(ed,IO.GetStoragePath()+("/metadata.json"))
+	for(;;){
+		var ret=UI.EDSaver_Write(ctx,ed)
+		if(ret=="done"){
+			break;
+		}else if(ret=="continue"){
+			//do nothing
+		}else{
+			//error saving metadata
+			ctx.discard();
+			break;
+		}
+	}
+	//IO.CreateFile(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata))
 }
 
 UI.TestOption=function(stable_name,default_value){

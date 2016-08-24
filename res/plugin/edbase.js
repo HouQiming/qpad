@@ -71,11 +71,19 @@ var ProcessIncludePaths=function(paths){
 
 var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?[
 	"%INCLUDE%",
+	"%VS140COMNTOOLS%../../VC/include",
+	"%VS130COMNTOOLS%../../VC/include",
 	"%VS120COMNTOOLS%../../VC/include",
 	"%VS110COMNTOOLS%../../VC/include",
 	"%VS100COMNTOOLS%../../VC/include",
 	"%VS90COMNTOOLS%../../VC/include",
 	"%VS80COMNTOOLS%../../VC/include",
+	"%VS140COMNTOOLS%../../../Windows Kits/8.0/Include/um",
+	"%VS140COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
+	"%VS140COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
+	"%VS130COMNTOOLS%../../../Windows Kits/8.0/Include/um",
+	"%VS130COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
+	"%VS130COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
 	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/um",
 	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
 	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
@@ -994,9 +1002,9 @@ UI.RegisterEditorPlugin(function(){
 				s_name_in_script='the project'
 				var s_button;
 				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-					s_button="rem [button: "+UI._("Run project")+"]\n";
+					s_button="rem [button: "+"Run project"+"]\n";
 				}else{
-					s_button="# [button: "+UI._("Run project")+"]\n";
+					s_button="# [button: "+"Run project"+"]\n";
 				}
 				s_script=s_button+s_script;
 			}

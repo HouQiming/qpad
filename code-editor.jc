@@ -4333,7 +4333,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			x_indent=0LL
 			for i=0:indent_point_atom-1
 				x_indent+=atoms[i].w+atoms[i].tail_kerning
-			if x_indent>w_line/3:
+			if x_indent>w_line*2LL/3LL:
 				x_indent=0LL
 				indent_point_atom=0L
 			line_breaks=GreedyLayoutGeneral(atoms[indent_point_atom:],w_line-x_indent)
@@ -4494,6 +4494,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					gl_FragColor=texture2D(tex0,base+st*size);
 				}
 			")
+			JS["UI"]["m_blit_framebuffer_tech"]=tech
 		tech.SetTexture2D("tex0",rtt_src.m_tex)
 		tech.SetUniform("base",float2(float(x0),float(y0))/float2(float(rtt_src.w),float(rtt_src.h)))
 		tech.SetUniform("size",float2(float(x1-x0),float(y1-y0))/float2(float(rtt_src.w),float(rtt_src.h)))
