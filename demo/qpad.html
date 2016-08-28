@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>qpad</title>
+    <style>
+      html, body { background:#ddd; margin: 0; padding: 0; border: 0; overflow:hidden }
+      #canvas { 
+        border: 0px none; display: block; 
+        position: relative;
+        -webkit-transform: translate(-50%, -50%); 
+        transform: translate(-50%, -50%); 
+        background:#ffffff;
+        border-radius: 8px;
+        box-shadow: 2px 2px 12px #888888 
+      }
+      .progress_container{
+        position: relative;-webkit-transform: translate(-50%, -50%);transform: translate(-50%, -50%);display:block;
+        width:512px;height:20px;border-radius: 8px;background-color:#e8e8e8;
+      }
+      .progress_bar{
+        background: #a7cfdf; /* Old browsers */
+        background: -moz-linear-gradient(top, #a7cfdf 0%, #23538a 100%); /* FF3.6-15 */
+        background: -webkit-linear-gradient(top, #a7cfdf 0%,#23538a 100%); /* Chrome10-25,Safari5.1-6 */
+        background: linear-gradient(to bottom, #a7cfdf 0%,#23538a 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+        filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#a7cfdf', endColorstr='#23538a',GradientType=0 ); /* IE6-9 */
+        height:100%;
+        border-radius: 8px;
+        line-height:inherit;
+      }
+    </style>
+  </head>
+  <body>
+    
+    <div style="position: absolute; left:50%; top:50%">
+      <canvas class="emscripten" id="canvas" style="width:640px;height:480px;" oncontextmenu="event.preventDefault()" onkeydown="event.preventDefault()"></canvas>
+    </div>
+    <div id="progress" style="position: absolute; left:50%; top:50%">
+      <div class="progress_container">
+        <div id="progress_bar" class="progress_bar">
+        </div>
+        <div id="loading_error" style="position:relative;left:0px;top:-44px;width:100%;text-align:center;font-family:arial,sans-serif;font-size:18px;color:#444444;display:block;">Loading...</div>
+      </div>
+    </div>
+    <script type='text/javascript'>
+
+      var Module = {
+        preRun: [],
+        postRun: [],
+        print: (function() {
+          return function(text) {
+            console.log(text);
+          };
+        })(),
+        printErr: function(text) {
+          if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+          console.error(text);
+        },
+        canvas: (function() {
+          var canvas = document.getElementById('canvas');
+
+          // As a default initial behavior, pop up an alert when webgl context is lost. To make your
+          // application robust, you may want to override this behavior before shipping!
+          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
+          canvas.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+
+          return canvas;
+        })(),
+        setStatus: function(text) {
+          if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+          if (text === Module.setStatus.text) return;
+        },
+        totalDependencies: 0,
+        monitorRunDependencies: function(left) {
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+        }
+      };
+      Module.setStatus('Downloading...');
+      window.onerror = function(event) {
+        // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
+        //Module.setStatus('Exception thrown, see JavaScript console');
+        //spinnerElement.style.display = 'none';
+        Module.setStatus = function(text) {
+          if (text) Module.printErr('[post-exception status] ' + text);
+        };
+      };
+    </script>
+    <script>
+        (function() {
+          var g_block_counts={js:7,mem:5};
+          var g_tot_count=g_block_counts.js+g_block_counts.mem;
+          //////////////////////
+          var postRequest=function(url, rtype, success, error) {  
+            var xhr = XMLHttpRequest ? new XMLHttpRequest() : 
+                                       new ActiveXObject("Microsoft.XMLHTTP"); 
+            xhr.open("GET", url, true); 
+            xhr.responseType = rtype;
+            xhr.onreadystatechange = function(){ 
+              if ( xhr.readyState == 4 ) { 
+                if ( xhr.status == 200 ) { 
+              success(xhr.response); 
+                } else { 
+              error(xhr, xhr.status); 
+                } 
+              } 
+            }; 
+            xhr.onerror = function () { 
+              error(xhr, xhr.status); 
+            }; 
+            xhr.send(null); 
+          };
+          var g_js_blobs=[];
+          var g_mem_blobs=[];
+          var fdownload_next=function(id){
+            var url;
+            var rtype;
+            var data_out;
+            document.getElementById('progress_bar').style["width"]=(100*id/g_tot_count).toString()+"%";
+            if(id<g_block_counts.js){
+                url='qpad.js'+id.toString()+'.bin';
+                rtype='text';
+                data_out=g_js_blobs;
+            }else if(id-g_block_counts.js<g_block_counts.mem){
+                url='qpad.js.mem'+(id-g_block_counts.js).toString()+'.bin';
+                rtype='arraybuffer';
+                data_out=g_mem_blobs;
+            }else{
+                var lg=0;
+                for(var i=0;i<g_mem_blobs.length;i++){
+                    lg+=g_mem_blobs[i].byteLength;
+                }
+                var ret=new Uint8Array(lg);
+                var lg=0;
+                for(var i=0;i<g_mem_blobs.length;i++){
+                    ret.set(new Uint8Array(g_mem_blobs[i]), lg);
+                    lg+=g_mem_blobs[i].byteLength;
+                }
+                g_mem_blobs=undefined;
+                Module['memoryInitializerRequest'] = {status:200,response:ret};
+                var nd_script = document.createElement('script');
+                nd_script.text = g_js_blobs.join('');
+                document.body.appendChild(nd_script);
+                document.getElementById('progress').style["display"]="none";
+                return;
+            }
+            postRequest (url,rtype, function (response) { // success callback
+              data_out.push(response);
+              window.setTimeout(fdownload_next.bind(null,id+1),10);
+            }, function (xhr, status) { // error callback
+              var error=document.getElementById('loading_error')
+              error.textContent='Error loading data, error '+status.toString();
+              error.style.color="#e31a1c";
+            });
+          };
+          fdownload_next(0);
+        })();
+    
+		document.onkeydown=function(e){
+			e=(window.event?event:e);
+			if(e.ctrlKey||e.altKey||e.keyCode>=112&&e.keyCode<=123){
+				e.preventDefault();
+			}
+		};
+		Module.preRun.push(function(){
+			var s_language=(navigator&&(navigator.languages&&navigator.languages[0]||navigator.language)||'en-US');
+			if(s_language.match(/^zh.*/)){
+				ENV.LANG = 'zh_CN.utf8';
+			}else if(s_language.match(/^ja.*/)){
+				ENV.LANG = 'ja_JP.utf8';
+			}else{
+				ENV.LANG = 'en_US.utf8';
+			}
+		});
+	
+    </script>
+  </body>
+</html>
