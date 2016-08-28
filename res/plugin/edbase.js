@@ -919,7 +919,7 @@ UI.RegisterHelpHook(function(items,ssearch){
 	var lang=(fn&&UI.ED_GetFileLanguage(fn));
 	if(!lang){return;}
 	var sext=UI.GetFileNameExtension(fn).toLowerCase();
-	if(lang.name=="C/C++"){
+	if(lang.name=="C/C++/C#"){
 		if(sext=='m'||sext=='mm'){
 			SearchEngineHook(items,ssearch,'プ',UI._("“@1” for Apple developers"),"https://developer.apple.com/search/?q=文");
 		}
@@ -1168,7 +1168,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		if(!g_vc_compiler_path){return 0;}
 		return g_vc_compiler_path;
 	};
-	UI.RegisterBuildEnv("C/C++",{
+	UI.RegisterBuildEnv("C/C++/C#",{
 		name:"Visual Studio",
 		CreateBuildScript:function(fname,doc){
 			var compiler_path=(DetectVC()||"???");
@@ -1177,7 +1177,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 				(compiler_path+'/../../vc/bin/x86_amd64/vcvarsx86_amd64.bat').replace(/[/]/g,'\\'),
 				'"\n',
 				'cd /d ',UI.GetPathFromFilename(fname),'\n',
-				'cl /Zi /D_HAS_ITERATOR_DEBUGGING=0 /D_SECURE_SCL=0 /D_SCL_SECURE_NO_WARNINGS /MT /DPM_C_MODE /DNEED_MAIN_WRAPPING ',fname,' && ',
+				'cl /Zi /D_HAS_ITERATOR_DEBUGGING=0 /D_SECURE_SCL=0 /D_SCL_SECURE_NO_WARNINGS /MT /DPM_C_MODE /DNEED_MAIN_WRAPPING ',fname,' || exit\n',
 				UI.GetMainFileName(fname),'\n',
 			].join("");
 		}
