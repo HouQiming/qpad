@@ -355,9 +355,9 @@ var g_cached_hyphenators={}
 exports.GetHyphenatorReal=function(lang){
 	var ret=g_cached_hyphenators[lang];
 	if(ret==undefined){
-		var sdata=IO.UIReadAll("res/misc/"+lang+".dfa")
+		var sdata=IO.UIReadAll("assets/"+lang+".dfa")
 		if(!sdata){
-			sdata=IO.ReadAll("res/misc/"+lang+".dfa")
+			sdata=IO.ReadAll("assets/"+lang+".dfa")
 			if(!sdata){
 				sdata=IO.ReadAll("res/misc/"+lang+".tex")
 			}

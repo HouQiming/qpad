@@ -1499,7 +1499,7 @@ UI.RegisterEditorPlugin(function(){
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				var ed_caret_original=this.GetCaretXY();
 				var scroll_y_original=this.scroll_y;
-				renderer.ResetWrapping(this.m_enable_wrapping?(this.m_current_wrap_width||1024):0,this)
+				renderer.ResetWrapping(this.m_enable_wrapping?(this.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH=="web")?768:1024)):0,this)
 				this.caret_is_wrapped=0
 				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
 				var ed_caret_new=this.GetCaretXY();

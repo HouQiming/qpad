@@ -4541,9 +4541,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return 0;
 	}
 	/////////////////////////////
-	g_model_cn=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_cn.bin").ConvertToAsBinary(u32))
-	g_model_jp=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_jp.bin").ConvertToAsBinary(u32))
-	g_model_b5=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_b5.bin").ConvertToAsBinary(u32))
-	g_model_jpgb=new CEncodingModel(sbox.UIReadAll("res/misc/bayesian_jpgb.bin").ConvertToAsBinary(u32))
+	g_model_cn=new CEncodingModel(sbox.UIReadAll("assets/bayesian_cn.bin").ConvertToAsBinary(u32))
+	g_model_jp=new CEncodingModel(sbox.UIReadAll("assets/bayesian_jp.bin").ConvertToAsBinary(u32))
+	g_model_b5=new CEncodingModel(sbox.UIReadAll("assets/bayesian_b5.bin").ConvertToAsBinary(u32))
+	g_model_jpgb=new CEncodingModel(sbox.UIReadAll("assets/bayesian_jpgb.bin").ConvertToAsBinary(u32))
 	g_model_jp.sjis=1
 })

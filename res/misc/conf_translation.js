@@ -57,6 +57,7 @@
 			"&Open":"打开(&O)",
 			"&Save":"保存(&S)",
 			"Save &as...":"另存为(&A)……",
+			"Downlo&ad as file":"作为文件下载(&A)",
 			"Save a&ll":"全部保存(&L)……",
 			"&Close":"关闭(&C)……",
 			"Close all":"全部关闭",

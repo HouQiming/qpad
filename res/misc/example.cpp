@@ -11,6 +11,10 @@ struct ExampleStruct{
 	int example_member;
 };
 
+/** \brief A demonstration function
+ *  \param a stores an integer in its only member
+ *  \return The number in a multiplied by EXAMPLE_CONST
+ */
 int ExampleFunction(const ExampleStruct &a){
 	return a.example_member*EXAMPLE_CONST;
 }
@@ -68,8 +72,10 @@ void AnotherFunction(){
 }
 
 int main(){
-	ExampleStruct a;
+	ExampleStruct a,b;
 	a.example_member=24;
+	b.example_member=25;
+	// You can try to print ExampleFunction(b) instead
 	printf("%d\n",ExampleFunction(a));
 	AnotherFunction();
 	return 0;

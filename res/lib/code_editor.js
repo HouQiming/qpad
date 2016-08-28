@@ -6932,6 +6932,23 @@ UI.NewCodeEditorTab=function(fname0){
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}
+			if(UI.Platform.ARCH=="web"){
+				var fn=(this.main_widget.file_name.indexOf('<')>=0?"untitled.txt":UI.RemovePath(this.main_widget.file_name));
+				var s_script=[
+					"(function(){",
+					"  var element = document.createElement('a');",
+					"  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(",
+						JSON.stringify(this.main_widget.doc.ed.GetText()),
+					"));",
+					"  element.setAttribute('download', ",JSON.stringify(fn),");",
+					"  element.style.display = 'none';",
+					"  document.body.appendChild(element);",
+					"  element.click();",
+					"  document.body.removeChild(element);",
+					"})();"].join('');
+				UI.EmscriptenEval(s_script);
+				return;
+			}
 			var fn=IO.DoFileDialog(1,undefined,
 				this.main_widget.file_name.indexOf('<')>=0?
 					UI.m_new_document_search_path:
@@ -7590,7 +7607,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	var s_ext=UI.GetFileNameExtension(fn)
 	//need an initialization-time wrap width
 	var language_id=(language_id_override||loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
-	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||1024):0);
+	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH=="web")?768:1024)):0);
 	if(is_preview){
 		wrap_width=1024;
 	}

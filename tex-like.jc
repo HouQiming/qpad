@@ -939,7 +939,7 @@ generateObject)
 		FlushWord()
 
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
-	g_char_to_flags=sbox.UIReadAll("res/misc/charflag.bin").ConvertToAsBinary(int)
+	g_char_to_flags=sbox.UIReadAll("assets/charflag.bin").ConvertToAsBinary(int)
 	JS_UI["ParseHyphenator"]=function(JSContext JS){
 		sdata=JS.Param(0).or("")
 		if sdata.StartsWith("{"):

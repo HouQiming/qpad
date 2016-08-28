@@ -19,6 +19,8 @@ __generate_json("js_units","gui2d/widgets.js")
 __generate_json("js_units","gui2d/dockbar.js")
 if Platform.ARCH=="ios"||Platform.ARCH=="web":
 	__generate_json("extra_resource_dirs","cjk_fonts")
+if Platform.ARCH=="web":
+	__generate_json("extra_resource_dirs","demo_docs")
 if Platform.ARCH=="ios":
 	__generate_json("icon_file","icon_ios.png")
 else if Platform.ARCH=="mac":
@@ -51,6 +53,27 @@ if Platform.ARCH=="android":
 if Platform.ARCH=="web":
 	__generate_json("cflags","-s TOTAL_MEMORY=268435456")
 	__generate_json("ldflags","-s TOTAL_MEMORY=268435456")
+	__generate_json("cflags","-s NO_DYNAMIC_EXECUTION=0")
+	__generate_json("ldflags","-s NO_DYNAMIC_EXECUTION=0")
+	__generate_json("shim_extra_js","
+		document.onkeydown=function(e){
+			e=(window.event?event:e);
+			if(e.ctrlKey||e.altKey||e.keyCode>=112&&e.keyCode<=123){
+				e.preventDefault();
+			}
+		};
+		Module.preRun.push(function(){
+			var s_language=(navigator&&(navigator.languages&&navigator.languages[0]||navigator.language)||'en-US');
+			if(s_language.match(/^zh.*/)){
+				ENV.LANG = 'zh_CN.utf8';
+			}else if(s_language.match(/^ja.*/)){
+				ENV.LANG = 'ja_JP.utf8';
+			}else{
+				ENV.LANG = 'en_US.utf8';
+			}
+		});
+	")
+	
 
 c_system=__c_function(int,"system","stdlib.h")
 
@@ -72,6 +95,15 @@ auto genString(string s0)
 				s.push(hex[ch&15])
 	return s
 
+if Platform.ARCH=="web":
+	registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+		JS_UI["EmscriptenEval"]=function(JSContext JS){
+			auto ptr=JS.Param(0).asCString()
+			emscripten_run_script=__c_function(int,"emscripten_run_script","emscripten.h")
+			emscripten_run_script(ptr)
+			return 0
+		}
+	})
 if Platform.IS_WINDOWS:
 	ExitProcess=__c_function(int,"ExitProcess","windows.h")
 	registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
@@ -523,6 +555,10 @@ if Platform.BUILD=="debug":
 				auto s=sbox.UIReadAll("res/misc/dict/en_us.dic")
 				f.Write(s)
 				f.Close()
+		if Platform.ARCH=="web":
+			for fn in ["markdown.md"]
+				System.IO.CreateFileWithContent(s_storage_path+"/"+fn,sbox.UIReadAll("demo_docs/"+fn))
+			System.IO.CreateFileWithContent(s_storage_path+"/example.cpp",sbox.UIReadAll("res/misc/example.cpp"))
 	}
 	Gui2D.g_log_file=s_storage_path+"/log.txt"
 	//for fn in sbox.m_ui_zip.AllFileNames()

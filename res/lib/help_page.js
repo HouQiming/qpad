@@ -329,6 +329,8 @@ W.HelpItem_prototype={
 				IO.Shell(["open",this.url])
 			}else if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 				IO.Shell(["xdg-open",this.url])
+			}else if(UI.Platform.ARCH=="web"){
+				UI.EmscriptenEval("window.open("+JSON.stringify(this.url)+",'_blank');");
 			}else{
 				//coulddo: support mobile
 			}
