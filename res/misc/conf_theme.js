@@ -715,6 +715,7 @@ UI.CustomTheme=function(){
 		},
 		notebook_view_v2:{
 			panel_style:{
+				h_button:32,
 				focus_h_budget_ratio:0.5,
 				scale:7/8,
 				shadow_size:12,

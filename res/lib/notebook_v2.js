@@ -336,11 +336,11 @@ W.notebook_prototype={
 					if(match){
 						obj_notebook.m_cells[cell_id].m_button_name=match[1];
 					}else{
-						match=s_check.match(/build script for (.+)/);
+						match=s_check.match(/build script for '(.+)'/);
 						if(match){
-							obj_notebook.m_cells[cell_id].m_button_name=UI.GetMainFileName(match[1]);
+							obj_notebook.m_cells[cell_id].m_button_name="\u25B6 "+UI.GetSmartTabName(match[1]);
 						}else{
-							match=s_check.match(/^#[ \t]*(.+)$/);
+							match=s_check.match(/^#[ \t]*(.+)\n/);
 							if(match){
 								obj_notebook.m_cells[cell_id].m_button_name=match[1];
 							}else{
@@ -895,7 +895,7 @@ W.NotebookView=function(id,attrs){
 	if(obj.m_cells){
 		for(var i=0;i<obj.m_cells.length;i++){
 			var cell_i=obj.m_cells[i];
-			var s_btn_name=(cell_i.m_button_name||(i+1).toString())
+			var s_btn_name=(cell_i.m_button_name||"Cell "+(i+1).toString())
 			buttons.push({id:i,text:s_btn_name});
 		}
 	}
@@ -904,7 +904,6 @@ W.NotebookView=function(id,attrs){
 		var w_button_i=16+UI.MeasureText(UI.default_styles.button.font,buttons[i].text).w;
 		w_buttons=Math.max(w_buttons,w_button_i);
 	}
-	w_buttons=0;//todo
 	UI.PushSubWindow(obj.x,obj.y,obj.w-w_buttons,obj.h,obj.panel_style.scale)
 	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
 	obj.x=0;obj.y=0;obj.w=(obj.w-w_buttons)/obj.panel_style.scale;obj.h/=obj.panel_style.scale;
@@ -1034,9 +1033,10 @@ W.NotebookView=function(id,attrs){
 	menu_notebook=undefined;
 	UI.FlushTopMostContext(n0_topmost)
 	UI.PopSubWindow()
+	obj.x=bk_dims[0];obj.y=bk_dims[1];obj.w=bk_dims[2];obj.h=bk_dims[3];
 	//buttons
 	var y_button=0;
-	var h_button=obj.h_button;
+	var h_button=obj.panel_style.h_button;
 	for(var i=0;i<buttons.length;i++){
 		var cell_i=obj.m_cells[buttons[i].id];
 		var btn=W.Button("btn_"+buttons[i].id,{
@@ -1068,14 +1068,6 @@ W.NotebookView=function(id,attrs){
 			}
 		}
 		y_button+=h_button;
-	}
-	if(w_buttons>0){
-		UI.PushCliprect(obj.x,obj.y,obj.w-w_buttons,obj.h);
-		UI.RoundRect({
-			x:obj.x+obj.w-w_buttons-obj.button_area_shadow_size,y:obj.y-obj.button_area_shadow_size,w:obj.button_area_shadow_size*2,h:obj.h+obj.button_area_shadow_size*2,
-			color:obj.button_area_shadow_color,border_width:-obj.button_area_shadow_size,round:obj.button_area_shadow_size,
-		})
-		UI.PopCliprect();
 	}
 	UI.End()
 	if(UI.enable_timing){
