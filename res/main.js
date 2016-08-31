@@ -736,12 +736,12 @@ UI.Application=function(id,attrs){
 		UI.g_app_inited=1;
 	}
 	if(!UI.m_ui_metadata["<has_opened_us_before>"]){
-		if(UI.Platform.ARCH!="web"){
-			UI.NewOptionsTab();
-		}
 		UI.m_new_document_search_path=IO.GetNewDocumentName(undefined,undefined,"document");
 		UI.m_previous_document=undefined
 		UI.OpenUtilTab('file_browser');
+		if(UI.Platform.ARCH!="web"){
+			UI.NewOptionsTab();
+		}
 		if(UI.Platform.ARCH=="web"){
 			var fn=IO.NormalizeFileName(IO.ProcessUnixFileName('~/markdown.md'));
 			UI.m_ui_metadata[fn]={m_enable_wrapping:1};

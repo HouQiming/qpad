@@ -487,6 +487,14 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		UI.ED_ParserQueueFile(this.m_file_name)
 		this.CallHooks("parse")
 		CallParseMore()
+		//parse one file *immediately*, hopefully it's our file and that's it
+		var ret=UI.ED_ParseMore()
+		if(ret){
+			var doc=UI.g_editor_from_file[ret.file_name];
+			if(doc){
+				doc.m_file_index=ret.file_index;
+			}
+		}
 	},
 	//always go left
 	GetBracketLevel:function(ccnt){
@@ -1587,22 +1595,6 @@ var CallParseMore=function(){
 				if(doc){
 					doc.m_file_index=ret.file_index;
 				}
-				//var obj_tab=undefined;
-				//for(var i=0;i<UI.g_all_document_windows.length;i++){
-				//	if(UI.g_all_document_windows[i].file_name==ret.file_name){
-				//		obj_tab=UI.g_all_document_windows[i]
-				//		break
-				//	}
-				//}
-				//if(obj_tab&&obj_tab.main_widget&&obj_tab.main_widget.doc){
-				//	obj_tab.main_widget.doc.m_file_index=ret.file_index
-				//	UI.Refresh()
-				//}else{
-				//	//not-opened-yet
-				//	//if(UI.Platform.BUILD=="debug"){
-				//	//	print("panic: failed to set m_file_index",ret.file_name)
-				//	//}
-				//}
 			}else{
 				g_is_parse_more_running=0;
 				if(g_need_reparse_dangling_deps){
@@ -5127,45 +5119,8 @@ W.CodeEditor=function(id,attrs){
 	//	var s_ext=UI.GetFileNameExtension(obj.file_name||"")
 	//	obj.m_language_id=Language.GetNameByExt(s_ext)
 	//}
-	var sxs_visualizer=obj.m_sxs_visualizer;
 	var w_obj_area=obj.w
 	var h_obj_area=obj.h
-	var x_sxs_area=0
-	var y_sxs_area=0
-	var w_sxs_area=0
-	var h_sxs_area=0
-	var sxs_area_dim=undefined
-	if(sxs_visualizer&&!obj.hide_sxs_visualizer){
-		if(w_obj_area>=h_obj_area){
-			w_obj_area*=0.618
-			x_sxs_area=obj.x+w_obj_area
-			y_sxs_area=obj.y
-			w_sxs_area=obj.w-w_obj_area
-			h_sxs_area=obj.h
-			sxs_area_dim='x'
-		}else{
-			h_obj_area*=0.618
-			x_sxs_area=obj.x
-			y_sxs_area=obj.y+h_obj_area
-			w_sxs_area=obj.w
-			h_sxs_area=obj.h-h_obj_area
-			sxs_area_dim='y'
-		}
-	}else{
-		if(w_obj_area>=h_obj_area){
-			x_sxs_area=obj.x+w_obj_area
-			y_sxs_area=obj.y
-			w_sxs_area=obj.w-w_obj_area
-			h_sxs_area=obj.h
-			sxs_area_dim='x'
-		}else{
-			x_sxs_area=obj.x
-			y_sxs_area=obj.y+h_obj_area
-			w_sxs_area=obj.w
-			h_sxs_area=obj.h-h_obj_area
-			sxs_area_dim='y'
-		}
-	}
 	//prevent m_current_file_list leaks
 	UI.m_current_file_list=undefined
 	UI.Begin(obj)
@@ -5629,11 +5584,11 @@ W.CodeEditor=function(id,attrs){
 					//	UI.Refresh()
 					//}
 				}
-				if(!doc){
-					if(obj.file_name=="*res/misc/example.cpp"){
-						UI.InvalidateCurrentFrame()
-					}
-				}
+				//if(!doc){
+				//	if(obj.file_name=="*res/misc/example.cpp"){
+				//		UI.InvalidateCurrentFrame();
+				//	}
+				//}
 				if(!doc){
 					doc=UI.OpenCodeEditorDocument(obj.file_name,obj.m_is_preview);
 					obj.m_tabswitch_count=((obj.file_name&&UI.m_ui_metadata[obj.file_name]||{}).m_tabswitch_count||{});
@@ -6806,25 +6761,6 @@ W.CodeEditor=function(id,attrs){
 			UI.PopCliprect()
 		}
 		///////////////////////////////////////
-		if(sxs_visualizer){
-			//separation shadow
-			var w_shadow=obj.sxs_shadow_size
-			if(sxs_area_dim=='x'){
-				UI.RoundRect({
-					x:x_sxs_area-w_shadow,y:y_sxs_area-w_shadow,w:w_shadow*2,h:h_sxs_area+w_shadow*2,
-					color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
-				})
-			}else{
-				UI.RoundRect({
-					x:x_sxs_area-w_shadow,y:y_sxs_area-w_shadow,w:w_sxs_area+w_shadow*2,h:w_shadow*2,
-					color:obj.sxs_shadow_color,border_width:-w_shadow,round:w_shadow,
-				})
-			}
-			if(!obj.hide_sxs_visualizer){
-				//it could just get parent as owner
-				sxs_visualizer('sxs_visualizer',{x:x_sxs_area,y:y_sxs_area,w:w_sxs_area,h:h_sxs_area,owner:obj})
-			}
-		}
 		obj.m_is_rendering_good=1;
 	UI.End()
 	if(UI.enable_timing){
@@ -7423,6 +7359,9 @@ W.FeatureItem=function(id,attrs){
 					}
 					UI.RefreshAllTabs()
 				}).bind(undefined,!is_enabled),
+				OnMouseWheel:function(event){
+					obj.owner.features_list.OnMouseWheel(event);
+				},
 			})
 		}else if(obj.license_line){
 			W.Text("",{x:obj.x+16,y:obj.y+obj.h-32,font:obj.font,text:obj.license_line,color:obj.text_color_license})
@@ -7430,24 +7369,33 @@ W.FeatureItem=function(id,attrs){
 			if(obj.special=='install_button'){
 				var s_text=UI._("Install shell menu integration")
 				var dims=UI.MeasureText(obj.font,s_text);
-				W.Button("install",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
-					UI.InstallQPad();
-				}})
-				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"盾",color:obj.install.text_color})
-				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.install.text_color})
+				W.Button("install_button",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",
+					OnMouseWheel:function(event){
+						obj.owner.features_list.OnMouseWheel(event);
+					},
+					OnClick:function(){
+						UI.InstallQPad();
+					},
+				})
+				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"盾",color:obj.install_button.text_color})
+				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.install_button.text_color})
 			}else if(obj.special=='theme_button'){
 				var s_text=UI._("Dark theme / light theme")
 				var dims=UI.MeasureText(obj.font,s_text);
-				W.Button("dark_light_theme",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
-					options["use_light_theme"]=!UI.TestOption("use_light_theme");
-					UI.ApplyTheme(UI.CustomTheme())
-					console.log('obj.editor_widget.Reload',!!obj.editor_widget)//todo
-					if(obj.editor_widget){
-						obj.editor_widget.Reload();
+				W.Button("dark_light_theme",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",
+					OnMouseWheel:function(event){
+						obj.owner.features_list.OnMouseWheel(event);
+					},
+					OnClick:function(){
+						options["use_light_theme"]=!UI.TestOption("use_light_theme");
+						UI.ApplyTheme(UI.CustomTheme())
+						if(obj.editor_widget){
+							obj.editor_widget.Reload();
+						}
+						obj.owner.plugin_view_items=undefined;
+						UI.RefreshAllTabs()
 					}
-					obj.owner.plugin_view_items=undefined;
-					UI.RefreshAllTabs()
-				}})
+				})
 				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"半",color:obj.dark_light_theme.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.dark_light_theme.text_color})
 			}else if(obj.special=='tab_width'){
@@ -7455,24 +7403,34 @@ W.FeatureItem=function(id,attrs){
 				var s_text=UI._("Adjust tab width")
 				var dims0=UI.MeasureText(obj.font_small,s_text_0);
 				var dims=UI.MeasureText(obj.font,s_text);
-				W.Button("tab_width_btn",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
-					var twidth=UI.GetOption("tab_width",4);
-					twidth+=2;
-					if(!(twidth<12)){twidth=2;}
-					options["tab_width"]=twidth;
-					if(obj.editor_widget){
-						obj.editor_widget.Reload();
+				W.Button("tab_width_btn",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",
+					OnMouseWheel:function(event){
+						obj.owner.features_list.OnMouseWheel(event);
+					},
+					OnClick:function(){
+						var twidth=UI.GetOption("tab_width",4);
+						twidth+=2;
+						if(!(twidth<12)){twidth=2;}
+						options["tab_width"]=twidth;
+						if(obj.editor_widget){
+							obj.editor_widget.Reload();
+						}
+						UI.RefreshAllTabs()
 					}
-					UI.RefreshAllTabs()
-				}})
+				})
 				W.Text("",{x:obj.x+16+(20-dims0.w)*0.5,y:obj.y+obj.h-34+(28-dims0.h)*0.5,font:obj.font_small,text:s_text_0,color:obj.tab_width_btn.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.tab_width_btn.text_color})
 			}else if(obj.special=='customize'){
 				var s_text=obj.text;
 				var dims=UI.MeasureText(obj.font,s_text);
-				var btn=W.Button("customize_"+obj.file,{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
-					UI.CustomizeConfigScript(obj.file)
-				}})
+				var btn=W.Button("customize_"+obj.file,{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",
+					OnMouseWheel:function(event){
+						obj.owner.features_list.OnMouseWheel(event);
+					},
+					OnClick:function(){
+						UI.CustomizeConfigScript(obj.file)
+					}
+				})
 				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"换",color:btn.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:btn.text_color})
 			}
@@ -7490,6 +7448,12 @@ W.OptionsPage=function(id,attrs){
 	}
 	UI.Begin(obj)
 		UI.RoundRect(obj)
+		W.Region('wheel_area',{
+			x:obj.x,y:obj.y,w:obj.w,h:obj.h,
+			OnMouseWheel:function(event){
+				obj.features_list.OnMouseWheel(event);
+			},
+		})
 		//just a bunch of checkboxes in a listview
 		//editor plugins, plugin files, install
 		if(!obj.plugin_view_items){
@@ -7530,6 +7494,7 @@ W.OptionsPage=function(id,attrs){
 			for(var i=0;i<UI.m_editor_plugins.length;i++){
 				var desc_i=UI.m_editor_plugins[i].prototype.desc;
 				if(!desc_i){continue;}
+				desc_i=JSON.parse(JSON.stringify(desc_i));
 				var cat_list=plugin_items[desc_i.category];
 				if(!cat_list){
 					cat_list=[];
@@ -7615,17 +7580,28 @@ UI.RegisterUtilType("preferences",function(){return UI.NewTab({
 	body:function(){
 		//frontmost doc
 		UI.context_parent.body=this.util_widget;
-		var tab_frontmost=UI.GetFrontMostEditorTab();
-		var obj_real=(tab_frontmost&&tab_frontmost.document_type=="text"&&tab_frontmost.main_widget&&tab_frontmost.main_widget.file_name=="*res/misc/example.cpp"?tab_frontmost.main_widget:undefined);
-		var had_body=!!this.util_widget;
+		var tab_frontmost=undefined;
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			var item_i=UI.g_all_document_windows[i];
+			var name=(item_i.area_name||"doc_default");
+			if(name.length<4||name.substr(0,4)!='doc_'){
+				continue;
+			}
+			if(item_i.document_type=="text"&&item_i.main_widget&&item_i.main_widget.file_name=="*res/misc/example.cpp"){
+				tab_frontmost=item_i;
+			}
+			item_i.__global_tab_id=i;
+		}
+		var obj_real=(tab_frontmost&&tab_frontmost.main_widget);
+		//var had_body=!!this.util_widget;
 		var body=W.OptionsPage('body',{
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'owner':obj_real,
 			'x':0,'y':0});
 		this.util_widget=body;
-		if(had_body&&!obj_real){
-			UI.m_invalid_util_tabs.push(this.__global_tab_id);
-		}
+		//if(had_body&&!tab_frontmost){
+		//	UI.m_invalid_util_tabs.push(this.__global_tab_id);
+		//}
 		return body;
 	},
 	Save:function(){},
@@ -7641,9 +7617,9 @@ UI.NewOptionsTab=function(){
 			return tab;
 		}
 	}
+	UI.OpenUtilTab('preferences');
 	var tab=UI.OpenEditorWindow("*res/misc/example.cpp");
 	tab.is_options_window=1
-	UI.OpenUtilTab('preferences')
 	//tab.title=UI._("Preferences")
 	//tab.file_name="*res/misc/example.cpp";
 	return tab;
@@ -7783,6 +7759,10 @@ UI.g_transient_projects=[];
 		UI.g_is_dir_a_project[projects[i]]="permanent";
 	}
 })()
+
+UI.RegisterSpecialFile("res/misc/example.cpp",{
+	display_name:"Sandbox File",
+});
 
 UI.RegisterSpecialFile("project_list",{
 	display_name:"Project List",
