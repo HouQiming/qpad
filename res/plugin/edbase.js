@@ -1,7 +1,7 @@
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
-require("res/lib/notebook");
+require("res/lib/notebook_v2");
 
 Language.RegisterFileIcon("M",["png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr"]);
 Language.RegisterFileIcon("V",["mp4","mpg","mpeg","h264","avi","mov","rm","rmvb"]);
@@ -764,7 +764,7 @@ UI.RegisterOutputParser('(.*?):([0-9]+)[.][.]([0-9]+): (.*)',4,function(matches)
 })
 
 //unix cc
-UI.RegisterOutputParser('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*?)',8,function(matches){
+UI.RegisterOutputParser('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*)',8,function(matches){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	var message=matches[8]
@@ -1189,7 +1189,7 @@ UI.RegisterBuildEnv("Jacy",{
 	CreateBuildScript:function(fname,doc){
 		return [
 			UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?'cd /d ':'cd ',UI.GetPathFromFilename(fname),'\n',
-			'jc ',fname,' --run\n',
+			'jc ',UI.RemovePath(fname),' --run\n',
 		].join("");
 	}
 })

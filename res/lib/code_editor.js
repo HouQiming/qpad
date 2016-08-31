@@ -623,7 +623,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		return (this.saved_point||0)!=this.ed.GetUndoQueueLength();
 	},
 	NeedXScrollAtWidth:function(w_content){
-		if(this.ed&&UI.TestOption("show_x_scroll_bar")){
+		if(this.ed&&UI.TestOption("show_x_scroll_bar")&&!this.disable_x_scroll){
 			this.PrepareForRendering();
 			var x_max=this.GetHorizontalSpan()+UI.GetCharacterAdvance(this.font,32);
 			if(x_max>w_content-this.m_rendering_w_line_numbers){
@@ -1019,7 +1019,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//prepare the line numbers
 		var edstyle=UI.default_styles.code_editor;
 		var w_line_numbers=0;
-		var show_line_numbers=UI.TestOption("show_line_numbers")
+		var show_line_numbers=(UI.TestOption("show_line_numbers")&&!this.disable_line_numbers)
 		if(show_line_numbers){
 			var lmax=(this.ed?this.GetLC(this.ed.GetTextSize())[0]:0)+1
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(edstyle.line_number_font,56);
@@ -1199,7 +1199,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		var fold_btn_ccnts=(line_indents?[]:undefined);
 		var fold_btn_next_line_ccnts=(line_indents?[]:undefined);
-		var show_line_numbers=UI.TestOption("show_line_numbers")
+		var show_line_numbers=(UI.TestOption("show_line_numbers")&&!this.disable_line_numbers)
 		UI.PushCliprect(area_x,area_y,area_w,area_h)
 		for(var i=0;i<line_ccnts.length;i++){
 			if(line_ccnts[i]<0){continue;}
@@ -1401,6 +1401,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_menu_context={x:event.x,y:event.y,menu:menu_context};
 		menu_context=undefined;
 		UI.Refresh()
+	},
+	toJSON:function(){
+		return this.ed.GetText();
 	},
 })
 
@@ -5442,7 +5445,7 @@ W.CodeEditor=function(id,attrs){
 			}
 		}
 		//hopefully '8' is the widest digit char
-		var show_line_numbers=UI.TestOption("show_line_numbers")
+		var show_line_numbers=(UI.TestOption("show_line_numbers")&&!(doc&&doc.disable_line_numbers))
 		if(show_line_numbers){
 			var lmax=(doc?doc.GetLC(doc.ed.GetTextSize())[0]:0)+1
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(obj.line_number_font,56);
@@ -5624,7 +5627,7 @@ W.CodeEditor=function(id,attrs){
 				}
 				doc.owner=obj;
 				var h_editor=h_obj_area-h_top_find;
-				if(doc.ed&&UI.TestOption("show_x_scroll_bar")&&h_editor>obj.w_scroll_bar){
+				if(doc.ed&&UI.TestOption("show_x_scroll_bar")&&!doc.disable_x_scroll&&h_editor>obj.w_scroll_bar){
 					var x_max=doc.GetHorizontalSpan()+UI.GetCharacterAdvance(doc.font,32);
 					if(x_max>w_document){
 						desc_x_scroll_bar={total_size:x_max,page_size:w_document};

@@ -3,7 +3,7 @@ var W=require("gui2d/widgets");
 require("res/lib/code_editor");
 require("res/lib/bin_editor");
 require("res/lib/subwin");
-require("res/lib/notebook");
+require("res/lib/notebook_v2");
 require("res/lib/help_page");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");

@@ -2651,7 +2651,7 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 					utf8_utf32_map[I]=pu
 					pu++
 				utf8_utf32_map[stext.n]=pu
-				match_positions=[int(utf8_utf32_map[a-match[match.n-2]]+1) for a in match[2:]]
+				match_positions=[int(utf8_utf32_map[max(a-match[match.n-2],0L)]+1) for a in match[2:]]
 				//Writeln(s_unicode,' ',match_positions)
 				(s_replaced,errs,edhint0)=native_replace_ctx.ApplyReplaceProgram(
 					native_replace_prg.prg,s_unicode,nbras_old,match_positions,0, 0)

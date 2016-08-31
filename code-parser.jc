@@ -189,6 +189,8 @@ TOK_RSHIFT_EQ=int('t')
 TOK_COMMENT=int('u')
 g_id_include=getid("#include")
 g_id_define=getid("#define")
+g_id_pragma=getid("#pragma")
+g_id_pragma_mark=getid("#pragma mark - ")
 g_id_typedef=getid("typedef")
 g_id_require=getid("require")
 g_id_import=getid("import")
@@ -358,6 +360,8 @@ auto tokenize(string sdata,int g_ignore_indents)
 		return 1
 	s_include="include"
 	s_define="define"
+	s_pragma="pragma"
+	s_mark="mark"
 	for(;;)
 		skipchars(ignore_indents?CharSet.spaces_newline:CharSet.spaces)
 		ch=int(feed[ptr])
@@ -766,6 +770,19 @@ auto tokenize(string sdata,int g_ignore_indents)
 						push_token(int('('),int(ptr),int(ptr))
 						push_token(int(')'),int(ptr),int(ptr))
 					push_token(int(';'),int(bk_ptr-1),int(bk_ptr))
+				else if __basic_api.memcmp(__pointer(feed.d+pword),__pointer(s_pragma.d),s_pragma.n)==0:
+					ptr=pword+s_pragma.n
+					skipchars(CharSet.spaces)
+					if __basic_api.memcmp(__pointer(feed.d+ptr),__pointer(s_mark.d),s_mark.n)==0:
+						ptr+=s_mark.n
+						skipchars(CharSet.spaces)
+						if ptr<feed.n&&int(feed[ptr])=='-':
+							ptr++
+							push_token(g_id_pragma_mark,int(pword),int(ptr))
+							skipchars(CharSet.spaces)
+							id=getid(cite_raw(ptr,bk_ptr))
+							push_token(TOK_ID+id,int(ptr),int(bk_ptr))
+							push_token(int(';'),int(bk_ptr),int(bk_ptr))
 				ptr=bk_ptr
 			continue
 		}
@@ -1245,7 +1262,21 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						searchDepFile(idfn_import,int(i_plus_1))
 				else if tok_i==TOK_ID+g_id_define:
 					//do nothing, next id does it
-					//just disqualify it as decl
+					//just disqualify #define itself as decl
+				else if tok_i==TOK_ID+g_id_pragma_mark:
+					//i_plus_1=PNextToken(i)
+					//i_plus_2=PNextToken(i_plus_1)
+					//if fetchTokenSafe(i_plus_1)==TOK_ID+g_id_mark&&fetchTokenSafe(i_plus_2)=='-':
+					//i_plus_3=PNextToken(i_plus_2)
+					//tok1=fetchTokenSafe(i_plus_3)
+					//#pragma mark - should count the remaining portion as global decl
+					tok1=nextToken()
+					if (tok1&TOK_TYPE_MASK)==TOK_ID:
+						all_key_decls.push(TKeyDeclItem(){
+							id_type:(tok1-TOK_ID)+KEY_DECL_MACRO,
+							epos0:toks[PNextToken(i)].epos0})
+						if scopes.n:
+							scopes[scopes.n-1].in_assignment=i8(1)
 				else if tok_i==TOK_ID+g_id_typedef:
 					scopes[scopes.n-1].in_typedef=i8(1)
 				else if tok_i==TOK_ID+g_id_if||tok_i==TOK_ID+g_id_while:
