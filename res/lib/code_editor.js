@@ -1398,7 +1398,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//generate the menu right here, using current-frame menu entries
 		var menu_context=UI.CreateContextMenu("context_menu_group");
 		if(!menu_context){return;}
-		this.m_menu_context={x:event.x,y:event.y,menu:menu_context};
+		this.m_menu_context={x:event.x,y:event.y,menu:menu_context,is_first:1};
 		menu_context=undefined;
 		UI.Refresh()
 	},
@@ -2239,8 +2239,14 @@ var find_context_prototype={
 					fn_display=fn_display.substr(s_repo_path.length+1);
 				}
 				var text_dim=UI.MeasureText(edstyle.find_message_font,fn_display)
+				UI.RoundRect({
+					x:(w_find_items-8-text_dim.w),y:y,
+					w:text_dim.w,h:text_dim.h,
+					round:2,
+					color:edstyle.bgcolor&0xaaffffff,
+				})
 				W.Text("",{
-					x:(w_find_items-4-text_dim.w),y:y,
+					x:(w_find_items-8-text_dim.w),y:y,
 					font:edstyle.find_message_font,color:edstyle.editor_style.color_symbol,
 					text:fn_display})
 			}
@@ -2475,7 +2481,7 @@ UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found
 		if(cell_i&&is_non_quiet!="output"){
 			UI.SetFocus(is_non_quiet=="output"?cell_i.m_text_out:cell_i.m_text_in)
 		}
-		UI.RefreshAllTabs()
+		UI.RefreshAllTabs();
 	}
 	return {obj_notebook:obj_notebook,cell_id:cell_id};
 }
@@ -2517,7 +2523,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		var spath_repo=UI.GetEditorProject(doc.m_file_name);
 		ctx.m_repo_path=spath_repo;
 		ctx.m_base_file=doc.m_file_name;
-		ctx.m_result_cell=UI.OpenNotebookCellFromEditor(doc,"Search result","Markdown",1)
+		ctx.m_result_cell=UI.OpenNotebookCellFromEditor(doc,"Search result","Markdown",1,"output")
 		if(ctx.m_result_cell){
 			ctx.m_result_cell.obj_notebook.ClearCellOutput(ctx.m_result_cell.cell_id)
 		}
@@ -4723,12 +4729,16 @@ UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 		//frontmost doc
 		UI.context_parent.body=this.util_widget;
 		var tab_frontmost=UI.GetFrontMostEditorTab();
+		var had_body=!!this.util_widget;
 		var body=W.FileBrowserPage('body',{
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'editor_widget':tab_frontmost&&tab_frontmost.main_widget,
 			'activated':this==UI.top.app.document_area.active_tab,
 			'x':0,'y':0});
 		this.util_widget=body;
+		if(UI.TestOption("auto_hide_filetab",0)&&had_body&&UI.nd_focus!=body.find_bar_edit){
+			UI.m_invalid_util_tabs.push(this.__global_tab_id);
+		}
 		return body;
 	},
 	NeedRendering:function(){
@@ -5102,6 +5112,15 @@ W.CodeEditor=function(id,attrs){
 			obj.doc=undefined
 			obj.m_is_preview=0
 			obj.m_file_name_before_preview=undefined
+		}
+	}
+	if(obj.doc){
+		var style=UI.default_styles.code_editor.editor_style;
+		if(style.__proto__!=W.CodeEditor_prototype){
+			style.__proto__=W.CodeEditor_prototype;
+		}
+		if(obj.doc.__proto__!=style){
+			obj.doc.__proto__=style;
 		}
 	}
 	//if(!obj.m_language_id){
@@ -5611,7 +5630,7 @@ W.CodeEditor=function(id,attrs){
 					//}
 				}
 				if(!doc){
-					if(obj.m_sxs_visualizer==W.SXS_OptionsPage){
+					if(obj.file_name=="*res/misc/example.cpp"){
 						UI.InvalidateCurrentFrame()
 					}
 				}
@@ -6503,13 +6522,22 @@ W.CodeEditor=function(id,attrs){
 			}
 			if(doc.m_menu_context){
 				UI.TopMostWidget(function(){
-					var is_first=!obj.context_menu;
+					var is_first=doc.m_menu_context.is_first;
 					var obj_submenu=W.FancyMenu("context_menu",{
 						x:doc.m_menu_context.x, y:doc.m_menu_context.y,
 						desc:doc.m_menu_context.menu,
 						HideMenu:function(){doc.m_menu_context=undefined;},
 					})
-					if(is_first){UI.SetFocus(obj_submenu);}
+					if(is_first){
+						UI.SetFocus(obj_submenu);
+						var y_bounded=Math.max(Math.min(obj_submenu.y,obj.y+obj.h-obj_submenu.h),obj.y);
+						if(y_bounded!=obj_submenu.y){
+							doc.m_menu_context.y=y_bounded;
+							UI.InvalidateCurrentFrame();
+							UI.Refresh();
+						}
+						doc.m_menu_context.is_first=0;
+					}
 				})
 			}else{
 				obj.context_menu=undefined;
@@ -6868,7 +6896,7 @@ UI.NewCodeEditorTab=function(fname0){
 			if(!this.main_widget&&!fname0){
 				if(this.is_options_window){
 					attrs.m_is_special_document=1;
-					attrs.m_sxs_visualizer=W.SXS_OptionsPage;
+					//attrs.m_sxs_visualizer=W.SXS_OptionsPage;
 					UI.InvalidateCurrentFrame();
 				}else if(this.is_preview_window){
 					attrs.m_is_special_document=1;
@@ -7022,6 +7050,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			}
 		}
 	}
+	return obj_tab;
 }
 
 UI.OpenForCommandLine=function(cmdline_opens){
@@ -7357,6 +7386,7 @@ W.FeatureItem=function(id,attrs){
 	if(obj.h_special){obj.h+=obj.h_special;}
 	UI.StdAnchoring(id,obj);
 	UI.Begin(obj)
+		obj.editor_widget=obj.owner.owner;
 		//default-enable everything
 		var options=UI.m_ui_metadata["<options>"];
 		if(obj.is_first){
@@ -7388,8 +7418,10 @@ W.FeatureItem=function(id,attrs){
 				x:obj.x,y:obj.y+obj.h-32,w:obj.w-12,h:32,
 				OnClick:(function(new_value){
 					options[obj.stable_name]=new_value;
-					obj.editor_widget.Reload();
-					UI.Refresh()
+					if(obj.editor_widget){
+						obj.editor_widget.Reload();
+					}
+					UI.RefreshAllTabs()
 				}).bind(undefined,!is_enabled),
 			})
 		}else if(obj.license_line){
@@ -7409,9 +7441,12 @@ W.FeatureItem=function(id,attrs){
 				W.Button("dark_light_theme",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",OnClick:function(){
 					options["use_light_theme"]=!UI.TestOption("use_light_theme");
 					UI.ApplyTheme(UI.CustomTheme())
-					obj.editor_widget.Reload();
+					console.log('obj.editor_widget.Reload',!!obj.editor_widget)//todo
+					if(obj.editor_widget){
+						obj.editor_widget.Reload();
+					}
 					obj.owner.plugin_view_items=undefined;
-					UI.Refresh()
+					UI.RefreshAllTabs()
 				}})
 				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"半",color:obj.dark_light_theme.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.dark_light_theme.text_color})
@@ -7425,8 +7460,10 @@ W.FeatureItem=function(id,attrs){
 					twidth+=2;
 					if(!(twidth<12)){twidth=2;}
 					options["tab_width"]=twidth;
-					obj.editor_widget.Reload();
-					UI.Refresh()
+					if(obj.editor_widget){
+						obj.editor_widget.Reload();
+					}
+					UI.RefreshAllTabs()
 				}})
 				W.Text("",{x:obj.x+16+(20-dims0.w)*0.5,y:obj.y+obj.h-34+(28-dims0.h)*0.5,font:obj.font_small,text:s_text_0,color:obj.tab_width_btn.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.tab_width_btn.text_color})
@@ -7444,7 +7481,7 @@ W.FeatureItem=function(id,attrs){
 	return obj
 }
 
-W.SXS_OptionsPage=function(id,attrs){
+W.OptionsPage=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"sxs_options_page");
 	var options=UI.m_ui_metadata["<options>"];
 	if(!options){
@@ -7472,6 +7509,7 @@ W.SXS_OptionsPage=function(id,attrs){
 				{name:UI._('Show line numbers'),stable_name:'show_line_numbers'},
 				{name:UI._('Show minimap'),stable_name:'show_minimap'},
 				{name:UI._('Auto-hide minimap'),stable_name:'auto_hide_minimap'},
+				{name:UI._('Auto-hide the "Files" tab'),stable_name:'auto_hide_filetab'},
 			];
 			plugin_items["Controls"]=[
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
@@ -7565,12 +7603,35 @@ W.SXS_OptionsPage=function(id,attrs){
 			item_template:{
 				object_type:W.FeatureItem,
 				owner:obj,
-				editor_widget:obj.owner,
 			},items:obj.plugin_view_items})
 		W.Hotkey("",{key:"ESC",action:function(){UI.top.app.document_area.CloseTab();}})
 	UI.End()
 	return obj
 }
+
+UI.RegisterUtilType("preferences",function(){return UI.NewTab({
+	title:UI._("Preferences"),
+	area_name:"h_tools",
+	body:function(){
+		//frontmost doc
+		UI.context_parent.body=this.util_widget;
+		var tab_frontmost=UI.GetFrontMostEditorTab();
+		var obj_real=(tab_frontmost&&tab_frontmost.document_type=="text"&&tab_frontmost.main_widget&&tab_frontmost.main_widget.file_name=="*res/misc/example.cpp"?tab_frontmost.main_widget:undefined);
+		var had_body=!!this.util_widget;
+		var body=W.OptionsPage('body',{
+			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
+			'owner':obj_real,
+			'x':0,'y':0});
+		this.util_widget=body;
+		if(had_body&&!obj_real){
+			UI.m_invalid_util_tabs.push(this.__global_tab_id);
+		}
+		return body;
+	},
+	Save:function(){},
+	SaveMetaData:function(){},
+	OnDestroy:function(){},
+})});
 
 UI.NewOptionsTab=function(){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
@@ -7580,10 +7641,11 @@ UI.NewOptionsTab=function(){
 			return tab;
 		}
 	}
-	var tab=UI.NewCodeEditorTab();
+	var tab=UI.OpenEditorWindow("*res/misc/example.cpp");
 	tab.is_options_window=1
-	tab.title=UI._("Preferences")
-	tab.file_name="*res/misc/example.cpp";
+	UI.OpenUtilTab('preferences')
+	//tab.title=UI._("Preferences")
+	//tab.file_name="*res/misc/example.cpp";
 	return tab;
 }
 
