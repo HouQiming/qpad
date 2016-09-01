@@ -75,6 +75,7 @@
 			"Show in folder...":"在文件夹中显示……",
 			"Return to file":"返回文件",
 			"&Notebook...":"脚本簿(&N)……",
+			"Note&book":"脚本簿(&B)",
 			"&Help...":"帮助(&H)……",
 			"Zoom (@1%)":"放缩 (@1%)",
 			"Create file cell":"为该文件建立脚本",
