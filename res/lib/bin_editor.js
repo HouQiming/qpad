@@ -533,6 +533,11 @@ W.BinaryEditor_prototype={
 		this.AutoScroll()
 		UI.Refresh()
 	},
+	OnDestroy:function(){
+		this.m_data_raw=new Buffer(0);
+		this.m_data=Buffer(Duktape.Buffer(this.m_data_raw));
+		Duktape.gc();
+	},
 };
 
 W.SlaveRegion_prototype={
@@ -1352,9 +1357,9 @@ UI.NewBinaryEditorTab=function(fname0){
 		SaveMetaData:function(){
 			if(this.main_widget){this.main_widget.SaveMetaData();}
 		},
-		//OnDestroy:function(){
-		//	if(this.main_widget){this.main_widget.OnDestroy();}
-		//},
+		OnDestroy:function(){
+			if(this.main_widget){this.main_widget.OnDestroy();}
+		},
 		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
 };
