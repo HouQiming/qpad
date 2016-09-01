@@ -173,6 +173,50 @@ UI.GetDefaultBuildEnv=function(s_lang){
 	return s_name_default;
 }
 
+//drag: record the original order
+//rendering... only-the-focus-is-bordered
+//left-align
+//the buttons: play / delete / wipe output
+//scroll - it's a listview
+W.cell_caption_prototype={
+	OnDblClick:function(){
+		//todo
+	},
+};
+W.CellCaption=function(id,attrs){
+	var obj=UI.StdWidget(id,attrs,"notebook_cell_caption",W.cell_caption_prototype);
+	UI.Begin(obj)
+		//W.PureRegion(id,obj)
+		//var sel_bgcolor=obj.owner.activated?obj.mystyle.sel_bgcolor:obj.mystyle.sel_bgcolor_deactivated;
+		//if(obj.selected){
+		//	UI.RoundRect({
+		//		x:obj.x+4,y:obj.y+4,w:obj.w-8,h:obj.h-8,
+		//		color:sel_bgcolor})
+		//}
+		if(obj.selected){
+			var panel_style=UI.default_styles.notebook_view_v2.panel_style;
+			var shadow_size=panel_style.button_area_shadow_size;
+			UI.PushCliprect(obj.x,obj.owner.y,obj.w,obj.owner.h);
+			UI.RoundRect({
+				x:obj.x-shadow_size,y:obj.y-shadow_size,w:obj.w+shadow_size*2,h:obj.h+shadow_size*2,
+				color:panel_style.button_area_shadow_color,
+				round:shadow_size,border_width:-shadow_size})
+			UI.RoundRect({
+				x:obj.x,y:obj.y,w:obj.w,h:obj.h,
+				color:panel_style.cell_list_bgcolor})
+			UI.PopCliprect();
+		}
+		var name_color=obj.mystyle.name_color;
+		var font=obj.mystyle.font;
+		var dims=UI.MeasureText(font,obj.text);
+		W.Text("",{
+			x:obj.x+8,y:obj.y+(obj.h-dims.h)*0.5,
+			font:font,text:obj.text,color:name_color,
+		})
+	UI.End()
+	return obj
+};
+
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 W.notebook_prototype={
 	Save:function(){
@@ -349,6 +393,7 @@ W.notebook_prototype={
 						}
 					}
 				}
+				//obj_notebook.m_buttons=undefined;
 				UI.Refresh();
 			})
 		}
@@ -442,6 +487,7 @@ W.notebook_prototype={
 		//this.scroll_y=Math.max((this.m_ytot_all_notes||0)-h_scrolling_area,0);
 		//this.m_last_focus_cell_id=cell_i.m_cell_id*2;
 		//this.need_auto_scroll=0;
+		//this.m_buttons=undefined;
 		UI.Refresh();
 	},
 	SwapCells:function(id0,id1){
@@ -891,18 +937,26 @@ W.NotebookView=function(id,attrs){
 	UI.Begin(obj)
 	UI.RoundRect(obj)
 	W.PureRegion(id,obj)
+	//if(!obj.m_buttons){
+	//	obj.m_buttons=buttons;
+	//}
+	//buttons=obj.m_buttons;
 	var buttons=[];
 	if(obj.m_cells){
 		for(var i=0;i<obj.m_cells.length;i++){
 			var cell_i=obj.m_cells[i];
 			var s_btn_name=(cell_i.m_button_name||"Cell "+(i+1).toString())
-			buttons.push({id:i,text:s_btn_name});
+			buttons.push({cell_id:i,text:s_btn_name,h:obj.panel_style.h_button});
 		}
 	}
 	var w_buttons=0;
 	for(var i=0;i<buttons.length;i++){
-		var w_button_i=16+UI.MeasureText(UI.default_styles.button.font,buttons[i].text).w;
+		var w_button_i=32+UI.MeasureText(UI.default_styles.button.font,buttons[i].text).w;
 		w_buttons=Math.max(w_buttons,w_button_i);
+	}
+	w_buttons=Math.min(w_buttons,obj.w*obj.panel_style.max_button_width_ratio);
+	for(var i=0;i<buttons.length;i++){
+		buttons[i].w=w_buttons-16;
 	}
 	UI.PushSubWindow(obj.x,obj.y,obj.w-w_buttons,obj.h,obj.panel_style.scale)
 	var bk_dims=[obj.x,obj.y,obj.w,obj.h];
@@ -1035,44 +1089,38 @@ W.NotebookView=function(id,attrs){
 	UI.PopSubWindow()
 	obj.x=bk_dims[0];obj.y=bk_dims[1];obj.w=bk_dims[2];obj.h=bk_dims[3];
 	//buttons
-	var y_button=0;
-	var h_button=obj.panel_style.h_button;
-	for(var i=0;i<buttons.length;i++){
-		var cell_i=obj.m_cells[buttons[i].id];
-		var btn=W.Button("btn_"+buttons[i].id,{
-			x:obj.x+obj.w-w_buttons,y:y_button,w:w_buttons,h:h_button,
-			text:buttons[i].text,
-			OnClick:(function(cell_id){
-				this.m_last_focus_cell_id=cell_id*2;
-				this.need_auto_scroll=1;
-				var cell_i=this.m_cells[cell_id];
-				if(cell_i){
-					UI.SetFocus(cell_i.m_text_in);
-				}
-				this.RunCell(cell_id);
-			}).bind(obj,buttons[i].id)
+	UI.RoundRect({
+		x:obj.x+obj.w-w_buttons,y:obj.y,w:w_buttons,h:obj.h,
+		color:obj.panel_style.cell_list_bgcolor,
+	})
+	if(w_buttons>0){
+		var shadow_size=obj.panel_style.button_area_shadow_size;
+		UI.PushCliprect(obj.x+obj.w-w_buttons,obj.y,w_buttons,obj.h);
+		UI.RoundRect({
+			x:obj.x+obj.w-w_buttons-shadow_size,y:obj.y-shadow_size,w:shadow_size*2,h:obj.h+shadow_size*2,
+			color:obj.panel_style.button_area_shadow_color,border_width:-shadow_size,round:shadow_size,
 		})
-		if(cell_i.m_proc){
-			//running
-			var progress=(cell_i&&(parseFloat(cell_i.m_progress)/100));
-			if((cell_i&&cell_i.m_progress)==undefined){progress=1;}
-			if(progress>0){
-				UI.PushCliprect(obj.x+obj.w-w_buttons,y_button,w_buttons*progress,h_button);
-				W.Button("btnp_"+buttons[i].id,{
-					x:obj.x+obj.w-w_buttons,y:y_button,w:w_buttons,h:h_button,
-					text:buttons[i].text,
-					OnClick:btn.OnClick,
-					style:UI.default_styles.button_progress,
-				})
-				UI.PopCliprect();
-			}
-		}
-		y_button+=h_button;
+		UI.PopCliprect();
 	}
+	W.ListView('cell_list',{
+		x:obj.x+obj.w-w_buttons,y:obj.y,w:w_buttons,h:obj.h,
+		dimension:'y',//no_region:1,no_clipping:1,
+		mouse_wheel_speed:80,
+		value:obj.m_last_focus_cell_id>>1,
+		OnChange:function(value){
+			W.ListView_prototype.OnChange.call(this,value);
+			obj.m_last_focus_cell_id=value*2;
+			UI.Refresh();
+		},
+		item_template:{
+			object_type:W.CellCaption,
+			owner:obj,
+		},items:buttons})
 	UI.End()
 	if(UI.enable_timing){
 		UI.TimingEvent("leaving NotebookView");
 	}
+	//CellCaption
 	return obj
 }
 
@@ -1151,6 +1199,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
 				'file_name':this.file_name,
+				'activated':this==UI.top.app.document_area.active_tab,
 			};
 			var body=W.NotebookView("body",attrs)
 			if(!this.main_widget){

@@ -718,8 +718,20 @@ UI.CustomTheme=function(){
 				h_button:32,
 				focus_h_budget_ratio:0.5,
 				scale:7/8,
+				max_button_width_ratio:0.125,
 				shadow_size:12,
 				shadow_color:C_shadow,
+				cell_list_bgcolor:L?0xffe8e8e8:0xff3f3f3f,
+				button_area_shadow_size:6,
+				button_area_shadow_color:C_shadow,
+			},
+		},
+		notebook_cell_caption:{
+			mystyle:{
+				sel_bgcolor:C,
+				sel_bgcolor_deactivated:L?0xff7f7f7f:0xff7f7f7f,
+				name_color:L?0xff000000:0xffe8e8e8,
+				font:UI.Font(UI.font_name,20,-50),
 			},
 		},
 		tip_window:{
