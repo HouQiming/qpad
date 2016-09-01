@@ -184,6 +184,7 @@ W.cell_caption_prototype={
 		this.m_drag_ctx={
 			cells0:this.owner.m_cells,
 			dragging_cell_id:this.m_cell_id,
+			dragging_dy:this.y+this.h*0.5-event.y,
 			rendering_dy:this.y-event.y,
 		};
 		this.owner.m_sel_rendering_y=this.y;
@@ -212,7 +213,7 @@ W.cell_caption_prototype={
 				is_invalid=1;
 				break;
 			}
-			if(!did&&obj_caption_i.y+obj_caption_i.h*0.5>event.y){
+			if(!did&&obj_caption_i.y+obj_caption_i.h*0.5>event.y+ctx.dragging_dy){
 				if(cells1.length!=ctx.dragging_cell_id){
 					ctx.m_dragged=1;
 				}
@@ -317,48 +318,46 @@ W.CellCaption=function(id,attrs){
 		var name_color=obj.mystyle.name_color;
 		var font=obj.mystyle.font;
 		var dims=UI.MeasureText(font,obj.text);
-		if(obj.selected){
-			UI.TopMostWidget(function(obj_y){
-				W.Text("",{
-					x:obj.x+8,y:obj_y+(obj.h-dims.h)*0.5-2,
-					font:font,text:obj.text,color:name_color,
-				});
-			}.bind(null,obj.y));
-		}else{
+		var frender=function(){
 			W.Text("",{
 				x:obj.x+8,y:obj.y+(obj.h-dims.h)*0.5-2,
 				font:font,text:obj.text,color:name_color,
 			});
-		}
-		if(obj.progress>0){
-			var y_progress_bar=obj.y+(obj.h-dims.h)*0.5+dims.h-1;
-			var w_bar=(obj.w-16);
-			if(obj.progress_mode=='normal'){
-				UI.RoundRect({
-					x:obj.x+8,y:y_progress_bar,
-					w:w_bar*obj.progress,h:3,
-					color:sel_bgcolor,
-					round:1.5,
-				});
-			}else{//'unknown'
-				var p0=Math.max(obj.progress-panel_style.unknown_progress_bar_length,0);
-				UI.RoundRect({
-					x:obj.x+8+w_bar*p0,y:y_progress_bar,
-					w:w_bar*(obj.progress-p0),h:3,
-					color:sel_bgcolor,
-					round:1.5,
-				});
-				var p1=Math.max(obj.progress-1,0)
-				if(p1>0){
-					p0=Math.max(p1-panel_style.unknown_progress_bar_length,0);
+			if(obj.progress>0){
+				var y_progress_bar=obj.y+(obj.h-dims.h)*0.5+dims.h-1;
+				var w_bar=(obj.w-16);
+				if(obj.progress_mode=='normal'){
 					UI.RoundRect({
-						x:obj.x+8+w_bar*p0,y:y_progress_bar,
-						w:w_bar*(p1-p0),h:3,
+						x:obj.x+8,y:y_progress_bar,
+						w:w_bar*obj.progress,h:3,
 						color:sel_bgcolor,
 						round:1.5,
 					});
+				}else{//'unknown'
+					var p0=Math.max(obj.progress-panel_style.unknown_progress_bar_length,0);
+					UI.RoundRect({
+						x:obj.x+8+w_bar*p0,y:y_progress_bar,
+						w:w_bar*(Math.min(obj.progress,1)-p0),h:3,
+						color:sel_bgcolor,
+						round:1.5,
+					});
+					var p1=Math.max(obj.progress-1,0)
+					if(p1>0){
+						p0=Math.max(p1-panel_style.unknown_progress_bar_length,0);
+						UI.RoundRect({
+							x:obj.x+8+w_bar*p0,y:y_progress_bar,
+							w:w_bar*(p1-p0),h:3,
+							color:sel_bgcolor,
+							round:1.5,
+						});
+					}
 				}
 			}
+		}
+		if(obj.selected){
+			UI.TopMostWidget(frender);
+		}else{
+			frender();
 		}
 		//obj.y=bky;
 	UI.End()
@@ -940,7 +939,7 @@ W.notebook_prototype={
 			}catch(e){
 				this.WriteCellOutput(id,e.stack);
 			}
-			this.need_save|=2;
+			this.need_save|=4;
 			this.need_auto_scroll=1;
 			UI.Refresh()
 			return;
@@ -966,7 +965,7 @@ W.notebook_prototype={
 		var proc_desc={proc:proc,fn_script:fn_script};
 		if(proc){
 			var fpoll=(function(cell_i,proc_desc){
-				this.need_save|=2;
+				this.need_save|=4;
 				var s=proc.Read(65536)
 				//print('fpoll',s,JSON.stringify(args),proc.IsRunning())
 				if(s){
@@ -1003,7 +1002,7 @@ W.notebook_prototype={
 			this.WriteCellOutput(id,this.file_name+":1:1: fatal error: failed to execute the script\n")
 			IO.DeleteFile(fn_script)
 		}
-		this.need_save|=2;
+		this.need_save|=4;
 		cell_i.m_proc=proc_desc;
 		cell_i.m_unknown_progress=0;
 		cell_i.m_t_unknown_progress=UI.m_frame_tick;
@@ -1051,7 +1050,7 @@ W.notebook_prototype={
 		if(s_text){doc_in.ed.Edit([0,0,s_text],1);}
 		doc_in.saved_point=(need_save?-1:doc_in.ed.GetUndoQueueLength());
 		cell_i.m_text_in=doc_in;
-		this.need_save|=2;
+		this.need_save|=4;
 		UI.SetFocus(doc_in)
 		UI.Refresh()
 	},
@@ -1150,6 +1149,18 @@ W.NotebookView=function(id,attrs){
 	if(obj.m_last_focus_cell_id==undefined){
 		obj.m_last_focus_cell_id=0;
 	}
+	//update need_save... a bit messy here
+	obj.need_save&=~1;
+	for(var i=0;i<obj.m_cells.length;i++){
+		var cell_i=obj.m_cells[i];
+		var doc_in=(cell_i&&cell_i.m_text_in);
+		if(doc_in){
+			if((doc_in.saved_point||0)!=doc_in.ed.GetUndoQueueLength()){
+				obj.need_save|=1;
+				break;
+			}
+		}
+	}
 	//note: the *docs* have to exist even when they're not focused - they may have unsaved changes
 	var focus_cell_id=obj.m_last_focus_cell_id;
 	var cur_cell=obj.m_cells[focus_cell_id>>1];
@@ -1231,11 +1242,12 @@ W.NotebookView=function(id,attrs){
 			W.Region("budget_adjuster_"+(focus_cell_id&-2).toString(),{
 				x:obj.x,y:obj.y+h_in_budget-obj.panel_style.separator_bar_region_size*0.5,w:obj.w,h:obj.panel_style.separator_bar_region_size,
 				cell:cur_cell,
+				obj_h:obj.h,
 				mouse_cursor:'sizens',
 				OnMouseDown:function(event){
 					this.m_drag_ctx={
 						dy:h_in_budget-event.y,
-						h:obj.h,
+						h:this.obj_h,
 					};
 					UI.CaptureMouse(this);
 				},
@@ -1243,7 +1255,7 @@ W.NotebookView=function(id,attrs){
 					var ctx=this.m_drag_ctx;
 					if(!ctx){return;}
 					this.cell.m_in_budget_ratio=Math.min(Math.max(0.125,(ctx.dy+event.y)/ctx.h),0.875);
-					obj.need_save|=2;
+					obj.need_save|=4;
 					UI.Refresh();
 				},
 				OnMouseUp:function(event){
@@ -1414,12 +1426,12 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 						UI.top.app.progress=parseFloat(s_progress)/100;
 					}
 					if(s_progress!=undefined){
-						this.title=UI.Format("@1 (@2%)",s_name,s_progress)+(this.need_save?'*':'');
+						this.title=UI.Format("@1 (@2%)",s_name,s_progress)+((this.need_save&3)?'*':'');
 					}else{
-						this.title=UI.Format("@1 (running)",s_name)+(this.need_save?'*':'');
+						this.title=UI.Format("@1 (running)",s_name)+((this.need_save&3)?'*':'');
 					}
 				}else{
-					this.title=UI.Format("@1 - Notebook",s_name)+(this.need_save?'*':'');
+					this.title=UI.Format("@1 - Notebook",s_name)+((this.need_save&3)?'*':'');
 				}
 				this.tooltip=this.file_name;
 			}
