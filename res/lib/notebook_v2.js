@@ -692,7 +692,7 @@ W.notebook_prototype={
 		}
 		this.need_save|=2;
 		this.InvalidateCellList();
-		this.m_last_focus_cell_id=Math.max(Math.min(this.m_last_focus_cell_id,this.m_cells.length-1),0);
+		this.m_last_focus_cell_id=Math.max(Math.min(this.m_last_focus_cell_id,(this.m_cells.length-1)*2),0);
 		UI.Refresh()
 	},
 	GetSubCell:function(sub_cell_id){
