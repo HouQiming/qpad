@@ -641,6 +641,7 @@ W.notebook_prototype={
 		}
 		this.need_save|=2;
 		///////////
+		cell_i.m_text_in.saved_point=-1;
 		this.GotoSubCell(cell_i.m_cell_id*2);
 		this.InvalidateCellList();
 		UI.Refresh();
@@ -956,7 +957,7 @@ W.notebook_prototype={
 			return;
 		}
 		var spath=UI.GetPathFromFilename(this.file_name);
-		var s_prj_mark="build script for '"
+		//var s_prj_mark="build script for '"
 		//var p_prj_fn=s_code.indexOf(s_prj_mark);
 		//if(p_prj_fn>=0){
 		//	var s_file_name=s_code.substr(p_prj_fn+s_prj_mark.length);
@@ -968,6 +969,12 @@ W.notebook_prototype={
 		//		}
 		//	}
 		//}
+		if(s_code.indexOf('[new window]')>=0){
+			//new window
+			IO.RunProcess(args,spath,1);
+			UI.Refresh();
+			return;
+		}
 		var proc=IO.RunToolRedirected(args,spath,0)
 		var idle_wait=100;
 		for(var i=0;i<this.m_cells.length;i++){
@@ -1139,6 +1146,12 @@ W.NotebookView=function(id,attrs){
 						cell_i.m_unknown_progress=obj.panel_style.unknown_progress_bar_length;
 					}
 					UI.AutoRefresh();
+				}
+			}
+			var doc_in=(cell_i&&cell_i.m_text_in);
+			if(doc_in){
+				if((doc_in.saved_point||0)!=doc_in.ed.GetUndoQueueLength()){
+					s_btn_name=s_btn_name+'*';
 				}
 			}
 			buttons.push({id:cell_i.m_temp_unique_name,m_cell_id:i,text:s_btn_name,h:obj.panel_style.h_button,progress:progress,progress_mode:progress_mode});

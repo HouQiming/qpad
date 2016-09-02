@@ -325,7 +325,7 @@ Language.Register({
 			if(lang.isInside(bid_regexp_charset)){
 				lang.DisableToken(tok_regexp_end);
 			}
-			//regexp-specific rules
+			//`${}`-specific rules
 			if(lang.isInside(bid_string_es6)){
 				lang.Enable(bid_string_param);
 			}else{
@@ -996,28 +996,44 @@ UI.RegisterEditorPlugin(function(){
 				obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
 			}
 		}
+		var spath_repo=IO.NormalizeFileName(UI.GetEditorProject(this.m_file_name));
+		var fn_to_build=IO.NormalizeFileName(this.m_file_name);
+		if(fn_to_build.length>spath_repo.length&&fn_to_build.substr(0,spath_repo.length)==spath_repo){
+			fn_to_build=fn_to_build.substr(spath_repo.length);
+			if(fn_to_build[0]=='/'||fn_to_build[0]=='\\'){
+				fn_to_build=fn_to_build.substr(1);
+			}
+		}
 		//if(!obj_buildenv){return 1;}
 		var menu_run=UI.BigMenu("&Run")
 		var fgencell=function(is_project){
 			var s_script=undefined;
 			if(obj_buildenv){
 				if(obj_buildenv.CreateInterpreterCall){
-					var args=obj_buildenv.CreateInterpreterCall(this.m_file_name,this);
+					var args=obj_buildenv.CreateInterpreterCall(fn_to_build,this);
 					if(typeof(args)=='string'){
 						//qpad js
-						s_script='eval(IO.ReadAll('+this.m_file_name,'));';
+						s_script='eval(IO.ReadAll('+fn_to_build,'));';
 					}else{
 						s_script=IO.ShellCmd(args);
+						//if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+						//	s_script='if "%1"=="run" goto run\nstart /WAIT %0 run\ngoto end\n:run\n'+s_script+'\npause\nexit\n:end\n';
+						//}
+						if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+							s_script="rem [new window]\n"+s_script+"\npause";
+						}else{
+							s_script="# [new window]\n"+s_script+'\nread -n1 -r -p '+JSON.stringify(UI._("Press any key to continue..."))+' unused_key';
+						}
 					}
 				}else{
-					s_script=obj_buildenv.CreateBuildScript(this.m_file_name,this)
+					s_script=obj_buildenv.CreateBuildScript(fn_to_build,this)
 				}
 			}else{
 				s_script="";
 			}
 			var s_mark=undefined;
 			var s_language=undefined;
-			var s_name_in_script="'"+this.m_file_name+"'";
+			var s_name_in_script="'"+fn_to_build+"'";
 			if(is_project){
 				s_name_in_script='the project'
 				var s_button;
@@ -1043,6 +1059,8 @@ UI.RegisterEditorPlugin(function(){
 				var size=doc_in.ed.GetTextSize();
 				if(size==Duktape.__byte_length(s_mark)){
 					doc_in.ed.Edit([0,size,s_mark+s_script]);
+					doc_in.m_cell_id=cell_i.m_cell_id;
+					doc_in.CallOnChange();
 				}
 				UI.RefreshAllTabs()
 			}
@@ -1054,7 +1072,7 @@ UI.RegisterEditorPlugin(function(){
 		var fruncell=function(is_project){
 			var s_mark=undefined;
 			var s_language=undefined;
-			var s_name_in_script="'"+this.m_file_name+"'";
+			var s_name_in_script="'"+fn_to_build+"'";
 			if(is_project){
 				s_name_in_script='the project'
 			}
