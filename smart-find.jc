@@ -168,7 +168,7 @@ module detail
 		int[][] m_all_substrs
 		//CReplaceGraph[] gs
 		TProgramItem[] m_prg
-		int m_enable_numericals
+		m_enable_numericals=1
 		auto SubstrLength(int[] s)
 			auto all_substrs=m_all_substrs
 			auto p=all_substrs.InlineBisect(inline(int[] s0){return s0<=s})
