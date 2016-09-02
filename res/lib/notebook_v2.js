@@ -176,6 +176,18 @@ UI.GetDefaultBuildEnv=function(s_lang){
 
 W.cell_caption_prototype={
 	OnMouseDown:function(event){
+		if(event.clicks>=2){
+			UI.SetFocus(this.owner.cell_list);
+			this.owner.cell_list.OnChange(this.m_cell_id);
+			this.OnMouseUp(event);
+			this.OnDblClick(event);
+			return;
+		}
+		if(event.button==UI.SDL_BUTTON_MIDDLE){
+			this.owner.DeleteCell(this.m_cell_id);
+			this.owner.m_set_focus_cell_list=1;
+			return;
+		}
 		if(this.owner.cell_list){
 			UI.SetFocus(this.owner.cell_list);
 			this.owner.cell_list.OnChange(this.m_cell_id);
@@ -225,6 +237,14 @@ W.cell_caption_prototype={
 			}
 			cells1.push(ctx.cells0[i]);
 		}
+		if(!is_invalid&&!did){
+			if(cells1.length!=ctx.dragging_cell_id){
+				ctx.m_dragged=1;
+			}
+			this.owner.m_last_focus_cell_id=cells1.length*2;
+			cells1.push(ctx.cells0[ctx.dragging_cell_id]);
+			did=1;
+		}
 		if(!is_invalid&&ctx.m_dragged){
 			this.owner.m_cells=cells1;
 		}
@@ -241,18 +261,12 @@ W.cell_caption_prototype={
 		this.m_drag_ctx=undefined;
 		this.owner.m_sel_rendering_y=undefined;
 		for(var i=0;i<this.owner.m_cells.length;i++){
+			if(this.owner.cell_list&&this.owner.m_cells[i].m_temp_unique_name){
+				this.owner.cell_list['$'+i.toString()]=this.owner.cell_list[this.owner.m_cells[i].m_temp_unique_name];
+			}
 			this.owner.m_cells[i].m_temp_unique_name=undefined;
 		}
 		UI.Refresh();
-	},
-	OnClick:function(event){
-		if(event.clicks>=2){
-			this.OnDblClick(event);
-			return;
-		}
-		if(event.button==UI.SDL_BUTTON_MIDDLE){
-			this.owner.DeleteCell(this.m_cell_id);
-		}
 	},
 	OnDblClick:function(){
 		this.owner.RunCell(this.m_cell_id);
@@ -260,6 +274,7 @@ W.cell_caption_prototype={
 	OnKeyDown:function(event){
 		if(UI.IsHotkey(event,"DELETE")){
 			this.owner.DeleteCell(this.m_cell_id);
+			this.owner.m_set_focus_cell_list=1;
 		}else if(UI.IsHotkey(event,"CTRL+D")){
 			var obj=this.owner;
 			obj.DupCell();
@@ -323,7 +338,7 @@ W.CellCaption=function(id,attrs){
 			//		{x:1,y:0,color:panel_style.cell_list_bgcolor&0x00ffffff},
 			//	]})
 		}
-		var name_color=obj.mystyle.name_color;
+		var name_color=(obj.text[0]=='\u2022'?obj.mystyle.dumb_name_color:obj.mystyle.name_color);
 		var font=obj.mystyle.font;
 		var dims=UI.MeasureText(font,obj.text);
 		var frender=function(){
@@ -1209,6 +1224,9 @@ W.NotebookView=function(id,attrs){
 	//note: the *docs* have to exist even when they're not focused - they may have unsaved changes
 	var focus_cell_id=obj.m_last_focus_cell_id;
 	var cur_cell=obj.m_cells[focus_cell_id>>1];
+	for(var i=0;i<obj.m_cells.length;i++){
+		obj.m_cells[i].m_cell_id=i;
+	}
 	if(cur_cell){
 		if(UI.nd_focus==cur_cell.m_text_in){
 			focus_cell_id&=-2;
