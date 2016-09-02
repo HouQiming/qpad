@@ -168,13 +168,23 @@ W.TabbedDocument_prototype={
 		if(tabid==undefined){return;}
 		var tab=this.items[tabid]
 		if(!tab){return;}
-		if(tab.need_save&&!forced){
-			//this doesn't count as a meaningful switch
-			this.current_tab_id=tabid
-			//dialog box
-			tab.in_save_dialog=1
-			UI.Refresh()
-			return;
+		if(tab.need_save&&!(tab.need_save&65535)){
+			//need autosave, do it
+			tab.Save();
+		}
+		if(!forced){
+			if(tab.need_save){
+				//this doesn't count as a meaningful switch
+				this.current_tab_id=tabid
+				//dialog box
+				tab.save_dialog_text=undefined;
+				tab.in_save_dialog=1
+				UI.Refresh()
+				return;
+			}else if(tab.OnTabClose&&!tab.OnTabClose()){
+				UI.Refresh()
+				return;
+			}
 		}
 		///////
 		var fntab=GetTabFileName(tab);
@@ -307,18 +317,30 @@ W.TabbedDocument_prototype={
 		var ret=0
 		for(var i=0;i<this.items.length;i++){
 			var tab_i=this.items[i]
+			if(tab_i.need_save&&!(tab_i.need_save&65535)){
+				//need autosave, do it
+				tab_i.Save();
+			}
 			if(tab_i.need_save){
 				if(ret==0){
 					//this doesn't count as a meaningful switch
 					this.just_created_a_tab=0;
 					this.current_tab_id=i;
 					UI.SetFocus(undefined)
+					tab_i.save_dialog_text=undefined;
 					tab_i.in_save_dialog=1
 				}
 				ret=1
-			}//else{
+			}else if(tab_i.OnTabClose&&!tab_i.OnTabClose()){
+				if(ret==0){
+					//this doesn't count as a meaningful switch
+					this.just_created_a_tab=0;
+					this.current_tab_id=i;
+					UI.SetFocus(undefined)
+				}
+				ret=1
+			}
 			tab_i.SaveMetaData()
-			//}
 		}
 		if(ret==0){
 			if(!this.m_is_close_pending){
@@ -972,7 +994,8 @@ var RenderLayout=function(layout,obj,y_base){
 					var tabid=tab.__global_tab_id;
 					W.SaveDialog("savedlg_"+tabid.toString(),{
 						x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content,
-						value:(tab.in_save_dialog||0),tabid:tabid,parent:obj})
+						value:(tab.in_save_dialog||0),desc:tab.save_dialog_desc,
+						tabid:tabid,parent:obj})
 				}else{
 					//just draw tips
 					UI.assert(nd.name=="doc_default");
@@ -1525,15 +1548,22 @@ W.SaveDialog=function(id,attrs){
 		if(obj.value){
 			var region=W.Region("savedlg_region",{x:obj.x,y:obj.y,w:obj.w,h:obj.h})
 			UI.SetFocus(region)
-			var s_text0=UI._("It's not saved yet...")
+			var desc=(obj.desc||{});
+			var s_text0=(desc.text||UI._("It's not saved yet..."));
 			var s_text_y=UI._("Save")
 			var s_text_n=UI._("Don't save")
 			var s_text_c=UI._("Cancel")
 			var sz_text=UI.MeasureText(obj.font_text,s_text0)
-			var sz_buttons=UI.MeasureText(obj.font_buttons,s_text_y)
+			var sz_buttons=UI.MeasureText(obj.font_buttons,s_text_y);
 			sz_buttons.w+=UI.MeasureText(obj.font_buttons,s_text_n).w
 			sz_buttons.w+=UI.MeasureText(obj.font_buttons,s_text_c).w
 			sz_buttons.w+=obj.space_button*2+obj.good_button_style.padding*2
+			if(desc.buttons){
+				sz_buttons.w=obj.space_button*(desc.buttons.length-1)+obj.good_button_style.padding*2;
+				for(var i=0;i<desc.buttons.length;i++){
+					sz_buttons.w+=UI.MeasureText(obj.font_buttons,desc.buttons[i].text).w;
+				}
+			}
 			var h_content=obj.space_middle+sz_text.h+obj.h_button
 			var y_text=obj.y+(obj.h-h_content)*0.5
 			var y_buttons=y_text+sz_text.h+obj.space_middle
@@ -1558,7 +1588,7 @@ W.SaveDialog=function(id,attrs){
 				if(darea.m_is_close_pending){
 					if(!UI.top.app.OnClose()){UI.DestroyWindow(UI.top.app)}
 				}
-			}
+			};
 			var fno=function(){
 				var darea=obj.parent
 				obj.parent.CloseTab(obj.tabid,"forced")
@@ -1567,21 +1597,48 @@ W.SaveDialog=function(id,attrs){
 				if(darea.m_is_close_pending){
 					if(!UI.top.app.OnClose()){UI.DestroyWindow(UI.top.app)}
 				}
-			}
+			};
 			var fcancel=function(){
 				obj.parent.items[obj.tabid].in_save_dialog=0
 				obj.parent.m_is_close_pending=0
 				obj.parent=undefined
 				UI.Refresh()
+			};
+			if(desc.buttons){
+				for(var i=0;i<desc.buttons.length;i++){
+					var obj_btn=W.Button("btn_"+i.toString(),{
+						x:x_buttons,y:y_buttons,h:obj.h_button, 
+						font:obj.font_buttons,text:desc.buttons[i].text,
+						style:desc.buttons[i].is_good?obj.good_button_style:obj.bad_button_style,
+						desc_obj:desc.buttons[i],
+						OnClick:function(){
+							if(this.desc_obj.OnClick){
+								this.desc_obj.OnClick();
+							}
+							if(this.desc_obj.std_action=="close"){
+								fno();
+							}else if(this.desc_obj.std_action=="cancel"){
+								fcancel();
+							}
+						},
+					});
+					x_buttons+=UI.MeasureText(obj.font_buttons,desc.buttons[i].text).w+obj.space_button;
+					if(desc.buttons[i].hotkeys){
+						for(var j=0;j<desc.buttons[i].hotkeys.length;j++){
+							W.Hotkey("",{key:desc.buttons[i].hotkeys[j],action:obj_btn.OnClick.bind(obj_btn)});
+						}
+					}
+				}
+			}else{
+				W.Button("btn_y",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_y,style:obj.good_button_style,OnClick:fyes});
+				x_buttons+=UI.MeasureText(obj.font_buttons,s_text_y).w+obj.space_button
+				W.Button("btn_n",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_n,style:obj.bad_button_style,OnClick:fno});
+				x_buttons+=UI.MeasureText(obj.font_buttons,s_text_n).w+obj.space_button
+				W.Button("btn_c",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_c,style:obj.bad_button_style,OnClick:fcancel});
+				W.Hotkey("",{key:"Y",action:fyes});W.Hotkey("",{key:"S",action:fyes});W.Hotkey("",{key:"RETURN",action:fyes});W.Hotkey("",{key:"SPACE",action:fyes})
+				W.Hotkey("",{key:"N",action:fno});W.Hotkey("",{key:"D",action:fno})
+				W.Hotkey("",{key:"ESC",action:fcancel});W.Hotkey("",{key:"C",action:fcancel})
 			}
-			W.Button("btn_y",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_y,style:obj.good_button_style,OnClick:fyes});
-			x_buttons+=UI.MeasureText(obj.font_buttons,s_text_y).w+obj.space_button
-			W.Button("btn_n",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_n,style:obj.bad_button_style,OnClick:fno});
-			x_buttons+=UI.MeasureText(obj.font_buttons,s_text_n).w+obj.space_button
-			W.Button("btn_c",{x:x_buttons,y:y_buttons,h:obj.h_button, font:obj.font_buttons,text:s_text_c,style:obj.bad_button_style,OnClick:fcancel});
-			W.Hotkey("",{key:"Y",action:fyes});W.Hotkey("",{key:"S",action:fyes});W.Hotkey("",{key:"RETURN",action:fyes});W.Hotkey("",{key:"SPACE",action:fyes})
-			W.Hotkey("",{key:"N",action:fno});W.Hotkey("",{key:"D",action:fno})
-			W.Hotkey("",{key:"ESC",action:fcancel});W.Hotkey("",{key:"C",action:fcancel})
 			/////////////////
 			//disable the side window as well
 			UI.document_property_sheet={};

@@ -73,11 +73,11 @@ UI.m_ui_metadata={};
 		}
 	}
 })();
-UI.SaveMetaData=function(){
+UI.SafeSave=function(fn,data){
 	//use EDSaver_Open to avoid dataloss on bad shutdown
 	var ed=UI.CreateEditor({font:UI.Font(UI.font_name,20,0)});
-	ed.Edit([0,0,JSON.stringify(UI.m_ui_metadata)]);
-	var ctx=UI.EDSaver_Open(ed,IO.GetStoragePath()+("/metadata.json"))
+	ed.Edit([0,0,data]);
+	var ctx=UI.EDSaver_Open(ed,fn)
 	for(;;){
 		var ret=UI.EDSaver_Write(ctx,ed)
 		if(ret=="done"){
@@ -87,10 +87,13 @@ UI.SaveMetaData=function(){
 		}else{
 			//error saving metadata
 			ctx.discard();
-			break;
+			return 0;
 		}
 	}
-	//IO.CreateFile(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata))
+	return 1;
+};
+UI.SaveMetaData=function(){
+	UI.SafeSave(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata));
 }
 
 UI.TestOption=function(stable_name,default_value){

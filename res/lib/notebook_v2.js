@@ -1,3 +1,4 @@
+// need_save|=65536: a superfluous change that should be saved automatically without even showing '*'
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
@@ -181,6 +182,7 @@ W.cell_caption_prototype={
 		}else{
 			this.owner.m_last_focus_cell_id=this.m_cell_id*2;
 		}
+		this.owner.need_save|=65536;
 		this.m_drag_ctx={
 			cells0:this.owner.m_cells,
 			dragging_cell_id:this.m_cell_id,
@@ -383,9 +385,10 @@ W.notebook_prototype={
 			//doc_out.ResetSaveDiff();
 			procs[i]=cell_i.m_proc;cell_i.m_proc=undefined;
 		}
-		var s=JSON.stringify({cells:this.m_cells},null,1)
-		var sz_std=Duktape.__byte_length(s);
-		var sz_written=IO.CreateFile(this.file_name,s);
+		var s=JSON.stringify({cells:this.m_cells,m_last_focus_cell_id:this.m_last_focus_cell_id},null,1)
+		var save_ret=UI.SafeSave(this.file_name,s);
+		//var sz_std=Duktape.__byte_length(s);
+		//var sz_written=IO.CreateFile(this.file_name,s);
 		this.m_loaded_time=IO.GetFileTimestamp(this.file_name);
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
@@ -393,7 +396,10 @@ W.notebook_prototype={
 			cell_i.m_text_out=docs[i*2+1];
 			cell_i.m_proc=procs[i];
 		}
-		if(!(sz_written>=sz_std)){
+		//if(!(sz_written>=sz_std)){
+		//	return 0;
+		//}
+		if(!save_ret){
 			return 0;
 		}
 		this.need_save=0;
@@ -580,9 +586,12 @@ W.notebook_prototype={
 		if(fn_notes){
 			this.m_loaded_time=IO.GetFileTimestamp(fn_notes);
 			try{
-				this.m_cells=JSON.parse(IO.ReadAll(fn_notes)).cells;
+				var json_obj=JSON.parse(IO.ReadAll(fn_notes));
+				this.m_cells=json_obj.cells;
+				this.m_last_focus_cell_id=(json_obj.m_last_focus_cell_id||0);
 			}catch(err){
 				this.m_cells=[];
+				this.m_last_focus_cell_id=0;
 			}
 		}
 		//create the initial data thisects
@@ -702,6 +711,7 @@ W.notebook_prototype={
 			return 0;
 		}
 		this.m_last_focus_cell_id=sub_cell_id;
+		this.need_save|=65536;
 		if(this.cell_list){
 			this.cell_list.value=(sub_cell_id>>1);
 			this.cell_list.AutoScroll();
@@ -894,6 +904,7 @@ W.notebook_prototype={
 		cell_i.m_has_any_error=0;;
 		cell_i.m_progress=undefined;
 		doc.ClearClickableRanges();
+		this.need_save|=65536;
 	},
 	RunCell:function(id){
 		var cell_i=this.m_cells[id];
@@ -939,7 +950,7 @@ W.notebook_prototype={
 			}catch(e){
 				this.WriteCellOutput(id,e.stack);
 			}
-			this.need_save|=4;
+			this.need_save|=65536;
 			this.need_auto_scroll=1;
 			UI.Refresh()
 			return;
@@ -965,7 +976,7 @@ W.notebook_prototype={
 		var proc_desc={proc:proc,fn_script:fn_script};
 		if(proc){
 			var fpoll=(function(cell_i,proc_desc){
-				this.need_save|=4;
+				this.need_save|=65536;
 				var s=proc.Read(65536)
 				//print('fpoll',s,JSON.stringify(args),proc.IsRunning())
 				if(s){
@@ -1002,7 +1013,7 @@ W.notebook_prototype={
 			this.WriteCellOutput(id,this.file_name+":1:1: fatal error: failed to execute the script\n")
 			IO.DeleteFile(fn_script)
 		}
-		this.need_save|=4;
+		this.need_save|=65536;
 		cell_i.m_proc=proc_desc;
 		cell_i.m_unknown_progress=0;
 		cell_i.m_t_unknown_progress=UI.m_frame_tick;
@@ -1050,7 +1061,7 @@ W.notebook_prototype={
 		if(s_text){doc_in.ed.Edit([0,0,s_text],1);}
 		doc_in.saved_point=(need_save?-1:doc_in.ed.GetUndoQueueLength());
 		cell_i.m_text_in=doc_in;
-		this.need_save|=4;
+		this.need_save|=65536;
 		UI.SetFocus(doc_in)
 		UI.Refresh()
 	},
@@ -1255,7 +1266,7 @@ W.NotebookView=function(id,attrs){
 					var ctx=this.m_drag_ctx;
 					if(!ctx){return;}
 					this.cell.m_in_budget_ratio=Math.min(Math.max(0.125,(ctx.dy+event.y)/ctx.h),0.875);
-					obj.need_save|=4;
+					obj.need_save|=65536;
 					UI.Refresh();
 				},
 				OnMouseUp:function(event){
@@ -1306,7 +1317,14 @@ W.NotebookView=function(id,attrs){
 		obj.m_last_focus_cell_id=focus_cell_id;
 		menu_notebook.AddNormalItem({
 			text:"&Delete cell",
+			enable_hotkey:1,key:"SHIFT+CTRL+X",
 			action:obj.DeleteCell.bind(obj,focus_cell_id>>1)})
+		if(cur_cell.m_text_out&&cur_cell.m_text_out.ed.GetTextSize()){
+			menu_notebook.AddNormalItem({
+				text:"Clear &output",
+				enable_hotkey:1,key:"SHIFT+CTRL+C",
+				action:obj.ClearCellOutput.bind(obj,focus_cell_id>>1)})
+		}
 	}
 	menu_notebook=undefined;
 	UI.FlushTopMostContext(n0_topmost)
@@ -1506,7 +1524,39 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 		Reload:function(){
 			if(this.main_widget){this.main_widget.Reload();}
 		},
-		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
+		OnTabClose:function(){
+			if(this.main_widget){
+				var body=this.main_widget;
+				var is_running=0;
+				for(var i=0;i<body.m_cells.length;i++){
+					if(body.m_cells[i].m_proc){
+						is_running=1;
+						break;
+					}
+				}
+				if(is_running){
+					this.in_save_dialog=1;
+					this.save_dialog_desc={
+						text:UI._("It's still running..."),
+						buttons:[{
+							text:UI._("Stop it"),is_good:1,
+							hotkeys:["K","Y","RETURN","SPACE"],
+							std_action:"close",
+							OnClick:function(){
+								for(var j=0;j<body.m_cells.length;j++){
+									body.KillCell(j);
+								}
+							},
+						},{
+							text:UI._("Cancel"),
+							hotkeys:["N","C","ESC"],
+							std_action:"cancel",
+						}]};
+					return 0;
+				}
+			}
+			return 1;
+		},
 	})
 	if(is_quiet){
 		UI.top.app.document_area.current_tab_id=bk_current_tab_id;
