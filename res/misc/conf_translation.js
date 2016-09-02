@@ -288,7 +288,6 @@
 			"Parameters":"参数",
 			"Returns":"返回值",
 			"In @1:":"在@1中：",
-			///////////////////
 			"Display":"显示",
 			"Controls":"操作",
 			"Editing":"编辑",
@@ -298,6 +297,15 @@
 			"Font Licenses":"字体授权",
 			"QPad v@1, by Qiming HOU":"QPad版本@1，侯启明",
 			"Contact: hqm03ster@gmail.com":"邮箱：hqm03ster@gmail.com",
+			"&Clone cell":"克隆脚本(&C)",
+			"Clear &output":"清除输出(&O)",
+			"Auto-hide the \"Files\" tab":"自动隐藏文件列表",
+			"Add cell":"新建脚本",
+			"Default Notebook":"默认脚本簿",
+			"It's still running...":"还在运行呢……",
+			"Stop it":"强行停止",
+			"Press any key to continue...":"按任意键继续……",
+			"@1 (@2%)":"@1 (@2%)"
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw

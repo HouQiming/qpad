@@ -36,7 +36,7 @@ UI.GetMainFileName=function(fname){
 		main_name=ret[2];
 	}
 	ret=main_name.match(g_regexp_chopext);
-	if(ret){
+	if(ret&&ret[1]){
 		main_name=ret[1];
 	}
 	return main_name;

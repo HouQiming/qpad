@@ -555,6 +555,7 @@ var CreateMenus=function(){
 		menu_tools.AddSeparator()
 	}
 	if(obj_active_tab&&obj_active_tab.file_name){
+		//polite GetEditorProject is identical to UI.GetNotebookProject
 		var spath_repo=UI.GetEditorProject(obj_active_tab.file_name,"polite");
 		if(spath_repo){
 			var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");

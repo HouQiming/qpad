@@ -250,6 +250,9 @@ W.cell_caption_prototype={
 			this.OnDblClick(event);
 			return;
 		}
+		if(event.button==UI.SDL_BUTTON_MIDDLE){
+			this.owner.DeleteCell(this.m_cell_id);
+		}
 	},
 	OnDblClick:function(){
 		this.owner.RunCell(this.m_cell_id);
@@ -257,6 +260,9 @@ W.cell_caption_prototype={
 	OnKeyDown:function(event){
 		if(UI.IsHotkey(event,"DELETE")){
 			this.owner.DeleteCell(this.m_cell_id);
+		}else if(UI.IsHotkey(event,"CTRL+D")){
+			var obj=this.owner;
+			obj.DupCell();
 		}
 	},
 	OnMouseWheel:function(event){
@@ -535,7 +541,7 @@ W.notebook_prototype={
 					}else{
 						match=s_check.match(/build script for '(.+)'/);
 						if(match){
-							obj_notebook.m_cells[cell_id].m_button_name="\u2022 "+UI.GetSmartTabName(match[1]);
+							obj_notebook.m_cells[cell_id].m_button_name="\u2022 "+match[1];
 						}else{
 							match=s_check.match(/^#[ \t]*(.+)\n/);
 							if(match){
@@ -642,9 +648,24 @@ W.notebook_prototype={
 		this.need_save|=2;
 		///////////
 		cell_i.m_text_in.saved_point=-1;
+		if(this.cell_list&&UI.nd_focus==this.cell_list){
+			this.m_set_focus_cell_list=1;
+		}
 		this.GotoSubCell(cell_i.m_cell_id*2);
 		this.InvalidateCellList();
 		UI.Refresh();
+	},
+	DupCell:function(){
+		var cell_i=undefined;
+		if(this.m_last_focus_cell_id!=undefined){
+			cell_i=this.m_cells[this.m_last_focus_cell_id>>1];
+		}
+		if(cell_i){
+			var bk_proc=cell_i.m_proc;
+			cell_i.m_proc=undefined;
+			this.NewCell(JSON.parse(JSON.stringify(cell_i)),this.m_last_focus_cell_id>>1);
+			cell_i.m_proc=bk_proc;
+		}
 	},
 	SwapCells:function(id0,id1){
 		var tmp=undefined;
@@ -1149,7 +1170,7 @@ W.NotebookView=function(id,attrs){
 				}
 			}
 			var doc_in=(cell_i&&cell_i.m_text_in);
-			if(doc_in){
+			if(!obj.is_default&&doc_in){
 				if((doc_in.saved_point||0)!=doc_in.ed.GetUndoQueueLength()){
 					s_btn_name=s_btn_name+'*';
 				}
@@ -1332,6 +1353,9 @@ W.NotebookView=function(id,attrs){
 			text:"&Delete cell",
 			enable_hotkey:1,key:"SHIFT+CTRL+X",
 			action:obj.DeleteCell.bind(obj,focus_cell_id>>1)})
+		menu_notebook.AddNormalItem({
+			text:"&Clone cell",
+			action:obj.DupCell.bind(obj)});
 		if(cur_cell.m_text_out&&cur_cell.m_text_out.ed.GetTextSize()){
 			menu_notebook.AddNormalItem({
 				text:"Clear &output",
@@ -1404,6 +1428,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 	var layout=UI.m_ui_metadata["<layout>"];
 	layout.m_is_maximized=0;
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
+	file_name=IO.NormalizeFileName(file_name);
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab_i=UI.g_all_document_windows[i];
 		if(obj_tab_i.file_name==file_name&&obj_tab_i.document_type=="notebook"){
@@ -1411,7 +1436,8 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 			return obj_tab_i;
 		}
 	}
-	file_name=IO.NormalizeFileName(file_name);
+	var spath=UI.GetPathFromFilename(file_name);
+	var is_default=(spath==IO.NormalizeFileName(IO.GetStoragePath()));
 	UI.top.app.quit_on_zero_tab=0;
 	var bk_current_tab_id=undefined;
 	if(is_quiet){
@@ -1419,7 +1445,8 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 	}
 	var ret=UI.NewTab({
 		file_name:file_name,
-		title:UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(file_name)),"Notebook"),
+		is_default:is_default,
+		title:is_default?UI._("Default Notebook"):UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(file_name)),"Notebook"),
 		tooltip:file_name,
 		document_type:"notebook",
 		area_name:"v_tools",
@@ -1441,7 +1468,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 		UpdateTitle:function(){
 			if(this.main_widget){
 				var body=this.main_widget;
-				var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
+				var s_name=this.is_default?UI._("Default Notebook"):UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
 				var is_running=0;
 				var s_progress=undefined;
 				for(var i=0;i<body.m_cells.length;i++){
@@ -1462,7 +1489,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 						this.title=UI.Format("@1 (running)",s_name)+((this.need_save&3)?'*':'');
 					}
 				}else{
-					this.title=UI.Format("@1 - Notebook",s_name)+((this.need_save&3)?'*':'');
+					this.title=(this.is_default?UI._("Default Notebook"):UI.Format("@1 - Notebook",s_name))+((this.need_save&3)?'*':'');
 				}
 				this.tooltip=this.file_name;
 			}
@@ -1475,6 +1502,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
 				'file_name':this.file_name,
+				'is_default':this.is_default,
 				'activated':this==UI.top.app.document_area.active_tab,
 			};
 			var body=W.NotebookView("body",attrs)
@@ -1482,6 +1510,9 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 				this.main_widget=body;
 			}
 			this.need_save=this.main_widget.need_save;
+			if(this.is_default&&this.need_save){
+				this.need_save=65536;
+			}
 			this.UpdateTitle();
 			//var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
 			//var is_running=0;
@@ -1516,6 +1547,9 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 			}
 			this.main_widget.Save();
 			this.need_save=this.main_widget.need_save;
+			if(this.is_default&&this.need_save){
+				this.need_save=65536;
+			}
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}

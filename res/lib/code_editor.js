@@ -2454,8 +2454,8 @@ var find_context_prototype={
 
 //initiator + mark
 UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found,is_non_quiet){
-	var spath_repo=UI.GetEditorProject(doc.m_file_name);
-	var obj_notebook_tab=UI.OpenNoteBookTab(spath_repo+"/notebook.json",'quiet')
+	var spath_repo=UI.GetNotebookProject(doc.m_file_name);
+	var obj_notebook_tab=UI.OpenNoteBookTab(spath_repo+"/notebook.json",'quiet');
 	if(is_non_quiet){
 		UI.top.app.document_area.BringUpTab(obj_notebook_tab.__global_tab_id)
 	}
@@ -3328,7 +3328,15 @@ UI.GetEditorProject=function(fn,is_polite){
 	var sdir=UI.GetPathFromFilename(fn);
 	ParseProject(sdir);
 	return sdir;
-}
+};
+
+UI.GetNotebookProject=function(fn){
+	var sdir=UI.GetEditorProject(fn,"polite");
+	if(!sdir){
+		return IO.GetStoragePath();
+	}
+	return sdir;
+};
 
 UI.GetRepoByPath=function(spath){return g_repo_list[spath];}
 UI.ClearFileListingCache=function(){

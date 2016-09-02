@@ -996,7 +996,8 @@ UI.RegisterEditorPlugin(function(){
 				obj_buildenv=desc.m_buildenv_by_name[this.m_compiler_name||s_name_default];
 			}
 		}
-		var spath_repo=IO.NormalizeFileName(UI.GetEditorProject(this.m_file_name));
+		var spath_repo=IO.NormalizeFileName(UI.GetNotebookProject(this.m_file_name));
+		//console.log(UI.GetNotebookProject(this.m_file_name),spath_repo);
 		var fn_to_build=IO.NormalizeFileName(this.m_file_name);
 		if(fn_to_build.length>spath_repo.length&&fn_to_build.substr(0,spath_repo.length)==spath_repo){
 			fn_to_build=fn_to_build.substr(spath_repo.length);
