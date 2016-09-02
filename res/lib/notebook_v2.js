@@ -957,17 +957,17 @@ W.notebook_prototype={
 		}
 		var spath=UI.GetPathFromFilename(this.file_name);
 		var s_prj_mark="build script for '"
-		var p_prj_fn=s_code.indexOf(s_prj_mark);
-		if(p_prj_fn>=0){
-			var s_file_name=s_code.substr(p_prj_fn+s_prj_mark.length);
-			var p_other_quote=s_file_name.indexOf("'")
-			if(p_other_quote>=0){
-				s_file_name=s_file_name.substr(0,p_other_quote);
-				if(IO.FileExists(s_file_name)){
-					spath=UI.GetPathFromFilename(s_file_name)
-				}
-			}
-		}
+		//var p_prj_fn=s_code.indexOf(s_prj_mark);
+		//if(p_prj_fn>=0){
+		//	var s_file_name=s_code.substr(p_prj_fn+s_prj_mark.length);
+		//	var p_other_quote=s_file_name.indexOf("'")
+		//	if(p_other_quote>=0){
+		//		s_file_name=s_file_name.substr(0,p_other_quote);
+		//		if(IO.FileExists(s_file_name)){
+		//			spath=UI.GetPathFromFilename(s_file_name)
+		//		}
+		//	}
+		//}
 		var proc=IO.RunToolRedirected(args,spath,0)
 		var idle_wait=100;
 		for(var i=0;i<this.m_cells.length;i++){

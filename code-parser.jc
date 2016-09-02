@@ -522,7 +522,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 			last_significant_newline_position=toks.n+1
 			break
 		//char/string literal
-		case '"','\'':
+		case '"','\'','`':
 			//is_python_str=0
 			//if ch==ch0:
 			//	if ptr<feed.n-1&&(int)feed[ptr+1]==(int)ch0:

@@ -80,6 +80,7 @@ LanguageDefinition.prototype={
 		this.m_coloring_rules.push({bid:bid,color_name:color_name});
 		this.m_word_dfa_initial_state.push(-1)
 		this.m_word_dfa_initial_state_triggered.push(-1)
+		return this.m_coloring_rules.length;
 	},
 	ColoredDelimiter:function(type,stok0,stok1,color_name){
 		var bid=this.DefineDelimiter(type,stok0,stok1)
@@ -140,20 +141,25 @@ LanguageDefinition.prototype={
 	/////////////////
 	DefineKeywordSet:function(s_for_color,ch_triggering){
 		var ret=new KeywordSet()
+		ret.m_kwset_id=this.m_keyword_sets.length;
 		this.m_keyword_sets.push(ret)
 		var id=-1;
-		if(s_for_color==this.m_color_default){
-			id=0
-		}else{
-			for(var i=0;i<this.m_coloring_rules.length;i++){
-				if(s_for_color==this.m_coloring_rules[i].color_name){
-					id=i+1;
-					break;
+		if(typeof s_for_color=='string'){
+			if(s_for_color==this.m_color_default){
+				id=0
+			}else{
+				for(var i=0;i<this.m_coloring_rules.length;i++){
+					if(s_for_color==this.m_coloring_rules[i].color_name){
+						id=i+1;
+						break;
+					}
 				}
 			}
+		}else{
+			id=s_for_color;
 		}
 		if(id<0){throw new Error("please define color @1 in a rule before defining its keyword set".replace("@1",s_for_color));}
-		var states=(ch_triggering?this.m_word_dfa_initial_state_triggered:this.m_word_dfa_initial_state)
+		var states=(ch_triggering?this.m_word_dfa_initial_state_triggered:this.m_word_dfa_initial_state);
 		if(states[id]!=-1){throw new Error("color @1 already has a keyword set".replace("@1",s_for_color));}
 		states[id]=this.m_keyword_sets.length-1;
 		if(ch_triggering){
@@ -165,6 +171,27 @@ LanguageDefinition.prototype={
 			}
 		}
 		return ret;
+	},
+	BindKeywordSet:function(s_for_color,kwset){
+		var id=-1;
+		if(typeof s_for_color=='string'){
+			if(s_for_color==this.m_color_default){
+				id=0
+			}else{
+				for(var i=0;i<this.m_coloring_rules.length;i++){
+					if(s_for_color==this.m_coloring_rules[i].color_name){
+						id=i+1;
+						break;
+					}
+				}
+			}
+		}else{
+			id=s_for_color;
+		}
+		if(id<0){throw new Error("please define color @1 in a rule before defining its keyword set".replace("@1",s_for_color));}
+		var states=(this.m_word_dfa_initial_state);
+		if(states[id]!=-1){throw new Error("color @1 already has a keyword set".replace("@1",s_for_color));}
+		states[id]=kwset.m_kwset_id;
 	},
 	DefineDefaultColor:function(s_color){
 		this.m_color_default=s_color;

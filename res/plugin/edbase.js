@@ -7,7 +7,7 @@ Language.RegisterFileIcon("M",["png","jpg","jpeg", "gif","tif","tiff", "bmp","pp
 Language.RegisterFileIcon("V",["mp4","mpg","mpeg","h264","avi","mov","rm","rmvb"]);
 Language.RegisterFileIcon("文",["txt"]);
 
-var f_C_like=function(lang,keywords,has_preprocessor){
+var f_C_like=function(lang,keywords,has_preprocessor,objc_keywords){
 	lang.DefineDefaultColor("color_symbol")
 	var tok_newline=lang.DefineToken("\n");
 	var bid_preprocessor
@@ -33,6 +33,12 @@ var f_C_like=function(lang,keywords,has_preprocessor){
 	kwset.DefineWordColor("color")
 	kwset.DefineWordType("color_number","0-9")
 	lang.SetKeyDeclsBaseColor("color")
+	if(objc_keywords){
+		var kwset2=lang.DefineKeywordSet("color_symbol","@");
+		for(var k in objc_keywords){
+			kwset2.DefineKeywords("color_"+k,objc_keywords[k])
+		}
+	}
 	return (function(lang){
 		if(has_preprocessor){
 			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2,bid_preprocessor]);
@@ -110,7 +116,12 @@ Language.Register({
 		return f_C_like(lang,{
 			keyword:['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'],
 			type:['void','char','short','int','long','auto','unsigned','signed','register','float','double','bool','const_cast','dynamic_cast','reinterpret_cast','typename','wchar_t','size_t']
-		},1)
+		},1,{
+			//objective C @... keywords
+			keyword:[
+				'interface','end','implementation','protocol','class','public','protected','private','try','throw','catch','finally',
+				'synthesize','dynamic','selector']
+		})
 	},
 	include_paths:standard_c_include_paths
 })
@@ -247,6 +258,7 @@ Language.Register({
 
 Language.Register({
 	name:'Javascript',parser:"C",
+	has_backquote_string:1,
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1},
 	extensions:['js','json'],
 	file_icon_color:0xffb4771f,
@@ -261,10 +273,14 @@ Language.Register({
 		var bid_comment=lang.ColoredDelimiter("key","/*","*/","color_comment");
 		var bid_comment2=lang.ColoredDelimiter("key","//","\n","color_comment");
 		var bid_regexp=lang.ColoredDelimiter("key",[tok_regexp_thing,tok_regexp_thing2,tok_regexp_thing3],tok_regexp_end,"color_string");
+		var bid_string_param=lang.DefineDelimiter("key","${","}");
 		var bid_regexp_charset=lang.ColoredDelimiter("key","[","]","color_string");
 		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
 		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
-		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{'],['}',']',')']);
+		var bid_string_es6=lang.ColoredDelimiter("key","`","`","color_string");
+		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{','${'],['}',']',')']);
+		//this rule takes priority over bid_string_es6
+		var crid_string_param=lang.AddColorRule(bid_string_param,"color_symbol");
 		lang.DefineToken("\\\\")
 		lang.DefineToken("\\'")
 		lang.DefineToken('\\"')
@@ -274,6 +290,8 @@ Language.Register({
 		var tok_regexp_escape=lang.DefineToken("\\/");
 		var tok_regexp_escape1=lang.DefineToken("\\[");
 		var tok_regexp_escape2=lang.DefineToken("\\]");
+		var tok_es6_string_param_left=lang.DefineToken("${");
+		var tok_curly_bracket1=lang.DefineToken("}");
 		var kwset=lang.DefineKeywordSet("color_symbol");
 		var keywords={
 			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined','yield','await'],
@@ -284,14 +302,17 @@ Language.Register({
 		}
 		kwset.DefineWordColor("color")
 		kwset.DefineWordType("color_number","0-9")
+		lang.BindKeywordSet(crid_string_param,kwset);
+		////////
 		lang.SetKeyDeclsBaseColor("color")
 		return (function(lang){
-			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2,bid_regexp]);
+			lang.SetExclusive([bid_comment,bid_comment2,bid_string,bid_string2,bid_regexp,bid_string_es6]);
 			if(lang.isInside(bid_comment)||lang.isInside(bid_comment2)||lang.isInside(bid_string)||lang.isInside(bid_string2)||lang.isInside(bid_regexp)){
 				lang.Disable(bid_bracket);
 			}else{
 				lang.Enable(bid_bracket);
 			}
+			//regexp-specific rules
 			if(lang.isInside(bid_regexp)){
 				lang.Enable(bid_regexp_charset);
 			}else{
@@ -304,8 +325,18 @@ Language.Register({
 			if(lang.isInside(bid_regexp_charset)){
 				lang.DisableToken(tok_regexp_end);
 			}
+			//regexp-specific rules
+			if(lang.isInside(bid_string_es6)){
+				lang.Enable(bid_string_param);
+			}else{
+				lang.Disable(bid_string_param);
+				//lang.DisableToken(tok_es6_string_param_left);
+			}
+			//enable the works-everywhere tokens
+			lang.EnableToken(tok_es6_string_param_left);
 			lang.EnableToken(tok_sqaure_bracket0);
 			lang.EnableToken(tok_sqaure_bracket1);
+			lang.EnableToken(tok_curly_bracket1);
 		});
 	}
 });
@@ -538,6 +569,7 @@ Language.Register({
 Language.Register({
 	name:'Unix Shell Script',parser:"none",
 	extensions:['sh'],
+	has_backquote_string:1,
 	shell_script_type:"unix",
 	file_icon_color:0xff444444,
 	file_icon:'プ',
@@ -1161,7 +1193,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		if(g_vc_compiler_path){return g_vc_compiler_path;}
 		var testbat=function(spath0){
 			var spath=IO.ProcessUnixFileName(spath0);
-			if(IO.FileExists(spath+"/vsvars32.bat")){return spath;}
+			if(IO.FileExists(spath+"/vsvars32.bat")){return spath0;}
 			return 0;
 		}
 		g_vc_compiler_path=(testbat("%VS120COMNTOOLS%")||testbat("%VS110COMNTOOLS%")||testbat("%VS100COMNTOOLS%")||testbat("%VS90COMNTOOLS%")||testbat("%VS80COMNTOOLS%"));
@@ -2282,14 +2314,14 @@ UI.RegisterEditorPlugin(function(){
 		var lang=this.plugin_language_desc
 		var ed=this.ed;
 		var ctx=this.m_bracket_ctx;
-		if(C=="{"||C=="["||C=="("||((C=="'"&&!lang.is_tex_like||C=='$'&&lang.is_tex_like||C=="\"")&&C!=ctx.current_bracket_ac)){
+		if(C=="{"||C=="["||C=="("||((C=="'"&&!lang.is_tex_like||C=='$'&&lang.is_tex_like||C=="\""||C=="`"&&lang.has_backquote_string)&&C!=ctx.current_bracket_ac)){
 			var chbac=MatchingBracket(C)
 			var ccnt_pos=this.sel1.ccnt
 			var ch_neibs=ed.GetUtf8CharNeighborhood(ccnt_pos)
 			var chprev=ch_neibs[0]
 			var chnext=ch_neibs[1]
 			if(chbac){
-				if(this.IsLeftBracket(C.charCodeAt(0))&&chbac!="'"&&chbac!="\""&&chbac!="$"){
+				if(this.IsLeftBracket(C.charCodeAt(0))&&chbac!="'"&&chbac!="\""&&chbac!="`"&&chbac!="$"){
 					//the syntax has to actually consider it as a bracket, or it has to be a quote
 					chbac=0;
 				}else if(!this.IsBracketEnabledAt(ccnt_pos)){
@@ -2305,7 +2337,7 @@ UI.RegisterEditorPlugin(function(){
 						chbac=0;
 					}
 				}else if(C==chbac&&chprev==C.charCodeAt(0)){
-					//type two quotes in the middle of a string, do not AC
+					//typing two quotes in the middle of a string, do not AC
 					chbac=0;
 				}
 			}
