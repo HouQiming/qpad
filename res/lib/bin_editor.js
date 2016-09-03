@@ -1200,10 +1200,10 @@ W.BinaryEditor=function(id,attrs){
 			menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:0,key:"SHIFT+CTRL+Z",action:function(){
 				obj.Redo()
 			}})
-			if(obj.undo_queue.length>0){
+			if(obj.m_undo_queue&&obj.m_undo_queue.length>0){
 				UI.ToolButton("undo",{tooltip:"Undo - CTRL+Z",action:function(){obj.Undo();}})
 			}
-			if(obj.redo_queue.length>0){
+			if(obj.m_redo_queue&&obj.m_redo_queue.length>0){
 				UI.ToolButton("redo",{tooltip:"Redo - SHIFT+CTRL+Z",action:function(){obj.Redo();}})
 			}
 			menu_edit=undefined;

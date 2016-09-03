@@ -1329,7 +1329,6 @@ W.NotebookView=function(id,attrs){
 			}
 		}
 	}
-	//coulddo: tool bar
 	if(obj.activated){
 		var menu_notebook=undefined;
 		menu_notebook=UI.BigMenu("Note&book");
