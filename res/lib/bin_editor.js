@@ -485,6 +485,7 @@ W.BinaryEditor_prototype={
 		UI.Refresh()
 	},
 	FindNext:function(addr,dir,buf_needle){
+		if(!buf_needle||!buf_needle.length){return;}
 		this.m_find_context={
 			m_needle:buf_needle,
 			m_needle_prt:UI.BIN_PreprocessNeedle(buf_needle,dir),

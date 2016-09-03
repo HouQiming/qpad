@@ -856,9 +856,13 @@ W.notebook_prototype={
 		var sel=doc.GetSelection();
 		ed.Edit([ccnt,0,s],1);
 		//try to advance the selection
+		var is_end=0;
 		if(sel[0]==sel[1]&&sel[1]==ccnt){
 			var ccnt_end=doc.ed.GetTextSize()
+			sel[0]=ccnt_end;
+			sel[1]=ccnt_end;
 			doc.SetSelection(ccnt_end,ccnt_end)
+			is_end=1;
 		}
 		//if(UI.g_output_parsers){
 		var line=doc.GetLC(ccnt)[0]
@@ -923,6 +927,10 @@ W.notebook_prototype={
 			line++;
 		}
 		//}
+		if(is_end){
+			var ccnt_end=ed.GetTextSize()
+			doc.SetSelection(ccnt_end,ccnt_end)
+		}
 		this.need_auto_scroll=1;
 		UI.Refresh()
 	},
@@ -1250,7 +1258,7 @@ W.NotebookView=function(id,attrs){
 			h_out=MeasureEditorSize(cur_cell.m_text_out,obj.w);
 		}
 		var doc=((focus_cell_id&1)?cur_cell.m_text_out:cur_cell.m_text_in);
-		var has_both=(cur_cell.m_text_in&&cur_cell.m_text_out&&cur_cell.m_text_out.ed.GetTextSize()>0)
+		var has_both=(cur_cell.m_text_in&&cur_cell.m_text_out&&(cur_cell.m_text_out.ed.GetTextSize()>0||(focus_cell_id&1)))
 		if(has_both){
 			//allocate a larger budget on the focused side
 			var h_in_budget=0,h_out_budget=0;

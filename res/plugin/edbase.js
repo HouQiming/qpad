@@ -3270,6 +3270,10 @@ UI.RegisterEditorPlugin(function(){
 			fsmart_replace.bind(this,"[\\x00-\\xff]*",function(smatch){
 				return encodeURIComponent(smatch);
 			})})
+		menu_convert.AddNormalItem({text:"Unescape URL query string",action:
+			fsmart_replace.bind(this,"[\\x00-\\xff]*",function(smatch){
+				return decodeURIComponent(smatch);
+			})})
 		menu_convert=undefined;
 	})
 })

@@ -109,6 +109,7 @@
 			"Line ending to Uni&x":"变成Uni&x换行",
 			"Escape C string":"处理C字符串用特殊字符",
 			"Escape URL query string":"处理网址用特殊字符",
+			"Unescape URL query string":"解码网址用特殊字符",
 			"Searching ...":"搜索中……",
 			"Listing project files...":"正在制作工程文件列表……",
 			"All files searched":"所有文件搜索完毕",
