@@ -280,7 +280,7 @@ Language.Register({
 		var bid_string_es6=lang.ColoredDelimiter("key","`","`","color_string");
 		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{','${'],['}',']',')']);
 		//this rule takes priority over bid_string_es6
-		var crid_string_param=lang.AddColorRule(bid_string_param,"color_symbol");
+		var crid_string_param=lang.AddColorRule(bid_string_param,"color_symbol","exclusive");
 		lang.DefineToken("\\\\")
 		lang.DefineToken("\\'")
 		lang.DefineToken('\\"')

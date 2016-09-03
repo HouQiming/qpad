@@ -121,7 +121,7 @@ struct TColorRule
 	//int bid
 	//int extend_0,extend_1
 	int bmask
-	int extend_before
+	int extend_flags
 
 struct TKeyword
 	string s
@@ -1863,10 +1863,10 @@ class CColorer_programmer
 						evt=TColoringEvent(){rule_id:i8(i)}
 						if mask&mask_i:
 							//we're entering, backtrack
-							evt.ofs=int(I-iptr(lg_token))
+							evt.ofs=(crules[i].extend_flags&1)?int(I-iptr(lg_token)):int(I)
 							evt.direction=i8(1)
 						else
-							evt.ofs=int(I)
+							evt.ofs=(crules[i].extend_flags&2)?int(I):int(I-iptr(lg_token))
 							evt.direction=i8(0)
 						coloring_events.push(evt)
 				mask0=mask
@@ -2211,7 +2211,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			bid=obj_i["bid"].or(0)
 			ret.m_coloring_rules.push(TColorRule(){
 				color_name:obj_i["color_name"].or(""),
-				bmask:1<<bid})
+				bmask:1<<bid,
+				extend_flags:obj_i["extend_flags"].or(3),
+			})
 		/////////
 		//1 bitmask + 1 counter for each nested + 1 min
 		ret.m_total_state_size=3*m_all_key_states.n

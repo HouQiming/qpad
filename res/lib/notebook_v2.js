@@ -1062,6 +1062,7 @@ W.notebook_prototype={
 		cell_i.m_t_unknown_progress=UI.m_frame_tick;
 		cell_i.m_current_path=spath;
 		this.need_auto_scroll=1;
+		this.m_last_focus_cell_id=id*2+1;
 		UI.Refresh()
 	},
 	KillCell:function(id){

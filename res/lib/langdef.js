@@ -71,13 +71,17 @@ LanguageDefinition.prototype={
 		this.m_bracket_types.push({type:real_type,is_key:(type=="key")|0,bid:bid,tok0:tok0,tok1:tok1});
 		return bid;
 	},
-	AddColorRule:function(bid,color_name){
+	AddColorRule:function(bid,color_name,sexclusive){
 		//coloring... bracket range + delta, later-overwrite-earlier rules
 		//nested brackets not allowed
 		if(!(bid<this.m_bracket_types.length&&bid>=0)){
 			throw new Error("bad delimiter id");
 		}
-		this.m_coloring_rules.push({bid:bid,color_name:color_name});
+		this.m_coloring_rules.push({
+			bid:bid,
+			color_name:color_name,
+			extend_flags:(sexclusive=="exclusive"?0:3),
+		});
 		this.m_word_dfa_initial_state.push(-1)
 		this.m_word_dfa_initial_state_triggered.push(-1)
 		return this.m_coloring_rules.length;
