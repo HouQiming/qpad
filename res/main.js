@@ -832,6 +832,20 @@ UI.OpenFile=function(fn){
 	}
 };
 
+UI.EventFilter=function(event){
+	if(event.type==UI.SDL_MOUSEWHEEL){
+		if(UI.IsPressed("LCTRL")||UI.IsPressed("RCTRL")){
+			if(event.y<0){
+				UI.ZoomRelative(1/ZOOM_RATE);
+			}else{
+				UI.ZoomRelative(ZOOM_RATE);
+			}
+			return 0;
+		}
+	}
+	return 1;
+};
+
 (function(){
 	var argv=IO.m_argv;
 	if(argv.length>0){argv.shift();}
@@ -877,4 +891,6 @@ UI.OpenFile=function(fn){
 	if(IO.IsFirstInstance){
 		IO.DeleteFile(fn_hack_pipe)
 	}
-})()
+})();
+
+	

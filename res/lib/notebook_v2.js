@@ -519,7 +519,6 @@ W.notebook_prototype={
 			return 1;
 		})
 		this.AddEventHandler('selectionChange',function(){
-			this.notebook_owner.need_auto_scroll=1;
 			UI.Refresh();
 		})
 		if(!this.read_only){
@@ -639,7 +638,7 @@ W.notebook_prototype={
 		this.m_cells=undefined;
 		this.Load()
 	},
-	NewCell:function(template,id_add_after){
+	NewCell:function(template,id_add_after,is_quiet){
 		var cell_i=(template||{});
 		if(cell_i.m_language==undefined){
 			cell_i.m_language=(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64")?"Windows BAT":'Unix Shell Script';
@@ -666,7 +665,11 @@ W.notebook_prototype={
 		if(this.cell_list&&UI.nd_focus==this.cell_list){
 			this.m_set_focus_cell_list=1;
 		}
-		this.GotoSubCell(cell_i.m_cell_id*2);
+		if(is_quiet){
+			this.m_last_focus_cell_id=cell_i.m_cell_id*2;
+		}else{
+			this.GotoSubCell(cell_i.m_cell_id*2);
+		}
 		this.InvalidateCellList();
 		UI.Refresh();
 	},
@@ -705,7 +708,7 @@ W.notebook_prototype={
 		}
 		if(!create_if_not_found){return -1;}
 		var id=this.m_cells.length;
-		this.NewCell({m_language:s_language,m_text_in:s_mark})
+		this.NewCell({m_language:s_language,m_text_in:s_mark},undefined,"quiet")
 		return id;
 	},
 	DeleteCell:function(id){
@@ -762,7 +765,6 @@ W.notebook_prototype={
 			}
 			doc.SetSelection(ccnt,ccnt)
 		}
-		this.need_auto_scroll=1;
 		UI.Refresh()
 		return 1;
 	},
@@ -931,7 +933,6 @@ W.notebook_prototype={
 			var ccnt_end=ed.GetTextSize()
 			doc.SetSelection(ccnt_end,ccnt_end)
 		}
-		this.need_auto_scroll=1;
 		UI.Refresh()
 	},
 	ClearCellOutput:function(id){
@@ -996,7 +997,6 @@ W.notebook_prototype={
 				this.WriteCellOutput(id,e.stack);
 			}
 			this.need_save|=65536;
-			this.need_auto_scroll=1;
 			UI.Refresh()
 			return;
 		}
@@ -1069,7 +1069,6 @@ W.notebook_prototype={
 		cell_i.m_unknown_progress=0;
 		cell_i.m_t_unknown_progress=UI.m_frame_tick;
 		cell_i.m_current_path=spath;
-		this.need_auto_scroll=1;
 		this.m_last_focus_cell_id=id*2+1;
 		UI.Refresh()
 	},
@@ -1117,37 +1116,6 @@ W.notebook_prototype={
 		UI.SetFocus(doc_in)
 		UI.Refresh()
 	},
-	ScrollShowRange:function(y0,h0, y1,h1){
-		var scroll_y0=this.scroll_y;
-		var h_scrolling_area=this.h;//this is the replaced subwindow h here!
-		if(h_scrolling_area>=h0){
-			this.scroll_y=Math.max(Math.min(this.scroll_y,y0),y0+h0-h_scrolling_area);
-		}else if(h_scrolling_area>=h1){
-			this.scroll_y=Math.max(Math.min(this.scroll_y,y1),y1+h1-h_scrolling_area);
-		}else{
-			this.scroll_y=Math.max(Math.min(this.scroll_y,y1+h1-h_scrolling_area),y1);
-		}
-		this.scroll_y=Math.max(Math.min(this.scroll_y,(this.m_ytot_all_notes||0)-h_scrolling_area),0)
-		this.need_auto_scroll=0;
-		if(this.scroll_y!=scroll_y0){
-			//UI.InvalidateCurrentFrame();
-			UI.Refresh();
-		}
-	},
-	//////////////////////////////
-	//OnMouseWheel:function(event){
-	//	var edstyle=UI.default_styles.code_editor.editor_style;
-	//	var hc=UI.GetCharacterHeight(edstyle.font)/this.scale;
-	//	var scroll_y0=this.scroll_y;
-	//	var h_scrolling_area=this.h/this.scale;
-	//	this.scroll_y+=-hc*event.y;
-	//	this.scroll_y=Math.max(Math.min(this.scroll_y,(this.m_ytot_all_notes||0)-h_scrolling_area),0)
-	//	this.need_auto_scroll=0;
-	//	if(this.scroll_y!=scroll_y0){
-	//		//UI.InvalidateCurrentFrame();
-	//		UI.Refresh();
-	//	}
-	//},
 	InvalidateCellList:function(){
 		this.m_cell_list_old_position=(this.cell_list&&this.cell_list.position);
 		this.cell_list=undefined;
@@ -1451,18 +1419,30 @@ W.NotebookView=function(id,attrs){
 	return obj
 }
 
-UI.OpenNoteBookTab=function(file_name,is_quiet){
-	var layout=UI.m_ui_metadata["<layout>"];
-	layout.m_is_maximized=0;
+UI.BringUpNotebookTab=function(file_name,mode){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
 	file_name=IO.NormalizeFileName(file_name);
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var obj_tab_i=UI.g_all_document_windows[i];
 		if(obj_tab_i.file_name==file_name&&obj_tab_i.document_type=="notebook"){
-			if(!is_quiet){UI.top.app.document_area.SetTab(i)}
+			if(mode=="focus"){
+				UI.top.app.document_area.SetTab(i)
+			}else if(mode=="bringup"){
+				UI.top.app.document_area.BringUpTab(i)
+			}else{
+				//nothing
+			}
 			return obj_tab_i;
 		}
 	}
+	return null;
+};
+UI.OpenNoteBookTab=function(file_name,is_quiet){
+	var layout=UI.m_ui_metadata["<layout>"];
+	layout.m_is_maximized=0;
+	file_name=IO.NormalizeFileName(file_name);
+	var obj_ret=UI.BringUpNotebookTab(file_name,is_quiet?"none":"focus");
+	if(obj_ret){return obj_ret;}
 	var spath=UI.GetPathFromFilename(file_name);
 	var is_default=(spath==IO.NormalizeFileName(IO.GetStoragePath()));
 	UI.top.app.quit_on_zero_tab=0;

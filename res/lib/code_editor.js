@@ -487,12 +487,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		UI.ED_ParserQueueFile(this.m_file_name)
 		this.CallHooks("parse")
 		CallParseMore()
-		//parse one file *immediately*, hopefully it's our file and that's it
-		var ret=UI.ED_ParseMore()
-		if(ret){
-			var doc=UI.g_editor_from_file[ret.file_name];
-			if(doc){
-				doc.m_file_index=ret.file_index;
+		if(this.owner){
+			//parse one file *immediately*, hopefully it's our file and that's it
+			//only do this for user-opened files
+			var ret=UI.ED_ParseMore();
+			if(ret){
+				var doc=UI.g_editor_from_file[ret.file_name];
+				if(doc){
+					doc.m_file_index=ret.file_index;
+				}
 			}
 		}
 	},
@@ -2515,7 +2518,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		var spath_repo=UI.GetEditorProject(doc.m_file_name);
 		ctx.m_repo_path=spath_repo;
 		ctx.m_base_file=doc.m_file_name;
-		ctx.m_result_cell=UI.OpenNotebookCellFromEditor(doc,"Search result","Markdown",1,"output")
+		ctx.m_result_cell=UI.OpenNotebookCellFromEditor(doc,"Search result","Markdown",1)
 		if(ctx.m_result_cell){
 			ctx.m_result_cell.obj_notebook.ClearCellOutput(ctx.m_result_cell.cell_id)
 		}
@@ -6952,6 +6955,18 @@ UI.NewCodeEditorTab=function(fname0){
 		Reload:function(){
 			if(this.main_widget){this.main_widget.Reload();}
 		},
+		OnTabActivate:function(){
+			//bring up the notebook if available
+			if(UI.TestOption("notebook_autoswitch")){
+				var spath_repo=UI.GetEditorProject(this.file_name,"polite");
+				if(spath_repo){
+					var fn_notebook=IO.NormalizeFileName(spath_repo+"/notebook.json");
+					UI.BringUpNotebookTab(fn_notebook,"bringup");
+					this.z_order=UI.g_current_z_value;
+					UI.g_current_z_value++;
+				}
+			}
+		},
 		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
 };
@@ -7489,6 +7504,7 @@ W.OptionsPage=function(id,attrs){
 				{name:UI._('Allow \u2190/\u2192 to cross lines'),stable_name:'left_right_line_wrap'},
 				{name:UI._('Move forward old tabs when manually opened'),stable_name:'explicit_open_mtf'},
 				{name:UI._('Automatically close stale tabs'),stable_name:'close_stale'},
+				{name:UI._('Auto-switch notebooks'),stable_name:'notebook_autoswitch'},
 			];
 			plugin_items["Tools"]=[];
 			if(UI.InstallQPad){
@@ -7577,7 +7593,9 @@ W.OptionsPage=function(id,attrs){
 				object_type:W.FeatureItem,
 				owner:obj,
 			},items:obj.plugin_view_items})
-		W.Hotkey("",{key:"ESC",action:function(){UI.top.app.document_area.CloseTab();}})
+		if(obj.activated){
+			W.Hotkey("",{key:"ESC",action:function(){UI.top.app.document_area.CloseTab();}});
+		}
 	UI.End()
 	return obj
 }
@@ -7605,6 +7623,7 @@ UI.RegisterUtilType("preferences",function(){return UI.NewTab({
 		var body=W.OptionsPage('body',{
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'owner':obj_real,
+			'activated':this==UI.top.app.document_area.active_tab,
 			'x':0,'y':0});
 		this.util_widget=body;
 		//if(had_body&&!tab_frontmost){

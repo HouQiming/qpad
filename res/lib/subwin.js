@@ -275,6 +275,10 @@ W.TabbedDocument_prototype={
 				}
 			}
 		}
+		var tab1=this.items[tabid];
+		if(tab1&&tab1.OnTabActivate){
+			tab1.OnTabActivate();
+		}
 		if(this.current_tab_id!=tabid){
 			//for close hack
 			this.just_created_a_tab=0;
@@ -498,6 +502,9 @@ W.TabbedDocument_prototype={
 							side="right";
 						}
 					}
+					if(fx>0.382&&fx<0.618&&fy>0.382&&fy<0.618){
+						side=undefined;
+					}
 					target_position={
 						score:dist,name:area_i.name,area_id:i,
 						split_side:side,
@@ -612,14 +619,17 @@ W.TabbedDocument_prototype={
 					this.items[i].__global_tab_id=i;
 					this[i]=undefined;
 				}
+				var tab0_did=0;
 				for(var i=0;i<this.items.length;i++){
 					if(i==target_position.tabid){
 						new_items.push(tab0);
+						tab0_did=1;
 					}
 					if(i==this.m_dragging_tab_src_tabid){continue;}
 					new_items.push(this.items[i]);
 				}
-				if(this.items.length==target_position.tabid){
+				//if(this.items.length==target_position.tabid)
+				if(!tab0_did){
 					new_items.push(tab0);
 				}
 				///////////////
