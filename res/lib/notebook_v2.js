@@ -1330,35 +1330,37 @@ W.NotebookView=function(id,attrs){
 		}
 	}
 	//coulddo: tool bar
-	var menu_notebook=undefined;
-	menu_notebook=UI.BigMenu("Note&book");
-	menu_notebook.AddNormalItem({
-		text:"&New cell",
-		icon:'新',enable_hotkey:1,key:"CTRL+M",action:obj.NewCell.bind(obj)})
-	if(cur_cell&&!obj.m_cells[focus_cell_id>>1].m_proc&&!(focus_cell_id&1)){
+	if(obj.activated){
+		var menu_notebook=undefined;
+		menu_notebook=UI.BigMenu("Note&book");
 		menu_notebook.AddNormalItem({
-			text:"&Run cell",
-			enable_hotkey:1,key:"CTRL+RETURN",action:(function(){
-				this.RunCell(focus_cell_id>>1)
-			}).bind(obj)})
-	}
-	if(cur_cell){
-		obj.m_last_focus_cell_id=focus_cell_id;
-		menu_notebook.AddNormalItem({
-			text:"&Delete cell",
-			enable_hotkey:1,key:"SHIFT+CTRL+X",
-			action:obj.DeleteCell.bind(obj,focus_cell_id>>1)})
-		menu_notebook.AddNormalItem({
-			text:"&Clone cell",
-			action:obj.DupCell.bind(obj)});
-		if(cur_cell.m_text_out&&cur_cell.m_text_out.ed.GetTextSize()){
+			text:"&New cell",
+			icon:'新',enable_hotkey:1,key:"CTRL+M",action:obj.NewCell.bind(obj)})
+		if(cur_cell&&!obj.m_cells[focus_cell_id>>1].m_proc&&!(focus_cell_id&1)){
 			menu_notebook.AddNormalItem({
-				text:"Clear &output",
-				enable_hotkey:1,key:"SHIFT+CTRL+C",
-				action:obj.ClearCellOutput.bind(obj,focus_cell_id>>1)})
+				text:"&Run cell",
+				enable_hotkey:1,key:"CTRL+RETURN",action:(function(){
+					this.RunCell(focus_cell_id>>1)
+				}).bind(obj)})
 		}
+		if(cur_cell){
+			obj.m_last_focus_cell_id=focus_cell_id;
+			menu_notebook.AddNormalItem({
+				text:"&Delete cell",
+				enable_hotkey:1,key:"SHIFT+CTRL+X",
+				action:obj.DeleteCell.bind(obj,focus_cell_id>>1)})
+			menu_notebook.AddNormalItem({
+				text:"&Clone cell",
+				action:obj.DupCell.bind(obj)});
+			if(cur_cell.m_text_out&&cur_cell.m_text_out.ed.GetTextSize()){
+				menu_notebook.AddNormalItem({
+					text:"Clear &output",
+					enable_hotkey:1,key:"SHIFT+CTRL+C",
+					action:obj.ClearCellOutput.bind(obj,focus_cell_id>>1)})
+			}
+		}
+		menu_notebook=undefined;
 	}
-	menu_notebook=undefined;
 	UI.FlushTopMostContext(n0_topmost)
 	UI.PopSubWindow()
 	obj.x=bk_dims[0];obj.y=bk_dims[1];obj.w=bk_dims[2];obj.h=bk_dims[3];

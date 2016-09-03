@@ -750,7 +750,7 @@ UI.CustomTheme=function(){
 						text_color:C,
 					},
 					down:{
-						text_color:L?0xff444444:0xffcccccc,
+						text_color:C_dark,
 					},
 				}
 			},
@@ -1024,7 +1024,47 @@ UI.CustomTheme=function(){
 			},
 		},
 		top_menu:{
-			//nothing
+			toolbar:{
+				buttons:[
+					"goto","去",
+					"run","放",
+					"save","存",
+					"undo","撤",
+					"redo","做",
+					"back","左",
+					"fwd","右",
+				],
+				padding:8,
+				button_size:28,
+				button_style:{
+					transition_dt:0.1,
+					round:0,
+					font:UI.Font(UI.icon_font_name,18),border_width:0,padding:2,
+					border_color:0,color:0,
+					text_color:0,
+					$:{
+						out:{
+							text_color:L?0xff000000:0xffe8e8e8,
+						},
+						over:{
+							text_color:C,
+						},
+						down:{
+							text_color:C_dark,
+						},
+						//////
+						checked_out:{
+							text_color:L?0xffcccccc:0xff7f7f7f,
+						},
+						checked_over:{
+							text_color:L?0xffcccccc:0xff7f7f7f,
+						},
+						checked_down:{
+							text_color:L?0xffcccccc:0xff7f7f7f,
+						},
+					}
+				},
+			},
 		},
 		top_menu_item:{
 			font:UI.Font(UI.font_name,22,-50),

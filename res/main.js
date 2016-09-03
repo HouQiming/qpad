@@ -426,6 +426,11 @@ var CreateMenus=function(){
 		menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
 			UI.top.app.document_area.SaveCurrent();
 		}});
+		if(doc_area.active_tab.need_save){
+			UI.ToolButton("save",{tooltip:"Save - CTRL+S",action:function(){
+				UI.top.app.document_area.SaveCurrent();
+			}})
+		}
 	}
 	if(doc_area.active_tab&&doc_area.active_tab.SaveAs){
 		if(UI.Platform.ARCH=="web"){
@@ -775,30 +780,14 @@ UI.Application=function(id,attrs){
 };
 
 if(UI.Platform.ARCH=="mac"){
-	/*
-	todo: mac
-		tell application "System Events"
-		    count (every process whose name is "BBEdit")
-		end tell
-		tell application "System Events"
-		    set theprocs to every process whose unix id is myProcessId
-		    repeat with proc in theprocs
-		        set the frontmost of proc to true
-		    end repeat
-		end tell
-
-		tell application "Finder" to select file "" of folder ""
-	*/
-	IO.IsFirstInstance=function(){
-		//todo
+	IO.SetForegroundProcess=function(pid){
+		IO.Shell(["osascript",
+			"-e",'tell application "QPad" to activate'])
 		return 1;
 	};
-	IO.SetForegroundProcess=function(pid){
-		//todo
-		return 0;
-	};
 	UI.ShowInFolder=function(fn){
-		//todo
+		IO.Shell(["osascript",
+			"-e",'tell application "Finder" to reveal POSIX file "'+fn+'"'])
 	}
 }
 

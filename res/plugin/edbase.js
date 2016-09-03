@@ -1133,14 +1133,18 @@ UI.RegisterEditorPlugin(function(){
 				}
 			}.bind(this)})
 		}else{*/
-		menu_run.AddNormalItem({text:"Build / &run file",icon:"放",enable_hotkey:1,key:"CTRL+F5",action:function(){
+		var frunfile=function(){
 			if(this.NeedSave()&&this.owner){this.owner.Save();}
 			if(this.NeedSave()){
 				return;
 			}
 			fruncell(0)
-		}.bind(this)})
+		}.bind(this);
+		menu_run.AddNormalItem({text:"Build / &run file",icon:"放",enable_hotkey:1,key:"CTRL+F5",action:frunfile})
 		/*}*/
+		if(UI.HasFocus(this)&&obj_buildenv){
+			UI.ToolButton("run",{tooltip:"Run - CTRL+F5",action:frunfile})
+		}
 		menu_run.AddNormalItem({text:"Build / run project",enable_hotkey:1,key:"F5",action:function(){
 			//coulddo: save other files in the project
 			if(this.NeedSave()&&this.owner){this.owner.Save();}
@@ -3088,12 +3092,18 @@ UI.RegisterEditorPlugin(function(){
 			var doc=this;
 			menu_search.AddSeparator();
 			menu_search.AddButtonRow({text:"Navigate"},[
-				{text:"\u2190",tooltip:"Back - CTRL+ALT+MINUS",action:function(){
+				{text:"navigate_back",icon:"左",tooltip:"Back - CTRL+ALT+MINUS",action:function(){
 					fprevhist.call(doc)
-				}},{text:"\u2192",tooltip:"Forward - CTRL+ALT+PLUS",action:function(){
+				}},{text:"navigate_fwd",icon:"右",tooltip:"Forward - CTRL+ALT+PLUS",action:function(){
 					//text:"&select to"
 					fnexthist.call(doc)
 				}}])
+			if(UI.g_cursor_history_undo.length>0){
+				UI.ToolButton("back",{tooltip:"Back - CTRL+ALT+MINUS",action:fprevhist.bind(doc)})
+			}
+			if(UI.g_cursor_history_redo.length>0){
+				UI.ToolButton("fwd",{tooltip:"Forward - CTRL+ALT+PLUS",action:fnexthist.bind(doc)})
+			}
 		}
 	})
 })//.prototype.desc={category:"Controls",name:"Cursor history navigation",stable_name:"cursor_hist"};
@@ -3233,12 +3243,12 @@ UI.RegisterEditorPlugin(function(){
 		var menu_convert=UI.BigMenu("Con&vert")
 		var tab_width=UI.GetOption("tab_width",4);
 		//var s_tab_space=Array(tab_width+1).join(' ');
-		menu_convert.AddNormalItem({text:"Leading &tabs to spaces",action:
+		menu_convert.AddNormalItem({icon:"空",text:"Leading &tabs to spaces",action:
 			fsmart_replace.bind(this,"^[ \t]+",function(smatch){
 				//return Array(smatch.length+1).join(s_tab_space);
 				return UI.ED_NativeToSpace(smatch,tab_width)
 			})})
-		menu_convert.AddNormalItem({text:"Leading &spaces to tabs",action:
+		menu_convert.AddNormalItem({icon:"表",text:"Leading &spaces to tabs",action:
 			//("+s_tab_space+")
 			fsmart_replace.bind(this,"^[ \t]+",function(smatch){
 				//return Array((((smatch.length+tab_width-1)/tab_width)|0)+1).join('\t');

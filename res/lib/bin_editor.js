@@ -1200,6 +1200,12 @@ W.BinaryEditor=function(id,attrs){
 			menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:0,key:"SHIFT+CTRL+Z",action:function(){
 				obj.Redo()
 			}})
+			if(obj.undo_queue.length>0){
+				UI.ToolButton("undo",{tooltip:"Undo - CTRL+Z",action:function(){obj.Undo();}})
+			}
+			if(obj.redo_queue.length>0){
+				UI.ToolButton("redo",{tooltip:"Redo - SHIFT+CTRL+Z",action:function(){obj.Redo();}})
+			}
 			menu_edit=undefined;
 			var menu_search=UI.BigMenu("&Search")
 			menu_search.AddNormalItem({text:"&Find...",icon:"s",enable_hotkey:1,key:'CTRL+F',action:function(){

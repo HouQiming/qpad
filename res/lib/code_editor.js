@@ -6191,10 +6191,16 @@ W.CodeEditor=function(id,attrs){
 				var menu_edit=UI.BigMenu("&Edit")
 				menu_edit.AddNormalItem({text:"&Undo",icon:"撤",enable_hotkey:0,key:"CTRL+Z",action:function(){
 					doc.Undo()
-				}})
+				}});
 				menu_edit.AddNormalItem({text:"&Redo",icon:"做",enable_hotkey:0,key:"SHIFT+CTRL+Z",action:function(){
 					doc.Redo()
-				}})
+				}});
+				if(doc.ed.GetUndoQueueLength()>0){
+					UI.ToolButton("undo",{tooltip:"Undo - CTRL+Z",action:function(){doc.Undo();}})
+				}
+				if(doc.ed.GetRedoQueueLength()>0){
+					UI.ToolButton("redo",{tooltip:"Redo - SHIFT+CTRL+Z",action:function(){doc.Redo();}})
+				}
 				///////////////////////
 				menu_edit.AddSeparator()
 				menu_edit.AddNormalItem({text:"Select &all",enable_hotkey:0,key:"CTRL+A",action:function(){
@@ -6312,6 +6318,7 @@ W.CodeEditor=function(id,attrs){
 				menu_search.AddSeparator();
 				menu_search.AddNormalItem({text:"&Go to...",icon:'去',enable_hotkey:1,key:"CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GOTO)})
 				menu_search.AddNormalItem({text:"Go to ... in project",enable_hotkey:1,key:"SHIFT+CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GLOBAL_GOTO)})
+				UI.ToolButton("goto",{tooltip:"Go to - CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GOTO)})
 				var neib=doc.ed.GetUtf8CharNeighborhood(doc.sel1.ccnt);
 				if(UI.g_goto_definition_context&&obj.m_prev_next_button_drawn!=UI.m_frame_tick){
 					//render the current gotodef context, and put up #/# text as notification

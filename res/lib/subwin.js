@@ -394,6 +394,7 @@ W.TabbedDocument_prototype={
 				UI.SetFocus(UI.m_frozen_global_menu.bk_focus)
 			}
 			UI.m_frozen_global_menu=undefined;
+			this.main_menu_bar=undefined;
 		}
 		UI.Refresh()
 	},
@@ -1081,7 +1082,7 @@ var SortTabsByArea=function(layout,obj){
 	}
 }
 
-var TranslateTooltip=function(s){
+UI.TranslateTooltip=function(s){
 	if(!s){return s;}
 	var s=UI._(s);
 	var p_hotkey=s.indexOf(' - ');
@@ -1136,6 +1137,8 @@ W.TabbedDocument=function(id,attrs){
 			w_menu_button=0;
 		}
 		var w_menu=w_menu_button;
+		//reset the toolbar buttons
+		UI.m_toolbar_buttons={};
 		//the big menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
 		UI.BigMenu("&File");
@@ -1307,7 +1310,7 @@ W.TabbedDocument=function(id,attrs){
 					W.TabLabel(tab_j.__global_tab_id,{
 						x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
 						selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
-						title:tab_j.title, tooltip:TranslateTooltip(tab_j.tooltip),
+						title:tab_j.title, tooltip:UI.TranslateTooltip(tab_j.tooltip),
 						hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
 						alpha:tab_alphas[tab_j.__global_tab_id],
 						tabid:tab_j.__global_tab_id,owner:obj})
@@ -1323,7 +1326,7 @@ W.TabbedDocument=function(id,attrs){
 					x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
 					w:w_src_at_target,h:area_i.h,
 					selected:2,
-					title:tab_dragging_src.title, tooltip:TranslateTooltip(tab_dragging_src.tooltip),
+					title:tab_dragging_src.title, tooltip:UI.TranslateTooltip(tab_dragging_src.tooltip),
 					hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
 					alpha:tab_alphas[tab_dragging_src.__global_tab_id],
 					tabid:tab_dragging_src.__global_tab_id,owner:obj})
@@ -1371,7 +1374,7 @@ W.TabbedDocument=function(id,attrs){
 							W.TabLabel(tab_j.__global_tab_id,{
 								x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
 								selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
-								title:tab_j.title, tooltip:TranslateTooltip(tab_j.tooltip),
+								title:tab_j.title, tooltip:UI.TranslateTooltip(tab_j.tooltip),
 								hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
 								alpha:tab_alphas[tab_j.__global_tab_id],
 								tabid:tab_j.__global_tab_id,owner:obj})
@@ -1412,7 +1415,7 @@ W.TabbedDocument=function(id,attrs){
 				x:obj.x+obj.w-obj.padding-obj.w_menu_button,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),
 				w:obj.w_menu_button,h:obj.h_menu_button,
 				style:obj.menu_button_style,
-				tooltip:TranslateTooltip('Restore tab size - ESC'),
+				tooltip:UI.TranslateTooltip('Restore tab size - ESC'),
 				font:UI.icon_font,text:"还",
 				value:0,
 				OnClick:function(){
@@ -1450,7 +1453,10 @@ W.TabbedDocument=function(id,attrs){
 				//	var bk_listview=obj.main_menu_bar.list_view;
 				//	obj.main_menu_bar={list_view:bk_listview};
 				//}
-				obj.main_menu_bar=undefined;
+				if(obj.main_menu_bar){
+					obj.main_menu_bar.list_view=undefined;
+				}
+				//obj.main_menu_bar=undefined;
 				obj.m_menu_preselect=undefined;
 			}
 			if(w_menu_bar>0){
@@ -1854,6 +1860,38 @@ W.TopMenuBar=function(id,attrs){
 		})
 		UI.PopCliprect()
 		UI.context_tentative_focus=bk_tentative_focus;
+		////////////////
+		//toolbar buttons
+		var x_toolbar_end=obj.x+obj.w-obj.list_view.w;
+		var n_buttons=(obj.toolbar.buttons.length>>1);
+		var x_buttons=obj.x+obj.w-(n_buttons*obj.toolbar.button_size+obj.toolbar.padding);
+		if(x_toolbar_end+obj.toolbar.padding<x_buttons){
+			for(var i=0;i<n_buttons;i++){
+				//UI.m_toolbar_buttons
+				var stable_name=obj.toolbar.buttons[i*2+0];
+				var s_icon=obj.toolbar.buttons[i*2+1];
+				var desc=UI.m_toolbar_buttons[stable_name];
+				W.Button("tbbtn_"+stable_name,{
+					x:x_buttons,
+					y:obj.y+(obj.h-obj.toolbar.button_size)*0.5,
+					w:obj.toolbar.button_size,
+					h:obj.toolbar.button_size,
+					value:!desc,
+					text:s_icon,
+					desc:desc,
+					tooltip:desc&&desc.tooltip,
+					style:obj.toolbar.button_style,
+					OnClick:function(){
+						if(this.desc){
+							this.desc.action();
+							UI.Refresh();
+						}
+					},
+				});
+				x_buttons+=obj.toolbar.button_size;
+			}
+		}
+		////////////////
 		if(!obj.m_show_sub_menus&&obj.owner.m_is_in_menu){
 			W.Hotkey("",{key:"DOWN",action:fshow_sub_menus})
 			W.Hotkey("",{key:"RETURN RETURN2",action:ftoggle_sub_menus})
@@ -1875,7 +1913,11 @@ W.TopMenuBar=function(id,attrs){
 	UI.End()
 	desc=undefined;
 	return obj;
-}
+};
+
+UI.ToolButton=function(name,desc){
+	UI.m_toolbar_buttons[name]=desc;
+};
 
 W.FancyMenu_prototype={
 	OnBlur:function(obj_new){
@@ -2069,7 +2111,7 @@ W.FancyMenu=function(id,attrs){
 				value:selected,
 				show_tooltip_override:selected,
 				style:obj.button_style,
-				tooltip:TranslateTooltip(item_i.tooltip),
+				tooltip:UI.TranslateTooltip(item_i.tooltip),
 				flags:8})
 		}else if(s_type=='separator'){
 			UI.RoundRect({x:obj.x+item_i.x,y:obj.y+item_i.y,w:item_i.w,h:obj.h_separator_fill,

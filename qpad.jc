@@ -25,6 +25,23 @@ if Platform.ARCH=="ios":
 	__generate_json("icon_file","icon_ios.png")
 else if Platform.ARCH=="mac":
 	__generate_json("icon_file","icon1k.png")
+	__generate_json("extra_plist_keys","
+		<key>CFBundleDocumentTypes</key>
+		<array>
+		    <dict>
+		        <key>CFBundleTypeName</key>
+		        <string>QPad document</string>
+		        <key>CFBundleTypeRole</key>
+		        <string>Editor</string>
+		        <key>LSHandlerRank</key> 
+		        <string>Alternate</string> 
+		        <key>LSItemContentTypes</key>
+		        <array>
+		            <string>public.data</string>
+		        </array>
+		    </dict>
+		</array>
+	")
 else
 	__generate_json("icon_file","icon256.png")
 __generate_json("icon_win","iconwin.ico")
@@ -406,8 +423,13 @@ if Platform.BUILD=="debug":
 			return JS.Return(sret)
 		}
 	else if Platform.ARCH=="mac":
-		//osal_DoFileDialogMac=__c_function(int,"osal_DoFileDialogMac","filedlg.h","c_files","filedlg_mac.m")
-		//__generate_json("mac_frameworks","System/Library/Frameworks/AppKit.framework")
+		jsio["IsFirstInstance"]=function(JSContext JS){
+			UnixIsFirstInstance=__c_function(int,"UnixIsFirstInstance","c_helper.h","c_files","c_helper.c")
+			if UnixIsFirstInstance():
+				return JS.Return(1)
+			else
+				return 0
+		}
 	if Platform.IS_MOBILE||Platform.ARCH=="rasppi"||Platform.ARCH=="web":
 		jsio["DoFileDialog"]=function(JSContext JS){
 			return 0
