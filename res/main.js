@@ -66,17 +66,7 @@ UI.icon_font_20=UI.Font(UI.icon_font_name,20);
 (function(){
 	//for theme, we always eval the default theme first in case the custom one is only partially defined
 	eval(IO.UIReadAll("res/misc/conf_theme.js"));
-	var fn_full=IO.GetStoragePath()+"/conf_theme.js";
-	var s0=IO.ReadAll(fn_full);
-	if(s0){
-		try{
-			eval(s0);
-		}catch(error){
-			error.message=[error.message," (",fn_full,")"].join("");
-			throw error;
-		}
-	}
-})()
+})();
 UI.ApplyTheme(UI.CustomTheme());
 
 UI.ReadOptionalConfigScript("conf_keymap.js");
@@ -788,6 +778,8 @@ if(UI.Platform.ARCH=="mac"){
 	UI.ShowInFolder=function(fn){
 		IO.Shell(["osascript",
 			"-e",'tell application "Finder" to reveal POSIX file "'+fn+'"'])
+		IO.Shell(["osascript",
+			"-e",'tell application "Finder" to activate'])
 	}
 }
 

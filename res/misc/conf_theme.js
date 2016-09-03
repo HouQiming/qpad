@@ -11,18 +11,53 @@ UI.Theme_Minimalistic(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
 //UI.Theme_Minimalistic(0xffb4771f);
 UI.interpolators.border_color_active=UI.interpolators.color;
 UI.interpolators.border_color=UI.interpolators.color;
+UI.g_core_theme={};
+UI.g_core_theme_template={};
+UI.g_theme_parsing_error='';
+var GetThemeColor=function(name,C){
+	var ret=UI.g_core_theme[name];
+	UI.g_core_theme_template[name]=C;
+	if(ret==undefined){
+		return C;
+	}else{
+		return ret;
+	}
+};
 UI.CustomTheme=function(){
-	var L=UI.TestOption("use_light_theme");
+	//try to reload the json theme
+	var fn_full=IO.GetStoragePath()+"/theme.json";
+	var s0=IO.ReadAll(fn_full);
+	if(s0){
+		UI.g_core_theme={};
+		UI.g_theme_parsing_error='';
+		try{
+			UI.g_core_theme=JSON.parse(s0);
+			for(var k in UI.g_core_theme){
+				var value=UI.g_core_theme[k];
+				if(typeof(value)=='string'){
+					UI.g_core_theme[k]=parseInt(value,16);
+				}
+			}
+		}catch(error){
+			if(UI.Platform.BUILD=="debug"){
+				console.log(error.stack);
+			}
+			UI.g_theme_parsing_error=error.toString();
+			UI.g_core_theme={};
+		}
+	}
+	var L=GetThemeColor("is_light",UI.TestOption("use_light_theme"));
+	var C_default_theme=(UI.Platform.BUILD=="debug"?0xff1c1ae3:0xffb4771f);
 	if(L){//light
-		var C=UI.current_theme_color;
+		var C=GetThemeColor("ui",C_default_theme);
 		var C_dark=UI.lerp_rgba(C,0xff000000,0.15)
 		var C_sel=UI.lerp_rgba(C,0xffffffff,0.66)
 		var C_raw=C;
 	}else{
-		var C=UI.lerp_rgba(UI.current_theme_color,0xff000000,0.25);
+		var C=UI.lerp_rgba(GetThemeColor("ui",C_default_theme),0xff000000,0.25);
 		var C_dark=UI.lerp_rgba(C,0xff000000,0.15)
 		var C_sel=UI.lerp_rgba(C,0xff444444,0.66)
-		var C_raw=UI.current_theme_color
+		var C_raw=GetThemeColor("ui",C_default_theme);
 	}
 	//var C_shadow=(UI.TestOption('enable_srgb')?(L?0x7f000000:0xaa000000):(L?0x55000000:0x7f000000));
 	var C_shadow=0xaa000000;
@@ -371,33 +406,33 @@ UI.CustomTheme=function(){
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",26,0),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",26,200),
 				font_tilde:UI.Font(UI.icon_font_name,26,100),
-				color:L?0xff000000:0xffbfdfdf,
-				color2:L?0xff000000:0xffbfdfdf,
-				color_normal:L?0xff000000:0xffbfdfdf,
-				color_overlay:L?0xff7f7f7f:0xffaaaaaa,
-				color_string:L?0xff1c1aa3:0xff0055ff,
-				color_number:L?0xff1c1aa3:0xffcfcc8a,
-				color_comment:L?0xff2ca033:0xff7f9f7f,
-				color_keyword:L?0xffb4771f:0xffaceaea,
-				color_type:L?0xffbc470f:0xff8fcfff,
-				color_symbol:L?0xff7f7f7f:0xffccdcdc,
-				color_symbol2:L?0xff7f7f7f:0xffccdcdc,
-				color_meta:L?0xff9a3d6a:0xff8fafdf,
+				color:GetThemeColor("normal",L?0xff000000:0xffbfdfdf),
+				color2:GetThemeColor("normal",L?0xff000000:0xffbfdfdf),
+				color_normal:GetThemeColor("normal",L?0xff000000:0xffbfdfdf),
+				color_overlay:GetThemeColor("overlay",L?0xff7f7f7f:0xffaaaaaa),
+				color_string:GetThemeColor("string",L?0xff1c1aa3:0xff0055ff),
+				color_number:GetThemeColor("number",L?0xff1c1aa3:0xffcfcc8a),
+				color_comment:GetThemeColor("comment",L?0xff2ca033:0xff7f9f7f),
+				color_keyword:GetThemeColor("keyword",L?0xffb4771f:0xffaceaea),
+				color_type:GetThemeColor("type",L?0xffbc470f:0xff8fcfff),
+				color_symbol:GetThemeColor("symbol",L?0xff7f7f7f:0xffccdcdc),
+				color_symbol2:GetThemeColor("symbol",L?0xff7f7f7f:0xffccdcdc),
+				color_meta:GetThemeColor("meta",L?0xff9a3d6a:0xff8fafdf),
 				/////////////
-				color_key_decl_func:L?0xff845717:0xffaceaea,
-				color_key_decl_class:L?0xffbc470f:0xff8fcfff,
-				color_key_decl_macro:L?0xff9a3d6a:0xff8fafdf,
+				color_key_decl_func:GetThemeColor("func",L?0xff845717:0xffaceaea),
+				color_key_decl_class:GetThemeColor("class",L?0xffbc470f:0xff8fcfff),
+				color_key_decl_macro:GetThemeColor("macro",L?0xff9a3d6a:0xff8fafdf),
 				/////////////
 				//virtual hyphen for tex-like files, should be even less obvious than normal symbols
-				color_hyphen:L?0xffaaaaaa:0xff555555,
-				color_tilde_spell_error:L?0xff1c1aa3:0xff5555ff,
-				color_tilde_compiler_error:L?0xff1c1aa3:0xff5555ff,
-				color_tilde_compiler_warning:L?0xff2ca033:0xff55ff55,
+				color_hyphen:GetThemeColor("hyphen",L?0xffaaaaaa:0xff555555),
+				color_tilde_spell_error:GetThemeColor("spell_error",L?0xff1c1aa3:0xff5555ff),
+				color_tilde_compiler_error:GetThemeColor("compiler_error",L?0xff1c1aa3:0xff5555ff),
+				color_tilde_compiler_warning:GetThemeColor("compiler_warning",L?0xff2ca033:0xff55ff55),
 				/////////////
-				color_completing_bracket:L?0x80999999:0x80666666,
-				color_auto_edit_range_highlight:L?0x4099ffff:0x40447f7f,
-				color_strikeout:L?0x80444444:0x80e8e8e8,
-				color_virtual_diff_bold:L?0xff1c1aa3:0xff5555ff,
+				color_completing_bracket:GetThemeColor("completing_bracket",L?0x80999999:0x80666666),
+				color_auto_edit_range_highlight:GetThemeColor("auto_edit_range_highlight",L?0x4099ffff:0x40447f7f),
+				color_strikeout:GetThemeColor("strikeout",L?0x80444444:0x80e8e8e8),
+				color_virtual_diff_bold:GetThemeColor("virtual_diff_bold",L?0xff1c1aa3:0xff5555ff),
 				/////////////
 				bgcolor_ellipsis:L?[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}]:[{x:0,y:0,color:C_sel},{x:1,y:1,color:0xff3f3f3f}],
 				w_ellipsis:32,
@@ -412,7 +447,7 @@ UI.CustomTheme=function(){
 				caret_flicker:500,
 				/////////////
 				//rectex_styles:[{color:0,w:32,h:32,round:8,border_width:3,border_color:0xff1c1aa3}],
-				rectex_styles:[{color:L?0x7f00ffff:0x7faaaa55,w:32,h:32,round:8,border_width:-8}],
+				rectex_styles:[{color:GetThemeColor("find_highlight",L?0x7f00ffff:0x7faaaa55),w:32,h:32,round:8,border_width:-8}],
 				page_guard_lines:3,
 			},
 			bgcolor:L?0xffe8e8e8:0xff3f3f3f,

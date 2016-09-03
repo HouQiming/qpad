@@ -7336,9 +7336,42 @@ UI.RegisterEditorPlugin(function(){
 UI.CustomizeConfigScript=function(fn){
 	var fn_full=IO.GetStoragePath()+"/"+fn;
 	if(!IO.FileExists(fn)){
-		IO.CreateFile(fn_full,IO.UIReadAll("res/misc/"+fn));
+		var s_content=undefined;
+		if(fn=='theme.json'){
+			var a_content=[];
+			a_content.push('{\n');
+			for(var k in UI.g_core_theme_template){
+				a_content.push('\t"',k,'":',k=='is_light'?UI.g_core_theme_template[k]:JSON.stringify(UI.g_core_theme_template[k].toString(16)),',\n');
+			}
+			a_content.pop();
+			a_content.push('\n}\n');
+			s_content=a_content.join('');
+		}else{
+			s_content=IO.UIReadAll("res/misc/"+fn);
+		}
+		IO.CreateFile(fn_full,s_content);
 	}
-	UI.OpenEditorWindow(fn_full)
+	UI.OpenEditorWindow(fn_full,function(){
+		if(fn=='theme.json'){
+			//coulddo: "reset to default" in right-click menu - delete the file and re-generate it
+			this.m_event_hooks['save']=[function(){
+				UI.ApplyTheme(UI.CustomTheme());
+				if(this.owner){
+					if(UI.g_theme_parsing_error){
+						this.owner.CreateNotification({id:'theme_error',icon:'警',text:"Bad theme:\n  "+UI.g_theme_parsing_error});
+						var match=UI.g_theme_parsing_error.match(/at offset ([0-9]+)/);
+						if(match){
+							var ccnt=Math.min(Math.max(parseInt(match[1])-1,0),this.ed.GetTextSize());
+							this.SetSelection(ccnt,ccnt);
+						}
+					}else{
+						this.owner.DismissNotification('theme_error');
+					}
+				}
+				UI.RefreshAllTabs();
+			}];
+		}
+	})
 }
 
 W.FeatureItem=function(id,attrs){
@@ -7537,7 +7570,7 @@ W.OptionsPage=function(id,attrs){
 			plugin_items["Display"].push(
 				{name:UI._('Create FBO for linear rendering'),stable_name:'software_srgb'},
 				{name:UI._('Enable smart repainting'),stable_name:'enable_smart_tab_repainting'},
-				{special:'customize',h_special:4,text:UI._("Customize the theme script"),file:"conf_theme.js"},
+				{special:'customize',h_special:4,text:UI._("Customize the theme"),file:"theme.json"},
 				{special:'customize',h_special:4,text:UI._("Customize the translation script"),file:"conf_translation.js"}
 			);
 			/////////////////

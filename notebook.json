@@ -2,7 +2,7 @@
  "cells": [
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\nmore concise theme system\n\tthe in-document colors\n\tthe one true UI color\n\tit's fine to be geeky here\nkeep case when replacing in case insensitive mode\nbad scrolling for \\r\nmac\n\t(test) show in folder\n\tzoom hotkey, tab-switch hotkey\n\tsystem menu\nnew release\n\tlinux source .tar.gz\n\t\tbuild-it-yourself release\nmultiple windows of the same file\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nsave notebook wrapping status\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nindent\n\tauto detect space / tab indent\ncode beautifier\n\thelp code auto beautification\ndiff / undo on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties\n\texplanation in AC sources\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nshort and simple theme color palette\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nfileindex gc vs parse queue\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\n[ new window ] and [ button: ... ] in help\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\n",
+   "m_text_in": "# TODO LIST\nkeep case when replacing in case insensitive mode\nbad scrolling for \\r\nmac\n\t(test) show in folder\n\tzoom hotkey, tab-switch hotkey\n\tsystem menu\nnew release\n\tlinux source .tar.gz\n\t\tbuild-it-yourself release\nmultiple windows of the same file\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nsave notebook wrapping status\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nindent\n\tauto detect space / tab indent\ncode beautifier\n\thelp code auto beautification\ndiff / undo on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties\n\texplanation in AC sources\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nshort and simple theme color palette\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nfileindex gc vs parse queue\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\n[ new window ] and [ button: ... ] in help\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\n",
    "m_text_out": "",
    "m_cell_id": 0,
    "m_has_any_error": 0,
@@ -27,15 +27,15 @@
     8,
     2,
     20,
-    6,
-    10,
+    49,
+    18,
     6
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug",
-   "m_unknown_progress": 0.961769141443392,
-   "m_t_unknown_progress": 75927279264
+   "m_unknown_progress": 1.2470024914317817,
+   "m_t_unknown_progress": 84519189266
   },
   {
    "m_language": "Windows BAT",
