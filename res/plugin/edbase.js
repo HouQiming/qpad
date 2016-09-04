@@ -1561,6 +1561,7 @@ UI.RegisterEditorPlugin(function(){
 				this.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
 				this.AutoScroll("show")
 				this.scrolling_animation=undefined
+				this.CallHooks("wrap")
 				UI.Refresh()
 			}.bind(this)})
 			menu_edit=undefined;

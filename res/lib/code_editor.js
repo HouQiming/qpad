@@ -118,6 +118,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks['close']=[]
 		this.m_event_hooks['parse']=[]
 		this.m_event_hooks['menu']=[]
+		this.m_event_hooks['wrap']=[]
 		this.m_event_hooks['global_menu']=[]
 		this.m_event_hooks['beforeEdit']=[]
 		this.m_event_hooks['autoComplete']=[]
@@ -5701,6 +5702,7 @@ W.CodeEditor=function(id,attrs){
 								doc.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
 								doc.AutoScroll("show")
 								doc.scrolling_animation=undefined
+								doc.CallHooks("wrap")
 								obj.SaveMetaData()
 								UI.Refresh()
 							}

@@ -402,6 +402,10 @@ W.notebook_prototype={
 			var doc_out=cell_i.m_text_out;
 			cell_i.m_text_out=doc_out.ed.GetText();
 			docs[i*2+1]=doc_out;
+			cell_i.in_m_current_wrap_width=doc_in.m_current_wrap_width;
+			cell_i.in_m_enable_wrapping=doc_in.m_enable_wrapping;
+			cell_i.out_m_current_wrap_width=doc_out.m_current_wrap_width;
+			cell_i.out_m_enable_wrapping=doc_out.m_enable_wrapping;
 			//doc_out.saved_point=doc_out.ed.GetUndoQueueLength();
 			//doc_out.ResetSaveDiff();
 			procs[i]=cell_i.m_proc;cell_i.m_proc=undefined;
@@ -572,14 +576,17 @@ W.notebook_prototype={
 				UI.Refresh();
 			})
 		}
+		this.AddEventHandler('wrap',function(){
+			this.notebook_owner.need_save|=65536;
+		})
 	}],
 	ProcessCell:function(cell_i){
 		//////
 		var doc_in=UI.CreateEmptyCodeEditor(cell_i.m_language);
 		doc_in.plugins=this.m_cell_plugins;
-		doc_in.wrap_width=0;
-		doc_in.m_enable_wrapping=0;
-		doc_in.m_current_wrap_width=512;
+		doc_in.m_enable_wrapping=cell_i.in_m_enable_wrapping||0;
+		doc_in.m_current_wrap_width=cell_i.in_m_current_wrap_width||512;
+		doc_in.wrap_width=(doc_in.m_enable_wrapping?doc_in.m_current_wrap_width:0);
 		doc_in.notebook_owner=this;
 		doc_in.disable_x_scroll=1;
 		doc_in.Init();
@@ -590,9 +597,9 @@ W.notebook_prototype={
 		//////
 		var doc_out=UI.CreateEmptyCodeEditor();
 		doc_out.plugins=this.m_cell_plugins;
-		doc_out.wrap_width=0;
-		doc_out.m_enable_wrapping=0;
-		doc_out.m_current_wrap_width=512;
+		doc_out.m_enable_wrapping=cell_i.out_m_enable_wrapping||0;
+		doc_out.m_current_wrap_width=cell_i.out_m_current_wrap_width||512;
+		doc_out.wrap_width=(doc_out.m_enable_wrapping?doc_out.m_current_wrap_width:0);
 		doc_out.notebook_owner=this;
 		doc_out.read_only=1;
 		doc_out.Init();
