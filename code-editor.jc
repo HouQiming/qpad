@@ -3484,6 +3484,56 @@ isWesternLetter=inline(ch){
 	return chi>=0x80||isWordChar(chi)
 }
 
+CASE_UNKNOWN=0
+CASE_ALL_LOWER=1
+CASE_ALL_UPPER=2
+CASE_LEADING_CAPITAL=3
+MAX_CASE_ASSESSABLE=256
+AssessCase=function(string s){
+	if s.n>=MAX_CASE_ASSESSABLE:return 0
+	flags=0
+	//1: lower, 2: upper, 4: other
+	//*1: first, *8: after that
+	flag_shift=0
+	for ch in Utf8Chars(s)
+		if ch>='a'&&ch<='z':
+			flags|=1<<flag_shift
+			flag_shift=3
+		else if ch>='A'&&ch<='Z':
+			flags|=2<<flag_shift
+			flag_shift=3
+		else
+			flags|=4<<flag_shift
+	switch(flags&(3*8+3)){
+	case 1,9:
+		return CASE_ALL_LOWER
+	case 2,18:
+		return CASE_ALL_UPPER
+	case 10:
+		return CASE_LEADING_CAPITAL
+	default:
+		return CASE_UNKNOWN
+	}
+}
+
+ApplyCase=function(string s,int case_id){
+	switch case_id:{
+	case CASE_ALL_LOWER:
+		return s.ToLower()
+	case CASE_ALL_UPPER:
+		return s.ToUpper()
+	case CASE_LEADING_CAPITAL:
+		s1=s.ToLower()
+		for i=0:s1.n-1
+			if s1[i]>='a'&&s1[i]<='z':
+				s1[i]-=0x20
+				break
+		return s1
+	default:
+		return s
+	}
+}
+
 g_rtt_tab_backup=CJSGLRenderToTextureContext.NULL
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
@@ -3576,6 +3626,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ret.progress=f32(ret.ofs)/f32(szmax)
 		return JS.Return("continue")
 	}
+	/**
+	\brief Native function to search in a document
+	\param js_callback is the JS-side per-match callback, if it's NULL, it's interpreted as a replace request and a "replace job" is constructed in js_this
+	\param js_this holds the replace request in the replace mode
+	*/
 	JS_UI["ED_Search"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
 		direction=JS.Param(2).or(1)
@@ -3602,20 +3657,45 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			//replace mode
 			assert(!(flags&SEARCH_FLAG_FUZZY))
 			if flags&SEARCH_FLAG_REGEXP:
+				//this ReportMatch callback is ignored inside SearchRegexp if an autoedit program is provided in m_ae_prg
 				ReportMatch=function(i64 ccnt0,i64 ccnt1){
 					ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:rjob.m_s_replace})
 					return rjob.m_match_cost
 				}
 			else
-				ReportMatch=function(i64 ccnt0,i64 ccnt1){
-					if flags&SEARCH_FLAG_WHOLE_WORD:
-						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
-						if isWordChar(ch0)==isWordChar(ch1):return 0
-						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
-						if isWordChar(ch0)==isWordChar(ch1):return 0
-					ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:rjob.m_s_replace})
-					return rjob.m_match_cost
-				}
+				preserve_case=0
+				if !(flags&SEARCH_FLAG_CASE_SENSITIVE):
+					case0=AssessCase(s)
+					case1=AssessCase(rjob.m_s_replace)
+					if case0==case1&&case0!=CASE_UNKNOWN:
+						preserve_case=1
+				if preserve_case:
+					ReportMatch=function(i64 ccnt0,i64 ccnt1){
+						if flags&SEARCH_FLAG_WHOLE_WORD:
+							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
+							if isWordChar(ch0)==isWordChar(ch1):return 0
+							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
+							if isWordChar(ch0)==isWordChar(ch1):return 0
+						auto s_replacement=rjob.m_s_replace
+						//make an attempt to preserve case
+						if ccnt1-ccnt0<MAX_CASE_ASSESSABLE:
+							case_i=AssessCase(ed.GetText(ccnt0,ccnt1-ccnt0))
+							if case_i!=0:
+								s_replacement=ApplyCase(s_replacement,case_i)
+						//s vs rjob.m_s_replace
+						ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:s_replacement})
+						return rjob.m_match_cost
+					}
+				else
+					ReportMatch=function(i64 ccnt0,i64 ccnt1){
+						if flags&SEARCH_FLAG_WHOLE_WORD:
+							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
+							if isWordChar(ch0)==isWordChar(ch1):return 0
+							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
+							if isWordChar(ch0)==isWordChar(ch1):return 0
+						ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:rjob.m_s_replace})
+						return rjob.m_match_cost
+					}
 		else
 			if flags&SEARCH_FLAG_REGEXP:
 				assert(!(flags&SEARCH_FLAG_FUZZY))
