@@ -982,6 +982,7 @@ g_in_parse_queue=new int[int]
 g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
+MAX_POSTDECL_GARBAGE=8 //# of ids between () and {}, like const / override / throw / ...
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	has_post_ctor_initializer=options["has_post_ctor_initializer"].or(0)
 	has_pointer_ops=options["has_pointer_ops"].or(0)
@@ -1477,12 +1478,20 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			if ss.n:
 				if function_id&&tok_i==')':
 					//ID(...){ testing
-					tok1=nextToken()
+					ptok1=PNextToken(i)
+					//skip garbage like const / override / throw
+					tok1=0
+					for i=0:MAX_POSTDECL_GARBAGE-1
+						tok1=fetchTokenSafe(ptok1)
+						if (tok1&TOK_TYPE_MASK)==TOK_ID:
+							ptok1=PNextToken(ptok1)
+						else
+							break
 					if (tok1=='{'||tok1==';'&&is_header)&&ptok_function_id>=0:
 						//this should go through even if there was a . before the name
 						fid_is_valid=1
 						if has_post_ctor_initializer:
-							p_after_bracket0=PNextToken(PNextToken(i))
+							p_after_bracket0=PNextToken(ptok1)
 							p_after_bracket1=PNextToken(p_after_bracket0)
 							tmask_ab0=(toks[p_after_bracket0].tok&TOK_TYPE_MASK)
 							if p_after_bracket1<toks.n&&(tmask_ab0==TOK_ID||tmask_ab0==TOK_STRING)&&toks[p_after_bracket1].tok==':':

@@ -6971,6 +6971,7 @@ UI.NewCodeEditorTab=function(fname0){
 					UI.BringUpNotebookTab(fn_notebook,"bringup");
 					this.z_order=UI.g_current_z_value;
 					UI.g_current_z_value++;
+					UI.RefreshAllTabs();
 				}
 			}
 		},

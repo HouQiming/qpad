@@ -450,7 +450,7 @@ UI.CustomTheme=function(){
 				rectex_styles:[{color:GetThemeColor("find_highlight",L?0x7f00ffff:0x7faaaa55),w:32,h:32,round:8,border_width:-8}],
 				page_guard_lines:3,
 			},
-			bgcolor:L?0xffe8e8e8:0xff3f3f3f,
+			bgcolor:GetThemeColor("background",L?0xffe8e8e8:0xff3f3f3f),
 			//padding:6,
 			padding:8,
 			separator_color:L?0xff999999:0xff000000,
@@ -474,9 +474,9 @@ UI.CustomTheme=function(){
 			///////
 			bookmark_font:UI.Font(UI.font_name,12,200),
 			bookmark_color:L?[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}]:[{x:0,y:0,color:C_sel},{x:1,y:1,color:0xff3f3f3f}],
-			bookmark_text_color:L?C:0xffbfdfdf,
+			bookmark_text_color:GetThemeColor("bookmark",L?C:0xffbfdfdf),
 			//bookmark_shadow:0xff000000,
-			bookmark_border_color:L?C:0xffbfdfdf,
+			bookmark_border_color:GetThemeColor("bookmark",L?C:0xffbfdfdf),
 			bookmark_scroll_bar_marker_size:2,
 			///////
 			fold_button_size:12,

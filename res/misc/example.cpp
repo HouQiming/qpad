@@ -4,6 +4,7 @@
 /* Other files have to be _RELOADED_ for changes to take effect. */
 /*****************************************************************/
 #include <stdio.h>
+#include <string.h>
 
 #define EXAMPLE_CONST 42
 

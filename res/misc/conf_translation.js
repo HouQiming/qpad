@@ -306,7 +306,15 @@
 			"It's still running...":"还在运行呢……",
 			"Stop it":"强行停止",
 			"Press any key to continue...":"按任意键继续……",
-			"@1 (@2%)":"@1 (@2%)"
+			"@1 (@2%)":"@1 (@2%)",
+			"Bad theme:\n  ":"主题文件有错：\n  ",
+			"Auto-switch notebooks":"自动切换脚本簿",
+			"Customize the theme":"定制界面主题",
+			"Undo - CTRL+Z":"撤销 - CTRL+Z",
+			"Redo - SHIFT+CTRL+Z":"重做 - SHIFT+CTRL+Z",
+			"Go to - CTRL+G":"跳转到 - CTRL+G",
+			"Save - CTRL+S":"保存 - CTRL+S",
+			"Run - CTRL+F5":"运行 - CTRL+F5",
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw
