@@ -720,6 +720,8 @@ UI.Application=function(id,attrs){
 				UI.top.app.document_area.n_tabs_last_checked=g_all_document_windows.length
 				UI.SetFocus(undefined)
 			}
+			//do not save metadata when restoring the workspace
+			UI.m_need_metadata_save=0;
 			UI.InvalidateCurrentFrame();
 			UI.Refresh()
 		}

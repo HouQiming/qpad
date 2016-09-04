@@ -94,9 +94,16 @@ UI.SafeSave=function(fn,data){
 };
 UI.m_need_metadata_save=0;
 UI.ReallySaveMetaData=function(){
+	if(UI.enable_timing){
+		UI.TimingEvent('ReallySaveMetaData');
+	}
 	UI.SafeSave(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata));
 };
 UI.SaveMetaData=function(){
+	if(UI.enable_timing){
+		UI.TimingEvent('SaveMetaData');
+		UI.DumpCallStack();
+	}
 	UI.m_need_metadata_save=1;
 }
 

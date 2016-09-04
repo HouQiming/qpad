@@ -138,13 +138,21 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(spell_checker){
 			this.m_spell_checker=spell_checker;
 		}
+		//if(UI.enable_timing){
+		//	UI.TimingEvent('before W.Edit_prototype.Init');
+		//}
 		W.Edit_prototype.Init.call(this);
+		//if(UI.enable_timing){
+		//	UI.TimingEvent('after W.Edit_prototype.Init');
+		//}
 		//these are locators when set
 		this.m_bookmarks=[undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined,undefined];
 		this.m_unkeyed_bookmarks=[];
 		if(this.m_is_main_editor){
 			this.m_diff_from_save=this.ed.CreateDiffTracker()
-			this.StartLoading(this.m_file_name)
+			if(this.m_file_name){
+				this.StartLoading(this.m_file_name)
+			}
 			//main editor things
 			//this.OnBlur=function(){
 			//	var obj=this.owner
@@ -480,7 +488,6 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	ParseFile:function(){
 		if(this.m_is_preview){return;}
 		if(!this.m_file_name){return;}
-		UI.BumpHistory(this.m_file_name)
 		var sz=this.ed.GetTextSize()
 		if(sz>MAX_PARSABLE||!UI.TestOption("enable_parser")){
 			return;
@@ -6986,6 +6993,10 @@ UI.NewCodeEditorTab=function(fname0){
 UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 	if(!(fname&&fname[0]=='*')){
 		fname=IO.NormalizeFileName(fname).replace(/[\\]/g,"/");
+		if(fname){
+			UI.BumpHistory(fname);
+			//console.log('BumpHistory',fname)
+		}
 	}
 	var obj_tab=undefined;
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
@@ -7730,6 +7741,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 		///////////////
 		language:Language.GetDefinitionByName(language_id),
 		plugin_language_desc:Language.GetDescObjectByName(language_id),
+		m_language_id:language_id,
 		wrap_width:wrap_width,
 		m_ed_refcnt:!is_preview,
 		///////////////
@@ -7750,10 +7762,10 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 
 UI.CreateEmptyCodeEditor=function(language_id){
 	if(!language_id){language_id="Plain text";}
-	var doc=UI.OpenCodeEditorDocument("",1);
-	doc.language=Language.GetDefinitionByName(language_id);
-	doc.plugin_language_desc=Language.GetDescObjectByName(language_id);
-	doc.m_language_id=language_id;
+	var doc=UI.OpenCodeEditorDocument("",1,language_id);
+	//doc.language=Language.GetDefinitionByName(language_id);
+	//doc.plugin_language_desc=Language.GetDescObjectByName(language_id);
+	//doc.m_language_id=language_id;
 	doc.m_is_preview=0;
 	return doc;
 }
