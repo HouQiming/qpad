@@ -601,6 +601,9 @@ W.notebook_prototype={
 		cell_i.m_text_out=doc_out;
 	},
 	Load:function(){
+		if(UI.enable_timing){
+			UI.TimingEvent('before json load');
+		}
 		var fn_notes=this.file_name;
 		this.m_cells=[];
 		if(fn_notes){
@@ -616,9 +619,15 @@ W.notebook_prototype={
 		}
 		//create the initial data thisects
 		for(var i=0;i<this.m_cells.length;i++){
+			if(UI.enable_timing){
+				UI.TimingEvent('before cell '+i.toString());
+			}
 			var cell_i=this.m_cells[i];
 			this.ProcessCell(cell_i);
 			cell_i.m_text_in.m_cell_id=i;
+			if(UI.enable_timing){
+				UI.TimingEvent('before CallOnChange');
+			}
 			cell_i.m_text_in.CallOnChange();
 		}
 		//if(!this.m_cells.length){
@@ -1137,7 +1146,13 @@ W.NotebookView=function(id,attrs){
 	//}
 	//buttons=obj.m_buttons;
 	if(!obj.m_cells){
+		if(UI.enable_timing){
+			UI.TimingEvent('before Load()');
+		}
 		obj.Load();
+		if(UI.enable_timing){
+			UI.TimingEvent('after Load()');
+		}
 	}
 	var buttons=[];
 	if(obj.m_cells){
@@ -1395,7 +1410,7 @@ W.NotebookView=function(id,attrs){
 	W.ListView('cell_list',cell_list_attrs);
 	obj.m_cell_list_old_position=undefined;
 	if(obj.m_sel_rendering_y!=undefined||!had_cell_list){
-		var pos0=obj.cell_list.position;
+		var pos0=(obj.cell_list.position||0);
 		obj.cell_list.AutoScroll();
 		if(pos0!=obj.cell_list.position){
 			if(!had_cell_list){

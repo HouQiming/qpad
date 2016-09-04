@@ -92,8 +92,12 @@ UI.SafeSave=function(fn,data){
 	}
 	return 1;
 };
-UI.SaveMetaData=function(){
+UI.m_need_metadata_save=0;
+UI.ReallySaveMetaData=function(){
 	UI.SafeSave(IO.GetStoragePath()+("/metadata.json"),JSON.stringify(UI.m_ui_metadata));
+};
+UI.SaveMetaData=function(){
+	UI.m_need_metadata_save=1;
 }
 
 UI.TestOption=function(stable_name,default_value){
@@ -169,6 +173,7 @@ UI.SaveWorkspace=function(){
 }
 
 UI.BumpHistory=function(file_name){
+	if(!file_name){return;}
 	var hist=UI.m_ui_metadata["<history>"]
 	if(!hist){
 		hist=[]

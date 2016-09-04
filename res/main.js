@@ -767,6 +767,10 @@ UI.Application=function(id,attrs){
 			UI.debugDumpFragmentation()
 		}});
 	}
+	if(UI.m_need_metadata_save){
+		UI.ReallySaveMetaData();
+		UI.m_need_metadata_save=0;
+	}
 };
 
 if(UI.Platform.ARCH=="mac"){
@@ -871,6 +875,10 @@ UI.EventFilter=function(event){
 	UI.Run();
 	if(IO.IsFirstInstance){
 		IO.DeleteFile(fn_hack_pipe)
+	}
+	if(UI.m_need_metadata_save){
+		UI.ReallySaveMetaData();
+		UI.m_need_metadata_save=0;
 	}
 })();
 

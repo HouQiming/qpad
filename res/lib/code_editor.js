@@ -479,6 +479,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	ParseFile:function(){
 		if(this.m_is_preview){return;}
+		if(!this.m_file_name){return;}
 		UI.BumpHistory(this.m_file_name)
 		var sz=this.ed.GetTextSize()
 		if(sz>MAX_PARSABLE||!UI.TestOption("enable_parser")){
@@ -487,9 +488,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		UI.ED_ParserQueueFile(this.m_file_name)
 		this.CallHooks("parse")
 		CallParseMore()
-		if(this.owner){
+		if(this.owner&&this.m_file_name){
 			//parse one file *immediately*, hopefully it's our file and that's it
 			//only do this for user-opened files
+			//if(UI.enable_timing){
+			//	UI.TimingEvent('onload parse of '+this.m_file_name);
+			//}
 			var ret=UI.ED_ParseMore();
 			if(ret){
 				var doc=UI.g_editor_from_file[ret.file_name];
@@ -4739,7 +4743,7 @@ UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 			'activated':this==UI.top.app.document_area.active_tab,
 			'x':0,'y':0});
 		this.util_widget=body;
-		if(UI.TestOption("auto_hide_filetab",0)&&had_body&&UI.nd_focus!=body.find_bar_edit){
+		if(UI.TestOption("auto_hide_filetab",0)&&had_body&&!(this==UI.top.app.document_area.active_tab)){
 			UI.m_invalid_util_tabs.push(this.__global_tab_id);
 		}
 		return body;
@@ -7359,7 +7363,7 @@ UI.CustomizeConfigScript=function(fn){
 				UI.ApplyTheme(UI.CustomTheme());
 				if(this.owner){
 					if(UI.g_theme_parsing_error){
-						this.owner.CreateNotification({id:'theme_error',icon:'警',text:"Bad theme:\n  "+UI.g_theme_parsing_error});
+						this.owner.CreateNotification({id:'theme_error',icon:'警',text:UI._("Bad theme:\n  ")+UI.g_theme_parsing_error});
 						var match=UI.g_theme_parsing_error.match(/at offset ([0-9]+)/);
 						if(match){
 							var ccnt=Math.min(Math.max(parseInt(match[1])-1,0),this.ed.GetTextSize());
@@ -7678,16 +7682,18 @@ UI.RegisterUtilType("preferences",function(){return UI.NewTab({
 })});
 
 UI.NewOptionsTab=function(){
-	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		if(UI.g_all_document_windows[i].is_options_window){
-			var tab=UI.g_all_document_windows[i]
-			UI.top.app.document_area.SetTab(i)
-			return tab;
-		}
-	}
+	//for(var i=0;i<UI.g_all_document_windows.length;i++){
+	//	if(UI.g_all_document_windows[i].is_options_window){
+	//		var tab=UI.g_all_document_windows[i]
+	//		UI.top.app.document_area.SetTab(i)
+	//		return tab;
+	//	}
+	//}
 	UI.OpenUtilTab('preferences');
-	var tab=UI.OpenEditorWindow("*res/misc/example.cpp");
-	tab.is_options_window=1
+	if(!UI.GetFrontMostEditorTab()){
+		var tab=UI.OpenEditorWindow("*res/misc/example.cpp");
+		tab.is_options_window=1
+	}
 	//tab.title=UI._("Preferences")
 	//tab.file_name="*res/misc/example.cpp";
 	return tab;
