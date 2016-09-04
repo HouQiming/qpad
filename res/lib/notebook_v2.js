@@ -1266,6 +1266,8 @@ W.NotebookView=function(id,attrs){
 			}else{
 				//met_budget_flags|=2;
 			}
+			cur_cell.m_text_in.default_focus=((focus_cell_id&1)?1:2);
+			cur_cell.m_text_out.default_focus=((focus_cell_id&1)?2:1);
 			var obj_widget_in=W.CodeEditor("cell_"+(focus_cell_id&-2).toString(),{
 				disable_minimap:1,
 				doc:cur_cell.m_text_in,

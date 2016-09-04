@@ -1502,7 +1502,7 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
-		if(UI.HasFocus(this)&&UI.SDL_HasClipboardText()){
+		if(UI.HasFocus(this)&&UI.SDL_HasClipboardText()&&(!this.owner||!this.owner.read_only)){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			var menu_edit_children=menu_edit.$
@@ -2337,7 +2337,16 @@ UI.RegisterEditorPlugin(function(){
 		var lang=this.plugin_language_desc
 		var ed=this.ed;
 		var ctx=this.m_bracket_ctx;
-		if(C=="{"||C=="["||C=="("||((C=="'"&&!lang.is_tex_like||C=='$'&&lang.is_tex_like||C=="\""||C=="`"&&lang.has_backquote_string)&&C!=ctx.current_bracket_ac)){
+		var sel=this.GetSelection();
+		if(C=="{"||C=="["||C=="("||//normal brackets
+			((//quote-likes
+				C=="'"&&!lang.is_tex_like||
+				C=='$'&&lang.is_tex_like||
+				C=="\""||
+				C=="`"&&lang.has_backquote_string
+			)&&C!=ctx.current_bracket_ac//they don't self-nest
+			&&sel[0]==sel[1])//they are not appropriate when overwriting things
+		){
 			var chbac=MatchingBracket(C)
 			var ccnt_pos=this.sel1.ccnt
 			var ch_neibs=ed.GetUtf8CharNeighborhood(ccnt_pos)
@@ -2345,7 +2354,7 @@ UI.RegisterEditorPlugin(function(){
 			var chnext=ch_neibs[1]
 			if(chbac){
 				if(this.IsLeftBracket(C.charCodeAt(0))&&chbac!="'"&&chbac!="\""&&chbac!="`"&&chbac!="$"){
-					//the syntax has to actually consider it as a bracket, or it has to be a quote
+					//the syntax has to actually consider it as a bracket, or it has to be a quote-like
 					chbac=0;
 				}else if(!this.IsBracketEnabledAt(ccnt_pos)){
 					//the state has to allow brackets
@@ -2397,7 +2406,7 @@ UI.RegisterEditorPlugin(function(){
 				var ccnt_next_nonspace=ed.MoveToBoundary(ccnt_pos,1,"space")
 				var chnext_nonspace=String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt_next_nonspace)[1])
 				var is_fcall_like=0
-				//([{
+				//previous-char whitelist for ([{
 				if('+-*/|&^%<>.?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&chnext_nonspace!=C&&UI.IsWordChar(chprev)&&this.m_user_just_typed_char){
 					//after-id-and-before-sym-case, and the id is just typed, most likely a func call or sth
 					is_fcall_like=1
@@ -2481,7 +2490,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 1
 	}
-	var listening_keys=["{","[","(","'","\"","$",")","]","}"]
+	var listening_keys=["{","[","(","'","\"","`","$",")","]","}"]
 	for(var i=0;i<listening_keys.length;i++){
 		var C=listening_keys[i];
 		this.AddEventHandler(C,f_key_test.bind(this,C))

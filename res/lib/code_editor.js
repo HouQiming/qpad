@@ -5620,6 +5620,9 @@ W.CodeEditor=function(id,attrs){
 				var was_bound_elsewhere=0;
 				if(doc.owner!=obj){
 					was_bound_elsewhere=1;
+					if(doc.owner&&doc.owner.m_current_find_context){
+						doc.owner.DestroyFindingContext();
+					}
 				}
 				doc.owner=obj;
 				var h_editor=h_obj_area-h_top_find;
@@ -6224,11 +6227,13 @@ W.CodeEditor=function(id,attrs){
 					menu_edit.AddNormalItem({text:"&Copy",icon:"拷",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+C",action:function(){
 						doc.Copy()
 					}})
-					menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+X",action:function(){
-						doc.Cut()
-					}})
+					if(!obj.read_only){
+						menu_edit.AddNormalItem({text:"Cu&t",icon:"剪",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+X",action:function(){
+							doc.Cut()
+						}})
+					}
 				}
-				if(UI.SDL_HasClipboardText()){
+				if(!obj.read_only&&UI.SDL_HasClipboardText()){
 					menu_edit.AddNormalItem({text:"&Paste",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+V",action:function(){
 						doc.Paste()
 					}})
