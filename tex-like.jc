@@ -610,7 +610,7 @@ auto TextToLayoutAtom(CHyphenator hyp,string s,int m_tab_width,i64 w_line,int en
 					style_id_new=ch-COMMAND_SET_STYLE
 					if u32(style_id_new)<u32(styles.m_styles.n):
 						style_id=style_id_new
-			else
+			else if ch!='\r':
 				words.push(int3(style_id,int(I),int(I_next)))
 			p_last_word=I_next
 	if p_last_word<s.n:

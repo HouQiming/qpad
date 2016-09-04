@@ -4379,7 +4379,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_FormatRichText"]=function(JSContext JS){
 		//leave objects for later
 		auto hyp=JS.Param(0).as(CHyphenator)
-		auto sblock=JS.Param(1).as(string).Replace(["\r",""])
+		auto sblock=JS.Param(1).as(string).Replace(["\r"," "])
 		auto tab_width=JS.Param(2).or(4)
 		auto w_line=double2fixed(JS.Param(3).as(double))
 		auto js_styles=JS.Param(4).as(JSObject)

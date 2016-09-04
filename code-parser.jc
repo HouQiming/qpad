@@ -1135,7 +1135,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								all_prototypes[n0+4+(param_ord-1)*2+0]=doc_str.x
 								all_prototypes[n0+4+(param_ord-1)*2+1]=doc_str.y
 				if param_id_map&&pbrief.x<0:
-					auto pid0=pcomment0+3
+					auto pid0=pcomment0
 					while pid0<pcomment1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
 						pid0++
 					if pid0<pcomment1:
@@ -1157,7 +1157,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		is_line_head=1
 		for ch in s
 			if ch=='\n':
-				if is_line_head:
+				if is_line_head>0:
 					break
 				else
 					if !(doc_string_pool.n&&doc_string_pool.back()==' '):
@@ -1165,10 +1165,16 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					is_line_head=1
 					continue
 			else if is_line_head:
-				if ch=='*'&&is_line_head==1:
+				if ch=='*'&&(is_line_head==1||is_line_head==2):
 					is_line_head=2
 					continue
+				if ch=='/'&&(is_line_head==1||is_line_head==3):
+					is_line_head=3
+					continue
 				if ch==' '||ch=='\t':
+					if is_line_head>1:
+						// skip no more * and /
+						is_line_head=4
 					continue
 				if (ch=='\\'||ch=='@'):
 					//command at line head = end of paragraph
