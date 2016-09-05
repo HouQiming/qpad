@@ -2,7 +2,7 @@
  "cells": [
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\n\\r bugs\n\tbad scrolling with unknown trigger\nmultiple windows of the same file\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nindent\n\tauto detect space / tab indent\ncode beautifier\n\thelp code / smart paste auto beautification\ndiff to generate undo ops on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties\n\texplanation in AC sources\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\tdisplay a \"how to replace\" hint when one presses ctrl+r\n\t[ new window ] and [ button: ... ] in help\n",
+   "m_text_in": "# TODO LIST\nmultiple windows of the same file\n\tneeded for the literate programming stuff\n\tproper MVC separation? or just backup and restore sel\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\n\\r bugs\n\tbad scrolling with unknown trigger\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nindent\n\tauto detect space / tab indent\ncode beautifier\n\thelp code / smart paste auto beautification\ndiff to generate undo ops on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\n\t\tor just buy a keyboard with Fn keys\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\tdisplay a \"how to replace\" hint when one presses ctrl+r\n\t[ new window ] and [ button: ... ] in help\n",
    "m_text_out": "",
    "m_cell_id": 0,
    "m_has_any_error": 0,
@@ -15,32 +15,40 @@
     45,
     5
    ],
-   "m_button_name": "TODO LIST"
+   "m_button_name": "TODO LIST",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "out_m_current_wrap_width": 512,
+   "out_m_enable_wrapping": 0
   },
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code -awin64 qpad.jc --run\n",
-   "m_text_out": "",
+   "m_text_out": "s7res.c\r\n   Creating library ./bin/win64/qpad.lib and object ./bin/win64/qpad.exp\r\n",
    "m_cell_id": 1,
    "m_completion_time": [
     2016,
     8,
-    3,
+    4,
     16,
-    37,
-    23,
-    0
+    31,
+    48,
+    1
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug",
-   "m_unknown_progress": 0.995129374851106,
-   "m_t_unknown_progress": 77237259280
+   "m_unknown_progress": 0.40724394644512896,
+   "m_t_unknown_progress": 8336465523,
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "out_m_current_wrap_width": 512,
+   "out_m_enable_wrapping": 0
   },
   {
    "m_language": "Windows BAT",
-   "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\njc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
-   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\ns7main.c\r\ns7res.c\r\n   Creating library ./bin/win32_release/qpad.lib and object ./bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4533760 bytes (4428 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1533989 bytes (1499 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4797952 bytes (4686 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1614429 bytes (1577 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
+   "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
+   "m_text_out": "\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4533760 bytes (4428 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1533124 bytes (1498 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4798464 bytes (4686 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1615666 bytes (1578 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
    "m_cell_id": 2,
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
@@ -48,14 +56,18 @@
     2016,
     8,
     3,
-    14,
-    4,
-    1,
+    16,
+    59,
+    59,
     0
    ],
    "m_button_name": "Release",
-   "m_unknown_progress": 1.141364358320034,
-   "m_t_unknown_progress": 46684958515
+   "m_unknown_progress": 0.672555468917137,
+   "m_t_unknown_progress": 81738872219,
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "out_m_current_wrap_width": 512,
+   "out_m_enable_wrapping": 0
   },
   {
    "m_language": "Unix Shell Script",
@@ -75,7 +87,11 @@
    ],
    "m_button_name": "Translate",
    "m_unknown_progress": 0.09296778604156831,
-   "m_t_unknown_progress": 5634099452
+   "m_t_unknown_progress": 5634099452,
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "out_m_current_wrap_width": 512,
+   "out_m_enable_wrapping": 0
   },
   {
    "m_language": "Markdown",
@@ -83,7 +99,11 @@
    "m_text_out": "c:/tp/qpad/code-editor.jc:13104..13114: wrap_width\nc:/tp/qpad/code-editor.jc:26310..26320: wrap_width\nc:/tp/qpad/code-editor.jc:26347..26357: wrap_width\nc:/tp/qpad/code-editor.jc:26368..26378: wrap_width\nc:/tp/qpad/code-editor.jc:26514..26524: wrap_width\nc:/tp/qpad/code-editor.jc:26540..26550: wrap_width\nc:/tp/qpad/code-editor.jc:28876..28886: wrap_width\nc:/tp/qpad/code-editor.jc:28892..28902: wrap_width\nc:/tp/qpad/code-editor.jc:28912..28922: wrap_width\nc:/tp/qpad/code-editor.jc:28935..28945: wrap_width\nc:/tp/qpad/code-editor.jc:29114..29124: wrap_width\nc:/tp/qpad/code-editor.jc:29223..29233: wrap_width\nc:/tp/qpad/code-editor.jc:29409..29419: wrap_width\nc:/tp/qpad/code-editor.jc:29432..29442: wrap_width\nc:/tp/qpad/code-editor.jc:29978..29988: wrap_width\nc:/tp/qpad/code-editor.jc:30087..30097: wrap_width\nc:/tp/qpad/code-editor.jc:35144..35154: wrap_width\nc:/tp/qpad/code-editor.jc:35250..35260: wrap_width\nc:/tp/qpad/code-editor.jc:35264..35274: wrap_width\nc:/tp/qpad/code-editor.jc:35275..35285: wrap_width\nc:/tp/qpad/code-editor.jc:35442..35452: wrap_width\nc:/tp/qpad/code-editor.jc:35464..35474: wrap_width\nc:/tp/qpad/code-editor.jc:39353..39363: wrap_width\nc:/tp/qpad/code-editor.jc:39589..39599: wrap_width\nc:/tp/qpad/code-editor.jc:39617..39627: wrap_width\nc:/tp/qpad/code-editor.jc:39833..39843: wrap_width\nc:/tp/qpad/code-editor.jc:39857..39867: wrap_width\nc:/tp/qpad/code-editor.jc:40171..40181: wrap_width\nc:/tp/qpad/code-editor.jc:40224..40234: wrap_width\nc:/tp/qpad/code-editor.jc:41166..41176: wrap_width\nc:/tp/qpad/code-editor.jc:41496..41506: wrap_width\nc:/tp/qpad/code-editor.jc:41985..41995: wrap_width\nc:/tp/qpad/code-editor.jc:45573..45583: wrap_width\nc:/tp/qpad/code-editor.jc:46227..46237: wrap_width\nc:/tp/qpad/code-editor.jc:46243..46253: wrap_width\nc:/tp/qpad/code-editor.jc:46977..46987: wrap_width\nc:/tp/qpad/code-editor.jc:47014..47024: wrap_width\nc:/tp/qpad/code-editor.jc:48571..48581: wrap_width\nc:/tp/qpad/code-editor.jc:48650..48660: wrap_width\nc:/tp/qpad/code-editor.jc:48766..48776: wrap_width\nc:/tp/qpad/code-editor.jc:48878..48888: wrap_width\nc:/tp/qpad/code-editor.jc:49035..49045: wrap_width\nc:/tp/qpad/code-editor.jc:49046..49056: wrap_width\nc:/tp/qpad/code-editor.jc:49119..49129: wrap_width\nc:/tp/qpad/code-editor.jc:49141..49151: wrap_width\nc:/tp/qpad/code-editor.jc:50298..50308: wrap_width\nc:/tp/qpad/code-editor.jc:50355..50365: wrap_width\nc:/tp/qpad/res/lib/code_editor.js:273503..273513: wrap_width\nc:/tp/qpad/res/lib/code_editor.js:273663..273673: wrap_width\nc:/tp/qpad/res/lib/code_editor.js:273863..273873: wrap_width\nc:/tp/qpad/res/lib/code_editor.js:273874..273884: wrap_width\nc:/tp/qpad/res/lib/help_page.js:12221..12231: wrap_width\nc:/tp/qpad/res/lib/notebook_v2.js:12170..12180: wrap_width\nc:/tp/qpad/res/lib/notebook_v2.js:12272..12282: wrap_width\nc:/tp/qpad/res/lib/notebook_v2.js:18133..18143: wrap_width\nc:/tp/qpad/res/lib/notebook_v2.js:33220..33230: wrap_width\nc:/tp/qpad/txtx-editor.jc:16006..16016: wrap_width\nc:/tp/qpad/txtx-editor.jc:31166..31176: wrap_width\n",
    "m_has_any_error": 1,
    "m_cell_id": 4,
-   "m_button_name": "• Search result"
+   "m_button_name": "• Search result",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "out_m_current_wrap_width": 512,
+   "out_m_enable_wrapping": 0
   }
  ],
  "m_last_focus_cell_id": 0

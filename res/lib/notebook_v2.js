@@ -1180,7 +1180,7 @@ W.NotebookView=function(id,attrs){
 					if(cell_i.m_unknown_progress>1+obj.panel_style.unknown_progress_bar_length){
 						cell_i.m_unknown_progress=obj.panel_style.unknown_progress_bar_length;
 					}
-					UI.AutoRefresh();
+					if(UI.MyWindowHasFocus()){UI.AutoRefresh();}
 				}
 			}
 			var doc_in=(cell_i&&cell_i.m_text_in);
