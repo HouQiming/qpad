@@ -504,9 +504,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			//}
 			var ret=UI.ED_ParseMore();
 			if(ret){
-				var ed=UI.g_editor_from_file[ret.file_name];
-				if(ed){
-					ed.m_file_index=ret.file_index;
+				var doc=UI.g_editor_from_file[ret.file_name];
+				if(doc&&doc.ed){
+					doc.ed.m_file_index=ret.file_index;
 				}
 			}
 		}
@@ -1606,9 +1606,9 @@ var CallParseMore=function(){
 			var ret=UI.ED_ParseMore()
 			//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),'UI.ED_ParseMore()');
 			if(ret){
-				var ed=UI.g_editor_from_file[ret.file_name];
-				if(ed){
-					ed.m_file_index=ret.file_index;
+				var doc=UI.g_editor_from_file[ret.file_name];
+				if(doc&&doc.ed){
+					doc.ed.m_file_index=ret.file_index;
 				}
 			}else{
 				g_is_parse_more_running=0;
@@ -2697,7 +2697,7 @@ W.CodeEditorWidget_prototype={
 			var temp_docs0=this.m_current_find_context.m_temp_documents;
 			ctx.m_temp_documents=[];
 			for(var i=0;i<temp_docs0.length;i++){
-				if(temp_docs0[i].ed.m_ed_refcnt>1){
+				if(temp_docs0[i].m_ed_refcnt>1){
 					UI.CloseCodeEditorDocument(temp_docs0[i])
 				}else{
 					ctx.m_temp_documents.push(temp_docs0[i]);
@@ -6960,9 +6960,9 @@ UI.NewCodeEditorTab=function(fname0){
 			fn=IO.NormalizeFileName(fn);
 			var doc=this.main_widget.doc;
 			if(doc){
-				if(UI.g_editor_from_file[doc.m_file_name]==doc.ed){
+				if(UI.g_editor_from_file[doc.m_file_name]==doc){
 					UI.g_editor_from_file[doc.m_file_name]=undefined;
-					UI.g_editor_from_file[fn]=doc.ed;
+					UI.g_editor_from_file[fn]=doc;
 				}
 				doc.m_file_name=fn;
 				doc.m_language_id=Language.GetNameByExt(UI.GetFileNameExtension(fn));
@@ -7725,6 +7725,13 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 		fn=IO.NormalizeFileName(fn);
 	}
 	///////////////////////////
+	if(!is_preview){
+		var doc=UI.g_editor_from_file[fn];
+		if(doc){
+			doc.m_ed_refcnt++;
+			return doc;
+		}
+	}
 	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
 	var style=UI.default_styles.code_editor.editor_style;
 	if(style.__proto__!=W.CodeEditor_prototype){
@@ -7755,15 +7762,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	};
 	doc.__proto__=style;
 	if(!is_preview){
-		doc.Init();
-		var ed=UI.g_editor_from_file[fn];
-		if(ed){
-			doc.ed=ed;
-		}else{
-			ed=doc.ed;
-			UI.g_editor_from_file[fn]=ed;
-		}
-		ed.m_ed_refcnt++;
+		UI.g_editor_from_file[fn]=doc;
 	}
 	return doc;
 };
@@ -7779,12 +7778,12 @@ UI.CreateEmptyCodeEditor=function(language_id){
 }
 
 UI.CloseCodeEditorDocument=function(doc){
-	doc.ed.m_ed_refcnt--;
-	if(!(doc.ed.m_ed_refcnt>0)){
+	doc.m_ed_refcnt--;
+	if(!(doc.m_ed_refcnt>0)){
 		var fn=doc.m_file_name;
+		doc.OnDestroy();
 		UI.g_editor_from_file[fn]=undefined;
 	}
-	doc.OnDestroy();
 }
 
 ////////////////////////////////////////////////

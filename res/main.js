@@ -547,9 +547,9 @@ var CreateMenus=function(){
 				action:UI.ShowInFolder.bind(undefined,obj_real_active_tab.file_name)
 			})
 		}
-		menu_tools.AddNormalItem({text:"Open a similar tab",tab_menu_group:'tools',enable_hotkey:0,action:function(fn){
-			UI.NewCodeEditorTab(fn);
-		}.bind(null,obj_real_active_tab.file_name)})
+		//menu_tools.AddNormalItem({text:"Open a similar tab",tab_menu_group:'tools',enable_hotkey:0,action:function(fn){
+		//	UI.NewCodeEditorTab(fn);
+		//}.bind(null,obj_real_active_tab.file_name)})
 		menu_tools.AddSeparator()
 	}
 	if(obj_active_tab&&obj_active_tab.file_name){
