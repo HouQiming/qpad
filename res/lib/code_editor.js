@@ -504,9 +504,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			//}
 			var ret=UI.ED_ParseMore();
 			if(ret){
-				var doc=UI.g_editor_from_file[ret.file_name];
-				if(doc){
-					doc.m_file_index=ret.file_index;
+				var ed=UI.g_editor_from_file[ret.file_name];
+				if(ed){
+					ed.m_file_index=ret.file_index;
 				}
 			}
 		}
@@ -1606,9 +1606,9 @@ var CallParseMore=function(){
 			var ret=UI.ED_ParseMore()
 			//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),'UI.ED_ParseMore()');
 			if(ret){
-				var doc=UI.g_editor_from_file[ret.file_name];
-				if(doc){
-					doc.m_file_index=ret.file_index;
+				var ed=UI.g_editor_from_file[ret.file_name];
+				if(ed){
+					ed.m_file_index=ret.file_index;
 				}
 			}else{
 				g_is_parse_more_running=0;
@@ -2069,7 +2069,7 @@ var find_context_prototype={
 				if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)&&(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)){
 					//global goto
 					if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)&&!g_is_parse_more_running){
-						if(doc_forward_search.m_file_index&&doc_forward_search.m_file_index.hasDecls()){
+						if(doc_forward_search.ed.m_file_index&&doc_forward_search.ed.m_file_index.hasDecls()){
 							var matches=(UI.ED_QueryKeyDeclByNeedle(doc_forward_search,this.m_needle)||[]);
 							for(var i=0;i<matches.length;i+=2){
 								this.ReportMatchForward(doc_forward_search,matches[i+0],matches[i+1])
@@ -2606,7 +2606,7 @@ W.CodeEditorWidget_prototype={
 		UI.m_ui_metadata[this.file_name]=new_metadata
 	},
 	OnSave:function(){
-		this.m_file_index=undefined;
+		this.ed.m_file_index=undefined;
 		this.SaveMetaData();
 		UI.SaveMetaData();
 		this.doc.CallHooks("save")
@@ -2697,7 +2697,7 @@ W.CodeEditorWidget_prototype={
 			var temp_docs0=this.m_current_find_context.m_temp_documents;
 			ctx.m_temp_documents=[];
 			for(var i=0;i<temp_docs0.length;i++){
-				if(temp_docs0[i].m_ed_refcnt>1){
+				if(temp_docs0[i].ed.m_ed_refcnt>1){
 					UI.CloseCodeEditorDocument(temp_docs0[i])
 				}else{
 					ctx.m_temp_documents.push(temp_docs0[i]);
@@ -6407,7 +6407,7 @@ W.CodeEditor=function(id,attrs){
 						OnClick:fgoto_action.bind(obj,1)})
 					W.Hotkey("",{key:"SHIFT+F12",action:fgoto_action.bind(obj,-1)})
 					W.Hotkey("",{key:"F12",action:fgoto_action.bind(obj,1)})
-				}else if(doc.m_file_index&&doc.m_file_index.hasDecls()&&(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1]))){
+				}else if(doc.ed.m_file_index&&doc.ed.m_file_index.hasDecls()&&(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1]))){
 					menu_search.AddNormalItem({text:"Go to &definition",context_menu_group:"definition",enable_hotkey:1,key:"F12",action:function(){
 						var obj=this
 						var doc=obj.doc
@@ -6960,9 +6960,9 @@ UI.NewCodeEditorTab=function(fname0){
 			fn=IO.NormalizeFileName(fn);
 			var doc=this.main_widget.doc;
 			if(doc){
-				if(UI.g_editor_from_file[doc.m_file_name]==doc){
+				if(UI.g_editor_from_file[doc.m_file_name]==doc.ed){
 					UI.g_editor_from_file[doc.m_file_name]=undefined;
-					UI.g_editor_from_file[fn]=doc;
+					UI.g_editor_from_file[fn]=doc.ed;
 				}
 				doc.m_file_name=fn;
 				doc.m_language_id=Language.GetNameByExt(UI.GetFileNameExtension(fn));
@@ -7725,13 +7725,6 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 		fn=IO.NormalizeFileName(fn);
 	}
 	///////////////////////////
-	if(!is_preview){
-		var doc=UI.g_editor_from_file[fn];
-		if(doc){
-			doc.m_ed_refcnt++;
-			return doc;
-		}
-	}
 	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
 	var style=UI.default_styles.code_editor.editor_style;
 	if(style.__proto__!=W.CodeEditor_prototype){
@@ -7762,7 +7755,15 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	};
 	doc.__proto__=style;
 	if(!is_preview){
-		UI.g_editor_from_file[fn]=doc;
+		doc.Init();
+		var ed=UI.g_editor_from_file[fn];
+		if(ed){
+			doc.ed=ed;
+		}else{
+			ed=doc.ed;
+			UI.g_editor_from_file[fn]=ed;
+		}
+		ed.m_ed_refcnt++;
 	}
 	return doc;
 };
@@ -7778,12 +7779,12 @@ UI.CreateEmptyCodeEditor=function(language_id){
 }
 
 UI.CloseCodeEditorDocument=function(doc){
-	doc.m_ed_refcnt--;
-	if(!(doc.m_ed_refcnt>0)){
+	doc.ed.m_ed_refcnt--;
+	if(!(doc.ed.m_ed_refcnt>0)){
 		var fn=doc.m_file_name;
-		doc.OnDestroy();
 		UI.g_editor_from_file[fn]=undefined;
 	}
+	doc.OnDestroy();
 }
 
 ////////////////////////////////////////////////

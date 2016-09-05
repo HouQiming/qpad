@@ -514,7 +514,11 @@ class CLayouter_programmer
 		m_current_frame_strikeouts=new float3[]
 		m_w_ellipsis=float2fixed(obj["w_ellipsis"].as(float))
 		m_ellipsis_items.clear()
-		m_file_index=obj["m_file_index"].as(CFileIndex)
+		edobj=obj["ed"].as(JSObject);
+		if edobj:
+			m_file_index=edobj["m_file_index"].as(CFileIndex)
+		else
+			m_file_index=CFileIndex.NULL
 		m_color_virtual_diff_bold=obj["color_virtual_diff_bold"].as(int)
 	}
 	SetCaretOverlay=function(CEditableText caller,i64 x,i64 y,JSObject obj){
