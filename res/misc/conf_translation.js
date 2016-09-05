@@ -315,6 +315,7 @@
 			"Go to - CTRL+G":"跳转到 - CTRL+G",
 			"Save - CTRL+S":"保存 - CTRL+S",
 			"Run - CTRL+F5":"运行 - CTRL+F5",
+			"O&pen a similar tab":"打开一个一样的窗格(&P)",
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw

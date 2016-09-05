@@ -2,7 +2,7 @@
  "cells": [
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\n\\r bugs\n\tbad scrolling with unknown trigger\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\nindent\n\tauto detect space / tab indent\ncode beautifier\n\thelp code / smart paste auto beautification\ndiff to generate undo ops on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nmultiple tabs for the same file\n\tprivate sel / scroll\n\tuse circled numbers for id?\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\n\t\tor just buy a keyboard with Fn keys\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\tdisplay a \"how to replace\" hint when one presses ctrl+r\n\t[ new window ] and [ button: ... ] in help\nmultiple windows of the same file\n\tdo it at the ed level?\n\t\tdoable, but loads of issues\n\t\t\trefresh, Init(), remaining conflicts, ...\n\t\t\tm_diff_from_save, ...\n\t\t\tscrolls...\n\tread-only views?\n\tjust full-dup views like old qpad\n\t\tit's enough... and it supports editing\n\t\tmake g_editor_from_file return an array\n\t\t\tonly reuse doc if we could find an unbound one\n\t\ttest that and trigger reload on save\n\t\talso use that to devise an alternative title string\n",
+   "m_text_in": "# TODO LIST\nF5/CTRL+F5 indicators\nbug: autoscroll of size-changing editors\nindent\n\tauto detect space / tab indent\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\n\tvs smart rendering...\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\n\\r bugs\n\tbad scrolling with unknown trigger\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\ncode beautifier\n\thelp code / smart paste auto beautification\ndiff to generate undo ops on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\n\t\tor just buy a keyboard with Fn keys\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\tdisplay a \"how to replace\" hint when one presses ctrl+r\n\t[ new window ] and [ button: ... ] in help\n",
    "m_text_out": "",
    "m_cell_id": 0,
    "m_has_any_error": 0,
@@ -29,17 +29,17 @@
    "m_completion_time": [
     2016,
     8,
-    4,
-    23,
+    6,
     14,
-    32,
-    1
+    4,
+    38,
+    3
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug",
-   "m_unknown_progress": 0.5407678496185213,
-   "m_t_unknown_progress": 18410029821,
+   "m_unknown_progress": 0.44107809818904786,
+   "m_t_unknown_progress": 2834182016,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -48,22 +48,22 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
-   "m_text_out": "\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4533760 bytes (4428 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1533124 bytes (1498 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4798464 bytes (4686 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1615666 bytes (1578 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
+   "m_text_out": "\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4535296 bytes (4429 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1535720 bytes (1500 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4799488 bytes (4687 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1616154 bytes (1579 KiB)\r\nEverything is Ok\r\nc:\\software\\cmder\\bin\\qpad_old.exe\r\nAccess is denied.\r\nA duplicate file name exists, or the file\r\ncannot be found.\r\n        1 file(s) copied.\r\n",
    "m_cell_id": 2,
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_completion_time": [
     2016,
     8,
-    3,
-    16,
-    59,
-    59,
-    0
+    6,
+    14,
+    12,
+    15,
+    3
    ],
    "m_button_name": "Release",
-   "m_unknown_progress": 0.672555468917137,
-   "m_t_unknown_progress": 81738872219,
+   "m_unknown_progress": 0.7497660865210818,
+   "m_t_unknown_progress": 4351632398,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -79,15 +79,15 @@
    "m_completion_time": [
     2016,
     8,
+    6,
+    14,
     2,
-    22,
-    24,
-    16,
-    6
+    1,
+    3
    ],
    "m_button_name": "Translate",
-   "m_unknown_progress": 0.09296778604156831,
-   "m_t_unknown_progress": 5634099452,
+   "m_unknown_progress": 0.08332700863411795,
+   "m_t_unknown_progress": 2312174373,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -106,5 +106,5 @@
    "out_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 5
 }

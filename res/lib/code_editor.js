@@ -504,9 +504,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			//}
 			var ret=UI.ED_ParseMore();
 			if(ret){
-				var doc=UI.g_editor_from_file[ret.file_name];
-				if(doc&&doc.ed){
-					doc.ed.m_file_index=ret.file_index;
+				var doc_arr=UI.g_editor_from_file[ret.file_name];
+				if(doc_arr){
+					doc_arr.forEach(function(doc){
+						if(doc&&doc.ed){
+							doc.ed.m_file_index=ret.file_index;
+						}
+					})
 				}
 			}
 		}
@@ -1606,9 +1610,13 @@ var CallParseMore=function(){
 			var ret=UI.ED_ParseMore()
 			//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),'UI.ED_ParseMore()');
 			if(ret){
-				var doc=UI.g_editor_from_file[ret.file_name];
-				if(doc&&doc.ed){
-					doc.ed.m_file_index=ret.file_index;
+				var doc_arr=UI.g_editor_from_file[ret.file_name];
+				if(doc_arr){
+					doc_arr.forEach(function(doc){
+						if(doc&&doc.ed){
+							doc.ed.m_file_index=ret.file_index;
+						}
+					})
 				}
 			}else{
 				g_is_parse_more_running=0;
@@ -2555,6 +2563,25 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 	return ctx;
 }
 
+var CheckEditorExternalChange=function(obj){
+	if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
+		if(obj.doc.ed.saving_context){return;}//saving docs are OK
+		//reload
+		if(!IO.FileExists(obj.file_name)){
+			//make a notification
+			obj.CreateNotification({id:'saving_progress',icon:'警',text:"IT'S DELETED!\nSave your changes to dismiss this"})
+			obj.doc.saved_point=-1;
+		}else if(obj.doc.NeedSave()){
+			//make a notification
+			obj.CreateNotification({id:'saving_progress',icon:'警',text:"FILE CHANGED OUTSIDE!\n - Use File-Revert to reload\n - Save your changes to dismiss this"})
+			obj.doc.saved_point=-1;
+		}else{
+			//what is reload? nuke it
+			obj.Reload()
+		}
+	}
+};
+
 W.CodeEditorWidget_prototype={
 	m_tabswitch_count:{},
 	OnDestroy:function(){
@@ -2606,7 +2633,7 @@ W.CodeEditorWidget_prototype={
 		UI.m_ui_metadata[this.file_name]=new_metadata
 	},
 	OnSave:function(){
-		this.ed.m_file_index=undefined;
+		this.doc.ed.m_file_index=undefined;
 		this.SaveMetaData();
 		UI.SaveMetaData();
 		this.doc.CallHooks("save")
@@ -2614,6 +2641,18 @@ W.CodeEditorWidget_prototype={
 			this.Reload()
 		}else{
 			this.doc.ParseFile()
+		}
+		////////////
+		if(this.doc.m_file_name){
+			var arr_ori=UI.g_editor_from_file[this.doc.m_file_name];
+			if(arr_ori&&arr_ori.length>1){
+				for(var i=0;i<arr_ori.length;i++){
+					var doc=arr_ori[i];
+					if(doc!=this.doc&&doc.owner){
+						CheckEditorExternalChange(doc.owner);
+					}
+				}
+			}
 		}
 	},
 	Save:function(){
@@ -6807,6 +6846,24 @@ W.CodeEditor=function(id,attrs){
 	return obj
 }
 
+var RemoveDocFromByFileList=function(doc,fn){
+	var arr_ori=UI.g_editor_from_file[fn];
+	if(arr_ori){
+		var arr_new=arr_ori.filter(function(doc_i){return doc_i!=doc})
+		if(arr_new.length<arr_ori.length){
+			UI.g_editor_from_file[fn]=(arr_new.length?arr_new:undefined);
+			return 1;
+		}
+	}
+	return 0;
+};
+
+var AddDocToByFileList=function(doc,fn){
+	var arr_ori=(UI.g_editor_from_file[fn]||[]);
+	arr_ori.push(doc);
+	UI.g_editor_from_file[fn]=arr_ori;
+};
+
 //UI.DetectRepository=DetectRepository;
 var g_new_id=0;
 var g_tab_appeared_names={arv:{},objs:{}};
@@ -6840,6 +6897,7 @@ UI.NewCodeEditorTab=function(fname0){
 		UpdateTitle:function(){
 			var doc=(this.main_widget&&this.main_widget.doc);
 			var fn_display=(doc&&doc.m_file_name||this.file_name)
+			var arr_editors=UI.g_editor_from_file[fn_display];
 			if(fn_display.length&&fn_display[0]=='*'){
 				var special_file_desc=UI.m_special_files[fn_display.substr(1)];
 				if(special_file_desc&&special_file_desc.display_name){
@@ -6849,6 +6907,18 @@ UI.NewCodeEditorTab=function(fname0){
 				fn_display=IO.NormalizeFileName(fn_display,1);
 			}
 			this.title=UI.GetSmartTabName(fn_display);
+			if(arr_editors&&arr_editors.length>1){
+				var dup_id=undefined;
+				for(var i=0;i<arr_editors.length;i++){
+					if(arr_editors[i]==doc){
+						dup_id=i;
+						break;
+					}
+				}
+				if(dup_id!=undefined){
+					this.title=this.title+':'+(dup_id+1).toString();
+				}
+			}
 			this.tooltip=fn_display;
 			this.need_save=0
 			if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
@@ -6892,25 +6962,6 @@ UI.NewCodeEditorTab=function(fname0){
 					doc.opening_callbacks=this.opening_callbacks
 				}
 				this.opening_callbacks=[]
-			}
-			if(body.m_is_special_document){
-				body.title=undefined;
-				body.tooltip=undefined
-			}else{
-				var fn_display=IO.NormalizeFileName(body.file_name,1);
-				if(body.file_name.length&&body.file_name[0]=='*'){
-					var special_file_desc=UI.m_special_files[body.file_name.substr(1)];
-					if(special_file_desc&&special_file_desc.display_name){
-						fn_display=special_file_desc.display_name;
-					}
-				}
-				body.title=UI.GetSmartTabName(fn_display);
-				body.tooltip=fn_display;
-				this.need_save=0
-				if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
-					body.title=body.title+'*'
-					this.need_save=1
-				}
 			}
 			//if(this.auto_focus_file_search&&body.sxs_visualizer&&body.sxs_visualizer.find_bar_edit){
 			//	this.auto_focus_file_search=0
@@ -6960,10 +7011,13 @@ UI.NewCodeEditorTab=function(fname0){
 			fn=IO.NormalizeFileName(fn);
 			var doc=this.main_widget.doc;
 			if(doc){
-				if(UI.g_editor_from_file[doc.m_file_name]==doc){
-					UI.g_editor_from_file[doc.m_file_name]=undefined;
-					UI.g_editor_from_file[fn]=doc;
+				if(RemoveDocFromByFileList(doc,doc.m_file_name)){
+					AddDocToByFileList(doc,fn);
 				}
+				//if(UI.g_editor_from_file[doc.m_file_name]==doc){
+				//	UI.g_editor_from_file[doc.m_file_name]=undefined;
+				//	UI.g_editor_from_file[fn]=doc;
+				//}
 				doc.m_file_name=fn;
 				doc.m_language_id=Language.GetNameByExt(UI.GetFileNameExtension(fn));
 			}
@@ -7005,14 +7059,16 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			//console.log('BumpHistory',fname)
 		}
 	}
-	var obj_tab=undefined;
-	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		if(UI.g_all_document_windows[i].file_name==fname){
-			obj_tab=UI.g_all_document_windows[i]
-			if(!is_quiet){
-				UI.top.app.document_area.SetTab(i)
+	if(is_quiet!='restore_workspace'){
+		var obj_tab=undefined;
+		for(var i=0;i<UI.g_all_document_windows.length;i++){
+			if(UI.g_all_document_windows[i].file_name==fname){
+				obj_tab=UI.g_all_document_windows[i]
+				if(!is_quiet){
+					UI.top.app.document_area.SetTab(i)
+				}
+				break
 			}
-			break
 		}
 	}
 	if(!obj_tab){
@@ -7083,22 +7139,7 @@ UI.OnApplicationSwitch=function(){
 		if(obj_tab.main_widget&&obj_tab.main_widget.doc){
 			//coulddo: more reliable class test
 			var obj=obj_tab.main_widget
-			if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
-				if(obj.doc.ed.saving_context){continue;}//saving docs are OK
-				//reload
-				if(!IO.FileExists(obj.file_name)){
-					//make a notification
-					obj.CreateNotification({id:'saving_progress',icon:'警',text:"IT'S DELETED!\nSave your changes to dismiss this"})
-					obj.doc.saved_point=-1;
-				}else if(obj_tab.need_save){
-					//make a notification
-					obj.CreateNotification({id:'saving_progress',icon:'警',text:"FILE CHANGED OUTSIDE!\n - Use File-Revert to reload\n - Save your changes to dismiss this"})
-					obj.doc.saved_point=-1;
-				}else{
-					//what is reload? nuke it
-					obj.Reload()
-				}
-			}
+			CheckEditorExternalChange(obj);
 		}else if(obj_tab.main_widget&&obj_tab.document_type=='notebook'){
 			var obj_notebook=obj_tab.main_widget;
 			if(obj_notebook.m_loaded_time!=IO.GetFileTimestamp(obj_notebook.file_name)){
@@ -7726,10 +7767,15 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	}
 	///////////////////////////
 	if(!is_preview){
-		var doc=UI.g_editor_from_file[fn];
-		if(doc){
-			doc.m_ed_refcnt++;
-			return doc;
+		var arr_ori=UI.g_editor_from_file[fn];
+		if(arr_ori){
+			for(var i=0;i<arr_ori.length;i++){
+				var doc=arr_ori[i];
+				if(doc&&!doc.owner){
+					doc.m_ed_refcnt++;
+					return doc;
+				}
+			}
 		}
 	}
 	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
@@ -7762,7 +7808,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	};
 	doc.__proto__=style;
 	if(!is_preview){
-		UI.g_editor_from_file[fn]=doc;
+		AddDocToByFileList(doc,fn);
 	}
 	return doc;
 };
@@ -7782,7 +7828,7 @@ UI.CloseCodeEditorDocument=function(doc){
 	if(!(doc.m_ed_refcnt>0)){
 		var fn=doc.m_file_name;
 		doc.OnDestroy();
-		UI.g_editor_from_file[fn]=undefined;
+		RemoveDocFromByFileList(doc,fn);
 	}
 }
 

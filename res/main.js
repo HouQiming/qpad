@@ -547,9 +547,9 @@ var CreateMenus=function(){
 				action:UI.ShowInFolder.bind(undefined,obj_real_active_tab.file_name)
 			})
 		}
-		//menu_tools.AddNormalItem({text:"Open a similar tab",tab_menu_group:'tools',enable_hotkey:0,action:function(fn){
-		//	UI.NewCodeEditorTab(fn);
-		//}.bind(null,obj_real_active_tab.file_name)})
+		menu_tools.AddNormalItem({text:"O&pen a similar tab",tab_menu_group:'tools',enable_hotkey:0,action:function(fn){
+			UI.NewCodeEditorTab(fn);
+		}.bind(null,obj_real_active_tab.file_name)})
 		menu_tools.AddSeparator()
 	}
 	if(obj_active_tab&&obj_active_tab.file_name){
@@ -707,7 +707,7 @@ UI.Application=function(id,attrs){
 				}else if(workspace[i].document_type=='notebook'){
 					UI.OpenNoteBookTab(workspace[i].file_name)
 				}else{
-					UI.OpenEditorWindow(workspace[i].file_name)
+					UI.OpenEditorWindow(workspace[i].file_name,undefined,'restore_workspace')
 				}
 				var item=UI.top.app.document_area.items[UI.top.app.document_area.items.length-1];
 				item.z_order=workspace[i].z_order;

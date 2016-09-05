@@ -995,13 +995,13 @@ var RenderLayout=function(layout,obj,y_base){
 						}
 					}
 					UI.PopSubWindow()
-					tab.tooltip=obj_tab.body.tooltip
-					if(obj_tab.body.title){
-						if(tab.title!=obj_tab.body.title){
-							tab.title=obj_tab.body.title
-							UI.Refresh()
-						}
-					}
+					//tab.tooltip=obj_tab.body.tooltip
+					//if(obj_tab.body.title){
+					//	if(tab.title!=obj_tab.body.title){
+					//		tab.title=obj_tab.body.title
+					//		UI.Refresh()
+					//	}
+					//}
 					var tabid=tab.__global_tab_id;
 					W.SaveDialog("savedlg_"+tabid.toString(),{
 						x:x,y:y+obj.h_caption+obj.h_bar,w:w,h:h_content,
