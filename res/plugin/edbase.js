@@ -1302,6 +1302,15 @@ var CountSpacesAfter=function(ed,ccnt){
 	return ed.MoveToBoundary(ccnt,1,"space")-ccnt;
 }
 
+var GetSpaceIndent=function(){
+	var tab_width=UI.GetOption("tab_width",4);
+	return Array(tab_width+1).join(' ');
+};
+
+var DeduceIndent=function(ed,ccnt){
+	return ed.GetUtf8CharNeighborhood(ccnt)[1]==32?GetSpaceIndent():'\t';
+};
+
 UI.RegisterEditorPlugin(function(){
 	//bracket-related auto-indent
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
@@ -1336,14 +1345,14 @@ UI.RegisterEditorPlugin(function(){
 				if(nspaces<=nspaces_curline){
 					//well... don't do it if the next line is less-indented
 					var nspaces=CountSpacesAfter(ed,ccnt_lh)
-					snewline=snewline+ed.GetText(ccnt_lh,nspaces)+"\t"
+					snewline=snewline+ed.GetText(ccnt_lh,nspaces)+DeduceIndent(ed,ccnt_lh);
 				}else{
 					snewline=snewline+ed.GetText(ccnt_nextline,nspaces)
 				}
 			}else{
 				//add extra indent
 				var nspaces=CountSpacesAfter(ed,ccnt_lh)
-				snewline=snewline+ed.GetText(ccnt_lh,nspaces)+"\t"
+				snewline=snewline+ed.GetText(ccnt_lh,nspaces)+DeduceIndent(ed,ccnt_lh)
 			}
 			delta_ccnt=Duktape.__byte_length(snewline)
 			did=1
@@ -1400,7 +1409,7 @@ UI.RegisterEditorPlugin(function(){
 				//for(), if(), main(), ...
 				//add {} and move cursor in between
 				var delta_ccnt=Duktape.__byte_length(snewline)+2
-				snewline="{"+snewline+"\t"+snewline+"}"
+				snewline="{"+snewline+DeduceIndent(ed,ccnt_lh)+snewline+"}"
 				if(acw==2){
 					snewline=snewline+';'
 				}
@@ -1711,7 +1720,7 @@ UI.RegisterEditorPlugin(function(){
 			var ccnt0=line_ccnts[i];
 			var ccnt1=line_ccnts[i+1];
 			if(delta>0){
-				ops.push(ccnt0,0,'\t')
+				ops.push(ccnt0,0,DeduceIndent(ed,ccnt0))
 			}else{
 				if(ccnt0<ccnt1){
 					var ch=ed.GetUtf8CharNeighborhood(ccnt0)[1];

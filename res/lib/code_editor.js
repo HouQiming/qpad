@@ -5415,6 +5415,13 @@ W.CodeEditor=function(id,attrs){
 			if(!obj.show_find_bar&&s_autofind_needle&&!obj.m_hide_find_highlight){
 				//repeat the animation to get the correct scrolling information
 				UI.Begin(doc)
+					//alway bound the scroll to valid ranges
+					var sx0=doc.scroll_x;
+					var sy0=doc.scroll_y;
+					doc.AutoScroll("bound")
+					if(!(sx0==doc.scroll_x&&sy0==doc.scroll_y)){
+						obj.scrolling_animation=undefined;
+					}
 					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
 						scroll_x:doc.scroll_x,
 						scroll_y:doc.scroll_y})
