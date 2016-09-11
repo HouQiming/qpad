@@ -3296,3 +3296,45 @@ UI.RegisterEditorPlugin(function(){
 		menu_convert=undefined;
 	})
 })
+
+//code tagging
+var CODE_TAG_LENGTH=12;
+var CreateFileTag=function(){
+	return IO.SHA1([UI.g_git_email,Date.now()].join('&')).substr(0,CODE_TAG_LENGTH);
+};
+
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('menu',function(){
+		if(!UI.HasFocus(this)){return;}
+		var sel=this.GetSelection();
+		var menu_tools=UI.BigMenu("&Tools")
+		if(sel[0]<sel[1]){
+			menu_tools.AddSeparator();
+			menu_tools.AddNormalItem({text:"Tag the code block",enable_hotkey:1,key:"CTRL+B",action:function(){
+				var stag=CreateFileTag();
+				var sel=this.GetSelection();
+				var line0=this.GetLC(sel[0])[0];
+				var line1=this.GetLC(sel[1])[0];
+				if(this.SeekLC(line1,0)<sel[1]){line1++;}
+				sel[0]=this.SeekLC(line0,0);
+				sel[1]=this.SeekLC(line1,0);
+				var sindent0=this.ed.GetText(sel[0],CountSpacesAfter(this.ed,sel[0]));
+				var sindent1=this.ed.GetText(sel[1],CountSpacesAfter(this.ed,sel[1]));
+				var lang=this.plugin_language_desc
+				var cmt_holder=lang;
+				if(lang.GetCommentStrings){
+					cmt_holder=lang.GetCommentStrings(this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
+				}
+				var s_line_comment=cmt_holder.line_comment||'//';
+				this.HookedEdit([
+					sel[0],0,sindent0+s_line_comment+'#b+'+stag+'\n',
+					sel[1],0,sindent1+s_line_comment+'#b-'+stag+'\n']);
+				this.SetSelection(sel[0],this.SeekLC(line1+2,0))
+				UI.SDL_SetClipboardText(stag);
+				UI.Refresh();
+			}.bind(this)});
+		}
+		menu_tools=undefined;
+	})
+})

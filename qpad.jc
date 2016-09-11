@@ -441,6 +441,10 @@ if Platform.BUILD=="debug":
 			spath=JS.Param(2).as(string)
 			return JS.Return(DoFileDialog(is_save,sfilters,spath))
 		}
+	jsio["SHA1"]=function(JSContext JS){
+		auto s=JS.Param(0).as(string)
+		return JS.Return(SHA1Digest(s))
+	}
 	/////////////
 	auto shellcmd(JSObject shell_args,int do_system)
 		if !shell_args:

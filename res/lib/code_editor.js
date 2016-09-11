@@ -5246,6 +5246,7 @@ W.CodeEditor=function(id,attrs){
 		var all_docvars=[];
 		if(doc){
 			//scrolling and stuff
+			doc.AutoScroll("bound")
 			var ccnt_tot=doc.ed.GetTextSize()
 			var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot);
 			if(h_obj_area<ytot&&!obj.m_is_preview){
@@ -5418,7 +5419,6 @@ W.CodeEditor=function(id,attrs){
 					//alway bound the scroll to valid ranges
 					var sx0=doc.scroll_x;
 					var sy0=doc.scroll_y;
-					doc.AutoScroll("bound")
 					if(!(sx0==doc.scroll_x&&sy0==doc.scroll_y)){
 						obj.scrolling_animation=undefined;
 					}
