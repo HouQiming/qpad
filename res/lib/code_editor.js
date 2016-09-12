@@ -6535,6 +6535,30 @@ W.CodeEditor=function(id,attrs){
 							}
 						}
 					}.bind(obj)})
+					menu_search.AddNormalItem({text:"&Peek definition",context_menu_group:"definition",enable_hotkey:1,key:"ALT+F12",action:function(){
+						//todo
+						var obj=this
+						var doc=obj.doc
+						var sel=doc.GetSelection();
+						var ed=doc.ed
+						var ccnt_sel1=doc.sel1.ccnt;
+						var ccnt_nextline=doc.SeekLC(doc.GetLC(ccnt_sel1)[0]+1,0);
+						var hc=UI.GetCharacterHeight(doc.font)
+						if(ed.GetUtf8CharNeighborhood(ccnt_nextline)[0]==10){
+							var renderer=doc.GetRenderer();
+							renderer.EmbedObject(ed,ccnt_nextline-1,{
+								w:800,h:5,hc:hc,
+								Render:function(x,y,scale){
+									UI.RoundRect({
+										x:x,y:y,
+										w:this.w,h:this.h*this.hc,
+										color:0xff0000ff,
+									})
+								},
+							});
+							UI.Refresh();
+						}
+					}.bind(obj)})
 					menu_search.AddNormalItem({text:"Find all references",context_menu_group:"definition",action:function(){
 						var obj=this
 						var doc=obj.doc

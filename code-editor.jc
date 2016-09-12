@@ -178,6 +178,8 @@ auto DrawTilde(TFont fnt_tilde,float x0,float x1,float y,int C)
 
 HL_DISPLAY_MODE_EMBOLDEN=2
 HL_DISPLAY_MODE_TILDE=3
+OVERLAY_AE=0
+OVERLAY_IME=1
 //U_ELLIPSIS=0x2026
 struct TEllipsisItem
 	float x,y,scale
@@ -185,12 +187,17 @@ struct TEllipsisItem
 struct TOverlayItem
 	i64 flatx
 	i64 y,delta_x
-	string s_text,s_type
+	string s_text
+	int type
 	int sel0,sel1
 	i64 w_strikeout
 struct TTildeItem
 	i64 ccnt0,ccnt1
 	int color
+class CCodeEmbededObject
+	CLocator loc
+	JSObject obj
+	i64 dy//<measured in # lines
 class CLayouter_programmer
 	FLAG_HAS_TAB=1
 	FLAG_HAS_ENTER=2
@@ -227,6 +234,7 @@ class CLayouter_programmer
 	int[int] m_char_kerning_cache
 	/////////////////
 	m_hidden_ranges=new CLocator[]
+	m_ceos=new CCodeEmbededObject[]
 	i64 m_w_ellipsis
 	m_ellipsis_items=new TEllipsisItem[]
 	/////////////////
@@ -402,6 +410,23 @@ class CLayouter_programmer
 		x+=w_post_enter
 		return x
 	}
+	GetFlatXEnMasse=inline(i64[] a){
+		auto ret=new i64[a.n/5]
+		for i=0:ret.n-1
+			w_pre_tab=a[i*5+0]
+			w_tab_enter=a[i*5+1]
+			w_post_enter=a[i*5+2]
+			flags=int(a[i*5+3])
+			x=w_pre_tab
+			if flags&FLAG_HAS_TAB:
+				x=(x/m_tab_width_in_fp+1LL)*m_tab_width_in_fp
+			x+=w_tab_enter
+			if flags&FLAG_HAS_ENTER:
+				x=(x/m_wrap_width_in_fp+1LL)*m_wrap_width_in_fp
+			x+=w_post_enter
+			ret[i]=x
+		return ret
+	}
 	XYToX=inline(i64 x,i64 y){
 		hc=charHeight()
 		return max(min(x,m_wrap_width_in_fp-1LL),0LL)+(y/hc)*m_wrap_width_in_fp
@@ -551,7 +576,7 @@ class CLayouter_programmer
 				y:(flatx+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp-1LL,
 				delta_x:double2fixed(w_overlayd),
 				s_text:s,
-				s_type:obj["type"].or("IME"),
+				type:obj["type"].or("IME")=="IME"?OVERLAY_IME:OVERLAY_AE,
 				sel0:x_sel0,
 				sel1:x_sel1,
 				w_strikeout:0LL,
@@ -570,7 +595,7 @@ class CLayouter_programmer
 				//////
 				hid=caller.m_handler_registration["renderer"].as(int)
 				a=caller.GetStateEnMasse(hid,ccnts)
-				flatxs=[GetFlatX(a[i*5:]) for i=0:n*2-1]
+				flatxs=GetFlatXEnMasse(a)//[GetFlatX(a[i*5:]) for i=0:n*2-1]
 				for i=0:n-1
 					s_i=m_tentative_editops[i*3+2].as(string)
 					if !s_i:
@@ -583,7 +608,7 @@ class CLayouter_programmer
 						y:(flatxs[i*2+1]+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp-1LL,
 						delta_x:double2fixed(w_overlayd_i),
 						s_text:s_i,
-						s_type:"AE",
+						type:OVERLAY_AE,
 						sel0:0LL,
 						sel1:0LL,
 						w_strikeout:flatxs[i*2+1]-flatxs[i*2],
@@ -602,7 +627,7 @@ class CLayouter_programmer
 			n=n3/3
 			hid=caller.m_handler_registration["renderer"].as(int)
 			a=caller.GetStateEnMasse(hid,ccnts)
-			flatxs=[GetFlatX(a[i*5:]) for i=0:n*2-1]
+			flatxs=GetFlatXEnMasse(a)//[GetFlatX(a[i*5:]) for i=0:n*2-1]
 			for i=0:n-1
 				ccnt_j=m_virtual_diffs[i*3+0].as(i64)
 				sz_j=m_virtual_diffs[i*3+1].as(i64)
@@ -620,7 +645,7 @@ class CLayouter_programmer
 					y:(flatxs[i*2+1]+m_wrap_width_in_fp-1LL)/m_wrap_width_in_fp-1LL,
 					delta_x:double2fixed(w_overlayd_i),
 					s_text:s_i,
-					s_type:"AE",
+					type:OVERLAY_AE,
 					sel0:0LL,
 					sel1:0LL,
 					w_strikeout:-double2fixed(w_overlayd_i),
@@ -684,7 +709,7 @@ class CLayouter_programmer
 			//g_renderer.DrawChar(fnt_scaled, prj_xo.x,prj_xo.y,m_color_overlay, chj)
 			g_renderer.FastDrawChar(prj_xo.x,prj_xo.y,m_color_overlay, chj)
 			xo+=dx_j
-		if oi.s_type=="IME":
+		if oi.type==OVERLAY_IME:
 			y_underline=prj_x.y+fnt_scaled.h*(fnt_scaled.pfnt.y_baseline_per_height+0.02f)
 			g_renderer.DrawRectangle(prj_x.x,y_underline,fixed2float(oi.delta_x)*scale,max(fnt_scaled.h*0.05f,1.f), m_color_overlay)
 		return 1
@@ -887,6 +912,16 @@ class CLayouter_programmer
 		//the \t\n ignorant hiding
 		HideChars(ed,ccnt_base,color_ids,s)
 		enable_hidden=m_enable_hidden
+		//maintain an embedded object list
+		p_next_ceo=0L
+		ccnt_next_ceo=-1LL
+		if m_ceos.n:
+			//virtual overlay
+			hid=ed.m_handler_registration["renderer"].as(int)
+			SortEmbededObjects()
+			p_next_ceo=m_ceos.InlineBisect(inline(a){return a.loc.ccnt<ccnt_base})
+			if p_next_ceo<m_ceos.n:
+				ccnt_next_ceo=m_ceos[p_next_ceo].loc.ccnt
 		//it's OK to have a negative dx_extra
 		//maintain x normally
 		I_query_valid_point=-1LL
@@ -920,6 +955,11 @@ class CLayouter_programmer
 			if ch=='\r':
 				//nothing
 			else if ch=='\n':
+				if ccnt_base+I==ccnt_next_ceo:
+					dy_extra+=m_ceos[p_next_ceo].dy
+					p_next_ceo++
+					if p_next_ceo<m_ceos.n:
+						ccnt_next_ceo=m_ceos[p_next_ceo].loc.ccnt
 				if cidi==u8(255):
 					dy_extra--
 					dx_extra+=ix
@@ -1051,23 +1091,33 @@ class CLayouter_programmer
 						DrawTilde(fnt_tilde,screen_x,screen_x+wf*scale,y+dy_baseline, C_tilde)
 					DrawTilde(fnt_tilde,screen_x,max(xy1.x,screen_x),xy1.y+dy_baseline, C_tilde)
 			//m_current_frame_spell_errors=long2[].NULL
-		else
-			//fnt_scaled=m_font
-			//fnt_scaled.h*=scale
-			if m_enable_hidden>0:
-				if !m_hidden_ranges_prepared:
-					PrepareHiddenRanges(ed)
-				if m_hidden_ccnts.n&&m_hidden_ccnts[0]==0LL:
-					//draw ... at the zeroth text, if it's visible
-					//g_renderer.DrawChar(fnt_scaled, fixed2float(-scroll_x)*scale+screen_x,fixed2float(-scroll_y)+screen_y,
-					//	m_cached_colors[0], U_ELLIPSIS)
-					m_ellipsis_items.push(TEllipsisItem(){
-							x:fixed2float(-scroll_x)*scale+screen_x,
-							y:fixed2float(-scroll_y)+screen_y,
-							scale:scale,color:m_cached_colors[0]})
-				js_callback=obj["DrawEllipsis"].as(JSObject)
-				foreach ei in m_ellipsis_items
-					js_callback.CallAsMethod(int,obj,ei.x,ei.y,ei.scale,ei.color)
+		//else
+		//fnt_scaled=m_font
+		//fnt_scaled.h*=scale
+		if m_enable_hidden>0:
+			if !m_hidden_ranges_prepared:
+				PrepareHiddenRanges(ed)
+			if m_hidden_ccnts.n&&m_hidden_ccnts[0]==0LL:
+				//draw ... at the zeroth text, if it's visible
+				//g_renderer.DrawChar(fnt_scaled, fixed2float(-scroll_x)*scale+screen_x,fixed2float(-scroll_y)+screen_y,
+				//	m_cached_colors[0], U_ELLIPSIS)
+				m_ellipsis_items.push(TEllipsisItem(){
+						x:fixed2float(-scroll_x)*scale+screen_x,
+						y:fixed2float(-scroll_y)*scale+screen_y,
+						scale:scale,color:m_cached_colors[0]})
+			js_callback=obj["DrawEllipsis"].as(JSObject)
+			foreach ei in m_ellipsis_items
+				js_callback.CallAsMethod(int,obj,ei.x,ei.y,ei.scale,ei.color)
+		//render embedded objects
+		if m_ceos.n:
+			SortEmbededObjects()
+			ceo_xys=ed.GetXYEnMasse([ceo.loc.ccnt+1 for ceo in m_ceos])
+			hc0=charHeight()
+			for ceo,I in m_ceos
+				ceo.obj.CallMethod(int,"Render",
+					(fixed2float(ceo_xys[I*2+0]-scroll_x)*scale+screen_x)/g_renderer.m_pixels_per_unit,
+					(fixed2float(ceo_xys[I*2+1]-ceo.dy*hc0-scroll_y)*scale+screen_y)/g_renderer.m_pixels_per_unit,
+					scale)
 		//draw strikeouts
 		if m_current_frame_strikeouts.n:
 			C_strikeout=obj["color_strikeout"].as(int)
@@ -1468,7 +1518,19 @@ class CLayouter_programmer
 	long4[] m_hidden_dx_add
 	long4[] m_hidden_dx_sub
 	i64[] m_hidden_ccnts
-	/*
+	struct TDeltaYItem
+		i64 flatx0_hidden
+		i64 flatx1_hidden
+		i64 dy_enforced//<measured in # lines
+	m_ceos_sorted=0
+	SortEmbededObjects=function(){
+		if m_ceos_sorted:return
+		m_ceos_sorted=1
+		m_ceos.Sortby(inline(a){return a.loc.ccnt})
+	}
+	/**
+	\brief how hidden text is being handled, mainly used when finding
+	
 	-1: disable all
 	 0: enable seeking, disable rendering
 	 1: enable all
@@ -1509,35 +1571,56 @@ class CLayouter_programmer
 		m_enable_hidden=-1
 		a=ed.GetStateEnMasse(hid,ccnts)
 		m_enable_hidden=1
-		all_x=[GetFlatX(a[i:]) for i=0:5:a.n-5]
-		dx_add=new long4[all_x.n>>1]
-		dx_sub=new long4[all_x.n>>1]
+		all_x=GetFlatXEnMasse(a)//[GetFlatX(a[i:]) for i=0:5:a.n-5]
+		dy_events=new TDeltaYItem[(all_x.n>>1)+m_ceos.n]
+		p_dy=0L
+		for i=0:2:all_x.n-1
+			dy_events[p_dy]=TDeltaYItem(){
+				flatx0_hidden:all_x[i+0],
+				flatx1_hidden:all_x[i+1],
+				dy_enforced:0LL,
+			}
+			p_dy++
+		//////////////////////
+		//convert ceos into dy items
+		SortEmbededObjects()
+		a2=GetFlatXEnMasse(ed.GetStateEnMasse(hid,[ceo.loc.ccnt for ceo in m_ceos]))
+		for ceo,I in m_ceos
+			dy_events[p_dy]=TDeltaYItem(){
+				flatx0_hidden:a2[I],
+				flatx1_hidden:a2[I],
+				dy_enforced:ceo.dy,
+			}
+			p_dy++
+		dx_add=new long4[dy_events.n]
+		dx_sub=new long4[dy_events.n]
 		m_hidden_dx_add=dx_add
 		m_hidden_dx_sub=dx_sub
 		m_hidden_ccnts=ccnts
 		w_hidden=m_w_ellipsis//charWidth(U_ELLIPSIS)
 		x_new_cur=0LL;y_new_cur=0LL;flatx_ori_cur=0LL
 		wrap_width=m_wrap_width_in_fp
-		for i=0:2:all_x.n-2
+		for dye,I in dy_events
 			y_ori_cur=flatx_ori_cur/wrap_width
-			if flatx_ori_cur<all_x[i]:
+			if flatx_ori_cur<dye.flatx0_hidden:
 				//honor and only honor the *original* newlines
-				y_ori_next=all_x[i]/wrap_width
+				y_ori_next=dye.flatx0_hidden/wrap_width
 				if y_ori_next>y_ori_cur:
 					y_new_cur+=y_ori_next-y_ori_cur
-					x_new_cur=all_x[i]-y_ori_next*wrap_width
+					x_new_cur=dye.flatx0_hidden-y_ori_next*wrap_width
 				else
-					x_new_cur+=(all_x[i]-flatx_ori_cur)
-			x_new_cur+=w_hidden
-			flatx_ori_cur=all_x[i+1]
+					x_new_cur+=(dye.flatx0_hidden-flatx_ori_cur)
+			y_new_cur+=dye.dy_enforced
+			if dye.flatx0_hidden<dye.flatx1_hidden:
+				x_new_cur+=w_hidden
+			flatx_ori_cur=dye.flatx1_hidden
 			dx=x_new_cur-(flatx_ori_cur-flatx_ori_cur/wrap_width*wrap_width)
 			//assert(dx>=0LL)
-			//this is just dy
-			dfx=(all_x[i+1]/wrap_width-y_new_cur)*wrap_width
-			assert(dfx>=0LL)
+			dfx=(dye.flatx1_hidden/wrap_width-y_new_cur)*wrap_width
+			//assert(dfx>=0LL)
 			////////////
-			dx_add[i>>1]=long4(x_new_cur,y_new_cur,dx,dfx)
-			dx_sub[i>>1]=long4(all_x[i],all_x[i+1],dx,dfx)
+			dx_add[I]=long4(x_new_cur,y_new_cur-dye.dy_enforced,dx,dfx)
+			dx_sub[I]=long4(dye.flatx0_hidden,dye.flatx1_hidden,dx,dfx)
 	}
 	AddHiddenRanges=function(CEditableText ed,i64 x,i64 y){
 		//it's not necessarily an 'add'
@@ -1554,7 +1637,11 @@ class CLayouter_programmer
 			x_real=x
 			if y_real==dxitem.y:
 				x_real-=dxitem.z
-			return max(min(x_real,m_wrap_width_in_fp-1LL),0LL)+(y_real)*m_wrap_width_in_fp+dxitem.w
+			dfx=dxitem.w
+			if dfx<0&&y_real+dfx/m_wrap_width_in_fp<dxitem.y:
+				//move down from the above of a CEO
+				dfx=0LL
+			return max(min(x_real,m_wrap_width_in_fp-1LL),0LL)+(y_real)*m_wrap_width_in_fp+dfx
 		else
 			return XYToX(x,y)
 	}
@@ -1682,6 +1769,39 @@ class CLayouter_programmer
 			ret[I]=loc.ccnt
 		return JS.Return(ret)
 	}
+	////////////////////
+	JS_EmbedObject=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return JS.ReturnError("invalid editor")
+		ccnt=JS.Param(1).as(i64)
+		obj=JS.Param(2).as(JSObject)
+		loc=ed.CreateLocator(ccnt,1)
+		m_ceos.push(new CCodeEmbededObject(){
+			loc:loc,
+			obj:obj,
+			dy:obj["h"].as(i64),
+		})
+		m_ceos_sorted=0
+		m_hidden_ranges_prepared=0
+		return JS.Return(1)
+	}
+	JS_QueryEmbeddedObjectAfter=function(JSContext JS){
+		ccnt=JS.Param(0).as(i64)
+		SortEmbededObjects()
+		p=m_ceos.InlineBisect(inline(a){return a.loc.ccnt<ccnt})-1L
+		if p<m_ceos.n:
+			return JS.Return(p)
+		else
+			return 0
+	}
+	JS_RemoveEmbeddedObject=function(JSContext JS){
+		id=JS.Param(0).as(iptr)
+		m_ceos=[ceo for ceo,I in m_ceos if I!=id]
+		m_ceos_sorted=0
+		m_hidden_ranges_prepared=0
+		return 0
+	}
+	////////////////////
 	JS_ResetWrapping=function(JSContext JS){
 		auto m_wrap_width=JS.Param(0).or(0.f)
 		auto obj=JS.Param(1).as(JSObject)
@@ -1713,6 +1833,11 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"SnapToShown",JS_SnapToShown)
 		proto.ExportMethod(this,"IsRangeHidden",JS_IsRangeHidden)
 		proto.ExportMethod(this,"GetHiddenRanges",JS_GetHiddenRanges)
+		////////////////////
+		proto.ExportMethod(this,"EmbedObject",JS_EmbedObject)
+		proto.ExportMethod(this,"QueryEmbeddedObjectAfter",JS_QueryEmbeddedObjectAfter)
+		proto.ExportMethod(this,"RemoveEmbeddedObject",JS_RemoveEmbeddedObject)
+		////////////////////
 		proto.ExportMethod(this,"ResetWrapping",JS_ResetWrapping)
 		////////////////////
 		proto.ExportProperty(this,"m_tentative_editops")
