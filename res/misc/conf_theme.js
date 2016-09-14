@@ -655,6 +655,8 @@ UI.CustomTheme=function(){
 			wrap_bar_size:3,
 			wrap_bar_region_size:8,
 			wrap_bar_color:L?0x2f000000:0x7f000000,
+			///////
+			peekdef_h:7,
 		},
 		code_editor_notification:{
 			transition_dt:0.1,

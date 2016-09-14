@@ -3212,18 +3212,18 @@ UI.RegisterEditorPlugin(function(){
 				return UI.ED_NativeToTab(smatch,tab_width)
 			})})
 		menu_convert.AddNormalItem({text:"Letters to &UPPERCASE",action:
-			fsmart_replace.bind(this,"[a-z]+",function(smatch){
+			fsmart_replace.bind(this,".+",function(smatch){
 				return smatch.toUpperCase();
 			})})
 		menu_convert.AddNormalItem({text:"Letters to &lowercase",action:
-			fsmart_replace.bind(this,"[A-Z]+",function(smatch){
+			fsmart_replace.bind(this,".+",function(smatch){
 				return smatch.toLowerCase();
 			})})
-		menu_convert.AddNormalItem({text:"Line ending to &DOS",action:
+		menu_convert.AddNormalItem({text:"Line endings to &DOS",action:
 			fsmart_replace.bind(this,"\r*\n",function(smatch){
 				return "\r\n"
 			})})
-		menu_convert.AddNormalItem({text:"Line ending to Uni&x",action:
+		menu_convert.AddNormalItem({text:"Line endings to Uni&x",action:
 			fsmart_replace.bind(this,"\r+\n",function(smatch){
 				return "\n";
 			})})

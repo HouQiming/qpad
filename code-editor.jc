@@ -222,6 +222,7 @@ class CLayouter_programmer
 	TTildeItem[] m_current_frame_tildes
 	float3[] m_current_frame_strikeouts
 	int m_temporarily_disable_spell_check
+	int m_enable_ceo_rendering
 	//////////////
 	//JSObject m_style
 	CLanguageDescription m_lang
@@ -1109,7 +1110,7 @@ class CLayouter_programmer
 			foreach ei in m_ellipsis_items
 				js_callback.CallAsMethod(int,obj,ei.x,ei.y,ei.scale,ei.color)
 		//render embedded objects
-		if m_ceos.n:
+		if m_enable_ceo_rendering&&m_ceos.n:
 			SortEmbededObjects()
 			ceo_xys=ed.GetXYEnMasse([ceo.loc.ccnt+1 for ceo in m_ceos])
 			hc0=charHeight()
@@ -1801,6 +1802,12 @@ class CLayouter_programmer
 		m_hidden_ranges_prepared=0
 		return 0
 	}
+	JS_RemoveAllEmbeddedObjects=function(JSContext JS){
+		m_ceos.clear()
+		m_ceos_sorted=0
+		m_hidden_ranges_prepared=0
+		return 0
+	}
 	////////////////////
 	JS_ResetWrapping=function(JSContext JS){
 		auto m_wrap_width=JS.Param(0).or(0.f)
@@ -1823,6 +1830,7 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"HunspellAddWord",JS_AddWord)
 		proto.ExportMethod(this,"HunspellSuggest",JS_Suggest)
 		proto.ExportProperty(this,"m_temporarily_disable_spell_check")
+		proto.ExportProperty(this,"m_enable_ceo_rendering")
 		proto.ExportMethod(this,"ResetSpellChecker",JS_ResetSpellChecker)
 		proto.ExportMethod(this,"HunspellClearContext",JS_ClearContext)
 		////////////////////
@@ -1837,6 +1845,7 @@ class CLayouter_programmer
 		proto.ExportMethod(this,"EmbedObject",JS_EmbedObject)
 		proto.ExportMethod(this,"QueryEmbeddedObjectAfter",JS_QueryEmbeddedObjectAfter)
 		proto.ExportMethod(this,"RemoveEmbeddedObject",JS_RemoveEmbeddedObject)
+		proto.ExportMethod(this,"RemoveAllEmbeddedObjects",JS_RemoveAllEmbeddedObjects)
 		////////////////////
 		proto.ExportMethod(this,"ResetWrapping",JS_ResetWrapping)
 		////////////////////

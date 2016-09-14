@@ -272,6 +272,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				this.CancelAutoCompletion()
 				this.m_ac_activated=0
 				this.m_user_just_typed_char=0
+				var renderer=this.GetRenderer();
+				renderer.RemoveAllEmbeddedObjects();
 				//////////
 				var obj=this.owner
 				if(!obj){return;}
@@ -1174,10 +1176,18 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		//main editor
 		if(enable_interaction){
+			var renderer=undefined;
+			if(this.ed){
+				renderer=this.GetRenderer();
+				renderer.m_enable_ceo_rendering=1;
+			}
 			this.RenderAsWidget(enable_interaction,
 				area_x+w_line_numbers+edstyle.padding,area_y,
 				area_w-w_line_numbers-edstyle.padding,
 				area_h);
+			if(renderer){
+				renderer.m_enable_ceo_rendering=0;
+			}
 			scroll_x=this.visible_scroll_x;
 			scroll_y=this.visible_scroll_y;
 		}else{
@@ -3070,6 +3080,178 @@ W.CodeEditorWidget_prototype={
 		this.m_find_next_context=ctx;
 		ctx.ffind_next();
 	},
+	OpenAsDefinition:function(fn,ccnt_go,is_peek,new_def_context){
+		var doc=this.doc;
+		var ed=doc.ed;
+		var ccnt_sel1=doc.sel1.ccnt;
+		var ccnt_nextline=doc.SeekLC(doc.GetLC(ccnt_sel1)[0]+1,0);
+		if(is_peek){
+			if(ed.GetUtf8CharNeighborhood(ccnt_nextline)[0]==10){
+				//actually open a readonly doc here - should be a copy of the actual file
+				//and we should support reopening
+				//a widget with Reload calls
+				var hc=doc.ed.GetCharacterHeightAt(0);
+				var renderer=doc.GetRenderer();
+				var doc_new=undefined;
+				if(fn){
+					//read that file, it's a peek, we are assuming a small file
+					doc_new=UI.OpenCodeEditorDocument(fn,1);
+					doc_new.Init();
+				}else{
+					//copy the current document
+					fn=doc.m_file_name;
+					doc_new=UI.CreateEmptyCodeEditor(doc.m_language_id)
+					doc_new.Init();
+					doc_new.ed.Edit([0,0,doc.ed.GetText()],1)
+				}
+				doc_new.read_only=1;
+				doc_new.m_is_preview=0;
+				if(ccnt_go!=undefined){
+					doc_new.SetSelection(ccnt_go,ccnt_go);
+				}
+				renderer.RemoveAllEmbeddedObjects();
+				renderer.EmbedObject(ed,ccnt_nextline-1,{
+					h:this.peekdef_h,hc:hc,doc:doc_new,
+					id_doc:"peek_"+Date.now(),
+					has_ccnt_set:0,
+					ccnt_go:ccnt_go,
+					host:this,
+					fn:fn,
+					Render:function(x,y,scale){
+						//UI.RoundRect({
+						//	x:x,y:y,
+						//	w:this.w,h:this.h*this.hc,
+						//	color:0xff0000ff,
+						//})
+						//console.log(this.id_doc,UI.m_frame_tick)
+						this.w=this.host.doc.w-0.5*(x-this.host.x);
+						var obj_peek=W.CodeEditor(this.id_doc,{
+							is_definition_peek:1,
+							disable_minimap:1,
+							doc:this.doc,
+							read_only:1,
+							x:x,y:y,w:this.w,h:this.h*this.hc,
+						});
+						var fn_display=UI.GetSmartTabName(this.fn);
+						var edstyle=UI.default_styles.code_editor;
+						var text_dim=UI.MeasureText(edstyle.find_message_font,fn_display)
+						UI.RoundRect({
+							x:(obj_peek.x+obj_peek.w-32-text_dim.w),y:y+4,
+							w:text_dim.w,h:text_dim.h,
+							round:2,
+							color:edstyle.bgcolor&0xaaffffff,
+						})
+						W.Text("",{
+							x:(obj_peek.x+obj_peek.w-32-text_dim.w),y:y+4,
+							font:edstyle.find_message_font,color:edstyle.editor_style.color_symbol,
+							text:fn_display})
+						//obj_peek
+						if(!this.has_ccnt_set){
+							this.has_ccnt_set=1;
+							if(this.ccnt_go!=undefined){
+								this.doc.SetSelection(this.ccnt_go,this.ccnt_go);
+								this.doc.scroll_y=this.doc.ed.XYFromCcnt(this.ccnt_go).y;
+								this.doc.h_top_hint=this.doc.h_top_hint_real;
+								this.doc.AutoScroll("show");
+							}
+						}
+					},
+				});
+				if(new_def_context){
+					UI.g_goto_definition_context=new_def_context;
+				}
+				UI.Refresh();
+			}
+		}else{
+			UI.RecordCursorHistroy(doc,"go_to_definition")
+			if(!fn){
+				this.doc.SetSelection(ccnt_go,ccnt_go);
+			}else{
+				UI.OpenEditorWindow(fn,ccnt_go!=undefined&&function(){
+					var doc=this;
+					var ccnt=ccnt_go;
+					if(doc.m_diff_from_save){
+						ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
+					}
+					doc.SetSelection(ccnt,ccnt)
+					if(new_def_context){
+						UI.g_goto_definition_context=new_def_context;
+					}
+					UI.g_cursor_history_test_same_reason=1
+					UI.Refresh()
+				});
+				if(new_def_context){
+					this.DestroyReplacingContext(1)
+				}
+			}
+		}
+	},
+	GotoDefinition:function(is_peek){
+		var doc=this.doc;
+		var sel=doc.GetSelection();
+		var ed=doc.ed
+		var ccnt_sel1=doc.sel1.ccnt
+		var hc=UI.GetCharacterHeight(doc.font);
+		if(doc.m_diff_from_save){ccnt_sel1=doc.m_diff_from_save.CurrentToBase(ccnt_sel1)}
+		var s_dep_file=UI.ED_QueryDepTokenByBaseCcnt(doc,ccnt_sel1)
+		if(s_dep_file){
+			//UI.OpenEditorWindow(s_dep_file)
+			this.OpenAsDefinition(s_dep_file,undefined,is_peek);
+			return
+		}
+		sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
+		sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
+		if(sel[0]<sel[1]){
+			var id=ed.GetText(sel[0],sel[1]-sel[0])
+			var ccnt0=doc.sel1.ccnt
+			var ccnt=ccnt0
+			for(;;){
+				//parser-friendly outer scope search
+				var fol_ret=doc.FindOuterLevel(ccnt);
+				ccnt=fol_ret.ccnt_editor;
+				ccnt_query=fol_ret.ccnt_parser;
+				if(!(ccnt>=0)){ccnt=0;}
+				if(doc.m_diff_from_save){
+					ccnt_query=doc.m_diff_from_save.CurrentToBase(ccnt_query)
+				}
+				var ccnt_decl=UI.ED_QueryDecl(doc,ccnt_query,id)
+				if(ccnt_decl>=0){
+					if(doc.m_diff_from_save){
+						ccnt_decl=doc.m_diff_from_save.BaseToCurrent(ccnt_decl)
+					}
+					if(ccnt_decl!=ccnt0){
+						//UI.SetSelectionEx(doc,ccnt_decl,ccnt_decl,"go_to_definition")
+						this.OpenAsDefinition(undefined,ccnt_decl,is_peek);
+						UI.Refresh()
+						return;
+					}
+				}
+				if(!(ccnt>0)){break;}
+			}
+			var gkds=UI.ED_QueryKeyDeclByID(id)
+			//not found, check key decls by id
+			var fn=doc.owner.file_name
+			var p_target=0
+			ccnt=ccnt0
+			if(doc.m_diff_from_save){
+				ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
+			}
+			for(var i=0;i<gkds.length;i+=2){
+				if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
+					p_target=i+2
+					if(p_target>=gkds.length){
+						p_target=0;
+					}
+					break
+				}
+			}
+			if(p_target<gkds.length){
+				this.OpenAsDefinition(gkds[p_target+0],gkds[p_target+1],is_peek,gkds.length>2&&{gkds:gkds,p_target:p_target});
+			}else{
+				this.CreateNotification({id:'find_result',icon:'警',text:UI._("Cannot find a definition of '@1'").replace("@1",id)})
+			}
+		}
+	}
 }
 
 var ffindbar_plugin=function(){
@@ -5370,6 +5552,7 @@ W.CodeEditor=function(id,attrs){
 			//if(UI.nd_captured){
 			//	h_top_hint=prev_h_top_hint;//don't change it while scrolling
 			//}
+			doc.h_top_hint_real=h_top_hint;
 			if(Math.abs(h_top_hint-prev_h_top_hint)>4&&h_top_hint>0&&!UI.nd_captured){
 				h_top_hint=(h_top_hint*0.5+prev_h_top_hint*0.5);
 				UI.Refresh()
@@ -6455,109 +6638,10 @@ W.CodeEditor=function(id,attrs){
 					W.Hotkey("",{key:"F12",action:fgoto_action.bind(obj,1)})
 				}else if(doc.ed.m_file_index&&doc.ed.m_file_index.hasDecls()&&(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1]))){
 					menu_search.AddNormalItem({text:"Go to &definition",context_menu_group:"definition",enable_hotkey:1,key:"F12",action:function(){
-						var obj=this
-						var doc=obj.doc
-						var sel=doc.GetSelection();
-						var ed=doc.ed
-						var ccnt_sel1=doc.sel1.ccnt
-						if(doc.m_diff_from_save){ccnt_sel1=doc.m_diff_from_save.CurrentToBase(ccnt_sel1)}
-						var s_dep_file=UI.ED_QueryDepTokenByBaseCcnt(doc,ccnt_sel1)
-						if(s_dep_file){
-							UI.OpenEditorWindow(s_dep_file)
-							return
-						}
-						sel[0]=ed.MoveToBoundary(sel[0],-1,"word_boundary_left")
-						sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
-						if(sel[0]<sel[1]){
-							var id=ed.GetText(sel[0],sel[1]-sel[0])
-							var ccnt0=doc.sel1.ccnt
-							var ccnt=ccnt0
-							for(;;){
-								//parser-friendly outer scope search
-								var fol_ret=doc.FindOuterLevel(ccnt);
-								ccnt=fol_ret.ccnt_editor;
-								ccnt_query=fol_ret.ccnt_parser;
-								if(!(ccnt>=0)){ccnt=0;}
-								if(doc.m_diff_from_save){
-									ccnt_query=doc.m_diff_from_save.CurrentToBase(ccnt_query)
-								}
-								var ccnt_decl=UI.ED_QueryDecl(doc,ccnt_query,id)
-								if(ccnt_decl>=0){
-									if(doc.m_diff_from_save){
-										ccnt_decl=doc.m_diff_from_save.BaseToCurrent(ccnt_decl)
-									}
-									if(ccnt_decl!=ccnt0){
-										UI.SetSelectionEx(doc,ccnt_decl,ccnt_decl,"go_to_definition")
-										UI.Refresh()
-										return;
-									}
-								}
-								if(!(ccnt>0)){break;}
-							}
-							var gkds=UI.ED_QueryKeyDeclByID(id)
-							//not found, check key decls by id
-							var fn=doc.owner.file_name
-							var p_target=0
-							ccnt=ccnt0
-							if(doc.m_diff_from_save){
-								ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
-							}
-							for(var i=0;i<gkds.length;i+=2){
-								if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
-									p_target=i+2
-									if(p_target>=gkds.length){
-										p_target=0;
-									}
-									break
-								}
-							}
-							if(p_target<gkds.length){
-								var ccnt_go=gkds[p_target+1]
-								UI.RecordCursorHistroy(doc,"go_to_definition")
-								UI.OpenEditorWindow(gkds[p_target+0],function(){
-									var doc=this
-									var ccnt=ccnt_go
-									if(doc.m_diff_from_save){
-										ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
-									}
-									doc.SetSelection(ccnt,ccnt)
-									if(gkds.length>2){
-										UI.g_goto_definition_context={gkds:gkds,p_target:p_target};
-									}
-									UI.g_cursor_history_test_same_reason=1
-									UI.Refresh()
-								})
-								if(gkds.length>2){
-									this.DestroyReplacingContext(1)
-								}
-							}else{
-								this.CreateNotification({id:'find_result',icon:'警',text:UI._("Cannot find a definition of '@1'").replace("@1",id)})
-							}
-						}
+						obj.GotoDefinition(0);
 					}.bind(obj)})
 					menu_search.AddNormalItem({text:"&Peek definition",context_menu_group:"definition",enable_hotkey:1,key:"ALT+F12",action:function(){
-						//todo
-						var obj=this
-						var doc=obj.doc
-						var sel=doc.GetSelection();
-						var ed=doc.ed
-						var ccnt_sel1=doc.sel1.ccnt;
-						var ccnt_nextline=doc.SeekLC(doc.GetLC(ccnt_sel1)[0]+1,0);
-						var hc=UI.GetCharacterHeight(doc.font)
-						if(ed.GetUtf8CharNeighborhood(ccnt_nextline)[0]==10){
-							var renderer=doc.GetRenderer();
-							renderer.EmbedObject(ed,ccnt_nextline-1,{
-								w:800,h:5,hc:hc,
-								Render:function(x,y,scale){
-									UI.RoundRect({
-										x:x,y:y,
-										w:this.w,h:this.h*this.hc,
-										color:0xff0000ff,
-									})
-								},
-							});
-							UI.Refresh();
-						}
+						obj.GotoDefinition(1);
 					}.bind(obj)})
 					menu_search.AddNormalItem({text:"Find all references",context_menu_group:"definition",action:function(){
 						var obj=this
