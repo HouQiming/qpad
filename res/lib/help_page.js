@@ -229,8 +229,21 @@ W.HelpPage=function(id,attrs){
 		var h_main_area=obj.h-obj.h_find_bar
 		obj.h_main_area=h_main_area;
 		if(!obj.help_ctx||obj.help_ctx.w_precomputed_for!=w_main_area){
+			var fn_base=obj.m_file_name;
+			var spath_peer=undefined;
+			var spath_repo=undefined;
+			if(fn_base){
+				spath_peer=UI.GetPathFromFilename(fn_base);
+				spath_repo=UI.GetEditorProject(fn_base,"polite");
+			}
 			var fsearchImage=function(fn){
-				//todo
+				console.log(spath_peer,spath_repo,fn)//todo
+				if(spath_peer&&IO.FileExists(spath_peer+'/'+fn)){
+					return IO.NormalizeFileName(spath_peer+'/'+fn);
+				}
+				if(spath_repo&&IO.FileExists(spath_repo+'/'+fn)){
+					return IO.NormalizeFileName(spath_repo+'/'+fn);
+				}
 				return fn;
 			}
 			obj.help_ctx=UI.ED_ProcessHelp(obj.text,obj.styles,fsearchImage,w_main_area);

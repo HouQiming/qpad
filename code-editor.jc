@@ -1797,12 +1797,16 @@ class CLayouter_programmer
 	}
 	JS_RemoveEmbeddedObject=function(JSContext JS){
 		id=JS.Param(0).as(iptr)
+		if uptr(id)<uptr(m_ceos.n):
+			m_ceos[id].obj.CallMethod(int,"OnDestroy")
 		m_ceos=[ceo for ceo,I in m_ceos if I!=id]
 		m_ceos_sorted=0
 		m_hidden_ranges_prepared=0
 		return 0
 	}
 	JS_RemoveAllEmbeddedObjects=function(JSContext JS){
+		for ceo in m_ceos
+			ceo.obj.CallMethod(int,"OnDestroy")
 		m_ceos.clear()
 		m_ceos_sorted=0
 		m_hidden_ranges_prepared=0
@@ -3538,7 +3542,10 @@ class CRichTextImage
 			texid=0u
 
 g_richtext_img_tech=GLTechnique.NULL
-auto RenderRichTextObject(JSContext JS,float x,float y,float w,JSObject objs,int oid)
+auto RenderRichTextObject(JSContext JS,float x0,float y0,float w0,JSObject objs,int oid)
+	auto x=x0
+	auto y=y0
+	auto w=w0
 	auto obj_help_page=JS["UI"]["default_styles"]["help_page"].as(JSObject)
 	obj_i=objs[oid].as(CEmbededObject).content
 	stype=obj_i["m_type"].as(string)
@@ -3552,6 +3559,45 @@ auto RenderRichTextObject(JSContext JS,float x,float y,float w,JSObject objs,int
 		ui_scale=g_renderer.m_pixels_per_unit
 		w_render=min(float(img.w),obj_help_page["w_max_img_width_percentage"].as(float)*w)*ui_scale
 		h_render=float(img.h)/float(img.w)*w_render
+		///////////
+		//clipping
+		u0=0.f
+		v0=0.f
+		cu=1.f
+		cv=1.f
+		clipped=0
+		x=x0;y=y0;
+		auto w=w_render
+		auto h=h_render
+		m_clip=Gui2D.detail.g_renderer.m_clip
+		if x<m_clip.x:
+			dx=m_clip.x-x
+			t=dx/w
+			x=m_clip.x;w-=dx
+			du=cu*t
+			u0+=du;cu-=du
+		if m_clip.z<x+w:
+			dx=m_clip.z-x
+			t=dx/w
+			w=dx
+			cu*=t
+		//use negated tests against NaN
+		if !(cu>0.f)||!(x+w>x):return
+		if y<m_clip.y:
+			dy=m_clip.y-y
+			t=dy/h
+			y=m_clip.y;h-=dy
+			dv=cv*t
+			v0+=dv;cv-=dv
+			clipped=1
+		if m_clip.w<y+h:
+			dy=m_clip.w-y
+			t=dy/h
+			h=dy
+			cv*=t
+			clipped=1
+		if !(cv>0.f)||!(y+h>y):return
+		///////////
 		g_renderer.InsertNativeDrawCall(function(){
 			auto texid=img.GetTexture()
 			if !g_richtext_img_tech:
@@ -3573,13 +3619,13 @@ auto RenderRichTextObject(JSContext JS,float x,float y,float w,JSObject objs,int
 					g_richtext_img_tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
 			vbo=g_renderer.UploadMiniVBO([
 				__float_as_int((x)),__float_as_int((y)),
-				__float_as_int((x+w_render)),__float_as_int((y)),
-				__float_as_int((x+w_render)),__float_as_int((y+h_render)),
-				__float_as_int((x)),__float_as_int((y+h_render)),
-				0,0,
-				0x3f800000,0,
-				0x3f800000,0x3f800000,
-				0,0x3f800000])
+				__float_as_int((x+w)),__float_as_int((y)),
+				__float_as_int((x+w)),__float_as_int((y+h)),
+				__float_as_int((x)),__float_as_int((y+h)),
+				__float_as_int(u0),__float_as_int(v0),
+				__float_as_int(u0+cu),__float_as_int(v0),
+				__float_as_int(u0+cu),__float_as_int(v0+cv),
+				__float_as_int(u0),__float_as_int(v0+cv)])
 			g_richtext_img_tech.SetVertexPointer("P", 2,GL_FLOAT,0, 2*sizeof(int),0L)
 			g_richtext_img_tech.SetVertexPointer("uv_vert", 2,GL_FLOAT,0, 2*sizeof(int),0L+8*sizeof(float))
 			prev_viewport=new int[4]

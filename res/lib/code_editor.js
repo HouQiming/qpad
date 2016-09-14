@@ -3163,6 +3163,11 @@ W.CodeEditorWidget_prototype={
 							}
 						}
 					},
+					OnDestroy:function(){
+						if(this.doc.m_file_name){
+							RemoveDocFromByFileList(this.doc,this.doc.m_file_name);
+						}
+					},
 				});
 				if(new_def_context){
 					UI.g_goto_definition_context=new_def_context;

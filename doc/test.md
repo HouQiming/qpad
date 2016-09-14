@@ -14,7 +14,7 @@ read -n1 -r -p "Press any key to continue..." key
 Markdown supports **bold** and `code=function{return 1+2;}` and *emph*. We automatically fix the "quotes" and 'single-quotes'. But when we can't, we leave them in place.
 
 We can insert images:
-![](c:/tp/qpad/icon256.png)
+![](icon256.png)
 
 And horizontal rules
 ---
