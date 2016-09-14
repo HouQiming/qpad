@@ -30,16 +30,16 @@
     2016,
     8,
     13,
-    17,
-    46,
-    36,
+    18,
+    9,
+    39,
     3
    ],
    "m_has_any_error": 1,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug",
    "m_unknown_progress": 0.25,
-   "m_t_unknown_progress": 12137033243,
+   "m_t_unknown_progress": 15118623748,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -48,7 +48,7 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
-   "m_text_out": "s7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\ns7res.c\r\n   Creating library ./bin/win32_release/qpad.lib and object ./bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4554752 bytes (4448 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1540158 bytes (1505 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4824576 bytes (4712 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1623629 bytes (1586 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
+   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\ns7main.c\r\ns7res.c\r\n   Creating library ./bin/win32_release/qpad.lib and object ./bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4554752 bytes (4448 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1540197 bytes (1505 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4824576 bytes (4712 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1623352 bytes (1586 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
    "m_cell_id": 2,
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
@@ -56,14 +56,14 @@
     2016,
     8,
     13,
-    17,
-    52,
-    14,
+    18,
+    4,
+    9,
     3
    ],
    "m_button_name": "Release",
-   "m_unknown_progress": 0.9401660844836319,
-   "m_t_unknown_progress": 12867325252,
+   "m_unknown_progress": 1.1255918448616706,
+   "m_t_unknown_progress": 14408380107,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -106,5 +106,5 @@
    "out_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 5
+ "m_last_focus_cell_id": 0
 }

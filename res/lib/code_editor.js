@@ -3097,7 +3097,7 @@ W.CodeEditorWidget_prototype={
 				var doc_new=undefined;
 				if(fn){
 					//read that file, it's a peek, we are assuming a small file
-					doc_new=UI.OpenCodeEditorDocument(fn,2);
+					doc_new=UI.OpenCodeEditorDocument(fn);
 					doc_new.m_is_preview=0;
 					doc_new.Init();
 				}else{
@@ -7909,7 +7909,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	//need an initialization-time wrap width
 	var language_id=(language_id_override||loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
 	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH=="web")?768:1024)):0);
-	if(is_preview==1){
+	if(is_preview){
 		wrap_width=1024;
 	}
 	var doc={
