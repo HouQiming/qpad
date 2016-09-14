@@ -334,10 +334,10 @@ var SetHelpText=function(doc_code){
 		if(doc_code){
 			//sel-to-help
 			var sel=doc_code.GetSelection();
-			if(!(sel[0]<sel[1])){
+			if(!(sel[0]<sel[1])&&doc_code.ed){
 				var ccnt=doc_code.sel1.ccnt;
 				var ed=doc_code.ed;
-				var neib=ed.GetUtf8CharNeighborhood(ccnt);;
+				var neib=ed.GetUtf8CharNeighborhood(ccnt);
 				if(UI.ED_isWordChar(neib[0])||UI.ED_isWordChar(neib[1])){
 					sel[0]=doc_code.SkipInvisibles(ccnt,-1);
 					sel[0]=doc_code.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(sel[0],-1),-1,"word_boundary_left"),-1);

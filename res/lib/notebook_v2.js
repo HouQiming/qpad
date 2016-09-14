@@ -1055,7 +1055,9 @@ W.notebook_prototype={
 				}else if(proc.IsRunning()){
 					idle_wait=Math.min(idle_wait*2,1000);
 					UI.setTimeout(fpoll,idle_wait);
-					//UI.Refresh();
+					if(cell_i.m_progress==undefined&&UI.MyWindowHasFocus()){
+						UI.Refresh();
+					}
 				}else{
 					if(cell_i.m_proc==proc_desc&&proc_desc.is_terminated!="forced"){
 						var code=proc.GetExitCode()
@@ -1180,7 +1182,9 @@ W.NotebookView=function(id,attrs){
 					if(cell_i.m_unknown_progress>1+obj.panel_style.unknown_progress_bar_length){
 						cell_i.m_unknown_progress=obj.panel_style.unknown_progress_bar_length;
 					}
-					if(UI.MyWindowHasFocus()){UI.AutoRefresh();}
+					//if(UI.MyWindowHasFocus()){
+					//	UI.RefreshIn(100);
+					//}
 				}
 			}
 			var doc_in=(cell_i&&cell_i.m_text_in);
