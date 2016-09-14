@@ -3095,7 +3095,8 @@ W.CodeEditorWidget_prototype={
 				var doc_new=undefined;
 				if(fn){
 					//read that file, it's a peek, we are assuming a small file
-					doc_new=UI.OpenCodeEditorDocument(fn,1);
+					doc_new=UI.OpenCodeEditorDocument(fn,2);
+					doc_new.m_is_preview=0;
 					doc_new.Init();
 				}else{
 					//copy the current document
@@ -3105,10 +3106,9 @@ W.CodeEditorWidget_prototype={
 					doc_new.ed.Edit([0,0,doc.ed.GetText()],1)
 				}
 				doc_new.read_only=1;
-				doc_new.m_is_preview=0;
-				if(ccnt_go!=undefined){
-					doc_new.SetSelection(ccnt_go,ccnt_go);
-				}
+				//if(ccnt_go!=undefined){
+				//	doc_new.SetSelection(ccnt_go,ccnt_go);
+				//}
 				renderer.RemoveAllEmbeddedObjects();
 				renderer.EmbedObject(ed,ccnt_nextline-1,{
 					h:this.peekdef_h,hc:hc,doc:doc_new,
@@ -3146,9 +3146,14 @@ W.CodeEditorWidget_prototype={
 							font:edstyle.find_message_font,color:edstyle.editor_style.color_symbol,
 							text:fn_display})
 						//obj_peek
+						if(this.has_ccnt_set==1){
+							this.doc.h_top_hint=this.doc.h_top_hint_real;
+							this.doc.AutoScroll("show");
+						}
 						if(!this.has_ccnt_set){
-							this.has_ccnt_set=1;
-							if(this.ccnt_go!=undefined){
+							//console.log(this.ccnt_go,this.doc.ed.GetTextSize());
+							if(this.ccnt_go!=undefined&&this.doc.ed&&this.ccnt_go<this.doc.ed.GetTextSize()){
+								this.has_ccnt_set=1;
 								this.doc.SetSelection(this.ccnt_go,this.ccnt_go);
 								this.doc.scroll_y=this.doc.ed.XYFromCcnt(this.ccnt_go).y;
 								this.doc.h_top_hint=this.doc.h_top_hint_real;
@@ -7902,7 +7907,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 	//need an initialization-time wrap width
 	var language_id=(language_id_override||loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
 	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH=="web")?768:1024)):0);
-	if(is_preview){
+	if(is_preview==1){
 		wrap_width=1024;
 	}
 	var doc={
