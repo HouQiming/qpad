@@ -92,6 +92,7 @@ var NewACContext=function(ret){
 };
 W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	tab_is_char:1,
+	ignore_newline_before_for_down:1,
 	plugin_class:'code_editor',
 	state_handlers:["renderer_programmer","colorer_programmer","line_column_unicode","seeker_indentation"],
 	//state_handlers:["renderer_fancy","colorer_programmer","line_column_unicode","seeker_indentation"],
@@ -132,6 +133,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(hyp_name){
 			this.hyphenator=Language.GetHyphenator(hyp_name)
 			this.m_hyphenator_name=hyp_name
+			this.ignore_newline_before_for_down=0;
 			this.font=this.tex_font
 			this.font_emboldened=this.tex_font_emboldened
 		}
