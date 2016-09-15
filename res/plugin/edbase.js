@@ -1179,6 +1179,9 @@ UI.RegisterEditorPlugin(function(){
 					icon:(obj_buildenv==desc.m_buildenv_by_name[s_name_i])?"对":undefined,
 					action:function(name,s_lang_name,is_selected,is_default){
 						if(is_selected&&!is_default){
+							if(!UI.m_ui_metadata["<compiler_assoc>"]){
+								UI.m_ui_metadata["<compiler_assoc>"]={};
+							}
 							UI.m_ui_metadata["<compiler_assoc>"][s_lang_name]=name;
 						}
 						this.m_compiler_name=name;
@@ -3303,6 +3306,9 @@ var CreateFileTag=function(){
 	return IO.SHA1([UI.g_git_email,Date.now()].join('&')).substr(0,CODE_TAG_LENGTH);
 };
 
+if(!UI.m_ui_metadata["<tag_cache>"]){
+	UI.m_ui_metadata["<tag_cache>"]={};
+}
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
@@ -3311,7 +3317,7 @@ UI.RegisterEditorPlugin(function(){
 		var menu_tools=UI.BigMenu("&Tools")
 		if(sel[0]<sel[1]){
 			menu_tools.AddSeparator();
-			menu_tools.AddNormalItem({text:"Tag the code block",enable_hotkey:1,key:"CTRL+B",action:function(){
+			menu_tools.AddNormalItem({text:"Tag the code &block",enable_hotkey:1,key:"CTRL+B",action:function(){
 				var stag=CreateFileTag();
 				var sel=this.GetSelection();
 				var line0=this.GetLC(sel[0])[0];
@@ -3331,7 +3337,8 @@ UI.RegisterEditorPlugin(function(){
 					sel[0],0,sindent0+s_line_comment+'#b+'+stag+'\n',
 					sel[1],0,sindent1+s_line_comment+'#b-'+stag+'\n']);
 				this.SetSelection(sel[0],this.SeekLC(line1+2,0))
-				UI.SDL_SetClipboardText(stag);
+				UI.SDL_SetClipboardText(['\n![](qtag://',stag,')\n\n'].join(''));
+				UI.m_ui_metadata["<tag_cache>"][stag]=this.m_file_name;
 				UI.Refresh();
 			}.bind(this)});
 		}

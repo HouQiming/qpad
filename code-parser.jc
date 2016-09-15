@@ -199,6 +199,12 @@ g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
 struct TToken
 	int tok
 	int epos0,epos1
+struct TParsedTag
+	int id_side
+	int epos
+class CTag
+	int id,idfn
+	int epos0,epos1
 auto tokenize(string sdata,int g_ignore_indents)
 	auto feed=sdata[0:].ConvertToAsBinary(u8)
 	//we want feed to be zero-terminated
@@ -284,6 +290,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 	inds=new int[]
 	brastk=new TBracket[]
 	toks=new TToken[]
+	tags=new TParsedTag[]
 	ignore_indents=g_ignore_indents
 	last_significant_newline_position=-1L
 	last_line_comment_position=-1L
@@ -634,6 +641,9 @@ auto tokenize(string sdata,int g_ignore_indents)
 				//merge comments to avoid perf issues during token neib lookup
 				if toks.n>0&&toks.back().tok==TOK_COMMENT:
 					toks[toks.n-1].epos1=int(ptr)
+				else if feed[efeed0]==u8('#')&&feed[efeed0+1]==u8('b')&&(feed[efeed0+2]==u8('+')||feed[efeed0+2]==u8('-')):
+					side=(feed[efeed0+2]==u8('-'))
+					tags.push(TParsedTag(){id_side:getid(cite_raw(efeed0+3,ptr))*2+side,epos:int(side==1?efeed0-2:ptr)})
 				else
 					push_token(TOK_COMMENT,int(efeed0),int(ptr))
 				//parseComment(feed,efeed0,ptr+1)
@@ -651,6 +661,9 @@ auto tokenize(string sdata,int g_ignore_indents)
 				//merge comments to avoid perf issues during token neib lookup
 				if toks.n>0&&toks.back().tok==TOK_COMMENT:
 					toks[toks.n-1].epos1=int(ptr-2)
+				else if feed[efeed0]==u8('#')&&feed[efeed0+1]==u8('b')&&(feed[efeed0+2]==u8('+')||feed[efeed0+2]==u8('-')):
+					side=(feed[efeed0+2]==u8('-'))
+					tags.push(TParsedTag(){id_side:getid(cite_raw(efeed0+3,ptr))*2+side,epos:int(side==1?efeed0-2:ptr)})
 				else
 					push_token(TOK_COMMENT,int(efeed0),int(ptr-2))
 				//parseComment(feed,efeed0,ptr)
@@ -794,7 +807,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 	pop_indents()
 	//toks.push(TToken(){'tok':TOK_EOF,'epos0':int(ptr),'epos1':int(ptr)})
 	push_token(TOK_EOF,int(ptr),int(ptr))
-	return toks
+	return (toks,tags)
 
 /*
 auto parseComment(u8[] feed,int ptr0,int ptr_end)
@@ -983,6 +996,7 @@ g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
 MAX_POSTDECL_GARBAGE=8 //# of ids between () and {}, like const / override / throw / ...
+g_tag_by_id=new CTag[int]
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	has_post_ctor_initializer=options["has_post_ctor_initializer"].or(0)
 	has_pointer_ops=options["has_pointer_ops"].or(0)
@@ -992,7 +1006,21 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	is_header=(pdot>=0L&&pdot+1<fn_base.n&&(fn_base[pdot+1]=='h'||fn_base[pdot+1]=='H'))
 	sdataz=new char[sdata.n+1]
 	copy(sdataz,sdata)
-	toks=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
+	(toks,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
+	/////////////////
+	//deal with the tags
+	for tag in tags
+		id=(tag.id_side>>1)
+		if tag.id_side&1:
+			ptag=g_tag_by_id[id]
+			if ptag:
+				ptag.epos1=tag.epos
+		else
+			g_tag_by_id[id]=new CTag(){
+				id:id,idfn:idfn_base,
+				epos0:tag.epos
+			}
+	/////////////////
 	inline cite_raw(iptr epos0,iptr epos1)
 		assert(epos1>0)
 		return sdataz[epos0:epos1-1]

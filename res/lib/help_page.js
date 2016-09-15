@@ -237,7 +237,6 @@ W.HelpPage=function(id,attrs){
 				spath_repo=UI.GetEditorProject(fn_base,"polite");
 			}
 			var fsearchImage=function(fn){
-				console.log(spath_peer,spath_repo,fn)//todo
 				if(spath_peer&&IO.FileExists(spath_peer+'/'+fn)){
 					return IO.NormalizeFileName(spath_peer+'/'+fn);
 				}
@@ -415,6 +414,37 @@ UI.RenderEmbededCodeBox=function(x,y,desc){
 		x:x,y:y,w:desc.m_width,h:desc.m_height,
 	})
 };
+
+UI.RenderQTagReference=function(x,y,desc){try{
+	//todo: file name, open-in-real-editor
+	var w=desc.m_width;
+	var h=desc.m_height;
+	var help_style=UI.default_styles.help_page;
+	if(!desc.m_fn){
+		//not found
+		var stext=UI._("Tag not found");
+		var dims=UI.MeasureText(help_style.find_bar_hint_font,stext)
+		W.Text("",{x:x+(w-dims.w)*0.5,y:y+(h-dims.h)*0.5,
+			font:help_style.find_bar_hint_font,color:help_style.find_bar_hint_color,
+			text:stext});
+	}else{
+		if(!desc.doc){
+			desc.doc=UI.OpenCodeEditorDocument(desc.m_fn);
+			desc.doc.Init();
+			desc.doc.opening_callbacks=[function(){
+				//todo: show-only rendering support
+				var ccnt0=this.m_diff_from_save.CurrentToBase(desc.m_epos0);
+				var ccnt1=this.m_diff_from_save.CurrentToBase(desc.m_epos1);
+				this.SetSelection(ccnt0,ccnt0);
+			}];
+		}
+		var obj_widget=W.CodeEditor("embeded_code_"+desc.m_id.toString(),{
+			doc:desc.doc,
+			disable_minimap:1,
+			x:x,y:y,w:w,h:h,
+		})
+	}
+}catch(e){console.log(e.stack);}};
 
 UI.GetCurrentProjectPath=function(){
 	var tab_frontmost=UI.GetFrontMostEditorTab();

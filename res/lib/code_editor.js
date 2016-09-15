@@ -5160,7 +5160,7 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options,is_base_only){
 		}
 	}
 	return '';
-}
+};
 
 var MAX_PARSABLE_FCALL=4096
 var finvoke_find=function(mode,s_force_needle){
