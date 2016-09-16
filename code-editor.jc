@@ -4484,8 +4484,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_QUOTE)
 					FormatNormalText(sline[2:sline.n-2],STYLE_ID_QUOTE)
 				continue
-			if sline.StartsWith("![")||sline.n&&sline[0]=='[':
-				is_img=(sline[0]=='!')
+			if sline.StartsWith("!["):
 				pbracket=sline.IndexOf(']')
 				if pbracket+1<sline.n&&sline[pbracket+1]=='(':
 					sline=sline[pbracket+2:]
@@ -4497,36 +4496,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						if sline.n>0&&sline[sline.n-1]==')':
 							sline.n--
 					fn_image=sline
-					if is_img:
-						//image case
-						if fsearchImage:
-							fn_image=fsearchImage.Call(string,fn_image)
-						sdata_image=System.IO.ReadAll(fn_image)
-						//Writeln('img:',fn_image,' ',!!sdata_image)
-						if sdata_image:
-							(img,wimg,himg)=g_renderer.LoadImage(sdata_image)
-							//Writeln('img:',fn_image,' ',wimg,' ',himg)
-							if img:
-								obj=JS.New()
-								obj["m_type"]="img"
-								obj["m_tex"]=new CRichTextImage(){
-									cpu_data:img,
-									w:wimg,
-									h:himg,
-								}
-								if sret.n&&sret.back()!='\n':sret.push('\n')
-								sret.PushUnicode(COMMAND_RUBBER_SPACE)
-								sret.PushUnicode(COMMAND_INSERT_OBJECT+int(objs.n))
-								sret.PushUnicode(COMMAND_RUBBER_SPACE)
-								sret.push('\n')
-								scale_img=min(float(wimg),w_image_max)/float(wimg)
-								objs.push(new CEmbededObject(){
-									content:obj,
-									w:float2fixed(float(wimg)*scale_img),
-									h:float2fixed(float(himg)*scale_img),
-									y_baseline:0LL,
-								})
-					else if fn_image.StartsWith("qtag://"):
+					if fn_image.StartsWith("qtag://"):
 						//code reference case
 						//tag locating - per-qpad-installation cache, do not overdesign
 						ptag=CodeParser.g_tag_by_id[CodeParser.getid(fn_image[7:])]
@@ -4559,6 +4529,35 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 							h:CODE_MAX_LINES*hc_code,
 							y_baseline:0LL,
 						})
+					else
+						//image case
+						if fsearchImage:
+							fn_image=fsearchImage.Call(string,fn_image)
+						sdata_image=System.IO.ReadAll(fn_image)
+						//Writeln('img:',fn_image,' ',!!sdata_image)
+						if sdata_image:
+							(img,wimg,himg)=g_renderer.LoadImage(sdata_image)
+							//Writeln('img:',fn_image,' ',wimg,' ',himg)
+							if img:
+								obj=JS.New()
+								obj["m_type"]="img"
+								obj["m_tex"]=new CRichTextImage(){
+									cpu_data:img,
+									w:wimg,
+									h:himg,
+								}
+								if sret.n&&sret.back()!='\n':sret.push('\n')
+								sret.PushUnicode(COMMAND_RUBBER_SPACE)
+								sret.PushUnicode(COMMAND_INSERT_OBJECT+int(objs.n))
+								sret.PushUnicode(COMMAND_RUBBER_SPACE)
+								sret.push('\n')
+								scale_img=min(float(wimg),w_image_max)/float(wimg)
+								objs.push(new CEmbededObject(){
+									content:obj,
+									w:float2fixed(float(wimg)*scale_img),
+									h:float2fixed(float(himg)*scale_img),
+									y_baseline:0LL,
+								})
 				continue
 			is_hr=0
 			if sline.n>=4&&(sline[0]=='*'||sline[0]=='-'||sline[0]=='_'):

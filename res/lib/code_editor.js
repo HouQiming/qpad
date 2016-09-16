@@ -994,6 +994,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	ActivateAC:function(){
 		if(!this.m_ac_context){return;}
 		this.m_ac_activated=1;
+		UI.SetFocus(this);
 		UI.Refresh()
 	},
 	ConfirmAC:function(id){
@@ -1038,6 +1039,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		this.CancelAutoCompletion()
 		this.UserTypedChar()
+		UI.SetFocus(this);
 		UI.Refresh()
 	},
 	//////////////////////////
@@ -2456,6 +2458,8 @@ var find_context_prototype={
 		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
 			UI.OpenEditorWindow(doc.m_file_name);
 		}
+		this.m_confirmed=1;
+		UI.SetFocus(doc);
 	},
 	RestoreSel:function(){
 		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
@@ -2913,6 +2917,7 @@ W.CodeEditorWidget_prototype={
 					rctx.m_current_replace_job=undefined
 				}
 				if(need_onchange){doc.CallOnChange();}
+				UI.SetFocus(doc);
 			}else{
 				UI.NextTick(ffind_next);
 			}
@@ -3068,6 +3073,7 @@ W.CodeEditorWidget_prototype={
 					UI.assert(this.m_owner.m_find_next_context==this,"panic: FindNext context overwritten")
 					this.m_owner.ReleaseEditLock();
 					this.m_owner.m_find_next_context=undefined
+					UI.SetFocus(doc);
 					if(!this.m_match_reported){
 						//notification
 						this.m_owner.CreateNotification({id:'find_result',icon:'警',text:UI._(direction<0?"No more '@1' above":"No more '@1' below").replace("@1",this.m_needle)})
@@ -6371,7 +6377,7 @@ W.CodeEditor=function(id,attrs){
 						if(nd_new==doc){
 							var obj=this.find_bar_owner
 							var ctx=obj.m_current_find_context
-							if(ctx){
+							if(ctx&&!ctx.m_confirmed){
 								ctx.CancelFind();
 							}
 						}

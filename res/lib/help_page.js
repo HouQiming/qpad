@@ -432,7 +432,7 @@ UI.RenderQTagReference=function(x,y,desc){try{
 			desc.doc=UI.OpenCodeEditorDocument(desc.m_fn);
 			desc.doc.Init();
 			desc.doc.opening_callbacks=[function(){
-				//todo: show-only rendering support
+				//todo: show-this-part-only rendering support
 				var ccnt0=this.m_diff_from_save.CurrentToBase(desc.m_epos0);
 				var ccnt1=this.m_diff_from_save.CurrentToBase(desc.m_epos1);
 				this.SetSelection(ccnt0,ccnt0);
