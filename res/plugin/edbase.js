@@ -3329,7 +3329,7 @@ UI.RegisterEditorPlugin(function(){
 				sel[0]=this.SeekLC(line0,0);
 				sel[1]=this.SeekLC(line1,0);
 				var sindent0=this.ed.GetText(sel[0],CountSpacesAfter(this.ed,sel[0]));
-				var sindent1=this.ed.GetText(sel[1],CountSpacesAfter(this.ed,sel[1]));
+				var sindent1=sindent0;//this.ed.GetText(sel[1],CountSpacesAfter(this.ed,sel[1]));
 				var lang=this.plugin_language_desc
 				var cmt_holder=lang;
 				if(lang.GetCommentStrings){
