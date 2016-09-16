@@ -4366,7 +4366,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						continue
 					else if ch=='*':
 						n_stars=1
-						if i<=stext.n-1&&stext[i+1]=='*':
+						if i<stext.n-1&&stext[i+1]=='*':
 							i++
 							n_stars++
 						if in_emph==n_stars:

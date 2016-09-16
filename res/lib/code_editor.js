@@ -20,6 +20,7 @@ UI.m_code_editor_persistent_members_doc=[
 	/////////
 	"m_hyphenator_name",
 	"m_spell_checker",
+	"m_is_help_page_preview",
 ]
 UI.RegisterCodeEditorPersistentMember=function(name){
 	UI.m_code_editor_persistent_members_doc.push(name)
@@ -5752,7 +5753,13 @@ W.CodeEditor=function(id,attrs){
 				right_overlay_drawn=1;
 			}
 		}
-		if(doc&&obj.m_edit_lock){
+		if(doc&&doc.m_is_help_page_preview){
+			W.HelpPage('help_page',{
+				x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,
+				is_file_view:1,
+				m_file_name:doc.m_file_name
+			});
+		}else if(doc&&obj.m_edit_lock){
 			obj.__children.push(doc)
 			UI.Begin(doc)
 				var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
@@ -5863,6 +5870,10 @@ W.CodeEditor=function(id,attrs){
 					doc=UI.OpenCodeEditorDocument(obj.file_name,obj.m_is_preview);
 					obj.m_tabswitch_count=((obj.file_name&&UI.m_ui_metadata[obj.file_name]||{}).m_tabswitch_count||{});
 					obj.doc=doc;
+					if(doc.m_is_help_page_preview){
+						UI.InvalidateCurrentFrame();
+						UI.Refresh();
+					}
 				}
 				UI.Keep("doc",{});
 				var was_bound_elsewhere=0;
@@ -6706,7 +6717,7 @@ W.CodeEditor=function(id,attrs){
 				obj.context_menu=undefined;
 			}
 		}
-		if(!is_find_mode_rendering){
+		if(!is_find_mode_rendering&&!(doc&&doc.m_is_help_page_preview)){
 			if(w_right_shadow!=undefined){
 				var h_right_shadow=doc.h;
 				if(y_bottom_shadow!=undefined){
@@ -6747,7 +6758,7 @@ W.CodeEditor=function(id,attrs){
 			UI.TimingEvent("starting to draw minimap");
 		}
 		//minimap / scroll bar
-		if(doc&&w_scrolling_area>0&&!UI.m_frame_is_invalid){
+		if(doc&&w_scrolling_area>0&&!UI.m_frame_is_invalid&&!doc.m_is_help_page_preview){
 			var y_scrolling_area=obj.y
 			var effective_scroll_y=doc.visible_scroll_y
 			var sbar_value=Math.max(Math.min(effective_scroll_y/(ytot-h_scrolling_area),1),0)
@@ -6945,7 +6956,7 @@ W.CodeEditor=function(id,attrs){
 				w:1, h:h_scrolling_area-(desc_x_scroll_bar?obj.w_scroll_bar-1:0),
 				color:obj.separator_color})
 		}
-		if(doc.m_ac_context&&doc.m_ac_context.m_n_cands>1){
+		if(doc.m_ac_context&&doc.m_ac_context.m_n_cands>1&&!doc.m_is_help_page_preview){
 			RenderACCands(obj,w_obj_area,h_obj_area);
 		}
 		//if(f_draw_accands){
@@ -6956,7 +6967,7 @@ W.CodeEditor=function(id,attrs){
 		if(UI.enable_timing){
 			UI.TimingEvent("starting to draw notifications");
 		}
-		if(obj.m_notifications&&!obj.show_find_bar){
+		if(obj.m_notifications&&!obj.show_find_bar&&!doc.m_is_help_page_preview){
 			//&&!UI.m_frame_is_invalid
 			//we need to keep it alive
 			UI.PushCliprect(obj.x,obj.y,w_obj_area,h_obj_area)

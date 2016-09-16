@@ -980,7 +980,6 @@ UI.RegisterHelpHook(function(items,ssearch){
 
 /////////////////////////////////////////////
 //interpreters / notebook cell generators
-//todo: ipython
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
 	this.AddEventHandler('global_menu',function(){
@@ -1066,9 +1065,11 @@ UI.RegisterEditorPlugin(function(){
 				UI.RefreshAllTabs()
 			}
 		}; 
-		menu_run.AddNormalItem({text:"Create file cell",key:"CTRL+F7",enable_hotkey:1,action:fgencell.bind(this,0)})
-		menu_run.AddNormalItem({text:"Create project cell",key:"F7",enable_hotkey:1,action:fgencell.bind(this,1)})
-		menu_run.AddSeparator()
+		if(desc.name!='Markdown'){
+			menu_run.AddNormalItem({text:"Create file cell",key:"CTRL+F7",enable_hotkey:1,action:fgencell.bind(this,0)})
+			menu_run.AddNormalItem({text:"Create project cell",key:"F7",enable_hotkey:1,action:fgencell.bind(this,1)})
+			menu_run.AddSeparator()
+		}
 		/////////////////
 		var fruncell=function(is_project){
 			var s_mark=undefined;
@@ -1140,19 +1141,21 @@ UI.RegisterEditorPlugin(function(){
 			}
 			fruncell(0)
 		}.bind(this);
-		menu_run.AddNormalItem({text:"Build / &run file",icon:"放",enable_hotkey:1,key:"CTRL+F5",action:frunfile})
-		/*}*/
-		if(UI.HasFocus(this)&&obj_buildenv){
-			UI.ToolButton("run",{tooltip:"Run - CTRL+F5",action:frunfile})
-		}
-		menu_run.AddNormalItem({text:"Build / run project",enable_hotkey:1,key:"F5",action:function(){
-			//coulddo: save other files in the project
-			if(this.NeedSave()&&this.owner){this.owner.Save();}
-			if(this.NeedSave()){
-				return;
+		if(desc.name!='Markdown'){
+			menu_run.AddNormalItem({text:"Build / &run file",icon:"放",enable_hotkey:1,key:"CTRL+F5",action:frunfile})
+			/*}*/
+			if(UI.HasFocus(this)&&obj_buildenv){
+				UI.ToolButton("run",{tooltip:"Run - CTRL+F5",action:frunfile})
 			}
-			fruncell(1)
-		}.bind(this)})
+			menu_run.AddNormalItem({text:"Build / run project",enable_hotkey:1,key:"F5",action:function(){
+				//coulddo: save other files in the project
+				if(this.NeedSave()&&this.owner){this.owner.Save();}
+				if(this.NeedSave()){
+					return;
+				}
+				fruncell(1)
+			}.bind(this)})
+		}
 		menu_run.AddNormalItem({text:"&Stop all cells",icon:"停",enable_hotkey:0,action:function(){
 			for(var i=0;i<UI.g_all_document_windows.length;i++){
 				var obj_tab_i=UI.g_all_document_windows[i];
@@ -3344,4 +3347,24 @@ UI.RegisterEditorPlugin(function(){
 		}
 		menu_tools=undefined;
 	})
-})
+});
+
+//markdown
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
+	this.AddEventHandler('global_menu',function(){
+		var desc=this.plugin_language_desc;
+		if(desc.name!='Markdown'){return;}
+		var menu_run=UI.BigMenu("&Run")
+		if(this.m_is_help_page_preview){
+			menu_run.AddNormalItem({text:"View source (&R)...",key:"F5",enable_hotkey:1,action:function(){
+				this.m_is_help_page_preview=0;
+			}.bind(this)});
+		}else{
+			menu_run.AddNormalItem({text:"View formatted (&R)...",key:"F5",enable_hotkey:1,action:function(){
+				this.m_is_help_page_preview=1;
+			}.bind(this)});
+		}
+		menu_run=undefined;
+	})
+})//.prototype.desc={category:"Tools",name:"Code tagging",stable_name:"code_tagging"};

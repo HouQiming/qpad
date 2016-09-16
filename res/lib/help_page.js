@@ -106,118 +106,126 @@ W.HelpPage=function(id,attrs){
 	UI.Begin(obj)
 	UI.RoundRect(obj)
 	W.PureRegion(id,obj)
-	//top bar for searching - repo.m_helps
-	//coulddo: show current project
-	var w_buttons=0;
-	W.Button("refresh_button",{
-		x:w_buttons,y:0,h:obj.h_find_bar,
-		value:obj.selected,padding:8,
-		font:UI.icon_font_20,
-		text:obj.text?"撤":"刷",
-		tooltip:obj.text?"Back":"Refresh",// - F5
-		anchor:'parent',anchor_align:'right',anchor_valign:'up',
-		OnClick:function(){
-			this.InvalidateContent();
-			if(this.current_repo){
-				UI.ReindexHelp(this.current_repo);
-			}
-			UI.Refresh()
-		}.bind(obj)
-	})
-	w_buttons+=obj.refresh_button.w
-	var rect_bar=UI.RoundRect({
-		x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
-		w:obj.w-w_buttons-obj.find_bar_padding*2,h:obj.h_find_bar-obj.find_bar_padding*2,
-		color:obj.find_bar_color,
-		round:obj.find_bar_round})
-	UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(obj.h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
-		obj.find_bar_hint_color,'s'.charCodeAt(0))
-	var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
-	var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
-	W.Edit("find_bar_edit",{
-		style:obj.find_bar_editor_style,
-		x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
-		owner:obj,
-		precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
-		same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
-		plugins:[fhelppage_findbar_plugin],
-		default_focus:2,
-		tab_width:UI.GetOption("tab_width",4),
-	});
-	if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
-		W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
-			font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
-			text:UI._("Search")})
-	}
-	var spath_repo="<none>";
-	if(obj.editor_widget){
-		spath_repo=UI.GetEditorProject(obj.editor_widget.file_name);
-	}
-	if(spath_repo!=obj.current_repo){
-		//repo changed, invalidate all
-		obj.InvalidateContent();
-		obj.current_repo=spath_repo;
-	}
-	if(!obj.text){
-		var repo=UI.GetRepoByPath(spath_repo);
-		if(!obj.found_items){
-			var s_search_text=obj.find_bar_edit.ed.GetText();
-			var items=[];
-			obj.found_items=items;
-			var s_searches=s_search_text.toLowerCase().split(' ');
-			var fsearchHelpIndex=function(idx){
-				if(!idx){return;}
-				for(var i=0;i<idx.length;i++){
-					var help_item_i=idx[i];
-					var s_i=help_item_i.title_search;
-					var is_bad=0;
-					var hl_ranges=[];
-					for(var j=0;j<s_searches.length;j++){
-						var p=s_i.indexOf(s_searches[j]);
-						if(p<0){
-							is_bad=1;
-							break
-						}
-						hl_ranges.push(p,p+s_searches[j].length);
-					}
-					if(!is_bad){
-						items.push({
-							icon:"问",
-							title:help_item_i.title,
-							file_name:help_item_i.file_name,
-							hl_ranges:hl_ranges,
-						})
-					}
-				}
-			};
-			fsearchHelpIndex(repo&&repo.m_helps);
-			fsearchHelpIndex([{title:"Using the Help System",title_search:"using the help system",file_name:"*res/misc/metahelp.md"}]);
-			//we should always have something with the search engine hooks
-			for(var i=0;i<g_help_hooks.length;i++){
-				g_help_hooks[i](items,s_search_text);
-			}
+	var h_find_bar=obj.h_find_bar;
+	if(obj.is_file_view){
+		if(!obj.text){
+			obj.OpenFile(obj.m_file_name);
 		}
-		//just show a list of candidates, with keyboard browsing -- listview
-		UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
-		W.ListView('help_list',{
-			x:obj.x,y:obj.y+obj.h_find_bar,w:obj.w,h:obj.h-obj.h_find_bar,
-			dimension:'y',layout_spacing:8,layout_align:'fill',
-			no_clipping:1,
-			items:obj.found_items,
-			item_template:{
-				object_type:W.HelpItem,
-				owner:obj,
-			}})
-		UI.RoundRect({
-			x:obj.x-obj.top_hint_shadow_size, y:obj.y+obj.h_find_bar-obj.top_hint_shadow_size, 
-			w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
-			round:obj.top_hint_shadow_size,
-			border_width:-obj.top_hint_shadow_size,
-			color:obj.top_hint_shadow_color})
-		UI.PopCliprect()
-		if(!repo||!repo.m_helps_parsed){
-			//set up for a re-find
-			obj.found_items=undefined;
+		h_find_bar=0;
+	}else{
+		//top bar for searching - repo.m_helps
+		//coulddo: show current project
+		var w_buttons=0;
+		W.Button("refresh_button",{
+			x:w_buttons,y:0,h:h_find_bar,
+			value:obj.selected,padding:8,
+			font:UI.icon_font_20,
+			text:obj.text?"撤":"刷",
+			tooltip:obj.text?"Back":"Refresh",// - F5
+			anchor:'parent',anchor_align:'right',anchor_valign:'up',
+			OnClick:function(){
+				this.InvalidateContent();
+				if(this.current_repo){
+					UI.ReindexHelp(this.current_repo);
+				}
+				UI.Refresh()
+			}.bind(obj)
+		})
+		w_buttons+=obj.refresh_button.w
+		var rect_bar=UI.RoundRect({
+			x:obj.x+obj.find_bar_padding,y:obj.y+obj.find_bar_padding,
+			w:obj.w-w_buttons-obj.find_bar_padding*2,h:h_find_bar-obj.find_bar_padding*2,
+			color:obj.find_bar_color,
+			round:obj.find_bar_round})
+		UI.DrawChar(UI.icon_font_20,obj.x+obj.find_bar_padding*2,obj.y+(h_find_bar-UI.GetCharacterHeight(UI.icon_font_20))*0.5,
+			obj.find_bar_hint_color,'s'.charCodeAt(0))
+		var x_find_edit=obj.x+obj.find_bar_padding*3+UI.GetCharacterAdvance(UI.icon_font_20,'s'.charCodeAt(0));
+		var w_find_edit=rect_bar.x+rect_bar.w-obj.find_bar_padding-x_find_edit;
+		W.Edit("find_bar_edit",{
+			style:obj.find_bar_editor_style,
+			x:x_find_edit,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+			owner:obj,
+			precise_ctrl_lr_stop:UI.TestOption("precise_ctrl_lr_stop"),
+			same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
+			plugins:[fhelppage_findbar_plugin],
+			default_focus:2,
+			tab_width:UI.GetOption("tab_width",4),
+		});
+		if(!obj.find_bar_edit.ed.GetTextSize()&&!obj.find_bar_edit.ed.m_IME_overlay){
+			W.Text("",{x:x_find_edit+2,w:w_find_edit,y:rect_bar.y,h:rect_bar.h,
+				font:obj.find_bar_hint_font,color:obj.find_bar_hint_color,
+				text:UI._("Search")})
+		}
+		var spath_repo="<none>";
+		if(obj.editor_widget){
+			spath_repo=UI.GetEditorProject(obj.editor_widget.file_name);
+		}
+		if(spath_repo!=obj.current_repo){
+			//repo changed, invalidate all
+			obj.InvalidateContent();
+			obj.current_repo=spath_repo;
+		}
+		if(!obj.text){
+			var repo=UI.GetRepoByPath(spath_repo);
+			if(!obj.found_items){
+				var s_search_text=obj.find_bar_edit.ed.GetText();
+				var items=[];
+				obj.found_items=items;
+				var s_searches=s_search_text.toLowerCase().split(' ');
+				var fsearchHelpIndex=function(idx){
+					if(!idx){return;}
+					for(var i=0;i<idx.length;i++){
+						var help_item_i=idx[i];
+						var s_i=help_item_i.title_search;
+						var is_bad=0;
+						var hl_ranges=[];
+						for(var j=0;j<s_searches.length;j++){
+							var p=s_i.indexOf(s_searches[j]);
+							if(p<0){
+								is_bad=1;
+								break
+							}
+							hl_ranges.push(p,p+s_searches[j].length);
+						}
+						if(!is_bad){
+							items.push({
+								icon:"问",
+								title:help_item_i.title,
+								file_name:help_item_i.file_name,
+								hl_ranges:hl_ranges,
+							})
+						}
+					}
+				};
+				fsearchHelpIndex(repo&&repo.m_helps);
+				fsearchHelpIndex([{title:"Using the Help System",title_search:"using the help system",file_name:"*res/misc/metahelp.md"}]);
+				//we should always have something with the search engine hooks
+				for(var i=0;i<g_help_hooks.length;i++){
+					g_help_hooks[i](items,s_search_text);
+				}
+			}
+			//just show a list of candidates, with keyboard browsing -- listview
+			UI.PushCliprect(obj.x,obj.y+h_find_bar,obj.w,obj.h-h_find_bar)
+			W.ListView('help_list',{
+				x:obj.x,y:obj.y+h_find_bar,w:obj.w,h:obj.h-h_find_bar,
+				dimension:'y',layout_spacing:8,layout_align:'fill',
+				no_clipping:1,
+				items:obj.found_items,
+				item_template:{
+					object_type:W.HelpItem,
+					owner:obj,
+				}})
+			UI.RoundRect({
+				x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_find_bar-obj.top_hint_shadow_size, 
+				w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+				round:obj.top_hint_shadow_size,
+				border_width:-obj.top_hint_shadow_size,
+				color:obj.top_hint_shadow_color})
+			UI.PopCliprect()
+			if(!repo||!repo.m_helps_parsed){
+				//set up for a re-find
+				obj.found_items=undefined;
+			}
 		}
 	}
 	if(obj.text){
@@ -226,7 +234,7 @@ W.HelpPage=function(id,attrs){
 		//	obj.text=IO.UIReadAll("res/misc/metahelp.md");
 		//}
 		var w_main_area=obj.w-obj.padding*2-obj.w_scroll_bar;
-		var h_main_area=obj.h-obj.h_find_bar
+		var h_main_area=obj.h-h_find_bar
 		obj.h_main_area=h_main_area;
 		if(!obj.help_ctx||obj.help_ctx.w_precomputed_for!=w_main_area){
 			var fn_base=obj.m_file_name;
@@ -261,7 +269,7 @@ W.HelpPage=function(id,attrs){
 		if(h_main_area<ytot){
 			var sbar_value=Math.max(Math.min(scroll_y/(ytot-h_main_area),1),0);
 			W.ScrollBar("sbar",{
-				x:obj.x+obj.w-obj.w_scroll_bar, y:obj.y+obj.h_find_bar, w:obj.w_scroll_bar, h:obj.h-obj.h_find_bar, dimension:'y',
+				x:obj.x+obj.w-obj.w_scroll_bar, y:obj.y+h_find_bar, w:obj.w_scroll_bar, h:obj.h-h_find_bar, dimension:'y',
 				page_size:h_main_area, total_size:ytot, value:sbar_value,
 				OnMouseWheel:obj.OnMouseWheel.bind(obj),
 				OnChange:function(value){
@@ -271,7 +279,7 @@ W.HelpPage=function(id,attrs){
 				},
 			})
 		}
-		UI.PushCliprect(obj.x,obj.y+obj.h_find_bar,obj.w,obj.h-obj.h_find_bar)
+		UI.PushCliprect(obj.x,obj.y+h_find_bar,obj.w,obj.h-h_find_bar)
 		//the ops
 		var cur_op=(obj.cur_op||0);
 		for(var i=0;i<obj.help_ctx.m_ops.length;i++){
@@ -280,7 +288,7 @@ W.HelpPage=function(id,attrs){
 			//print(op_i.y0,op_i.y1)
 			UI.RoundRect({
 				x:obj.x+obj.padding,
-				y:obj.y+obj.h_find_bar-obj.scroll_y+op_i.y0,
+				y:obj.y+h_find_bar-obj.scroll_y+op_i.y0,
 				w:w_main_area,
 				h:op_i.y1-op_i.y0,
 				color:i==cur_op?obj.ophl.focus_color:obj.ophl.color,
@@ -289,7 +297,7 @@ W.HelpPage=function(id,attrs){
 			})
 			W.Region("rgn_op_"+i.toString(),{
 				x:obj.x+obj.padding,
-				y:obj.y+obj.h_find_bar-obj.scroll_y+op_i.y0,
+				y:obj.y+h_find_bar-obj.scroll_y+op_i.y0,
 				w:w_main_area,
 				h:op_i.y1-op_i.y0,
 				id:i,
@@ -317,10 +325,10 @@ W.HelpPage=function(id,attrs){
 		}
 		//coulddo: pre-format the code to a predefined style - after beautifier
 		//the main part
-		UI.ED_RenderRichText(obj.help_ctx.prt,obj.help_ctx.m_text,obj.x+obj.padding,obj.y+obj.h_find_bar-obj.scroll_y,obj.help_ctx.m_objs)
+		UI.ED_RenderRichText(obj.help_ctx.prt,obj.help_ctx.m_text,obj.x+obj.padding,obj.y+h_find_bar-obj.scroll_y,obj.help_ctx.m_objs)
 		//if(obj.scroll_y>0){
 		UI.RoundRect({
-			x:obj.x-obj.top_hint_shadow_size, y:obj.y+obj.h_find_bar-obj.top_hint_shadow_size, 
+			x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_find_bar-obj.top_hint_shadow_size, 
 			w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
 			round:obj.top_hint_shadow_size,
 			border_width:-obj.top_hint_shadow_size,
