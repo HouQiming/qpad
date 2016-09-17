@@ -453,9 +453,11 @@ UI.RenderQTagReference=function(x,y,desc){try{
 				var ccnt1=this.m_diff_from_save.CurrentToBase(desc.m_epos1);
 				this.SetSelection(ccnt0,ccnt0);
 			}];
+			desc.doc.read_only=1;
 		}
 		var obj_widget=W.CodeEditor("embeded_code_"+desc.m_id.toString(),{
 			doc:desc.doc,
+			read_only:1,
 			disable_minimap:1,
 			x:x,y:y,w:w,h:h,
 		})
