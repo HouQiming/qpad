@@ -4390,6 +4390,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				sret.push(ch)
 		}
 		code_box_id=0
+		fseektag=JS["UI"]["SeekTag"].as(JSObject)
 		foreach sline,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 			if sline.StartsWith('```'):
 				//code
@@ -4512,9 +4513,20 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						obj=JS.New()
 						obj["m_type"]="qtag"
 						if ptag:
-							obj["m_fn"]=CodeParser.getIdString(ptag.idfn)
+							s_fn=CodeParser.getIdString(ptag.idfn)
+							obj["m_fn"]=s_fn
 							obj["m_epos0"]=ptag.epos0
 							obj["m_epos1"]=ptag.epos1
+							//create an op
+							obj_op=JS.New()
+							obj_op["match"]=JS.NewArray()
+							obj_op["match"][0]=s_fn
+							obj_op["match"][1]=fn_image[7:]
+							obj_op["action"]=fseektag
+							obj_op["ccnt"]=sret.n
+							ops[ops_length]=obj_op;ops_length++
+							has_dangling_op=0
+							SWrite(sret,'Tag ',fn_image[7:],' in ',s_fn,':\n')
 						obj["m_width"]=w_code_box
 						obj["m_height"]=fixed2float(CODE_MAX_LINES*hc_code)
 						obj["m_id"]=code_box_id

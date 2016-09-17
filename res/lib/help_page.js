@@ -423,6 +423,14 @@ UI.RenderEmbededCodeBox=function(x,y,desc){
 	})
 };
 
+UI.SeekTag=function(op_active){
+	var fn=op_active.match[0];
+	var stag=op_active.match[1];
+	UI.OpenEditorWindow(fn,function(){
+		this.SetSelection(0,0);
+		this.owner.FindNext(1,'#b+'+stag,0);
+	});
+};
 UI.RenderQTagReference=function(x,y,desc){try{
 	//todo: file name, open-in-real-editor
 	var w=desc.m_width;
