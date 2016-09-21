@@ -1516,8 +1516,8 @@ class CLayouter_programmer
 	///////////////////////
 	//call onchange in js
 	m_hidden_ranges_prepared=0
-	long4[] m_hidden_dx_add
-	long4[] m_hidden_dx_sub
+	TAddRangeItem[] m_hidden_dx_add
+	TSubRangeItem[] m_hidden_dx_sub
 	i64[] m_hidden_ccnts
 	struct TDeltaYItem
 		i64 flatx0_hidden
@@ -1537,6 +1537,12 @@ class CLayouter_programmer
 	 1: enable all
 	*/
 	m_enable_hidden=1 
+	struct TAddRangeItem
+		i64 x,y
+		i64 dx,dfx,dy_enforced
+	struct TSubRangeItem
+		i64 fx0,fx1
+		i64 dx,dfx
 	PrepareHiddenRanges=function(CEditableText ed){
 		//remove the stale ranges
 		n2=0
@@ -1593,8 +1599,9 @@ class CLayouter_programmer
 				dy_enforced:ceo.dy,
 			}
 			p_dy++
-		dx_add=new long4[dy_events.n]
-		dx_sub=new long4[dy_events.n]
+		dy_events.Sortby(inline(a){return a.flatx0_hidden})
+		dx_add=new TAddRangeItem[dy_events.n]
+		dx_sub=new TSubRangeItem[dy_events.n]
 		m_hidden_dx_add=dx_add
 		m_hidden_dx_sub=dx_sub
 		m_hidden_ccnts=ccnts
@@ -1620,8 +1627,8 @@ class CLayouter_programmer
 			dfx=(dye.flatx1_hidden/wrap_width-y_new_cur)*wrap_width
 			//assert(dfx>=0LL)
 			////////////
-			dx_add[I]=long4(x_new_cur,y_new_cur-dye.dy_enforced,dx,dfx)
-			dx_sub[I]=long4(dye.flatx0_hidden,dye.flatx1_hidden,dx,dfx)
+			dx_add[I]=TAddRangeItem(){x:x_new_cur,y:y_new_cur-dye.dy_enforced, dx:dx,dfx:dfx, dy_enforced:dye.dy_enforced}
+			dx_sub[I]=TSubRangeItem(){fx0:dye.flatx0_hidden,fx1:dye.flatx1_hidden, dx:dx,dfx:dfx}
 	}
 	AddHiddenRanges=function(CEditableText ed,i64 x,i64 y){
 		//it's not necessarily an 'add'
@@ -1632,35 +1639,36 @@ class CLayouter_programmer
 			PrepareHiddenRanges(ed)
 		hc=charHeight()
 		y_real=y/hc
-		p=m_hidden_dx_add.Bisect(function(long4 a){return a.y<y_real||a.y==y_real&&a.x<=x})-1L
+		p=m_hidden_dx_add.InlineBisect(inline(a){return a.y<y_real||a.y==y_real&&a.x<=x})-1L
 		if p>=0:
 			dxitem=m_hidden_dx_add[p]
 			x_real=x
 			if y_real==dxitem.y:
-				x_real-=dxitem.z
-			dfx=dxitem.w
-			if dfx<0&&y_real+dfx/m_wrap_width_in_fp<dxitem.y:
+				x_real-=dxitem.dx
+			dfx=dxitem.dfx
+			if dxitem.dy_enforced>0&&y_real-dxitem.dy_enforced<dxitem.y:
 				//move down from the above of a CEO
-				dfx=0LL
+				dfx+=dxitem.dy_enforced*m_wrap_width_in_fp
 			return max(min(x_real,m_wrap_width_in_fp-1LL),0LL)+(y_real)*m_wrap_width_in_fp+dfx
 		else
 			return XYToX(x,y)
 	}
-	SubHiddenRanges=function(CEditableText ed,i64 fx){
+	SubHiddenRanges=function(CEditableText ed,i64 fx0){
+		auto fx=fx0
 		y=fx/m_wrap_width_in_fp
 		x=fx-y*m_wrap_width_in_fp
 		if m_enable_hidden>0:
 			if !m_hidden_ranges_prepared:
 				PrepareHiddenRanges(ed)
-			p=m_hidden_dx_sub.Bisect(function(long4 a){return a.x<fx})-1L
+			p=m_hidden_dx_sub.InlineBisect(inline(a){return a.fx0<fx})-1L
 			if p>=0:
 				dxitem=m_hidden_dx_sub[p]
 				wrap_width=m_wrap_width_in_fp
 				dx=0LL
-				if dxitem.y/wrap_width==y||fx<dxitem.y:
-					dx=dxitem.z
+				if dxitem.fx1/wrap_width==y||fx<dxitem.fx1:
+					dx=dxitem.dx
 				//Writeln('SubHiddenRanges ',p,' ',fx,' ',dxitem,' ',dx)
-				fx=max(fx,dxitem.y)-dxitem.w
+				fx=max(fx,dxitem.fx1)-dxitem.dfx
 				y=fx/m_wrap_width_in_fp
 				x=fx-y*m_wrap_width_in_fp
 				x+=dx
