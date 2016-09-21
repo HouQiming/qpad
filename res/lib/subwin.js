@@ -709,7 +709,7 @@ W.TabbedDocument_prototype={
 		if(this.m_dragging_caption_areas){return;}
 		var layout=UI.m_ui_metadata["<layout>"];
 		layout.m_is_maximized=!layout.m_is_maximized;
-		UI.Refresh();
+		UI.RefreshAllTabs();
 	},
 }
 var g_sizing_rect_prototype={

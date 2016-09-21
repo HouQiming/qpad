@@ -1583,13 +1583,18 @@ UI.SHOW_FIND=UI.SEARCH_FLAG_SHOW;
 UI.SHOW_GOTO=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GOTO_MODE;
 UI.SHOW_GLOBAL_FIND=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GLOBAL;
 UI.SHOW_GLOBAL_GOTO=UI.SEARCH_FLAG_SHOW+UI.SEARCH_FLAG_GLOBAL+UI.SEARCH_FLAG_GOTO_MODE;
-if(!UI.m_ui_metadata["<find_state>"]){
-	UI.m_ui_metadata["<find_state>"]={
-		m_current_needle:"",
-		m_binary_needle:"",
-		m_find_flags:UI.SEARCH_FLAG_HIDDEN,
+(function(){
+	if(!UI.m_ui_metadata["<find_state>"]){
+		UI.m_ui_metadata["<find_state>"]={
+			m_current_needle:"",
+			m_binary_needle:"",
+			m_find_flags:UI.SEARCH_FLAG_HIDDEN,
+		}
 	}
-}
+	if(!UI.m_ui_metadata["<projects>"]){
+		UI.m_ui_metadata["<projects>"]=[];
+	}
+})();
 
 var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 	//should be sorted now
@@ -3115,6 +3120,10 @@ W.CodeEditorWidget_prototype={
 					doc_new.ed.Edit([0,0,doc.ed.GetText()],1)
 				}
 				doc_new.read_only=1;
+				doc_new.AddEventHandler('ESC',function(){
+					renderer.RemoveAllEmbeddedObjects();
+					UI.Refresh();
+				})
 				//if(ccnt_go!=undefined){
 				//	doc_new.SetSelection(ccnt_go,ccnt_go);
 				//}
@@ -3158,6 +3167,7 @@ W.CodeEditorWidget_prototype={
 						if(this.has_ccnt_set==1){
 							this.doc.h_top_hint=this.doc.h_top_hint_real;
 							this.doc.AutoScroll("show");
+							this.has_ccnt_set=2;
 						}
 						if(!this.has_ccnt_set){
 							//console.log(this.ccnt_go,this.doc.ed.GetTextSize());
@@ -4580,7 +4590,7 @@ var fnewpage_findbar_plugin=function(){
 }
 
 var g_regexp_backslash=new RegExp("\\\\","g");
-var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
+var g_regexp_abspath=new RegExp("^(([a-zA-Z]:[\\\\/])|([\\\\/~]))");
 var g_regexp_is_path=new RegExp("^(([a-zA-Z]:[\\\\/])|[~\\\\/]|([.]+[\\\\/])).*$");
 var FILE_RELEVANCE_SWITCH_SCORE=32
 var FILE_RELEVANCE_REPO_SCORE=8

@@ -23,6 +23,24 @@ if Platform.ARCH=="web":
 	__generate_json("extra_resource_dirs","demo_docs")
 if Platform.ARCH=="ios":
 	__generate_json("icon_file","icon_ios.png")
+	__generate_json("default_screen_file","default_screen.png")
+	__generate_json("extra_plist_keys","
+		<key>CFBundleDocumentTypes</key>
+		<array>
+		    <dict>
+		        <key>CFBundleTypeName</key>
+		        <string>QPad</string>
+		        <key>CFBundleTypeRole</key>
+		        <string>Editor</string>
+		        <key>LSHandlerRank</key> 
+		        <string>Alternate</string> 
+		        <key>LSItemContentTypes</key>
+		        <array>
+		            <string>public.data</string>
+		        </array>
+		    </dict>
+		</array>
+	")
 else if Platform.ARCH=="mac":
 	__generate_json("icon_file","icon1k.png")
 	__generate_json("extra_plist_keys","
@@ -30,7 +48,7 @@ else if Platform.ARCH=="mac":
 		<array>
 		    <dict>
 		        <key>CFBundleTypeName</key>
-		        <string>QPad document</string>
+		        <string>QPad</string>
 		        <key>CFBundleTypeRole</key>
 		        <string>Editor</string>
 		        <key>LSHandlerRank</key> 

@@ -637,7 +637,7 @@ UI.Application=function(id,attrs){
 				title:'QPad',w:1280,h:720,
 				bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
-				flags:(UI.Platform.ARCH=="web"?0:UI.SDL_WINDOW_MAXIMIZED)|UI.SDL_WINDOW_RESIZABLE,
+				flags:(UI.Platform.ARCH=="web"?0:(UI.IS_MOBILE?UI.SDL_WINDOW_FULLSCREEN:UI.SDL_WINDOW_MAXIMIZED))|UI.SDL_WINDOW_RESIZABLE,
 				is_main_window:1,
 				OnWindowBlur:function(){
 					this.document_area.OnWindowBlur();

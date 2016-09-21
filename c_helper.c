@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int UnixMatchFileAttributes(char* fntar,char* fnsrc){
 	struct stat sb;
