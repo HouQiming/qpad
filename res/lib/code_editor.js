@@ -3170,6 +3170,7 @@ W.CodeEditorWidget_prototype={
 				doc_new.read_only=1;
 				doc_new.AddEventHandler('ESC',function(){
 					renderer.RemoveAllEmbeddedObjects();
+					Duktape.gc();
 					UI.Refresh();
 				})
 				//if(ccnt_go!=undefined){
@@ -3182,6 +3183,7 @@ W.CodeEditorWidget_prototype={
 					has_ccnt_set:0,
 					ccnt_go:ccnt_go,
 					host:this,
+					ccnt_host_embed:ccnt_sel1,
 					fn:fn,
 					Render:function(x,y,scale){
 						//UI.RoundRect({
@@ -3193,6 +3195,7 @@ W.CodeEditorWidget_prototype={
 						this.w=this.host.doc.w-0.5*(x-this.host.x);
 						var obj_peek=W.CodeEditor(this.id_doc,{
 							is_definition_peek:1,
+							m_ceo_host:this,
 							disable_minimap:1,
 							disable_top_hint:1,
 							doc:this.doc,
@@ -3235,6 +3238,7 @@ W.CodeEditorWidget_prototype={
 						}
 					},
 				});
+				Duktape.gc();
 				if(new_def_context){
 					UI.g_goto_definition_context=new_def_context;
 				}
@@ -3264,12 +3268,62 @@ W.CodeEditorWidget_prototype={
 			}
 		}
 	},
+	GotoDefinitionByID:function(is_peek,id){
+		var doc=this.doc;
+		var ed=doc.ed
+		var ccnt0=doc.sel1.ccnt
+		var ccnt=ccnt0
+		for(;;){
+			//parser-friendly outer scope search
+			var fol_ret=doc.FindOuterLevel(ccnt);
+			ccnt=fol_ret.ccnt_editor;
+			ccnt_query=fol_ret.ccnt_parser;
+			if(!(ccnt>=0)){ccnt=0;}
+			if(doc.m_diff_from_save){
+				ccnt_query=doc.m_diff_from_save.CurrentToBase(ccnt_query)
+			}
+			var ccnt_decl=UI.ED_QueryDecl(doc,ccnt_query,id)
+			if(ccnt_decl>=0){
+				if(doc.m_diff_from_save){
+					ccnt_decl=doc.m_diff_from_save.BaseToCurrent(ccnt_decl)
+				}
+				if(ccnt_decl!=ccnt0){
+					//UI.SetSelectionEx(doc,ccnt_decl,ccnt_decl,"go_to_definition")
+					this.OpenAsDefinition(undefined,ccnt_decl,is_peek);
+					UI.Refresh()
+					return;
+				}
+			}
+			if(!(ccnt>0)){break;}
+		}
+		var gkds=UI.ED_QueryKeyDeclByID(id)
+		//not found, check key decls by id
+		var fn=doc.owner.file_name
+		var p_target=0
+		ccnt=ccnt0
+		if(doc.m_diff_from_save){
+			ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
+		}
+		for(var i=0;i<gkds.length;i+=2){
+			if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
+				p_target=i+2
+				if(p_target>=gkds.length){
+					p_target=0;
+				}
+				break
+			}
+		}
+		if(p_target<gkds.length){
+			this.OpenAsDefinition(gkds[p_target+0],gkds[p_target+1],is_peek,gkds.length>2&&{gkds:gkds,p_target:p_target});
+		}else{
+			this.CreateNotification({id:'find_result',icon:'警',text:UI._("Cannot find a definition of '@1'").replace("@1",id)})
+		}
+	},
 	GotoDefinition:function(is_peek){
 		var doc=this.doc;
 		var sel=doc.GetSelection();
 		var ed=doc.ed
 		var ccnt_sel1=doc.sel1.ccnt
-		var hc=UI.GetCharacterHeight(doc.font);
 		if(doc.m_diff_from_save){ccnt_sel1=doc.m_diff_from_save.CurrentToBase(ccnt_sel1)}
 		var s_dep_file=UI.ED_QueryDepTokenByBaseCcnt(doc,ccnt_sel1)
 		if(s_dep_file){
@@ -3281,53 +3335,15 @@ W.CodeEditorWidget_prototype={
 		sel[1]=ed.MoveToBoundary(sel[1],1,"word_boundary_right")
 		if(sel[0]<sel[1]){
 			var id=ed.GetText(sel[0],sel[1]-sel[0])
-			var ccnt0=doc.sel1.ccnt
-			var ccnt=ccnt0
-			for(;;){
-				//parser-friendly outer scope search
-				var fol_ret=doc.FindOuterLevel(ccnt);
-				ccnt=fol_ret.ccnt_editor;
-				ccnt_query=fol_ret.ccnt_parser;
-				if(!(ccnt>=0)){ccnt=0;}
-				if(doc.m_diff_from_save){
-					ccnt_query=doc.m_diff_from_save.CurrentToBase(ccnt_query)
-				}
-				var ccnt_decl=UI.ED_QueryDecl(doc,ccnt_query,id)
-				if(ccnt_decl>=0){
-					if(doc.m_diff_from_save){
-						ccnt_decl=doc.m_diff_from_save.BaseToCurrent(ccnt_decl)
-					}
-					if(ccnt_decl!=ccnt0){
-						//UI.SetSelectionEx(doc,ccnt_decl,ccnt_decl,"go_to_definition")
-						this.OpenAsDefinition(undefined,ccnt_decl,is_peek);
-						UI.Refresh()
-						return;
-					}
-				}
-				if(!(ccnt>0)){break;}
-			}
-			var gkds=UI.ED_QueryKeyDeclByID(id)
-			//not found, check key decls by id
-			var fn=doc.owner.file_name
-			var p_target=0
-			ccnt=ccnt0
-			if(doc.m_diff_from_save){
-				ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
-			}
-			for(var i=0;i<gkds.length;i+=2){
-				if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
-					p_target=i+2
-					if(p_target>=gkds.length){
-						p_target=0;
-					}
-					break
+			if(this.is_definition_peek&&!is_peek){
+				var obj_host=this.m_ceo_host.host;
+				if(obj_host.doc){
+					obj_host.doc.SetSelection(this.m_ceo_host.ccnt_host_embed,this.m_ceo_host.ccnt_host_embed);
+					obj_host.GotoDefinitionByID(1,id);
+					return;
 				}
 			}
-			if(p_target<gkds.length){
-				this.OpenAsDefinition(gkds[p_target+0],gkds[p_target+1],is_peek,gkds.length>2&&{gkds:gkds,p_target:p_target});
-			}else{
-				this.CreateNotification({id:'find_result',icon:'警',text:UI._("Cannot find a definition of '@1'").replace("@1",id)})
-			}
+			this.GotoDefinitionByID(is_peek,id);
 		}
 	}
 }
