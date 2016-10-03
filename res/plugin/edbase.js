@@ -2702,6 +2702,7 @@ UI.RegisterEditorPlugin(function(){
 		renderer.ResetTentativeOps()
 		//if(this.owner){this.owner.m_no_more_replace=0;}
 	}
+	this.InvalidateAutoEdit=InvalidateAutoEdit.bind(this);
 	var StartAutoEdit=function(cclines,mode){
 		var locs=[]
 		this.m_autoedit_locators=locs;
@@ -2814,7 +2815,7 @@ UI.RegisterEditorPlugin(function(){
 		if(!UI.ED_AutoEdit_SetExample(ctx,line_id>>1,ed.GetText(locs[line_id].ccnt,locs[line_id+1].ccnt-locs[line_id].ccnt))){
 			return 1;
 		}
-		var ops=UI.ED_AutoEdit_Evaluate(ctx,locs)
+		var ops=UI.ED_AutoEdit_Evaluate(ctx,locs);
 		//for(var i=0;i<locs.length;i+=2){
 		//	print("============",i/2)
 		//	print(ed.GetText(locs[i+0].ccnt,locs[i+1].ccnt-locs[i+0].ccnt))
@@ -2823,7 +2824,7 @@ UI.RegisterEditorPlugin(function(){
 		//highlight ops - fill out the overlay system
 		var renderer=ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		this.m_hide_prev_next_buttons=0;
-		renderer.m_tentative_editops=ops
+		renderer.m_tentative_editops=ops;
 		renderer.ResetTentativeOps()
 		UI.Refresh()
 		return 1;
@@ -2931,7 +2932,7 @@ UI.RegisterEditorPlugin(function(){
 			//this.vsel_display_hl.color=this.bgcolor_selection;
 			return;
 		}
-		this.is_in_vsel=1
+		this.is_in_vsel=1;
 		//if(this.owner){this.owner.m_no_more_replace=1;}
 		if(!this.vsel_sel0){
 			this.vsel_sel0=this.ed.CreateLocator(this.sel1.ccnt,1)
@@ -2978,7 +2979,7 @@ UI.RegisterEditorPlugin(function(){
 		if(this.vsel_skip_sel_change){this.vsel_skip_sel_change=0;return 1;}
 		if(!this.is_in_vsel){return 1;}//return 1 for "don't intercept"
 		//leave vsel
-		this.is_in_vsel=0
+		this.is_in_vsel=0;
 		//this.vsel_display_loc0.ccnt=0
 		//this.vsel_display_loc1.ccnt=0
 		return 1;

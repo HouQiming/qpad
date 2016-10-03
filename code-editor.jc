@@ -4076,6 +4076,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		if !wprg:return JS.ReturnError("invalid program")
 		locs=JS.Param(1).as(JSObject)
 		if !locs:return JS.ReturnError("invalid locators")
+		include_examples=JS.Param(2).or(0)
 		prg=wprg.prg
 		ctx=obj["m_ctx"].as(CReplaceContext)
 		ed=obj["m_owner"].as(CEditableText)
@@ -4083,7 +4084,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ops=new TEditop[]
 		n=locs.length()
 		for i=0:2:n-2
-			if example_lines[i>>1].as(int):continue
+			if example_lines[i>>1].as(int)&&!include_examples:continue
 			ccnt0=(locs[i].as(CLocator)).ccnt
 			ccnt1=(locs[i+1].as(CLocator)).ccnt
 			(s_unicode,nbras_old)=TextToAutoEditText(1,1,ed.GetText(i64(ccnt0),i64(ccnt1-ccnt0)))

@@ -1355,6 +1355,54 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	SmartPaste:function(){
 		var sel=this.GetSelection();
 		var ed=this.ed;
+		//vsel-and-paste case
+		if(this.m_autoedit_context&&this.m_autoedit_mode=='explicit'){
+			var renderer=this.GetRenderer();
+			var locs=this.m_autoedit_locators
+			if(locs&&!renderer.m_tentative_ops){
+				var line_id=-1;
+				//the line(s) intersected by ops... multi-line edit should cancel it
+				for(var i=0;i<locs.length;i+=2){
+					if(locs[i+1].ccnt>=sel[1]){
+						if(locs[i+0].ccnt<=sel[0]){
+							line_id=i
+							break
+						}
+					}
+				}
+				if(line_id>=0){
+					var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent);
+					if(sinsert==undefined){
+						sinsert=UI.SDL_GetClipboardText();
+					}
+					var lines=sinsert.replace(/\r/g,'').split('\n');
+					var shack=UI.ED_RichTextCommandChar(0x108000);
+					///////
+					var s_example=[
+						ed.GetText(locs[line_id].ccnt,sel[0]-locs[line_id].ccnt),
+						shack,
+						ed.GetText(sel[1],locs[line_id+1].ccnt-sel[1]),
+					].join('');
+					if(UI.ED_AutoEdit_SetExample(this.m_autoedit_context,line_id>>1,s_example)){
+						//include examples in the evaluation
+						var ops=UI.ED_AutoEdit_Evaluate(this.m_autoedit_context,locs,1);
+						if(this.InvalidateAutoEdit){
+							this.InvalidateAutoEdit();
+						}
+						var p_lines=0;
+						for(var i=0;i<ops.length;i+=3){
+							if(ops[i+2]){
+								ops[i+2]=ops[i+2].replace(shack,lines[p_lines++]||"");
+							}
+						}
+						this.HookedEdit(ops);
+						this.CallOnChange();
+						UI.Refresh()
+						return;
+					}
+				}
+			}
+		}
 		/*
 		indent handling
 		line head: nothing/less (tell from the last line), good
