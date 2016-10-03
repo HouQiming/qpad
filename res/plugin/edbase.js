@@ -1703,6 +1703,7 @@ UI.RegisterEditorPlugin(function(){
 			menu_edit.AddSeparator()
 			menu_edit.AddNormalItem({icon:"释",text:"Toggle c&omment",enable_hotkey:1,key:"CTRL+K",action:fcomment.bind(this)})
 			menu_edit=undefined;
+			this.AddTransientHotkey('CTRL+/',fcomment.bind(this));
 		}
 	})
 })//.prototype.desc={category:"Editing",name:"Comment / uncomment",stable_name:"toggle_comment"};
