@@ -16,11 +16,29 @@ if(UI.TestOption('software_srgb')){
 	//UI.SetSRGBEnabling(0);
 	UI.SetSRGBEnabling(2);
 }
-if(UI.IS_MOBILE){
-	//on mobile, we're better without the IME - it doesn't work on external kbd anyway
-	UI.SDL_StartTextInput=function(){};
-	UI.SDL_StopTextInput=function(){};
-}
+UI.g_git_name="";
+UI.g_git_email="@";
+(function(){
+	var s_git_config=IO.ReadAll(IO.ProcessUnixFileName("~/.gitconfig"));
+	if(!s_git_config){
+		return;
+	}
+	var match_email=s_git_config.match(/\n[ \t]*email[ \t]*=[ \t]*(.*)/);
+	if(match_email){
+		UI.g_git_email=match_email[1];
+	}
+	var match_name=s_git_config.match(/\n[ \t]*name[ \t]*=[ \t]*(.*)/);
+	if(match_name){
+		UI.g_git_name=match_name[1];
+	}
+})();
+
+//if(UI.IS_MOBILE){
+//	//on mobile, we're better without the IME - it doesn't work on external kbd anyway
+//	//no, it's SDL's fault
+//	UI.SDL_StartTextInput=function(){};
+//	UI.SDL_StopTextInput=function(){};
+//}
 UI.ChooseScalingFactor({designated_screen_size:UI.IS_MOBILE?720:1080})
 UI.SetFontSharpening(1);
 UI.wheel_message_mode="over";

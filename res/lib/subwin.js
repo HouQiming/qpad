@@ -216,6 +216,14 @@ W.TabbedDocument_prototype={
 		}
 		this.just_created_a_tab=0;
 		if(this.current_tab_id>=this.items.length){this.current_tab_id--}
+		if(this.current_tab_id<this.items.length&&((window_list[this.current_tab_id]||{}).area_name||"doc_default")!=(tab.area_name||"doc_default")){
+			//despite our best efforts, we still went to another area
+			//go to the topmost editor document
+			var tab_editor=UI.GetFrontMostEditorTab();
+			if(tab_editor){
+				this.current_tab_id=tab_editor.__global_tab_id;
+			}
+		}
 		//this doesn't count as a meaningful switch
 		if(this.current_tab_id<0){this.current_tab_id=0;}
 		if(tab.OnDestroy){tab.OnDestroy()}

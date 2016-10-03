@@ -1575,9 +1575,10 @@ class CLayouter_programmer
 				cvg++
 		assert(!(ccnts.n&1))
 		hid=ed.m_handler_registration["renderer"].as(int)
+		bk_m_enable_hidden=m_enable_hidden
 		m_enable_hidden=-1
 		a=ed.GetStateEnMasse(hid,ccnts)
-		m_enable_hidden=1
+		m_enable_hidden=bk_m_enable_hidden
 		all_x=GetFlatXEnMasse(a)//[GetFlatX(a[i:]) for i=0:5:a.n-5]
 		dy_events=new TDeltaYItem[(all_x.n>>1)+m_ceos.n]
 		p_dy=0L
@@ -4330,7 +4331,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto STYLE_ID_QUOTE=5
 		auto STYLE_ID_HEADINGS=6
 		auto STYLE_ID_N_HEADINGS=4
-		auto CODE_MAX_LINES=8
+		auto CODE_MAX_LINES=12
 		auto sret=new string
 		auto is_in_code=JSObject.NULL
 		auto scode=string.NULL
@@ -4799,6 +4800,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//fbo_w=max(fbo_w,g_rtt_tab_backup.w)
 				//fbo_h=max(fbo_h,g_rtt_tab_backup.h)
 				g_rtt_tab_backup.discard()
+			if Platform.BUILD=="debug":
+				Writeln('creating FBO: ',fbo_w,' ',fbo_h)
 			g_rtt_tab_backup=glCreateRenderToTextureContext(GL_RGBA8,fbo_w,fbo_h,0)
 		tab_viewport=new int[4]
 		glGetIntegerv(GL_VIEWPORT,__pointer(tab_viewport.d));

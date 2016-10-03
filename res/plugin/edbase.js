@@ -84,18 +84,15 @@ var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.P
 	"%VS100COMNTOOLS%../../VC/include",
 	"%VS90COMNTOOLS%../../VC/include",
 	"%VS80COMNTOOLS%../../VC/include",
-	"%VS140COMNTOOLS%../../../Windows Kits/8.0/Include/um",
-	"%VS140COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
-	"%VS140COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
-	"%VS130COMNTOOLS%../../../Windows Kits/8.0/Include/um",
-	"%VS130COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
-	"%VS130COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
-	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/um",
-	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
-	"%VS120COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
-	"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/um",
-	"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/shared",
-	"%VS110COMNTOOLS%../../../Windows Kits/8.0/Include/winrt",
+	"%ProgramFiles(x86)%/Windows Kits/10/Include/um",
+	"%ProgramFiles(x86)%/Windows Kits/10/Include/shared",
+	"%ProgramFiles(x86)%/Windows Kits/10/Include/winrt",
+	"%ProgramFiles(x86)%/Windows Kits/8.1/Include/um",
+	"%ProgramFiles(x86)%/Windows Kits/8.1/Include/shared",
+	"%ProgramFiles(x86)%/Windows Kits/8.1/Include/winrt",
+	"%ProgramFiles(x86)%/Windows Kits/8.0/Include/um",
+	"%ProgramFiles(x86)%/Windows Kits/8.0/Include/shared",
+	"%ProgramFiles(x86)%/Windows Kits/8.0/Include/winrt",
 	"%VS90COMNTOOLS%../../../Microsoft SDKs/Windows/v5.0/Include",
 	"c:/mingw/include"
 ]:[
@@ -209,7 +206,7 @@ Language.Register({
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['abstract','assert','break','case','catch','class','const','continue','default','do','else','enum','extends','final','finally','for','goto','if','implements','import','instanceof','interface','native','new','package','private','protected','public','return','static','strictfp','super','switch','synchronized','this','throw','throws','transient','try','while','false','null','true'],
-			'type':['volatile','byte','long','char','boolean','double','float','int','short','void'],
+			'type':['volatile','byte','long','char','boolean','double','float','int','short','void','Object'],
 		},0)
 	}
 });
@@ -2627,8 +2624,10 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('selectionChange',function(){
 		var sel=this.GetSelection();
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-		renderer.ShowRange(this.ed,sel[0]+1,sel[0]-1)
-		renderer.ShowRange(this.ed,sel[1]+1,sel[1]-1)
+		if(renderer.m_enable_wrapping>0){
+			renderer.ShowRange(this.ed,sel[0]+1,sel[0]-1)
+			renderer.ShowRange(this.ed,sel[1]+1,sel[1]-1)
+		}
 	})
 })//.prototype.desc={category:"Controls",name:"Text folding",stable_name:"text_folding"};
 
@@ -3304,9 +3303,10 @@ UI.RegisterEditorPlugin(function(){
 })
 
 //code tagging
-var CODE_TAG_LENGTH=12;
+//var CODE_TAG_LENGTH=12;
 var CreateFileTag=function(){
-	return IO.SHA1([UI.g_git_email,Date.now()].join('&')).substr(0,CODE_TAG_LENGTH);
+	//return IO.SHA1([UI.g_git_email,Date.now()].join('&')).substr(0,CODE_TAG_LENGTH);
+	return [UI.g_git_name,UI.g_git_email,(new Date()).toISOString()].join('_').replace(/[\-: ]/g,'_');
 };
 
 if(!UI.m_ui_metadata["<tag_cache>"]){

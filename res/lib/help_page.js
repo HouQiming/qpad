@@ -432,7 +432,6 @@ UI.SeekTag=function(op_active){
 	});
 };
 UI.RenderQTagReference=function(x,y,desc){try{
-	//todo: file name, open-in-real-editor
 	var w=desc.m_width;
 	var h=desc.m_height;
 	var help_style=UI.default_styles.help_page;
@@ -446,21 +445,36 @@ UI.RenderQTagReference=function(x,y,desc){try{
 	}else{
 		if(!desc.doc){
 			desc.doc=UI.OpenCodeEditorDocument(desc.m_fn);
-			desc.doc.Init();
 			desc.doc.opening_callbacks=[function(){
-				//todo: show-this-part-only rendering support
+				//show-this-part-only rendering support
+				var renderer=this.GetRenderer();
+				renderer.m_enable_hidden=0;
 				var ccnt0=this.m_diff_from_save.CurrentToBase(desc.m_epos0);
 				var ccnt1=this.m_diff_from_save.CurrentToBase(desc.m_epos1);
+				if(this.ed.GetUtf8CharNeighborhood(ccnt0)[1]==13){ccnt0++;}
+				if(this.ed.GetUtf8CharNeighborhood(ccnt0)[1]==10){
+					ccnt0=this.ed.MoveToBoundary(ccnt0+1,1,"space");
+				}
+				renderer.ShowRange(this.ed,0,this.ed.GetTextSize());
+				renderer.HideRange(this.ed,0,ccnt0);
+				renderer.HideRange(this.ed,ccnt1,this.ed.GetTextSize());
 				this.SetSelection(ccnt0,ccnt0);
+				this.scroll_y=this.ed.XYFromCcnt(ccnt0).y;
+				//this.AutoScroll("show");
+				this.m_is_preview=1;
+				//console.log('load: ',this.scroll_y);
 			}];
 			desc.doc.read_only=1;
+			desc.doc.Init();
 		}
 		var obj_widget=W.CodeEditor("embeded_code_"+desc.m_id.toString(),{
 			doc:desc.doc,
 			read_only:1,
 			disable_minimap:1,
+			disable_top_hint:1,
 			x:x,y:y,w:w,h:h,
-		})
+		});
+		//console.log(desc.doc.scroll_y);
 	}
 }catch(e){console.log(e.stack);}};
 
