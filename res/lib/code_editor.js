@@ -7070,13 +7070,18 @@ UI.NewCodeEditorTab=function(fname0){
 			this.title=UI.GetSmartTabName(fn_display);
 			if(arr_editors&&arr_editors.length>1){
 				var dup_id=undefined;
+				var cur_dup_id=0;
 				for(var i=0;i<arr_editors.length;i++){
-					if(arr_editors[i]==doc){
-						dup_id=i;
-						break;
+					if(!(arr_editors[i].owner&&arr_editors[i].owner.is_a_tab)){
+						continue;
 					}
+					if(arr_editors[i]==doc){
+						dup_id=cur_dup_id;
+						//break;
+					}
+					cur_dup_id++;
 				}
-				if(dup_id!=undefined){
+				if(dup_id!=undefined&&cur_dup_id>1){
 					this.title=this.title+':'+(dup_id+1).toString();
 				}
 			}
@@ -7095,6 +7100,7 @@ UI.NewCodeEditorTab=function(fname0){
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
 				'file_name':this.file_name,
+				'is_a_tab':1,
 			};
 			if(!this.main_widget&&!fname0){
 				if(this.is_options_window){
