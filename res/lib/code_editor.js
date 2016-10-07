@@ -3155,7 +3155,7 @@ W.CodeEditorWidget_prototype={
 				var hc=doc.ed.GetCharacterHeightAt(0);
 				var renderer=doc.GetRenderer();
 				var doc_new=undefined;
-				if(fn){
+				if(fn&&fn!=doc.m_file_name){
 					//read that file, it's a peek, we are assuming a small file
 					doc_new=UI.OpenCodeEditorDocument(fn);
 					doc_new.m_is_preview=0;
@@ -3166,6 +3166,7 @@ W.CodeEditorWidget_prototype={
 					doc_new=UI.CreateEmptyCodeEditor(doc.m_language_id)
 					doc_new.Init();
 					doc_new.ed.Edit([0,0,doc.ed.GetText()],1)
+					doc_new.ed.m_file_index=doc.ed.m_file_index;
 				}
 				doc_new.read_only=1;
 				doc_new.AddEventHandler('ESC',function(){
