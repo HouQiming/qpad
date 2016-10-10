@@ -12,6 +12,8 @@ import TextBox.*
 import TextBox.detail.*
 import Encoding.*
 
+ENABLE_EXPERIMENTAL_FEATURES=1
+
 /////////////////////////////////////
 //parser utility from compiler code
 class CUniqueIDProvider(TTraits)
@@ -154,6 +156,8 @@ module CharSet
 	idbody=charset("_0-9A-Za-z\200-\377")
 	spaces=charset("\r\t ")
 	spaces_newline=charset("\r\n\t ")
+	qi_typename=charset("~$._0-9A-Za-z\200-\377")
+	qi_separator=charset("\r\n\t ,")
 	newlines=charset("\r\n")
 	inline has(u32[] ok,int c)
 		return !(c&0xffffff00)&&((ok[c>>5]>>(c&31))&1u);
@@ -195,6 +199,8 @@ g_id_typedef=getid("typedef")
 g_id_require=getid("require")
 g_id_import=getid("import")
 g_id_in=getid("in")
+g_id_this=getid("this")
+g_id_home=getid("~")
 g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 struct TToken
 	int tok
@@ -624,7 +630,7 @@ auto tokenize(string sdata,int g_ignore_indents)
 			//else
 			//toks.push(TToken(){'tok':TOK_STRING+getid(str),'epos0':int(efeed0)-1,'epos1':int(ptr)})
 			push_token(TOK_STRING,int(efeed0),int(ptr)-1)
-			//todo: python tri-quote strings
+			//coulddo: python tri-quote strings
 			continue
 		//comments
 		case '/':
@@ -901,6 +907,40 @@ struct TIDBriefWithFile
 	int epos_comment
 	int id
 	int2 pdoc
+///////////////
+//qinfo-related things
+struct TQIType
+	int id
+	int2[] annotations
+struct TQIObjectEvent
+	//type annotations of the same object could be time dependent...
+	//we just record the events and do an O(n) search on query
+	//class members could be handled the same way
+	int epos
+	int id
+	TQIType t
+//params can be in-out
+QIPARAM_IN=0
+QIPARAM_OUT=0x80000000
+struct TQIParamDesc
+	int id_inout
+	TQIType t
+	inline GetID()
+		return (id_inout&0x7fffffff)
+class CQIFunc
+	//we want to index methods by effect... and by applicability
+	//id and epos are fine to include though
+	//params / call pattern
+	int epos
+	TQIParamDesc[] params
+	int[] call_ptn
+	int id
+	////////////
+	int p_index
+class CQIScope
+	int epos
+	m_objects=new TQIObjectEvent[]
+//////////////
 KEY_DECL_CLASS=TOK_TYPE*1
 KEY_DECL_FUNCTION=TOK_TYPE*0
 KEY_DECL_MACRO=TOK_TYPE*2
@@ -925,6 +965,7 @@ class CFileIndex
 	int[] m_toplevel_ids
 	string m_doc_string_pool
 	TDocedVariable[] m_doc_vars
+	CQIFunc[] all_qifuncs
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
 	//dependency
@@ -986,6 +1027,116 @@ auto ComputeIDOrderingMaps(int[] just_ids)
 
 inline IDToOrder(id)
 	return g_symbols[id].user_slot
+
+auto ParseQIType(string feed)
+	ptr=0L
+	inline skipchars(u32[] cs)
+		while ptr<feed.n
+			ch=int(u8(feed[ptr]))
+			if !CharSet.has(cs,ch):return
+			ptr++
+	inline skipToChars(u32[] cs)
+		while ptr<feed.n
+			ch=int(u8(feed[ptr]))
+			if CharSet.has(cs,ch):return
+			ptr++
+	skipchars(CharSet.spaces_newline)
+	ptr0=ptr
+	skipchars(CharSet.qi_typename)
+	id=getid(s[ptr0:ptr-1])
+	skipchars(CharSet.spaces_newline)
+	annotations=int2[].NULL
+	if ptr<feed.n&&feed[ptr]=='[':
+		annotations=new int2[]
+		ptr++
+		while ptr<feed.n:
+			skipchars(CharSet.spaces_newline)
+			if feed[ptr]==']':
+				break
+			ptr0=ptr
+			skipchars(CharSet.qi_typename)
+			if !(ptr0<ptr):break
+			id_a=getid(s[ptr0:ptr-1])
+			id_b=0
+			skipchars(CharSet.spaces_newline)
+			if ptr<feed.n&&feed[ptr]=='=':
+				ptr++
+				skipchars(CharSet.spaces_newline)
+				ptr0=ptr
+				skipToChars(CharSet.qi_separator)
+				id_b=getid(s[ptr0:ptr-1])
+			skipchars(CharSet.spaces_newline)
+			if ptr<feed.n&&feed[ptr]==',':
+				ptr++
+			annotations.push(int2(id_a,id_b))
+	return TQIType(){
+		id:id,
+		annotations:annotations,
+	}
+
+struct TQIFuncIndexItem
+	CQIFunc pf
+	int w,x
+g_qifi_items=[TQIFuncIndexItem()] //leave [0] as a sentential
+g_qifi_by_first_param_type=new int[int]
+g_qifi_by_global_flag=new int[int]
+g_qifi_freelist=-1
+
+inline AllocQIFI()
+	if g_qifi_freelist<0:
+		g_qifi_freelist=int(g_qifi_items.n)
+		g_qifi_items.push(TGlobalKeyDeclItem(){x:-1})
+	ret=g_qifi_freelist
+	g_qifi_freelist=g_qifi_items[ret].x
+	return ret
+
+inline IndexQIFunc(CQIFunc qif)
+	assert(!qif.p_index)
+	p=AllocQIFI()
+	g_qifi_items[p]=qif
+	id=qif.m_params[0].GetID()
+	if id==g_id_home&&qif.m_params[0].t.annotations.n>0:
+		map=g_qifi_by_global_flag
+		key=qif.m_params[0].t.annotations[0].x
+	else
+		map=g_qifi_by_first_param_type
+		key=qif.m_params[0].t.id
+	p_next=map[key]
+	map[key]=p
+	g_qifi_items[p].x=p_next
+	g_qifi_items[p].w=0
+	if p_next>0:
+		g_qifi_items[p_next].w=p
+	qif.p_index=p
+	
+inline UnindexQIFunc(CQIFunc qif)
+	assert(qif.p_index>0)
+	id=qif.m_params[0].GetID()
+	if id==g_id_home&&qif.m_params[0].t.annotations.n>0:
+		map=g_qifi_by_global_flag
+		key=qif.m_params[0].t.annotations[0].x
+	else
+		map=g_qifi_by_first_param_type
+		key=qif.m_params[0].t.id
+	p=qif.p_index
+	qif.p_index=0
+	pw=g_qifi_items[p].w
+	px=g_qifi_items[p].x
+	if pw>0:
+		g_qifi_items[pw].x=px
+	else
+		map[key]=px
+	if px>0:
+		g_qifi_items[px].w=pw
+	//free node
+	g_qifi_items[p].x=g_qifi_freelist
+	g_qifi_freelist=p
+
+auto QueryAvailableQIObject(CEditableText ed)
+	//do on-query parse of QIFunc calls to avoid the multi-pass problem
+	//qinfo-var can be handled here, which removes the need of CQIScope
+	//the eposes are completely decoupled, so it's fine to use editted text here
+	!?
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 g_function_ids=[getid("function"),getid("function*"),getid("inline"),getid('def')]
@@ -1075,6 +1226,12 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		int blevel
 		char in_assignment
 		char in_typedef
+		if ENABLE_EXPERIMENTAL_FEATURES:
+			CQIScope qi_scope
+			inline GetQIScope()
+				if !qi_scope:
+					qi_scope=new CQIScope()
+				return qi_scope
 	ss=new TStkEntry[]
 	scopes=new TScopeEntry[]
 	sc_decls=new int2[]
@@ -1090,6 +1247,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	all_prototypes=new int[]
 	p_prototypes=new int2[]
 	id_briefs=new TIDBrief[]
+	if ENABLE_EXPERIMENTAL_FEATURES:
+		all_qifuncs=new CQIFunc[]
 	MAX_PROTOTYPE_TOKS=1024
 	parsePrototype=function(int function_id,int ptok,iptr ptok_last_comment){
 		auto blevel=0
@@ -1097,6 +1256,11 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		auto p0=int(all_prototypes.n)
 		auto is_done=0
 		all_prototypes.push(0)
+		auto qi_params=TQIParamDesc[].NULL
+		inline GetQIParams()
+			if !qi_params:
+				qi_params=new TQIParamDesc[]
+			return qi_params
 		for i=ptok:min(toks.n,ptok+MAX_PROTOTYPE_TOKS)-1
 			auto tok_i=toks[i].tok
 			switch(tok_i){
@@ -1162,6 +1326,32 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								doc_str=PoolDoxygenComment(sdataz[pid1:pcomment1-1])
 								all_prototypes[n0+4+(param_ord-1)*2+0]=doc_str.x
 								all_prototypes[n0+4+(param_ord-1)*2+1]=doc_str.y
+					if ENABLE_EXPERIMENTAL_FEATURES:
+						//these two may make up qinfo-specific params like `this`
+						ParseQIParam=inline(flag,delta_lg){
+							//qinfo - param
+							//find the end of the param desc - \ @
+							auto pid0=i+delta_lg
+							while pid0<pcomment1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+								pid0++
+							auto pid1=pid0
+							while pid1<pcomment1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+								pid1++
+							auto id_param=getid(sdataz[pid0:pid1-1])
+							while pid1<pcomment1&&(sdataz[pid1]==' '||sdataz[pid1]=='\t'):
+								pid1++
+							auto pid2=pid1
+							while pid2<pcomment1&&(sdataz[pid2]!='\r'&&sdataz[pid2]!='\n'):
+								pid2++
+							GetQIParams().push(TQIParamDesc(){
+								id_inout:id_param+flag,
+								t:ParseQIType(sdataz[pid1:pid2-1])
+							})
+						}
+						if __basic_api.memcmp(__pointer(sdataz.d+i+1),"qinfo-in",8)==0:
+							ParseQIParam(QIPARAM_IN,8)
+						if __basic_api.memcmp(__pointer(sdataz.d+i+1),"qinfo-out",9)==0:
+							ParseQIParam(QIPARAM_OUT,9)
 				if param_id_map&&pbrief.x<0:
 					auto pid0=pcomment0
 					while pid0<pcomment1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
@@ -1175,6 +1365,24 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					all_prototypes[n0 +2]=preturn.x
 					all_prototypes[n0 +3]=preturn.y
 					is_documented=1
+				if ENABLE_EXPERIMENTAL_FEATURES:
+					if qi_params&&qi_params.n:
+						//we have qinfo, generate a CQIFunc
+						auto call_ptn=new int[]
+						call_ptn.push(TOK_ID+g_id_this)
+						call_ptn.push(int('.'))
+						call_ptn.push(function_id)
+						call_ptn.push(int('('))
+						for i=0:all_prototypes[p0]-1
+							call_ptn.push(all_prototypes[p0+1+i])
+							call_ptn.push(int(','))
+						call_ptn[call_ptn.n-1]=int(')')
+						all_qifuncs.push(new CQIFunc(){
+							epos:toks[ptok].epos0,
+							params:qi_params,
+							call_ptn:call_ptn,
+							id:function_id,
+						})
 			if !is_documented:
 				all_prototypes.push(-1)
 			p_prototypes.push(int2(function_id,p0))
@@ -1419,21 +1627,45 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			ptok_last_comment=i
 			epos0=toks[i].epos0
 			epos1=toks[i].epos1
-			for j=epos0:min(epos1,epos0+3)-1
-				if sdataz[j]=='@'&&__basic_api.memcmp(__pointer(sdataz.d+j+1),"qpadvar",7)==0:
-					//@qpad variable visibility
-					auto pid0=j+8
-					while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
-						pid0++
-					auto pid1=pid0
-					while pid1<epos1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
-						pid1++
-					if pid1<epos1:
-						all_doc_vars.push(TDocedVariable(){
-							epos_scope:scopes.back().ptok0<0?0:toks[scopes.back().ptok0].epos0,
-							id:getid(sdataz[pid0:pid1-1]),
-							pdoc:PoolDoxygenComment(sdataz[pid1:epos1-1])})
-					break
+			if ENABLE_EXPERIMENTAL_FEATURES:
+				for j=epos0:min(epos1,epos0+3)-1
+					if sdataz[j]=='@':
+						if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qpadvar",7)==0:
+							//@qpad variable visibility
+							auto pid0=j+8
+							while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+								pid0++
+							auto pid1=pid0
+							while pid1<epos1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+								pid1++
+							if pid1<epos1:
+								all_doc_vars.push(TDocedVariable(){
+									epos_scope:scopes.back().ptok0<0?0:toks[scopes.back().ptok0].epos0,
+									id:getid(sdataz[pid0:pid1-1]),
+									pdoc:PoolDoxygenComment(sdataz[pid1:epos1-1])})
+							break
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
+							//create a CQIFunc from scratch, with alternative call sequence
+							//todo
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-var",9)==0:
+							//create an object from scratch
+							auto pid0=i+9
+							while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+								pid0++
+							auto pid1=pid0
+							while pid1<epos1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+								pid1++
+							auto id=getid(sdataz[pid0:pid1-1])
+							while pid1<epos1&&(sdataz[pid1]==' '||sdataz[pid1]=='\t'):
+								pid1++
+							auto pid2=pid1
+							while pid2<epos1&&(sdataz[pid2]!='\r'&&sdataz[pid2]!='\n'):
+								pid2++
+							scopes[scopes.n-1].GetQIScope().m_objects.push(TQIObjectEvent(){
+								epos:j,
+								id:id,
+								t:ParseQIType(sdataz[pid1:pid2-1]),
+							})
 			epos_var_comment=-1L
 			epos0=toks[i].epos0
 			epos1=toks[i].epos1
@@ -1604,6 +1836,10 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	name_dot_entries.Sortby(inline(a){return int2(IDToOrder(a.x),IDToOrder(a.y))});
 	func_param_entries.Sortby(inline(a){return int3(IDToOrder(a.x),a.y,IDToOrder(a.z))});
 	/////////////
+	if ENABLE_EXPERIMENTAL_FEATURES:
+		for qif in all_qifuncs
+			IndexQIFunc(qif)
+	/////////////
 	ppm_pool=new int2[]
 	name_dot_index=new int2[int]
 	function_bracket_index=new int2[int2]
@@ -1642,6 +1878,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		m_doc_string_pool:doc_string_pool,
 		m_doc_vars:all_doc_vars,
 		m_id_briefs:id_briefs,
+		m_all_qifuncs:all_qifuncs,
 	}
 
 auto parseAsText(string sdata,JSObject options)
@@ -1757,6 +1994,10 @@ class CKeyDeclFile
 			//free node
 			g_key_decls[p].x=g_key_decl_freelist
 			g_key_decl_freelist=p
+		if ENABLE_EXPERIMENTAL_FEATURES:
+			if fidx&&fidx.all_qifuncs:
+				for qif in fidx.all_qifuncs
+					UnindexQIFunc(qif)
 g_key_decl_files=new CKeyDeclFile[int] //this is sparse enough to make a separate map worthwhile?
 g_key_decls=[TGlobalKeyDeclItem()] //leave [0] as a sentential
 g_key_decl_freelist=-1
