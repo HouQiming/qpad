@@ -5156,7 +5156,7 @@ UI.ED_ParseMore_callback=function(fn){
 			if(fn_c){UI.ED_ParserQueueFile(fn_c);break;}
 		}
 	}
-	return ret
+	return ret;
 }
 
 UI.ED_SearchIncludeFile=function(fn_base,fn_include,options,is_base_only){

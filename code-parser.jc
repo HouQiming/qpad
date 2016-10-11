@@ -158,6 +158,7 @@ module CharSet
 	spaces_newline=charset("\r\n\t ")
 	qi_typename=charset("~$._0-9A-Za-z\200-\377")
 	qi_separator=charset("\r\n\t ,")
+	qi_call_ptn_separator=charset(",;)]}")
 	newlines=charset("\r\n")
 	inline has(u32[] ok,int c)
 		return !(c&0xffffff00)&&((ok[c>>5]>>(c&31))&1u);
@@ -934,12 +935,14 @@ class CQIFunc
 	int epos
 	TQIParamDesc[] params
 	int[] call_ptn
+	int2[] tmp_param_match_slots
+	int[] s_param_id
+	int p_sig
 	int id
 	////////////
+	int id_sig
 	int p_index
-class CQIScope
-	int epos
-	m_objects=new TQIObjectEvent[]
+	int p_index_call_ptn
 //////////////
 KEY_DECL_CLASS=TOK_TYPE*1
 KEY_DECL_FUNCTION=TOK_TYPE*0
@@ -1080,6 +1083,7 @@ struct TQIFuncIndexItem
 g_qifi_items=[TQIFuncIndexItem()] //leave [0] as a sentential
 g_qifi_by_first_param_type=new int[int]
 g_qifi_by_global_flag=new int[int]
+g_qifi_by_call_signature=new int[int]
 g_qifi_freelist=-1
 
 inline AllocQIFI()
@@ -1090,36 +1094,18 @@ inline AllocQIFI()
 	g_qifi_freelist=g_qifi_items[ret].x
 	return ret
 
-inline IndexQIFunc(CQIFunc qif)
-	assert(!qif.p_index)
+auto IndexQIFuncOnce(int[int] map,int key,CQIFunc qif)
 	p=AllocQIFI()
 	g_qifi_items[p]=qif
-	id=qif.m_params[0].GetID()
-	if id==g_id_home&&qif.m_params[0].t.annotations.n>0:
-		map=g_qifi_by_global_flag
-		key=qif.m_params[0].t.annotations[0].x
-	else
-		map=g_qifi_by_first_param_type
-		key=qif.m_params[0].t.id
 	p_next=map[key]
 	map[key]=p
 	g_qifi_items[p].x=p_next
 	g_qifi_items[p].w=0
 	if p_next>0:
 		g_qifi_items[p_next].w=p
-	qif.p_index=p
-	
-inline UnindexQIFunc(CQIFunc qif)
-	assert(qif.p_index>0)
-	id=qif.m_params[0].GetID()
-	if id==g_id_home&&qif.m_params[0].t.annotations.n>0:
-		map=g_qifi_by_global_flag
-		key=qif.m_params[0].t.annotations[0].x
-	else
-		map=g_qifi_by_first_param_type
-		key=qif.m_params[0].t.id
-	p=qif.p_index
-	qif.p_index=0
+	return p
+
+auto UnindexQIFuncOnce(int[int] map,int key,int p)
 	pw=g_qifi_items[p].w
 	px=g_qifi_items[p].x
 	if pw>0:
@@ -1132,10 +1118,173 @@ inline UnindexQIFunc(CQIFunc qif)
 	g_qifi_items[p].x=g_qifi_freelist
 	g_qifi_freelist=p
 
-auto QueryAvailableQIObject(CEditableText ed)
+inline IndexQIFunc(CQIFunc qif)
+	assert(!qif.p_index)
+	id=qif.m_params[0].GetID()
+	if id==g_id_home&&qif.m_params[0].t.annotations.n>0:
+		map=g_qifi_by_global_flag
+		key=qif.m_params[0].t.annotations[0].x
+	else
+		map=g_qifi_by_first_param_type
+		key=qif.m_params[0].t.id
+	qif.p_index=IndexQIFuncOnce(map,key,qif)
+	is_param=new int[int]
+	for p,I in qif.m_params
+		is_param[p.GetID()]=I+1
+	//also preprocess call_ptn
+	s_param_id=new int[call_ptn.n]
+	id_sig=0
+	p_sig=0
+	for tok,I in qif.call_ptn
+		if (tok&TOK_TYPE_MASK)==TOK_ID:
+			id=tok-TOK_ID
+			if is_param[id]:
+				s_param_id[I]=is_param[id]
+			else
+				if !id_sig:
+					id_sig=id
+					p_sig=I
+	//p_index_call_ptn - g_qifi_by_call_signature
+	if id_sig:
+		qif.s_param_id=s_param_id
+		qif.p_sig=p_sig
+		qif.id_sig=id_sig
+		qif.p_index_call_ptn=IndexQIFuncOnce(g_qifi_by_call_signature,id_sig,qif)
+	
+inline UnindexQIFunc(CQIFunc qif)
+	assert(qif.p_index>0)
+	id=qif.m_params[0].GetID()
+	if id==g_id_home&&qif.m_params[0].t.annotations.n>0:
+		map=g_qifi_by_global_flag
+		key=qif.m_params[0].t.annotations[0].x
+	else
+		map=g_qifi_by_first_param_type
+		key=qif.m_params[0].t.id
+	UnindexQIFuncOnce(map,key,qif.p_index)
+	qif.p_index=0
+	if qif.p_index_call_ptn:
+		UnindexQIFuncOnce(g_qifi_by_call_signature,qif.id_sig,qif.p_index)
+		qif.p_index_call_ptn=0
+
+inline EnumQIFIndex(int p0)
+	return {forEach:inline(fbody){
+		for(p=p0;p>0;p=g_qifi_items[p].x)
+			fbody(g_qifi_items[p].pf)
+	}}
+
+auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt,JSObject options)
 	//do on-query parse of QIFunc calls to avoid the multi-pass problem
 	//qinfo-var can be handled here, which removes the need of CQIScope
 	//the eposes are completely decoupled, so it's fine to use editted text here
+	//options is just Language.GetDescObjectByName(language_id)
+	sdataz=ed.GetText(0LL,ccnt+1)
+	sdataz[ccnt]=char(0)
+	(toks0,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
+	//filter out unrelated {}s - *only* keep the unpaired ones
+	toks=new TToken[]
+	pcurlies=new iptr[]
+	for tok in toks0
+		if tok.tok==int('{'):
+			pcurlies.push(toks.n+1)
+		else if tok.tok==int('}')&&pcurlies.n:
+			toks.resize(pcurlies.pop())
+		toks.push(tok)
+	//next occurance of a specific token? there shouldn't be a need
+	//just search for the common stuff, ,;)]
+	prev_sep=new int[toks.n]
+	next_sep=new int[toks.n]
+	cur_prev_sep=-1
+	for tok,I in toks
+		if !(tok.tok&TOK_TYPE_MASK):
+			if CharSet.has(CharSet.qi_call_ptn_separator,tok.tok):
+				for j=cur_prev_sep+1:I
+					next_sep[j]=I
+				cur_prev_sep=I
+		prev_sep[I]=cur_prev_sep
+	for j=cur_prev_sep+1:toks.n-1
+		next_sep[j]=toks.n
+	//parse qinfo-var and try to match the call patterns...
+	obj_types=new TQIType[int]
+	for tok,ptok in toks
+		if tok.tok==TOK_COMMENT:
+			epos0=toks[i].epos0
+			epos1=toks[i].epos1
+			for j=epos0:min(epos1,epos0+3)-1
+				if sdataz[j]=='@':
+					if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-var",9)==0:
+						//create an object from scratch
+						auto pid0=i+9
+						while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+							pid0++
+						auto pid1=pid0
+						while pid1<epos1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+							pid1++
+						auto id=getid(sdataz[pid0:pid1-1])
+						while pid1<epos1&&(sdataz[pid1]==' '||sdataz[pid1]=='\t'):
+							pid1++
+						auto pid2=pid1
+						while pid2<epos1&&(sdataz[pid2]!='\r'&&sdataz[pid2]!='\n'):
+							pid2++
+						obj_types[id]=ParseQIType(sdataz[pid1:pid2-1])
+		else if (tok.tok&TOK_TYPE_MASK)==TOK_ID:
+			for qif in EnumQIFIndex(g_qifi_by_call_signature[tok.tok-TOK_ID])
+				call_ptn=qif.call_ptn
+				s_param_id=qif.s_param_id
+				tmp_param_match_slots=qif.tmp_param_match_slots
+				if !tmp_param_match_slots:
+					tmp_param_match_slots=new int2[qif.m_params.n]
+					qif.tmp_param_match_slots=tmp_param_match_slots
+				for i=0:tmp_param_match_slots.n-1
+					tmp_param_match_slots[i]=int2(-1,-1)
+				ptok_left=ptok-1
+				is_bad=0
+				for i=qif.p_sig-1:-1:0
+					if ptok_left<0:
+						is_bad=1
+						break
+					if s_param_id[i]:
+						ptok_next=prev_sep[ptok_left]
+						if ptok_left==ptok_next:
+							is_bad=1
+							break
+						else
+							tmp_param_match_slots[s_param_id[i]-1]=int2(ptok_left,ptok_next)
+							ptok_left=ptok_next
+					else 
+						if call_ptn[i]!=toks[ptok_left].tok:
+							is_bad=1
+							break
+						else
+							ptok_left--
+				if !is_bad:
+					ptok_right=ptok+1
+					for i=qif.p_sig+1:call_ptn.n-1
+						if ptok_right>=toks.n:
+							is_bad=1
+							break
+						if s_param_id[i]:
+							ptok_next=next_sep[ptok_right]
+							if ptok_right==ptok_next:
+								is_bad=1
+								break
+							else
+								tmp_param_match_slots[s_param_id[i]-1]=int2(ptok_right,ptok_next)
+								ptok_right=ptok_next
+						else 
+							if call_ptn[i]!=toks[ptok_right].tok:
+								is_bad=1
+								break
+							else
+								ptok_right++
+				if !is_bad:
+					//we matched one! fill the out params
+					for p,I in qif.m_params
+						if p.id_inout&QIPARAM_OUT:
+							pparampos=tmp_param_match_slots[I]
+							if pparampos.x<pparampos.y:
+								id_generated_obj=getid(sdataz[toks[pparampos.x].epos0:toks[pparampos.y-1].epos1-1])
+								obj_types[id_generated_obj]=p.t
+	//return obj_types
 	!?
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
@@ -1226,12 +1375,6 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		int blevel
 		char in_assignment
 		char in_typedef
-		if ENABLE_EXPERIMENTAL_FEATURES:
-			CQIScope qi_scope
-			inline GetQIScope()
-				if !qi_scope:
-					qi_scope=new CQIScope()
-				return qi_scope
 	ss=new TStkEntry[]
 	scopes=new TScopeEntry[]
 	sc_decls=new int2[]
@@ -1647,25 +1790,6 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
 							//create a CQIFunc from scratch, with alternative call sequence
 							//todo
-						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-var",9)==0:
-							//create an object from scratch
-							auto pid0=i+9
-							while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
-								pid0++
-							auto pid1=pid0
-							while pid1<epos1&&(sdataz[pid1]!=' '&&sdataz[pid1]!='\t'&&sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
-								pid1++
-							auto id=getid(sdataz[pid0:pid1-1])
-							while pid1<epos1&&(sdataz[pid1]==' '||sdataz[pid1]=='\t'):
-								pid1++
-							auto pid2=pid1
-							while pid2<epos1&&(sdataz[pid2]!='\r'&&sdataz[pid2]!='\n'):
-								pid2++
-							scopes[scopes.n-1].GetQIScope().m_objects.push(TQIObjectEvent(){
-								epos:j,
-								id:id,
-								t:ParseQIType(sdataz[pid1:pid2-1]),
-							})
 			epos_var_comment=-1L
 			epos0=toks[i].epos0
 			epos1=toks[i].epos1
