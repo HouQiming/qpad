@@ -3369,4 +3369,18 @@ UI.RegisterEditorPlugin(function(){
 		}
 		menu_run=undefined;
 	})
-})//.prototype.desc={category:"Tools",name:"Code tagging",stable_name:"code_tagging"};
+});
+
+//QInfo
+UI.RegisterEditorPlugin(function(){
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	this.AddEventHandler('global_menu',function(){
+		var menu_tools=UI.BigMenu("&Tools")
+		menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
+			//coulddo: size-limiting
+			UI.ED_QueryQInfo(this,0,this.sel1.ccnt);
+			//todo
+		}.bind(this)});
+		menu_tools=undefined;
+	})
+});

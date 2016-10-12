@@ -310,19 +310,19 @@ W.HelpPage=function(id,attrs){
 			})
 		}
 		//we don't have to activate the tab...
-		if(cur_op<obj.help_ctx.m_ops.length){
-			W.Hotkey("",{key:"CTRL+E",action:(function(){
-				var cur_op=(this.cur_op||0);
-				if(this.RunOp(cur_op)){
-					cur_op++;
-					if(!(cur_op<this.help_ctx.m_ops.length)){
-						cur_op=0;
-					}
-					this.SetSelection(cur_op);
-				}
-				UI.Refresh();
-			}).bind(obj)})
-		}
+		//if(cur_op<obj.help_ctx.m_ops.length){
+		//	W.Hotkey("",{key:"CTRL+E",action:(function(){
+		//		var cur_op=(this.cur_op||0);
+		//		if(this.RunOp(cur_op)){
+		//			cur_op++;
+		//			if(!(cur_op<this.help_ctx.m_ops.length)){
+		//				cur_op=0;
+		//			}
+		//			this.SetSelection(cur_op);
+		//		}
+		//		UI.Refresh();
+		//	}).bind(obj)})
+		//}
 		//coulddo: pre-format the code to a predefined style - after beautifier
 		//the main part
 		UI.ED_RenderRichText(obj.help_ctx.prt,obj.help_ctx.m_text,obj.x+obj.padding,obj.y+h_find_bar-obj.scroll_y,obj.help_ctx.m_objs)

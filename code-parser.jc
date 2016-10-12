@@ -202,6 +202,7 @@ g_id_import=getid("import")
 g_id_in=getid("in")
 g_id_this=getid("this")
 g_id_home=getid("~")
+g_id_1=getid("1")
 g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 struct TToken
 	int tok
@@ -913,11 +914,7 @@ struct TIDBriefWithFile
 struct TQIType
 	int id
 	int2[] annotations
-struct TQIObjectEvent
-	//type annotations of the same object could be time dependent...
-	//we just record the events and do an O(n) search on query
-	//class members could be handled the same way
-	int epos
+struct TQIObject
 	int id
 	TQIType t
 //params can be in-out
@@ -933,7 +930,7 @@ class CQIFunc
 	//id and epos are fine to include though
 	//params / call pattern
 	int epos
-	TQIParamDesc[] params
+	TQIParamDesc[] m_params
 	int[] call_ptn
 	int2[] tmp_param_match_slots
 	int[] s_param_id
@@ -968,7 +965,7 @@ class CFileIndex
 	int[] m_toplevel_ids
 	string m_doc_string_pool
 	TDocedVariable[] m_doc_vars
-	CQIFunc[] all_qifuncs
+	CQIFunc[] m_all_qifuncs
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
 	//dependency
@@ -1033,12 +1030,12 @@ inline IDToOrder(id)
 
 auto ParseQIType(string feed)
 	ptr=0L
-	inline skipchars(u32[] cs)
+	inline skipchars(cs)
 		while ptr<feed.n
 			ch=int(u8(feed[ptr]))
 			if !CharSet.has(cs,ch):return
 			ptr++
-	inline skipToChars(u32[] cs)
+	inline skipToChars(cs)
 		while ptr<feed.n
 			ch=int(u8(feed[ptr]))
 			if CharSet.has(cs,ch):return
@@ -1046,7 +1043,7 @@ auto ParseQIType(string feed)
 	skipchars(CharSet.spaces_newline)
 	ptr0=ptr
 	skipchars(CharSet.qi_typename)
-	id=getid(s[ptr0:ptr-1])
+	id=getid(feed[ptr0:ptr-1])
 	skipchars(CharSet.spaces_newline)
 	annotations=int2[].NULL
 	if ptr<feed.n&&feed[ptr]=='[':
@@ -1059,15 +1056,15 @@ auto ParseQIType(string feed)
 			ptr0=ptr
 			skipchars(CharSet.qi_typename)
 			if !(ptr0<ptr):break
-			id_a=getid(s[ptr0:ptr-1])
-			id_b=0
+			id_a=getid(feed[ptr0:ptr-1])
+			id_b=g_id_1
 			skipchars(CharSet.spaces_newline)
 			if ptr<feed.n&&feed[ptr]=='=':
 				ptr++
 				skipchars(CharSet.spaces_newline)
 				ptr0=ptr
 				skipToChars(CharSet.qi_separator)
-				id_b=getid(s[ptr0:ptr-1])
+				id_b=getid(feed[ptr0:ptr-1])
 			skipchars(CharSet.spaces_newline)
 			if ptr<feed.n&&feed[ptr]==',':
 				ptr++
@@ -1089,14 +1086,14 @@ g_qifi_freelist=-1
 inline AllocQIFI()
 	if g_qifi_freelist<0:
 		g_qifi_freelist=int(g_qifi_items.n)
-		g_qifi_items.push(TGlobalKeyDeclItem(){x:-1})
+		g_qifi_items.push(TQIFuncIndexItem(){x:-1})
 	ret=g_qifi_freelist
 	g_qifi_freelist=g_qifi_items[ret].x
 	return ret
 
 auto IndexQIFuncOnce(int[int] map,int key,CQIFunc qif)
 	p=AllocQIFI()
-	g_qifi_items[p]=qif
+	g_qifi_items[p].pf=qif
 	p_next=map[key]
 	map[key]=p
 	g_qifi_items[p].x=p_next
@@ -1130,9 +1127,9 @@ inline IndexQIFunc(CQIFunc qif)
 	qif.p_index=IndexQIFuncOnce(map,key,qif)
 	is_param=new int[int]
 	for p,I in qif.m_params
-		is_param[p.GetID()]=I+1
+		is_param[p.GetID()]=int(I+1)
 	//also preprocess call_ptn
-	s_param_id=new int[call_ptn.n]
+	s_param_id=new int[qif.call_ptn.n]
 	id_sig=0
 	p_sig=0
 	for tok,I in qif.call_ptn
@@ -1147,7 +1144,7 @@ inline IndexQIFunc(CQIFunc qif)
 	//p_index_call_ptn - g_qifi_by_call_signature
 	if id_sig:
 		qif.s_param_id=s_param_id
-		qif.p_sig=p_sig
+		qif.p_sig=int(p_sig)
 		qif.id_sig=id_sig
 		qif.p_index_call_ptn=IndexQIFuncOnce(g_qifi_by_call_signature,id_sig,qif)
 	
@@ -1172,13 +1169,13 @@ inline EnumQIFIndex(int p0)
 			fbody(g_qifi_items[p].pf)
 	}}
 
-auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt,JSObject options)
+auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 	//do on-query parse of QIFunc calls to avoid the multi-pass problem
 	//qinfo-var can be handled here, which removes the need of CQIScope
 	//the eposes are completely decoupled, so it's fine to use editted text here
 	//options is just Language.GetDescObjectByName(language_id)
-	sdataz=ed.GetText(0LL,ccnt+1)
-	sdataz[ccnt]=char(0)
+	sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1)
+	sdataz[iptr(ccnt1-ccnt0)]=char(0)
 	(toks0,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
 	//filter out unrelated {}s - *only* keep the unpaired ones
 	toks=new TToken[]
@@ -1205,15 +1202,32 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt,JSObject options)
 		next_sep[j]=toks.n
 	//parse qinfo-var and try to match the call patterns...
 	obj_types=new TQIType[int]
+	inline SetObjectType(int id,TQIType t)
+		//annotation handling - if the type stayed the same, append / update annotations
+		auto t0=obj_types[id]
+		if t0.id==t.id:
+			anno_new=new int2[]
+			got_it=new int[int]
+			for ai in t.annotations
+				if !got_it[ai.x]:
+					got_it[ai.x]=1
+					anno_new.push(ai)
+			for ai in t0.annotations
+				if !got_it[ai.x]:
+					got_it[ai.x]=1
+					anno_new.push(ai)
+			obj_types[id]=TQIType(){id:t.id,annotations:anno_new}
+		else
+			obj_types[id]=t
 	for tok,ptok in toks
 		if tok.tok==TOK_COMMENT:
-			epos0=toks[i].epos0
-			epos1=toks[i].epos1
+			epos0=tok.epos0
+			epos1=tok.epos1
 			for j=epos0:min(epos1,epos0+3)-1
 				if sdataz[j]=='@':
 					if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-var",9)==0:
 						//create an object from scratch
-						auto pid0=i+9
+						auto pid0=j+9
 						while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
 							pid0++
 						auto pid1=pid0
@@ -1225,7 +1239,7 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt,JSObject options)
 						auto pid2=pid1
 						while pid2<epos1&&(sdataz[pid2]!='\r'&&sdataz[pid2]!='\n'):
 							pid2++
-						obj_types[id]=ParseQIType(sdataz[pid1:pid2-1])
+						SetObjectType(id,ParseQIType(sdataz[pid1:pid2-1]))
 		else if (tok.tok&TOK_TYPE_MASK)==TOK_ID:
 			for qif in EnumQIFIndex(g_qifi_by_call_signature[tok.tok-TOK_ID])
 				call_ptn=qif.call_ptn
@@ -1236,7 +1250,7 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt,JSObject options)
 					qif.tmp_param_match_slots=tmp_param_match_slots
 				for i=0:tmp_param_match_slots.n-1
 					tmp_param_match_slots[i]=int2(-1,-1)
-				ptok_left=ptok-1
+				ptok_left=int(ptok-1)
 				is_bad=0
 				for i=qif.p_sig-1:-1:0
 					if ptok_left<0:
@@ -1257,7 +1271,7 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt,JSObject options)
 						else
 							ptok_left--
 				if !is_bad:
-					ptok_right=ptok+1
+					ptok_right=int(ptok+1)
 					for i=qif.p_sig+1:call_ptn.n-1
 						if ptok_right>=toks.n:
 							is_bad=1
@@ -1283,9 +1297,63 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt,JSObject options)
 							pparampos=tmp_param_match_slots[I]
 							if pparampos.x<pparampos.y:
 								id_generated_obj=getid(sdataz[toks[pparampos.x].epos0:toks[pparampos.y-1].epos1-1])
-								obj_types[id_generated_obj]=p.t
-	//return obj_types
-	!?
+								SetObjectType(id_generated_obj,p.t)
+	//////////////////////////////
+	return [TQIObject(){id:k,t:d} for d,k in obj_types]
+
+auto QueryAvailableQIFuncs(TQIObject[] objs)
+	tids=new int[][int]
+	gflags=new int[int]
+	for obj,I in objs
+		tids_I=tids[obj.t.id]
+		if !tids_I:
+			tids_I=new int[]
+			tids[obj.t.id]=tids_I
+		tids_I.push(I)
+		if obj.id==g_id_home:
+			for ai in obj.t.annotations
+				gflags[ai.x]=ai.y
+	auto TestQIFAvailability(CQIFunc qif)
+		for p,I in qif.m_params
+			if p.id_inout==QIPARAM_IN+g_id_home:
+				//global requirement, search obj_global by id
+				for ai in p.t.annotations
+					if gflags[ai.x]!=ai.y:
+						return 0
+			else if !(p.id_inout&QIPARAM_OUT)
+				//local requirement, search by type
+				found_p_t=0
+				for oid in tids[p.t.id]
+					//we must find every annotation
+					a_avail=objs[oid].t.annotations
+					found_annotation_i=0
+					for ai in p.t.annotations
+						found=0
+						for aj in a_avail
+							if aj.x==ai.x:
+								if aj.y!=ai.y:
+									found=0
+								else
+									found=1
+								break
+						if found:
+							found_annotation_i=1
+							break
+					if found_annotation_i:
+						found_p_t=1
+						break
+				if !found_p_t:return 0
+		return 1
+	qi_funcs=new CQIFunc[]
+	for d,k in tids
+		for qif in EnumQIFIndex(g_qifi_by_first_param_type[k])
+			if TestQIFAvailability(qif):
+				qi_funcs.push(qif)
+	for d,k in gflags
+		for qif in EnumQIFIndex(g_qifi_by_global_flag[k])
+			if TestQIFAvailability(qif):
+				qi_funcs.push(qif)
+	return qi_funcs
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 g_function_ids=[getid("function"),getid("function*"),getid("inline"),getid('def')]
@@ -1522,7 +1590,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						call_ptn[call_ptn.n-1]=int(')')
 						all_qifuncs.push(new CQIFunc(){
 							epos:toks[ptok].epos0,
-							params:qi_params,
+							m_params:qi_params,
 							call_ptn:call_ptn,
 							id:function_id,
 						})
@@ -2119,8 +2187,8 @@ class CKeyDeclFile
 			g_key_decls[p].x=g_key_decl_freelist
 			g_key_decl_freelist=p
 		if ENABLE_EXPERIMENTAL_FEATURES:
-			if fidx&&fidx.all_qifuncs:
-				for qif in fidx.all_qifuncs
+			if fidx&&fidx.m_all_qifuncs:
+				for qif in fidx.m_all_qifuncs
 					UnindexQIFunc(qif)
 g_key_decl_files=new CKeyDeclFile[int] //this is sparse enough to make a separate map worthwhile?
 g_key_decls=[TGlobalKeyDeclItem()] //leave [0] as a sentential
@@ -2758,6 +2826,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret[n+1]=fidx.m_doc_string_pool[di.pdoc.x:di.pdoc.y-1]
 			n+=2
 		return JS.Return(ret)
+	}
+	JS_UI["ED_QueryQInfo"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		options=doc["plugin_language_desc"].as(JSObject)
+		ed=doc["ed"].as(CEditableText)
+		if !options:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		//return a list of available objects and callable functions
+		objs=QueryAvailableQIObjects(ed,ccnt0,ccnt1,options)
+		funcs=QueryAvailableQIFuncs(objs)
+		Writeln(objs)
+		Writeln(funcs)
+		//todo: translate to JS
+		return JS.Return(1)
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
