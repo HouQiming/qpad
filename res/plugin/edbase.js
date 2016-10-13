@@ -3378,7 +3378,8 @@ UI.RegisterEditorPlugin(function(){
 		var menu_tools=UI.BigMenu("&Tools")
 		menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
 			//coulddo: size-limiting
-			UI.ED_QueryQInfo(this,0,this.sel1.ccnt);
+			var ret=UI.ED_QueryQInfo(this,0,this.sel1.ccnt);
+			console.log(JSON.stringify(ret,null,2));
 			//todo
 		}.bind(this)});
 		menu_tools=undefined;

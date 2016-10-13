@@ -716,7 +716,7 @@ module detail
 									lgconst=raw_matches[i-1].pm1
 									ctail=raw_matches[i-1].pret+lgconst
 									for k=1:lgconst
-										if s[j-k]!=ret[ctail-k]:break
+										if j-k<0||s[j-k]!=ret[ctail-k]:break
 										cand=st[pst-s.n-k].best+(k==lgconst?k*WEIGHT_PROGRAM_MATCH:k)
 										if bestij<cand:
 											bestij=cand
