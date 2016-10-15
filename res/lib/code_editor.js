@@ -50,13 +50,14 @@ W.ACContext_prototype={
 	GetDisplayItem:function(id){
 		var ret=this.m_display_items[id]
 		if(!ret){
-			UI.assert(id==this.m_display_items.length,"panic: not doing acctx sequentially")
+			//UI.assert(id==this.m_display_items.length,"panic: not doing acctx sequentially")
 			var cc=this.m_accands.at(id);
 			//ignore weight for now: cc.weight
 			ret={
 				x:this.m_x_current,
 				w:UI.MeasureText(UI.default_styles.code_editor.accands_font,cc.name).w,
-				name:cc.name
+				name:cc.name,
+				brief:cc.brief,
 			}
 			this.m_x_current+=ret.w+UI.default_styles.code_editor.accands_padding
 			this.m_display_items[id]=ret
@@ -903,6 +904,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	//////////////////////////
 	CancelAutoCompletion:function(){
 		this.m_ac_context=undefined;
+		this.m_explicit_accands=undefined;
 	},
 	/*
 	needed for accands
@@ -931,32 +933,37 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				}
 			}
 		}
-		if(!accands){
-			var hk=this.m_event_hooks["autoComplete"];
-			if(hk){
-				for(var i=hk.length-1;i>=0;i--){
-					accands=hk[i].call(this);
-					if(accands){
-						is_user_defined=1;
-						break;
-					}
+		var extras=[];
+		if(this.m_explicit_accands){
+			extras.push(this.m_explicit_accands);
+		}
+		var hk=this.m_event_hooks["autoComplete"];
+		if(hk){
+			for(var i=hk.length-1;i>=0;i--){
+				var more_extras=hk[i].call(this);
+				if(more_extras){
+					extras.push(more_extras);
 				}
 			}
 		}
 		if(!accands){
+			var real_extras=Array.prototype.concat.apply([],extras);
 			if(this.plugin_language_desc.parser=="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)){
 				this.m_ac_activated=0;
 				return 0;
 			}
 			var neib=this.ed.GetUtf8CharNeighborhood(this.sel1.ccnt);
 			//\u002e: dot
-			if(!((UI.ED_isWordChar(neib[0])||this.plugin_language_desc.parser=="C"&&neib[0]==0x2e)&&!UI.ED_isWordChar(neib[1]))){
-				this.m_ac_activated=0;
-				return 0;
+			if(!real_extras.length){
+				if(!((UI.ED_isWordChar(neib[0])||this.plugin_language_desc.parser=="C"&&neib[0]==0x2e)&&!UI.ED_isWordChar(neib[1]))){
+					this.m_ac_activated=0;
+					return 0;
+				}
 			}
-			accands=UI.ED_QueryAutoCompletion(this,this.sel1.ccnt);
+			accands=UI.ED_QueryAutoCompletion(this,this.sel1.ccnt, real_extras);
 		}
 		if(!accands){
+			this.m_explicit_accands=undefined;
 			this.m_ac_activated=0;
 			return 0;
 		}
@@ -968,6 +975,17 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			m_owner:this,
 		})
 		return 1
+	},
+	StartACWithCandidates:function(cands){
+		this.m_explicit_accands=cands;
+		this.TestAutoCompletion("explicit");
+		var acctx=this.m_ac_context;
+		if(acctx&&acctx.m_accands.m_common_prefix){
+			this.ConfirmAC(undefined);
+		}else{
+			this.ActivateAC()
+		}
+		UI.Refresh()
 	},
 	TestCorrection:function(){
 		if(this.sel0.ccnt!=this.sel1.ccnt){return 0;}
@@ -5293,36 +5311,45 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 		var dii=acctx.GetDisplayItem(acctx.m_selection);
 		var prt_msg_brief=acctx.m_brief_cache[dii.name];
 		if(prt_msg_brief==undefined){
-			var briefs=UI.ED_QueryBriefsByID(doc,dii.name);
-			if(briefs&&briefs.length){
-				var a_msg_brief=[];
-				var id_in_file=0;
-				for(var i=0;i<briefs.length;i++){
-					if(!i||briefs[i].file!=briefs[i-1].file){
-						a_msg_brief.push(
-							UI.Format('In @1:',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1)+UI.GetSmartTabName(briefs[i].file)+UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0)),
-							'\n');
-						id_in_file=0;
-					}
-					a_msg_brief.push('   ')
-					id_in_file++;
-					if(id_in_file>1||i+1<briefs.length&&briefs[i+1].file==briefs[i].file){
-						a_msg_brief.push(
-							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
-							id_in_file<=20?String.fromCharCode(0x245f+id_in_file):id_in_file.toString()+'.',' ',
-							UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0))
-					}
-					a_msg_brief.push(UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),briefs[i].brief,'\n');
-				}
-				var s_brief_text=a_msg_brief.join('');
+			var prt_msg_brief=null;
+			if(dii.brief){
+				var brief_ctx=UI.ED_ProcessHelp(dii.brief,obj.accands_styles2,null,obj.accands_w_brief);
 				prt_msg_brief={
 					prt:UI.ED_FormatRichText(
 						Language.GetHyphenator(UI.m_ui_language),
-						s_brief_text,4,obj.accands_w_brief,obj.accands_styles),
-					text:s_brief_text,
+						brief_ctx.m_text,4,obj.accands_w_brief,obj.accands_styles2,brief_ctx.m_objs),
+					text:brief_ctx.m_text,
 				};
 			}else{
-				prt_msg_brief=null;
+				var briefs=UI.ED_QueryBriefsByID(doc,dii.name);
+				if(briefs&&briefs.length){
+					var a_msg_brief=[];
+					var id_in_file=0;
+					for(var i=0;i<briefs.length;i++){
+						if(!i||briefs[i].file!=briefs[i-1].file){
+							a_msg_brief.push(
+								UI.Format('In @1:',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1)+UI.GetSmartTabName(briefs[i].file)+UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0)),
+								'\n');
+							id_in_file=0;
+						}
+						a_msg_brief.push('   ')
+						id_in_file++;
+						if(id_in_file>1||i+1<briefs.length&&briefs[i+1].file==briefs[i].file){
+							a_msg_brief.push(
+								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
+								id_in_file<=20?String.fromCharCode(0x245f+id_in_file):id_in_file.toString()+'.',' ',
+								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0))
+						}
+						a_msg_brief.push(UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),briefs[i].brief,'\n');
+					}
+					var s_brief_text=a_msg_brief.join('');
+					prt_msg_brief={
+						prt:UI.ED_FormatRichText(
+							Language.GetHyphenator(UI.m_ui_language),
+							s_brief_text,4,obj.accands_w_brief,obj.accands_styles),
+						text:s_brief_text,
+					};
+				}
 			}
 			acctx.m_brief_cache[dii.name]=prt_msg_brief;
 		}
@@ -7581,7 +7608,8 @@ UI.RegisterEditorPlugin(function(){
 		}
 	})
 	this.AddEventHandler('change',function(){
-		this.CancelAutoCompletion()
+		this.m_ac_context=undefined;
+		//this.CancelAutoCompletion()
 	})
 	this.AddEventHandler('TAB',function(){
 		if(this.TestAutoCompletion("explicit")){

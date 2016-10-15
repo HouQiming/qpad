@@ -604,6 +604,22 @@ UI.CustomTheme=function(){
 				{font:UI.Font(UI.font_name,18,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
 				{font:UI.Font(UI.font_name,18,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
 			],
+			accands_styles2:[
+				{font:UI.Font("res/fonts/opensans.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//normal
+				{font:UI.Font("res/fonts/opensansi.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//emph
+				{font:UI.Font("res/fonts/opensans.ttf",18,150),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
+				{
+					font:UI.Font("res/fonts/inconsolata.ttf",21,0),
+					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",21,150),
+					paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa
+				},//code
+				{font:UI.Font("res/fonts/opensans.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//list
+				{font:UI.Font("res/fonts/opensansi.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa,},//quote
+				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
+				{font:UI.Font("res/fonts/opensans.ttf",22,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
+				{font:UI.Font("res/fonts/opensans.ttf",20,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
+				{font:UI.Font("res/fonts/opensans.ttf",18,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
+			],
 			autoedit_button_size:24,
 			autoedit_button_padding:2,
 			//w_accands:512,

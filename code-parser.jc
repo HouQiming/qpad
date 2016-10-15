@@ -156,8 +156,8 @@ module CharSet
 	idbody=charset("_0-9A-Za-z\200-\377")
 	spaces=charset("\r\t ")
 	spaces_newline=charset("\r\n\t ")
-	qi_typename=charset("~$._0-9A-Za-z\200-\377")
-	qi_separator=charset("\r\n\t ,]")
+	qi_typename=charset("~$._[]0-9A-Za-z\200-\377")
+	qi_separator=charset("\r\n\t ,}")
 	qi_call_ptn_separator=charset(",;)]}")
 	newlines=charset("\r\n")
 	inline has(u32[] ok,int c)
@@ -214,7 +214,7 @@ struct TParsedTag
 class CTag
 	int id,idfn
 	int epos0,epos1
-auto tokenize(string sdata,int g_ignore_indents)
+auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 	auto feed=sdata[0:].ConvertToAsBinary(u8)
 	//we want feed to be zero-terminated
 	//merge all files to one big vector, add zeroes, and pass in the starting location
@@ -811,8 +811,9 @@ auto tokenize(string sdata,int g_ignore_indents)
 		//toks.push(TToken(){'tok':ch0,'epos0':int(epos0_ch0),'epos1':int(ptr)})
 		push_token(ch0,int(epos0_ch0),int(ptr))
 	//////////////////
-	while brastk.n:
-		right_bracket(0)
+	if !allow_unpaired_brackets:
+		while brastk.n:
+			right_bracket(0)
 	pop_indents()
 	//toks.push(TToken(){'tok':TOK_EOF,'epos0':int(ptr),'epos1':int(ptr)})
 	push_token(TOK_EOF,int(ptr),int(ptr))
@@ -1076,12 +1077,12 @@ auto ParseQIType(string feed)
 	id=getid(feed[ptr0:ptr-1])
 	skipchars(CharSet.spaces_newline)
 	annotations=int2[].NULL
-	if ptr<feed.n&&feed[ptr]=='[':
+	if ptr<feed.n&&feed[ptr]=='{':
 		annotations=new int2[]
 		ptr++
 		while ptr<feed.n:
 			skipchars(CharSet.spaces_newline)
-			if feed[ptr]==']':
+			if feed[ptr]=='}':
 				break
 			ptr0=ptr
 			skipchars(CharSet.qi_typename)
@@ -1211,23 +1212,34 @@ inline EnumQIFIndex(int p0)
 			fbody(g_qifi_items[p].pf)
 	}}
 
-auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
+auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 	//do on-query parse of QIFunc calls to avoid the multi-pass problem
 	//qinfo-var can be handled here, which removes the need of CQIScope
 	//the eposes are completely decoupled, so it's fine to use editted text here
 	//options is just Language.GetDescObjectByName(language_id)
-	sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1)
+	sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
 	sdataz[iptr(ccnt1-ccnt0)]=char(0)
-	(toks0,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
+	(toks0,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),1)
 	//filter out unrelated {}s - *only* keep the unpaired ones
+	//also check for unfinished function calls
 	toks=new TToken[]
 	pcurlies=new iptr[]
+	bstack=new iptr[]
 	for tok in toks0
 		if tok.tok==int('{'):
 			pcurlies.push(toks.n+1)
 		else if tok.tok==int('}')&&pcurlies.n:
 			toks.resize(pcurlies.pop())
+		else if tok.tok==int('('):
+			bstack.push(toks.n-1)
+		else if tok.tok==int(')')&&bstack.n:
+			bstack.pop()
 		toks.push(tok)
+	pcall_bracket=-1L
+	if bstack.n:
+		pcall_bracket=bstack.pop()
+		if !(pcall_bracket>=0&&(toks[pcall_bracket].tok&TOK_TYPE_MASK)==TOK_ID)
+			pcall_bracket=-1
 	//next occurance of a specific token? there shouldn't be a need
 	//just search for the common stuff, ,;)]
 	prev_sep=new int[toks.n]
@@ -1244,7 +1256,7 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject optio
 		next_sep[j]=toks.n
 	//parse qinfo-var and try to match the call patterns...
 	obj_types=new TQIType[int]
-	inline SetObjectType(int id,TQIType t)
+	auto SetObjectType(int id,TQIType t)
 		//annotation handling - if the type stayed the same, append / update annotations
 		auto t0=obj_types[id]
 		if t0.id==t.id:
@@ -1261,6 +1273,113 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject optio
 			obj_types[id]=TQIType(){id:t.id,annotations:anno_new}
 		else
 			obj_types[id]=t
+	struct TPotentialParam
+		CQIFunc qif
+		int param_id
+	potential_params=new TPotentialParam[]
+	CP_MODE_FULL=0
+	CP_MODE_FHINT=1
+	auto TestCallPatternAt(iptr ptok,int mode)
+		assert((toks[ptok].tok&TOK_TYPE_MASK)==TOK_ID)
+		for qif in EnumQIFIndex(g_qifi_by_call_signature[toks[ptok].tok-TOK_ID])
+			//Writeln('testing fidx: ',getIdString(tok.tok-TOK_ID))
+			call_ptn=qif.call_ptn
+			s_param_id=qif.s_param_id
+			tmp_param_match_slots=qif.tmp_param_match_slots
+			if !tmp_param_match_slots:
+				tmp_param_match_slots=new int2[qif.m_params.n]
+				qif.tmp_param_match_slots=tmp_param_match_slots
+			for i=0:tmp_param_match_slots.n-1
+				tmp_param_match_slots[i]=int2(-1,-1)
+			//match left
+			ptok_left=int(ptok-1)
+			is_bad=0
+			for i=qif.p_sig-1:-1:0
+				if ptok_left<0:
+					is_bad=1
+					break
+				if s_param_id[i]:
+					ptok_next=prev_sep[ptok_left]
+					if ptok_left==ptok_next:
+						is_bad=1
+						break
+					else
+						tmp_param_match_slots[s_param_id[i]-1]=int2(ptok_next+1,ptok_left+1)
+						ptok_left=ptok_next
+				else 
+					if call_ptn[i]!=toks[ptok_left].tok:
+						is_bad=1
+						break
+					else
+						ptok_left--
+			//Writeln('after left: ',is_bad)
+			//match right
+			if !is_bad:
+				ptok_right=int(ptok+1)
+				for i=qif.p_sig+1:call_ptn.n-1
+					if ptok_right>=toks.n:
+						if mode==CP_MODE_FHINT:
+							if s_param_id[i]:
+								potential_params.push(TPotentialParam(){qif:qif,param_id:s_param_id[i]-1})
+							else if i>0&&s_param_id[i-1]:
+								potential_params.push(TPotentialParam(){qif:qif,param_id:s_param_id[i-1]-1})
+						is_bad=1
+						break
+					if s_param_id[i]:
+						ptok_next=next_sep[ptok_right]
+						if ptok_right==ptok_next:
+							is_bad=1
+							break
+						else
+							tmp_param_match_slots[s_param_id[i]-1]=int2(ptok_right,ptok_next)
+							ptok_right=ptok_next
+					else 
+						if call_ptn[i]!=toks[ptok_right].tok:
+							is_bad=1
+							break
+						else
+							ptok_right++
+			if mode==CP_MODE_FHINT:
+				continue
+			//match optional_prefixes
+			if !is_bad&&qif.optional_prefixes:
+				//Writeln('after right: ',is_bad)
+				for prefix_ptn,I in qif.optional_prefixes.ReverseOrder()
+					auto ptok_left0=ptok_left
+					failed_i=0
+					s_param_id_I=qif.prefix_param_ids[I]
+					for i=prefix_ptn.n-1:-1:0
+						if ptok_left<0:
+							failed_i=1
+							break
+						if s_param_id_I[i]:
+							ptok_next=prev_sep[ptok_left]
+							if ptok_left==ptok_next:
+								failed_i=1
+								break
+							else
+								tmp_param_match_slots[s_param_id_I[i]-1]=int2(ptok_next+1,ptok_left+1)
+								ptok_left=ptok_next
+						else 
+							if prefix_ptn[i]!=toks[ptok_left].tok:
+								failed_i=1
+								break
+							else
+								ptok_left--
+					if failed_i:
+						ptok_left=ptok_left0
+						for d in s_param_id_I
+							if d>0:
+								tmp_param_match_slots[d-1]=int2(-1,-1)
+			if !is_bad&&mode==CP_MODE_FULL:
+				//we matched one! fill the out params
+				for p,I in qif.m_params
+					if p.id_inout&QIPARAM_OUT:
+						pparampos=tmp_param_match_slots[I]
+						if pparampos.x<pparampos.y:
+							id_generated_obj=getid(sdataz[toks[pparampos.x].epos0:toks[pparampos.y-1].epos1-1])
+							SetObjectType(id_generated_obj,p.t)
+	///////////
 	for tok,ptok in toks
 		if tok.tok==TOK_COMMENT:
 			epos0=tok.epos0
@@ -1283,156 +1402,93 @@ auto QueryAvailableQIObjects(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject optio
 							pid2++
 						SetObjectType(id,ParseQIType(sdataz[pid1:pid2-1]))
 		else if (tok.tok&TOK_TYPE_MASK)==TOK_ID:
-			for qif in EnumQIFIndex(g_qifi_by_call_signature[tok.tok-TOK_ID])
-				//Writeln('testing fidx: ',getIdString(tok.tok-TOK_ID))
-				call_ptn=qif.call_ptn
-				s_param_id=qif.s_param_id
-				tmp_param_match_slots=qif.tmp_param_match_slots
-				if !tmp_param_match_slots:
-					tmp_param_match_slots=new int2[qif.m_params.n]
-					qif.tmp_param_match_slots=tmp_param_match_slots
-				for i=0:tmp_param_match_slots.n-1
-					tmp_param_match_slots[i]=int2(-1,-1)
-				//match left
-				ptok_left=int(ptok-1)
-				is_bad=0
-				for i=qif.p_sig-1:-1:0
-					if ptok_left<0:
-						is_bad=1
-						break
-					if s_param_id[i]:
-						ptok_next=prev_sep[ptok_left]
-						if ptok_left==ptok_next:
-							is_bad=1
-							break
-						else
-							tmp_param_match_slots[s_param_id[i]-1]=int2(ptok_next+1,ptok_left+1)
-							ptok_left=ptok_next
-					else 
-						if call_ptn[i]!=toks[ptok_left].tok:
-							is_bad=1
-							break
-						else
-							ptok_left--
-				//Writeln('after left: ',is_bad)
-				//match right
-				if !is_bad:
-					ptok_right=int(ptok+1)
-					for i=qif.p_sig+1:call_ptn.n-1
-						if ptok_right>=toks.n:
-							is_bad=1
-							break
-						if s_param_id[i]:
-							ptok_next=next_sep[ptok_right]
-							if ptok_right==ptok_next:
-								is_bad=1
-								break
-							else
-								tmp_param_match_slots[s_param_id[i]-1]=int2(ptok_right,ptok_next)
-								ptok_right=ptok_next
-						else 
-							if call_ptn[i]!=toks[ptok_right].tok:
-								is_bad=1
-								break
-							else
-								ptok_right++
-				//match optional_prefixes
-				if !is_bad&&qif.optional_prefixes:
-					//Writeln('after right: ',is_bad)
-					for prefix_ptn,I in qif.optional_prefixes.ReverseOrder()
-						auto ptok_left0=ptok_left
-						failed_i=0
-						s_param_id_I=qif.prefix_param_ids[I]
-						for i=prefix_ptn.n-1:-1:0
-							if ptok_left<0:
-								failed_i=1
-								break
-							if s_param_id_I[i]:
-								ptok_next=prev_sep[ptok_left]
-								if ptok_left==ptok_next:
-									failed_i=1
-									break
-								else
-									tmp_param_match_slots[s_param_id_I[i]-1]=int2(ptok_next+1,ptok_left+1)
-									ptok_left=ptok_next
-							else 
-								if prefix_ptn[i]!=toks[ptok_left].tok:
-									failed_i=1
-									break
-								else
-									ptok_left--
-						if failed_i:
-							ptok_left=ptok_left0
-							for d in s_param_id_I
-								if d>0:
-									tmp_param_match_slots[d-1]=int2(-1,-1)
-				if !is_bad:
-					//we matched one! fill the out params
-					for p,I in qif.m_params
-						if p.id_inout&QIPARAM_OUT:
-							pparampos=tmp_param_match_slots[I]
-							if pparampos.x<pparampos.y:
-								id_generated_obj=getid(sdataz[toks[pparampos.x].epos0:toks[pparampos.y-1].epos1-1])
-								SetObjectType(id_generated_obj,p.t)
+			TestCallPatternAt(ptok,CP_MODE_FULL)
 	//////////////////////////////
-	return [TQIObject(){id:k,t:d} for d,k in obj_types]
-
-auto QueryAvailableQIFuncs(TQIObject[] objs)
-	tids=new int[][int]
-	gflags=new int[int]
-	for obj,I in objs
-		tids_I=tids[obj.t.id]
-		if !tids_I:
-			tids_I=new int[]
-			tids[obj.t.id]=tids_I
-		tids_I.push(I)
-		if obj.id==g_id_home:
-			for ai in obj.t.annotations
-				gflags[ai.x]=ai.y
-	auto TestQIFAvailability(CQIFunc qif)
-		for p,I in qif.m_params
-			if p.id_inout==QIPARAM_IN+g_id_home:
-				//global requirement, search obj_global by id
-				for ai in p.t.annotations
-					if gflags[ai.x]!=ai.y:
-						return 0
-			else if !(p.id_inout&QIPARAM_OUT)
-				//local requirement, search by type
-				found_p_t=0
-				if tids[p.t.id]:
-					for oid in tids[p.t.id]
-						//we must find every annotation
-						a_avail=objs[oid].t.annotations
-						found_annotation_i=1
-						if p.t.annotations:
-							for ai in p.t.annotations
-								found=0
-								if a_avail:
-									for aj in a_avail
-										if aj.x==ai.x:
-											if aj.y!=ai.y:
-												found=0
-											else
-												found=1
-											break
-								if !found:
-									found_annotation_i=0
-									break
-						if found_annotation_i:
-							found_p_t=1
-							break
-				if !found_p_t:return 0
-		return 1
 	qi_funcs=new CQIFunc[]
-	for d,k in tids
-		for qif in EnumQIFIndex(g_qifi_by_first_param_type[k])
-			if TestQIFAvailability(qif):
-				qi_funcs.push(qif)
-	for d,k in gflags
-		for qif in EnumQIFIndex(g_qifi_by_global_flag[k])
-			if TestQIFAvailability(qif):
-				qi_funcs.push(qif)
-	return qi_funcs
+	if pcall_bracket>=0:
+		//potential_params
+		TestCallPatternAt(pcall_bracket,CP_MODE_FHINT)
+		//only list objects that match the types
+		objs=new TQIObject[]
+		for t,id in obj_types
+			is_good=0
+			for pp in potential_params
+				param_i=pp.qif.m_params[pp.param_id]
+				if t.id!=param_i.t.id:continue
+				if t.annotations:
+					is_bad_i=0
+					for ai in t.annotations
+						found_j=0
+						if param_i.t.annotations:
+							for aj in param_i.t.annotations
+								if ai.x==aj.x:
+									if ai.y==aj.y:
+										found_j=1
+									break
+						if !found_j:
+							is_bad_i=1
+							break
+					if !is_bad_i:
+						is_good=1
+						break
+			if is_good:
+				objs.push(TQIObject(){id:id,t:t})
+	else
+		objs=[TQIObject(){id:k,t:d} for d,k in obj_types]
+		tids=new int[][int]
+		gflags=new int[int]
+		for obj,I in objs
+			tids_I=tids[obj.t.id]
+			if !tids_I:
+				tids_I=new int[]
+				tids[obj.t.id]=tids_I
+			tids_I.push(I)
+			if obj.id==g_id_home:
+				for ai in obj.t.annotations
+					gflags[ai.x]=ai.y
+		auto TestQIFAvailability(CQIFunc qif)
+			for p,I in qif.m_params
+				if p.id_inout==QIPARAM_IN+g_id_home:
+					//global requirement, search obj_global by id
+					for ai in p.t.annotations
+						if gflags[ai.x]!=ai.y:
+							return 0
+				else if !(p.id_inout&QIPARAM_OUT)
+					//local requirement, search by type
+					found_p_t=0
+					if tids[p.t.id]:
+						for oid in tids[p.t.id]
+							//we must find every annotation
+							a_avail=objs[oid].t.annotations
+							found_annotation_i=1
+							if p.t.annotations:
+								for ai in p.t.annotations
+									found=0
+									if a_avail:
+										for aj in a_avail
+											if aj.x==ai.x:
+												if aj.y!=ai.y:
+													found=0
+												else
+													found=1
+												break
+									if !found:
+										found_annotation_i=0
+										break
+							if found_annotation_i:
+								found_p_t=1
+								break
+					if !found_p_t:return 0
+			return 1
+		for d,k in tids
+			for qif in EnumQIFIndex(g_qifi_by_first_param_type[k])
+				if TestQIFAvailability(qif):
+					qi_funcs.push(qif)
+		for d,k in gflags
+			for qif in EnumQIFIndex(g_qifi_by_global_flag[k])
+				if TestQIFAvailability(qif):
+					qi_funcs.push(qif)
+	return (objs,qi_funcs)
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 g_function_ids=[getid("function"),getid("function*"),getid("inline"),getid('def')]
@@ -1453,7 +1509,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	is_header=(pdot>=0L&&pdot+1<fn_base.n&&(fn_base[pdot+1]=='h'||fn_base[pdot+1]=='H'))
 	sdataz=new char[sdata.n+1]
 	copy(sdataz,sdata)
-	(toks,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0))
+	(toks,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),0)
 	/////////////////
 	//deal with the tags
 	for tag in tags
@@ -1652,7 +1708,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							auto pid1=pid0
 							while pid1<pcomment1&&(sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
 								pid1++
-							(toks_prefix,tags_prefix)=tokenize(sdataz[pid0:pid1],1)
+							(toks_prefix,tags_prefix)=tokenize(sdataz[pid0:pid1],1,0)
 							qi_optional_prefixes.push([tok.tok for tok in toks_prefix])
 						}
 				if param_id_map&&pbrief.x<0:
@@ -2216,9 +2272,10 @@ auto parseAsText(string sdata,JSObject options)
 //////////////////////////////////////////////////////////////////
 //auto-completion interface
 class CACContext
-	int2[] m_candidates
+	int3[] m_candidates
 	string s_prefix
 	string m_common_prefix
+	string[] m_briefs
 	m_ccnt0=-1LL
 	//int m_auto_activate_after_tab
 	JS_At=function(JSContext JS){
@@ -2228,6 +2285,8 @@ class CACContext
 		cand=m_candidates[id]
 		ret["name"]=getIdString(cand.x)
 		ret["weight"]=cand.y
+		if cand.z:
+			ret["brief"]=m_briefs[cand.z-1]
 		return JS.Return(ret)
 	}
 	JS_GetLength=function(JSContext JS){
@@ -2503,12 +2562,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		else
 			return 0
 	}
-	jsPrepareAccands=function(JSContext JS,int2[] cands,string s_prefix,string s_common_prefix,i64 ccnt0){
+	jsPrepareAccands=function(JSContext JS,int3[] cands,string[] builtin_briefs,string s_prefix,string s_common_prefix,i64 ccnt0){
 		cands.Sortby(byMember("x"))
-		ret_temp=new int2[]
+		ret_temp=new int3[]
 		foreach id,same_cands in cands.Groupby(byMember("x"))
 			weight=__float_as_int([__int_as_float(cc.y) for cc in same_cands].Sum())
-			ret_temp.push(int2(id,weight))
+			brief_id=[cc.z for cc in same_cands].Max(0)
+			ret_temp.push(int3(id,weight,brief_id))
 		ret_temp.Sort(inline(ia,ib){
 			auto ret=ib.y-ia.y
 			if !ret:
@@ -2522,7 +2582,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					ret=sym0.n-sym1.n
 			return ret<0
 		})
-		acret=new CACContext(){m_candidates:ret_temp,s_prefix:s_prefix,m_common_prefix:s_common_prefix,m_ccnt0:ccnt0}
+		acret=new CACContext(){m_candidates:ret_temp,m_briefs:builtin_briefs,s_prefix:s_prefix,m_common_prefix:s_common_prefix,m_ccnt0:ccnt0}
 		if ret_temp.n==1:
 			s_only_cand=getIdString(ret_temp[0].x)
 			if ccnt0<0LL:
@@ -2535,11 +2595,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ED_QueryAutoCompletion"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)
 		ccnt=JS.Param(1).as(i64)
+		extras=JS.Param(2).as(JSObject)
 		fidx=doc["ed"]["m_file_index"].as(CFileIndex)
 		ed=doc["ed"].as(CEditableText)
 		if !fidx:return 0
 		if !ed:return JS.ReturnError("invalid editor object")
-		cands=new int2[]
+		cands=new int3[]
+		builtin_briefs=new string[]
 		if fidx.m_ppm1_index:
 			fcheck=function(int c0,int c1){return !isWordChar(c0)||isCJK(c0)}
 		else
@@ -2553,7 +2615,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				if char_neib[1]=='.'||char_neib[0]==':'&&char_neib[1]==':'||char_neib[0]=='-'&&char_neib[1]=='>':
 					is_name_dot=1
 			if !is_name_dot:
-				return 0
+				lg=0
+				if extras:
+					lg=extras["length"].as(iptr)
+				if !(lg>0):return 0
 		s_prefix=ed.GetText(ccnt_before_word,ccnt-ccnt_before_word)
 		/////////////////////
 		auto prefix_smalleri0(string a,string b)
@@ -2575,7 +2640,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				arr_i=arr[i]
 				//if weight_scale>1.f:
 				//	Writeln(getIdString(arr_i.x),' ',arr_i.y,' ',weight_scale)
-				cands.push(int2(arr_i.x,__float_as_int(float(arr_i.y)*weight_scale)))
+				cands.push(int3(arr_i.x,__float_as_int(float(arr_i.y)*weight_scale),0))
 				assert(g_symbols[arr_i.x].n>=s_prefix.n)
 		//weight normalization? no: evidence size is also significant
 		auto SearchPPMRange(int2 rg,float weight_scale)
@@ -2589,52 +2654,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			PrecomputeIndices(fidx)
 			if fidx.m_temp_ids&&fidx.m_temp_ids.n:
 				SearchPrefix(fidx.m_temp_ids,1.f)
-			if cands.n:
-				cands.Sort(inline(cand0,cand1){
-					auto id0=cand0.x
-					auto id1=cand1.x
-					auto p0=g_symbols[id0].p_name
-					auto n0=g_symbols[id0].n
-					auto p1=g_symbols[id1].p_name
-					auto n1=g_symbols[id1].n
-					for(j=0;;j++){
-						if j>=n0||j>=n1:
-							return n0<n1
-						if !chrequi(g_strings[p0+j],g_strings[p1+j]):
-							ch0=int(u8(g_strings[p0+j])); if u32(ch0-'A')<26u:ch0|=0x20
-							ch1=int(u8(g_strings[p1+j])); if u32(ch1-'A')<26u:ch1|=0x20
-							return ch0<ch1
-					}
-				})
-				//Writeln(s_prefix)
-				//foreach cand_i in cands
-				//	Writeln(getIdString(cand_i.x),' ',cand_i.y)
-				s_common_prefix=CommonPrefix(getIdString(cands[0].x)[s_prefix.n:],getIdString(cands.back().x)[s_prefix.n:])
-				//Writeln('s_common_prefix=',s_common_prefix)
-				if s_common_prefix.n:
-					//find the most similar
-					best=0
-					best_I=0
-					has_identical=0
-					foreach cc,I in cands
-						s_cc=getIdString(cc.x)
-						if s_cc.n==s_prefix.n+s_common_prefix.n:
-							has_identical=1
-						score=0
-						for i=0:min(s_prefix.n,s_cc.n)-1
-							if s_prefix[i]==s_cc[i]:
-								score++
-						if best<score:
-							best=score
-							best_I=I
-						//if best>=s_prefix.n:break
-					s_common_prefix=getIdString(cands[best_I].x)[s_prefix.n:s_prefix.n+s_common_prefix.n-1]
-					//auto_activate_after_tab=!has_identical
-					//cands=[int2(getid(getIdString(cands[best_I].x)[:s_prefix.n+s_common_prefix.n-1]),0x3f800000)]
-					//return JS.Return(new CACContext(){
-					//	m_candidates:cands,
-					//	m_auto_activate_after_tab:!has_identical,
-					//	s_prefix:s_prefix,m_common_prefix:s_common_prefix})
 		if fidx.m_ppm1_index:
 			ccnt_last_word=ed.MoveToBoundary(ccnt_before_word,-1,ed.GetStockFCheck("space",-1),4096)
 			ccnt_before_last_word=ed.MoveToBoundary(ccnt_last_word,-1,fcheck,4096)
@@ -2688,8 +2707,72 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 							}
 						//Writeln(ed.GetText(ccnt_before_fname,ccnt_bracket-ccnt_before_fname),'()')
 						SearchPPMRange(fidx.m_function_bracket_index[int2(id_fname,arg_id)],65536.f)
+		if extras:
+			lg=extras["length"].as(iptr)
+			is_first=1
+			for i=0:lg-1
+				acobj=extras[i].as(JSObject)
+				if !acobj:continue
+				s_extra_i=acobj["name"].as(string)
+				if !(s_extra_i&&s_extra_i.StartsWith(s_prefix)):continue
+				weight_i=acobj["weight"].or(1.f)
+				brief_id=0
+				s_brief=acobj["brief"].as(string)
+				if s_brief:
+					builtin_briefs.push(s_brief)
+					brief_id=builtin_briefs.n
+				if is_first:
+					is_first=0
+					cands.resize(0)
+				cands.push(int3(getid(s_extra_i),__float_as_int(weight_i),int(brief_id)))
+		if cands.n:
+			cands.Sort(inline(cand0,cand1){
+				auto id0=cand0.x
+				auto id1=cand1.x
+				auto p0=g_symbols[id0].p_name
+				auto n0=g_symbols[id0].n
+				auto p1=g_symbols[id1].p_name
+				auto n1=g_symbols[id1].n
+				for(j=0;;j++){
+					if j>=n0||j>=n1:
+						return n0<n1
+					if !chrequi(g_strings[p0+j],g_strings[p1+j]):
+						ch0=int(u8(g_strings[p0+j])); if u32(ch0-'A')<26u:ch0|=0x20
+						ch1=int(u8(g_strings[p1+j])); if u32(ch1-'A')<26u:ch1|=0x20
+						return ch0<ch1
+				}
+			})
+			//Writeln(s_prefix)
+			//foreach cand_i in cands
+			//	Writeln(getIdString(cand_i.x),' ',cand_i.y)
+			s_common_prefix=CommonPrefix(getIdString(cands[0].x)[s_prefix.n:],getIdString(cands.back().x)[s_prefix.n:])
+			//Writeln('s_common_prefix=',s_common_prefix)
+			if s_common_prefix.n:
+				//find the most similar
+				best=0
+				best_I=0
+				has_identical=0
+				foreach cc,I in cands
+					s_cc=getIdString(cc.x)
+					if s_cc.n==s_prefix.n+s_common_prefix.n:
+						has_identical=1
+					score=0
+					for i=0:min(s_prefix.n,s_cc.n)-1
+						if s_prefix[i]==s_cc[i]:
+							score++
+					if best<score:
+						best=score
+						best_I=I
+					//if best>=s_prefix.n:break
+				s_common_prefix=getIdString(cands[best_I].x)[s_prefix.n:s_prefix.n+s_common_prefix.n-1]
+				//auto_activate_after_tab=!has_identical
+				//cands=[int2(getid(getIdString(cands[best_I].x)[:s_prefix.n+s_common_prefix.n-1]),0x3f800000)]
+				//return JS.Return(new CACContext(){
+				//	m_candidates:cands,
+				//	m_auto_activate_after_tab:!has_identical,
+				//	s_prefix:s_prefix,m_common_prefix:s_common_prefix})
 		//////////////////////////
-		return jsPrepareAccands(JS,cands,s_prefix,s_common_prefix,-1LL)
+		return jsPrepareAccands(JS,cands,builtin_briefs,s_prefix,s_common_prefix,-1LL)
 	}
 	JS_UI["ED_QueryDecl"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)
@@ -2943,8 +3026,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ccnt0=JS.Param(1).as(i64)
 		ccnt1=JS.Param(2).as(i64)
 		//return a list of available objects and callable functions
-		objs=QueryAvailableQIObjects(ed,ccnt0,ccnt1,options)
-		funcs=QueryAvailableQIFuncs(objs)
+		//flexibility is pointless
+		//query modes - fhint or not, do all in native, do linear search for (
+		//in fhint mode, we could attempt to match the call_ptns and see which arg we're in
+		(objs,funcs)=QueryQIStateAt(ed,ccnt0,ccnt1,options)
 		//////
 		//coulddo: JS on-demand array - do the conversion in a GetElement method or sth
 		js_objs=JS.NewArray()
@@ -3090,9 +3175,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		freqs=JS["freqs"].as(JSObject)
 		if freqs:
 			//ss_real.Sortby(inline(cand){return -freqs[cand.id].as(double)})
-			cands=[int2(getid(cand.s),freqs[cand.id].as(int)) foreach cand in ss_real]
+			cands=[int3(getid(cand.s),__float_as_int(freqs[cand.id].as(float)),0) foreach cand in ss_real]
 		else
-			cands=[int2(getid(cand.s),1) foreach cand in ss_real]
-		return jsPrepareAccands(JS,cands,s_prefix,s_common_prefix,ccnt0)
+			cands=[int3(getid(cand.s),0x3f800000,0) foreach cand in ss_real]
+		return jsPrepareAccands(JS,cands,new string[],s_prefix,s_common_prefix,ccnt0)
 	}
 })

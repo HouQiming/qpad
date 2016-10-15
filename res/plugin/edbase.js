@@ -3379,8 +3379,19 @@ UI.RegisterEditorPlugin(function(){
 		menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
 			//coulddo: size-limiting
 			var ret=UI.ED_QueryQInfo(this,0,this.sel1.ccnt);
-			console.log(JSON.stringify(ret,null,2));
-			//todo
+			var cands=[];
+			var BIG_WEIGHT=1048576;
+			for(var i=0;i<ret.objs.length;i++){
+				if(!ret.objs[i].id!='~'){
+					cands.push({name:ret.objs[i].id,weight:BIG_WEIGHT});
+				}
+			}
+			for(var i=0;i<ret.funcs.length;i++){
+				cands.push({name:ret.funcs[i].toJSON().id,weight:BIG_WEIGHT});
+			}
+			if(cands.length){
+				this.StartACWithCandidates(cands);
+			}
 		}.bind(this)});
 		menu_tools=undefined;
 	})
