@@ -981,10 +981,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.TestAutoCompletion("explicit");
 		var acctx=this.m_ac_context;
 		if(acctx&&acctx.m_accands.m_common_prefix){
+			this.ActivateAC();
 			this.ConfirmAC(undefined);
 		}else{
-			this.ActivateAC()
+			this.ActivateAC();
 		}
+		//this.ActivateAC()
 		UI.Refresh()
 	},
 	TestCorrection:function(){
@@ -1056,7 +1058,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(acctx.m_accands.length<2){
 			this.m_ac_activated=0;
 		}
-		this.CancelAutoCompletion()
+		//we need to keep the explicit AC cands
+		//this.CancelAutoCompletion()
+		this.m_ac_context=undefined;
 		this.UserTypedChar()
 		UI.SetFocus(this);
 		UI.Refresh()
@@ -2731,7 +2735,7 @@ W.CodeEditorWidget_prototype={
 			this.doc.ParseFile()
 		}
 		////////////
-		if(this.doc.m_file_name){
+		if(this.doc&&this.doc.m_file_name){
 			var arr_ori=UI.g_editor_from_file[this.doc.m_file_name];
 			if(arr_ori&&arr_ori.length>1){
 				for(var i=0;i<arr_ori.length;i++){

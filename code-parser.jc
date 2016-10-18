@@ -157,8 +157,8 @@ module CharSet
 	spaces=charset("\r\t ")
 	spaces_newline=charset("\r\n\t ")
 	qi_typename=charset("~$._[]0-9A-Za-z\200-\377")
-	qi_separator=charset("\r\n\t ,}")
-	qi_call_ptn_separator=charset(",;)]}")
+	qi_separator=charset("\r\n,}")
+	//qi_call_ptn_separator=charset(",;)]}")
 	newlines=charset("\r\n")
 	inline has(u32[] ok,int c)
 		return !(c&0xffffff00)&&((ok[c>>5]>>(c&31))&1u);
@@ -204,6 +204,7 @@ g_id_this=getid("this")
 g_id_home=getid("~")
 g_id_1=getid("1")
 g_id_return=getid("return")
+g_id_const=getid("const")
 g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 struct TToken
 	int tok
@@ -304,7 +305,7 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 	last_significant_newline_position=-1L
 	last_line_comment_position=-1L
 	inline left_bracket(int ch0)
-		brastk.push(TBracket(){ch:ch0,pos:ptr})
+		brastk.push(TBracket(){ch:ch0,pos:iptr(ptr)})
 		if ch0=='{':
 			ignore_indents=g_ignore_indents
 			if !ignore_indents:
@@ -945,6 +946,7 @@ class CQIFunc
 	int[][] optional_prefixes
 	int[][] prefix_param_ids
 	int id
+	string s_brief
 	////////////
 	int[] s_param_id
 	int p_sig
@@ -1212,6 +1214,65 @@ inline EnumQIFIndex(int p0)
 			fbody(g_qifi_items[p].pf)
 	}}
 
+ParseDoxygenComment=function(string s){
+	auto ret=new string
+	is_line_head=1
+	got_paragraph=0
+	for ch in s
+		if ch=='\n':
+			if is_line_head>0:
+				if !got_paragraph:
+					ret.push('\n')
+					ret.push('\n')
+					got_paragraph=1
+				continue
+			else
+				if !(ret.n&&ret.back()==' '):
+					ret.push(' ')
+				is_line_head=1
+				continue
+		else if is_line_head:
+			if ch=='*'&&(is_line_head==1||is_line_head==2):
+				is_line_head=2
+				continue
+			if ch=='/'&&(is_line_head==1||is_line_head==3):
+				is_line_head=3
+				continue
+			if ch==' '||ch=='\t':
+				if is_line_head>1:
+					// skip no more * and /
+					is_line_head=4
+				continue
+			if (ch=='\\'||ch=='@'):
+				//command at line head = end of paragraph
+				break
+			is_line_head=0
+			got_paragraph=0
+		else
+			if ch==' '&&ret.n&&ret.back()==' ':
+				continue
+			if ret.back()=='*'&&ch=='/':
+				ret.pop();
+				break
+		ret.push(ch)
+	return ret
+}
+
+FormatQIType=function(TQIType t){
+	ret=getIdString(t.id)
+	if t.annotations&&t.annotations.n:
+		ret.push('{')
+		for ai in t.annotations
+			ret.push(getIdString(ai.x))
+			if ai.y!=g_id_1:
+				ret.push('=')
+				ret.push(getIdString(ai.y))
+			ret.push(',')
+		ret.pop()
+		ret.push('}')
+	return ret
+}
+
 auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 	//do on-query parse of QIFunc calls to avoid the multi-pass problem
 	//qinfo-var can be handled here, which removes the need of CQIScope
@@ -1224,14 +1285,14 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 	//also check for unfinished function calls
 	toks=new TToken[]
 	pcurlies=new iptr[]
-	bstack=new iptr[]
+	bstack=new int[]
 	for tok in toks0
 		if tok.tok==int('{'):
 			pcurlies.push(toks.n+1)
 		else if tok.tok==int('}')&&pcurlies.n:
 			toks.resize(pcurlies.pop())
 		else if tok.tok==int('('):
-			bstack.push(toks.n-1)
+			bstack.push(int(toks.n-1))
 		else if tok.tok==int(')')&&bstack.n:
 			bstack.pop()
 		toks.push(tok)
@@ -1245,20 +1306,53 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 	prev_sep=new int[toks.n]
 	next_sep=new int[toks.n]
 	cur_prev_sep=-1
+	bstack.clear()
 	for tok,I in toks
 		if !(tok.tok&TOK_TYPE_MASK):
-			if CharSet.has(CharSet.qi_call_ptn_separator,tok.tok):
-				for j=cur_prev_sep+1:I
-					next_sep[j]=I
+			if tok.tok==int('(')||tok.tok==int('[')||tok.tok==int('{'):
+				bstack.push(int(cur_prev_sep))
 				cur_prev_sep=I
+			else if tok.tok==int(')')||tok.tok==int(']')||tok.tok==int('}'):
+				cur_prev_sep=bstack.pop()
+			else if tok.tok==int(',')||tok.tok==int(';'):
+				cur_prev_sep=I
+		else if (tok.tok&TOK_TYPE_MASK)==TOK_ID&&I>0&&(toks[I-1].tok&TOK_TYPE_MASK)==TOK_ID:
+			cur_prev_sep=int(I-1)
 		prev_sep[I]=cur_prev_sep
-	for j=cur_prev_sep+1:toks.n-1
-		next_sep[j]=toks.n
+	cur_prev_sep=toks.n
+	bstack.clear()
+	for tok,I in toks.ReverseOrder()
+		if !(tok.tok&TOK_TYPE_MASK):
+			if tok.tok==int('(')||tok.tok==int('[')||tok.tok==int('{'):
+				if bstack.n:
+					cur_prev_sep=bstack.pop()
+			else if tok.tok==int(')')||tok.tok==int(']')||tok.tok==int('}'):
+				bstack.push(int(cur_prev_sep))
+				cur_prev_sep=I
+			else if tok.tok==int(',')||tok.tok==int(';'):
+				cur_prev_sep=int(I)
+		else if (tok.tok&TOK_TYPE_MASK)==TOK_ID&&I<toks.n-1&&(toks[I+1].tok&TOK_TYPE_MASK)==TOK_ID:
+			cur_prev_sep=int(I+1)
+		next_sep[I]=cur_prev_sep
 	//parse qinfo-var and try to match the call patterns...
-	obj_types=new TQIType[int]
-	auto SetObjectType(int id,TQIType t)
+	struct THintObject
+		int id
+		TQIType t
+		string s_brief
+	obj_types=new THintObject[int]
+	auto SetObjectType(int id,TQIType t,string s_brief0)
 		//annotation handling - if the type stayed the same, append / update annotations
-		auto t0=obj_types[id]
+		if t.id==g_id_const:
+			if !s_brief0:
+				s_brief="**Constant**"
+			else
+				s_brief=FormatAsText("**Constant** ",s_brief0)
+		else
+			if !s_brief0:
+				s_brief=FormatAsText("**Type** `",FormatQIType(t),"`")
+			else
+				s_brief=FormatAsText("**Type** `",FormatQIType(t),"`\n\n",s_brief0)
+		auto t0=obj_types[id].t
 		if t0.id==t.id:
 			anno_new=new int2[]
 			got_it=new int[int]
@@ -1270,9 +1364,9 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 				if !got_it[ai.x]:
 					got_it[ai.x]=1
 					anno_new.push(ai)
-			obj_types[id]=TQIType(){id:t.id,annotations:anno_new}
+			obj_types[id]=THintObject(){id:id,t:TQIType(){id:t.id,annotations:anno_new},s_brief:s_brief}
 		else
-			obj_types[id]=t
+			obj_types[id]=THintObject(){id:id,t:t,s_brief:s_brief}
 	struct TPotentialParam
 		CQIFunc qif
 		int param_id
@@ -1378,15 +1472,18 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 						pparampos=tmp_param_match_slots[I]
 						if pparampos.x<pparampos.y:
 							id_generated_obj=getid(sdataz[toks[pparampos.x].epos0:toks[pparampos.y-1].epos1-1])
-							SetObjectType(id_generated_obj,p.t)
+							SetObjectType(id_generated_obj,p.t,string.NULL)
 	///////////
 	for tok,ptok in toks
 		if tok.tok==TOK_COMMENT:
 			epos0=tok.epos0
 			epos1=tok.epos1
+			pbrief=-1L
 			for j=epos0:epos1-11
 				if sdataz[j]=='@':
-					if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-var",9)==0:
+					if __basic_api.memcmp(__pointer(sdataz.d+j+1),"brief",5)==0:
+						pbrief=j+6
+					else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-var",9)==0:
 						//create an object from scratch
 						auto pid0=j+10
 						while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
@@ -1400,7 +1497,12 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 						auto pid2=pid1
 						while pid2<epos1&&(sdataz[pid2]!='\r'&&sdataz[pid2]!='\n'):
 							pid2++
-						SetObjectType(id,ParseQIType(sdataz[pid1:pid2-1]))
+						if pbrief>=0L:
+							s_brief=ParseDoxygenComment(sdataz[pbrief:j-2])
+							pbrief=-1L
+						else
+							s_brief=string.NULL
+						SetObjectType(id,ParseQIType(sdataz[pid1:pid2-1]),s_brief)
 		else if (tok.tok&TOK_TYPE_MASK)==TOK_ID:
 			TestCallPatternAt(ptok,CP_MODE_FULL)
 	//////////////////////////////
@@ -1409,8 +1511,9 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 		//potential_params
 		TestCallPatternAt(pcall_bracket,CP_MODE_FHINT)
 		//only list objects that match the types
-		objs=new TQIObject[]
-		for t,id in obj_types
+		objs=new THintObject[]
+		for hint,id in obj_types
+			t=hint.t
 			is_good=0
 			for pp in potential_params
 				param_i=pp.qif.m_params[pp.param_id]
@@ -1432,9 +1535,19 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 						is_good=1
 						break
 			if is_good:
-				objs.push(TQIObject(){id:id,t:t})
+				objs.push(hint)
+		//put consts into candidates
+		for pp in potential_params
+			param_i=pp.qif.m_params[pp.param_id]
+			if param_i.t.id==g_id_const:
+				if param_i.t.annotations:
+					for ai in param_i.t.annotations
+						objs.push(THintObject(){
+							id:ai.x,
+							s_brief:FormatAsText("Constant for **",getIdString(param_i.GetID()),"** ",ai.y==g_id_1?"":getIdString(ai.y)),
+						})
 	else
-		objs=[TQIObject(){id:k,t:d} for d,k in obj_types]
+		objs=[d for d,k in obj_types]
 		tids=new int[][int]
 		gflags=new int[int]
 		for obj,I in objs
@@ -1455,6 +1568,9 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 							return 0
 				else if !(p.id_inout&QIPARAM_OUT)
 					//local requirement, search by type
+					if p.t.id==g_id_const:
+						//consts are always available
+						return 1
 					found_p_t=0
 					if tids[p.t.id]:
 						for oid in tids[p.t.id]
@@ -1608,17 +1724,37 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			if !qi_params:
 				qi_params=new TQIParamDesc[]
 			return qi_params
+		auto epos_type0=-1
+		auto epos_type1=-1
+		auto ptok_last_id=-1
 		for i=ptok:min(toks.n,ptok+MAX_PROTOTYPE_TOKS)-1
 			auto tok_i=toks[i].tok
 			switch(tok_i){
 			default:
 				if (tok_i&TOK_TYPE_MASK)==TOK_ID:
+					if ENABLE_EXPERIMENTAL_FEATURES:
+						if epos_type0<0:
+							epos_type0=toks[i].epos0
+						if param_id:
+							epos_type1=toks[ptok_last_id].epos1
+						ptok_last_id=i
 					param_id=tok_i-TOK_ID
 				break
 			case ',':
 				if blevel==1:
+					if ENABLE_EXPERIMENTAL_FEATURES:
+						if epos_type1>=0&&param_id:
+							//we got a type, make a qi_param
+							//GetQIParams().push(TQIParamDesc(){
+							//	id:param_id,
+							//	t:ParseQIType(sdataz[epos_type0:epos_type1-1]),
+							//})
 					all_prototypes.push(param_id)
 					param_id=0
+					if ENABLE_EXPERIMENTAL_FEATURES:
+						epos_type0=-1
+						epos_type1=-1
+						ptok_last_id=-1
 				break
 			case '(','[','{':
 				blevel++
@@ -1751,6 +1887,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							call_ptn:call_ptn,
 							optional_prefixes:qi_optional_prefixes,
 							id:function_id,
+							s_brief:is_documented?new(doc_string_pool[pbrief.x:pbrief.y-1]):string.NULL,
 						})
 			if !is_documented:
 				all_prototypes.push(-1)
@@ -2013,7 +2150,17 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 									id:getid(sdataz[pid0:pid1-1]),
 									pdoc:PoolDoxygenComment(sdataz[pid1:epos1-1])})
 							break
-						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"include",7)==0:
+							//allow @include
+							auto pid0=j+8
+							while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+								pid0++
+							auto pid1=pid0
+							while pid1<epos1&&(sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
+								pid1++
+							if pid0<pid1:
+								searchDepFile(getid(sdataz[pid0:pid1-1]),int(i))
+						else if ENABLE_EXPERIMENTAL_FEATURES&&__basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
 							//create a CQIFunc from scratch, with alternative call sequence
 							//todo
 			epos_var_comment=-1L
@@ -2483,6 +2630,17 @@ auto PrecomputeIndices(CFileIndex fidx)
 		fidx.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
 		fidx.m_temp_p_prototypes=temp_p_prototypes
 		fidx.m_temp_id_briefs=temp_id_briefs
+
+inline WriteToken(s,tok)
+	if tok&TOK_TYPE_MASK:
+		if (tok&TOK_TYPE_MASK)==TOK_ID:
+			s.push(getIdString(tok-TOK_ID))
+		else
+			//ignore
+	else
+		s.push(char(tok))
+		if tok==int(','):
+			s.push(' ')
 
 MAX_PARSABLE_SIZE=1LL<<24
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
@@ -3037,12 +3195,43 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			js_obj_i=JS.New()
 			js_objs[I]=js_obj_i
 			js_obj_i["id"]=getIdString(obj.id)
-			obj_t=QITypeToJS(JS,obj.t)
-			js_obj_i["t"]=obj_t
+			//obj_t=QITypeToJS(JS,obj.t)
+			//js_obj_i["t"]=obj_t
+			if obj.s_brief:
+				js_obj_i["brief"]=obj.s_brief
 		//////
 		js_funcs=JS.NewArray()
 		for qif,I in funcs
-			js_funcs[I]=qif
+			//function brief + formatted params
+			s_brief_i=new string
+			s_brief_i.push('**')
+			for tok in qif.call_ptn
+				WriteToken(s_brief_i,tok)
+			s_brief_i.push('**\n')
+			if qif.s_brief&&qif.s_brief.n:
+				s_brief_i.push('\n')
+				s_brief_i.push(qif.s_brief)
+				s_brief_i.push('\n')
+			//todo: param docs
+			is_first_input=1
+			for p in qif.m_params
+				if !(p.id_inout&QIPARAM_OUT)&&p.GetID()!=g_id_home:
+					if is_first_input:
+						s_brief_i.push('\n**Input**\n')
+						is_first_input=0
+					SWrite(s_brief_i,'- **',getIdString(p.GetID()),'** `',FormatQIType(p.t),'`\n')
+			is_first_output=1
+			for p in qif.m_params
+				if (p.id_inout&QIPARAM_OUT):
+					if is_first_output:
+						s_brief_i.push('\n**Output**\n')
+						is_first_output=0
+					SWrite(s_brief_i,'- **',getIdString(p.GetID()),'** `',FormatQIType(p.t),'`\n')
+			js_func_i=JS.New()
+			js_funcs[I]=js_func_i
+			js_func_i["id"]=getIdString(qif.id)
+			js_func_i["brief"]=s_brief_i
+			//js_funcs[I]=qif
 		//////
 		auto final_ret=JS.New()
 		final_ret["objs"]=js_objs

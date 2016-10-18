@@ -104,7 +104,7 @@ var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.P
 
 Language.Register({
 	name:"C/C++/C#",parser:"C",
-	extensions:["c","cxx","cpp","cc","h","hpp","mm","cs"],
+	extensions:["c","cxx","cpp","cc","h","hpp","mm","cs","qinfo"],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
 	file_icon_color:0xff9a3d6a,
@@ -3383,11 +3383,11 @@ UI.RegisterEditorPlugin(function(){
 			var BIG_WEIGHT=1048576;
 			for(var i=0;i<ret.objs.length;i++){
 				if(!ret.objs[i].id!='~'){
-					cands.push({name:ret.objs[i].id,weight:BIG_WEIGHT});
+					cands.push({name:ret.objs[i].id,weight:BIG_WEIGHT,brief:ret.objs[i].brief});
 				}
 			}
 			for(var i=0;i<ret.funcs.length;i++){
-				cands.push({name:ret.funcs[i].toJSON().id,weight:BIG_WEIGHT});
+				cands.push({name:ret.funcs[i].id,weight:BIG_WEIGHT,brief:ret.funcs[i].brief});
 			}
 			if(cands.length){
 				this.StartACWithCandidates(cands);

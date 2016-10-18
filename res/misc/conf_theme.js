@@ -599,7 +599,7 @@ UI.CustomTheme=function(){
 			accands_text_sel_color:L?0xffffffff:0xffe8e8e8,
 			accands_sel_bgcolor:C,
 			accands_n_shown:5,
-			accands_w_brief:256,
+			accands_w_brief:512,
 			accands_styles:[
 				{font:UI.Font(UI.font_name,18,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
 				{font:UI.Font(UI.font_name,18,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
@@ -609,8 +609,8 @@ UI.CustomTheme=function(){
 				{font:UI.Font("res/fonts/opensansi.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//emph
 				{font:UI.Font("res/fonts/opensans.ttf",18,150),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
 				{
-					font:UI.Font("res/fonts/inconsolata.ttf",21,0),
-					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",21,150),
+					font:UI.Font("res/fonts/inconsolata.ttf",16,0),
+					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,150),
 					paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa
 				},//code
 				{font:UI.Font("res/fonts/opensans.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//list
