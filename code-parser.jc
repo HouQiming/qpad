@@ -192,6 +192,8 @@ TOK_LSHIFT_EQ=int('s')
 TOK_RSHIFT_EQ=int('t')
 ////////////////
 TOK_COMMENT=int('u')
+TOK_COMBO_SLOT=int('v')
+
 g_id_include=getid("#include")
 g_id_define=getid("#define")
 g_id_pragma=getid("#pragma")
@@ -300,7 +302,7 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 	inds=new int[]
 	brastk=new TBracket[]
 	toks=new TToken[]
-	tags=new TParsedTag[]
+	//tags=new TParsedTag[]
 	ignore_indents=g_ignore_indents
 	last_significant_newline_position=-1L
 	last_line_comment_position=-1L
@@ -649,11 +651,14 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 				if last_significant_newline_position==toks.n:
 					last_line_comment_position=toks.n
 				//merge comments to avoid perf issues during token neib lookup
-				if toks.n>0&&toks.back().tok==TOK_COMMENT:
+				can_merge=1
+				if ENABLE_EXPERIMENTAL_FEATURES:
+					for j=efeed0:min(ptr,efeed0+3)-1
+						if feed[j]=='@':
+							can_merge=0
+							break
+				if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
 					toks[toks.n-1].epos1=int(ptr)
-				else if feed[efeed0]==u8('#')&&feed[efeed0+1]==u8('b')&&(feed[efeed0+2]==u8('+')||feed[efeed0+2]==u8('-')):
-					side=(feed[efeed0+2]==u8('-'))
-					tags.push(TParsedTag(){id_side:getid(cite_raw(efeed0+3,ptr))*2+side,epos:int(side==1?efeed0-2:ptr)})
 				else
 					push_token(TOK_COMMENT,int(efeed0),int(ptr))
 				//parseComment(feed,efeed0,ptr+1)
@@ -669,11 +674,14 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 					if ch=='/'&&c=='*':break;
 					c=ch;
 				//merge comments to avoid perf issues during token neib lookup
-				if toks.n>0&&toks.back().tok==TOK_COMMENT:
+				can_merge=1
+				if ENABLE_EXPERIMENTAL_FEATURES:
+					for j=efeed0:min(ptr,efeed0+3)-1
+						if feed[j]=='@':
+							can_merge=0
+							break
+				if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
 					toks[toks.n-1].epos1=int(ptr-2)
-				else if feed[efeed0]==u8('#')&&feed[efeed0+1]==u8('b')&&(feed[efeed0+2]==u8('+')||feed[efeed0+2]==u8('-')):
-					side=(feed[efeed0+2]==u8('-'))
-					tags.push(TParsedTag(){id_side:getid(cite_raw(efeed0+3,ptr))*2+side,epos:int(side==1?efeed0-2:ptr)})
 				else
 					push_token(TOK_COMMENT,int(efeed0),int(ptr-2))
 				//parseComment(feed,efeed0,ptr)
@@ -818,7 +826,7 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 	pop_indents()
 	//toks.push(TToken(){'tok':TOK_EOF,'epos0':int(ptr),'epos1':int(ptr)})
 	push_token(TOK_EOF,int(ptr),int(ptr))
-	return (toks,tags)
+	return toks
 
 /*
 auto parseComment(u8[] feed,int ptr0,int ptr_end)
@@ -1280,7 +1288,7 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 	//options is just Language.GetDescObjectByName(language_id)
 	sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
 	sdataz[iptr(ccnt1-ccnt0)]=char(0)
-	(toks0,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),1)
+	toks0=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),1)
 	//filter out unrelated {}s - *only* keep the unpaired ones
 	//also check for unfinished function calls
 	toks=new TToken[]
@@ -1624,6 +1632,87 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 					qi_funcs.push(qif)
 	return (objs,qi_funcs)
 
+struct TComboPart
+	int id
+	int[] id_params
+	int[] pattern
+class CQICombo
+	int id
+	int epos0
+	string code
+	TComboPart[] parts
+if ENABLE_EXPERIMENTAL_FEATURES:
+	g_combo_by_id=new CQICombo[int]
+	g_combos_parsed=0
+
+auto BuildComboDFA()
+	struct TNFAPattern
+		int id_combo
+		int id_part
+		int[] pattern
+	all_patterns=new TNFAPattern[]
+	for combo,id in g_combo_by_id
+		for part,I in combo.parts
+			//we must have at least 2 tokens in each part
+			if part.pattern.n<2:continue
+			all_patterns.push(TNFAPattern(){
+				id_combo:id,
+				id_part:I,
+				pattern:part.pattern,
+			})
+	//build the meaningful token map - the param tokens are tranformed into TOK_EOF+#
+	//also build the first-token map
+	token_map=new int[int]
+	token_list=new int[]
+	token_list.push(0)
+	token_list.push(TOK_ID)
+	!? //todo: bracket forking support... the merge on pop, it could be too much - use NFA instead
+	first_token=new int[][int]
+	for ptn,I in all_patterns
+		for tok in ptn.pattern
+			if tok!=TOK_COMBO_SLOT&&(tok&TOK_TYPE_MASK)!=TOK_EOF:
+				if !token_map[tok]:
+					token_map[tok]=token_list.n
+					token_list.push(tok)
+		tok0=token_map[ptn.pattern[0]]
+		if !tok0:
+			if tok0==TOK_COMBO_SLOT:
+				//can't start with slots
+				continue
+			if (tok0&TOK_TYPE_MASK)==TOK_EOF:
+				tok0=1
+		pptns=first_token[tok0]
+		if !pptns:
+			pptns=new int[]
+			first_token[tok0]=pptns
+		pptns.push(I)
+	n_token_types=token_list.n //use 0 for "anything else" and 1 for "other id"
+	state_map=new int[i64[]]
+	Q=[new i64[]]
+	state_map[Q[0]]=1
+	phead=0L
+	sts=[first_token[i]?[(i64(pid)<<32)+1LL for pid in first_token[i]]:new i64[] for i=0:n_token_types-1]
+	n0s=[st.n for st in sts]
+	while phead<Q.n:
+		st=Q[phead]
+		for i=0:n_token_types-1
+			sts[i].n=n0s[i]
+		for sti in st
+			pid=int(sti>>32)
+			ptr=int(sti)
+			tok_theirs=all_patterns[pid].pattern[ptr]
+			if (tok_theirs&TOK_TYPE_MASK)==TOK_EOF:
+				for i=0:n_token_types-1
+					if (token_list[i]&TOK_TYPE_MASK)==TOK_ID:
+						sts[i].push(sti+1LL)
+			else if tok_theirs==TOK_COMBO_SLOT:
+				!? //anything that is not a bracket
+				//and we need to model the split
+			else
+				//we must match it
+				!?
+		!?
+
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 g_function_ids=[getid("function"),getid("function*"),getid("inline"),getid('def')]
 g_id_if=getid("if")
@@ -1633,7 +1722,6 @@ g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
 MAX_POSTDECL_GARBAGE=8 //# of ids between () and {}, like const / override / throw / ...
-g_tag_by_id=new CTag[int]
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	has_post_ctor_initializer=options["has_post_ctor_initializer"].or(0)
 	has_pointer_ops=options["has_pointer_ops"].or(0)
@@ -1643,20 +1731,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	is_header=(pdot>=0L&&pdot+1<fn_base.n&&(fn_base[pdot+1]=='h'||fn_base[pdot+1]=='H'))
 	sdataz=new char[sdata.n+1]
 	copy(sdataz,sdata)
-	(toks,tags)=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),0)
-	/////////////////
-	//deal with the tags
-	for tag in tags
-		id=(tag.id_side>>1)
-		if tag.id_side&1:
-			ptag=g_tag_by_id[id]
-			if ptag:
-				ptag.epos1=tag.epos
-		else
-			g_tag_by_id[id]=new CTag(){
-				id:id,idfn:idfn_base,
-				epos0:tag.epos
-			}
+	toks=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),0)
 	/////////////////
 	inline cite_raw(iptr epos0,iptr epos1)
 		assert(epos1>0)
@@ -1729,6 +1804,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	id_briefs=new TIDBrief[]
 	if ENABLE_EXPERIMENTAL_FEATURES:
 		all_qifuncs=new CQIFunc[]
+		cur_combo=CQICombo.NULL
+		common_combo_args=int[].NULL
+		ptok_combo_ptn_last=0
 	MAX_PROTOTYPE_TOKS=1024
 	parsePrototype=function(int function_id,int ptok,iptr ptok_last_comment){
 		auto blevel=0
@@ -1862,7 +1940,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							auto pid1=pid0
 							while pid1<pcomment1&&(sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
 								pid1++
-							(toks_prefix,tags_prefix)=tokenize(sdataz[pid0:pid1],1,0)
+							toks_prefix=tokenize(sdataz[pid0:pid1],1,0)
 							qi_optional_prefixes.push([tok.tok for tok in toks_prefix])
 						}
 				if param_id_map&&pbrief.x<0:
@@ -2152,6 +2230,13 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			epos0=toks[i].epos0
 			epos1=toks[i].epos1
 			if ENABLE_EXPERIMENTAL_FEATURES:
+				FlushComboPattern=inline(){
+					if cur_combo&&cur_combo.parts.n:
+						auto pattern=cur_combo.parts.back().pattern
+						for j=ptok_combo_ptn_last:i-1
+							pattern.push(toks[j].tok)
+						ptok_combo_ptn_last=i
+				}
 				for j=epos0:min(epos1,epos0+3)-1
 					if sdataz[j]=='@':
 						if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qpadvar",7)==0:
@@ -2178,7 +2263,65 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								pid1++
 							if pid0<pid1:
 								searchDepFile(getid(sdataz[pid0:pid1-1]),int(i))
-						else if ENABLE_EXPERIMENTAL_FEATURES&&__basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-begin",12)==0:
+							//parse the prototype
+							toks_proto=tokenize(sdataz[j+18:epos1-1])
+							p_cproto=0L
+							if p_cproto<toks_proto.n&&(toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID&&i<toks.n-1:
+								//create a combo
+								cur_combo=new CQICombo
+								cur_combo.epos0=toks[i+1].epos0
+								common_combo_args=new int[]
+								cur_combo.id=toks_proto[p_cproto]-TOK_ID
+								p_cproto++
+								while p_cproto<toks_proto.n:
+									if (toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID:
+										common_combo_args.push(toks_proto[p_cproto]-TOK_ID)
+									p_cproto++
+								ptok_combo_ptn_last=i+1
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-end",10)==0:
+							if cur_combo:
+								FlushComboPattern()
+								for part in cur_combo.parts
+									tok_tran=new int[int]
+									for id,I in part.id_params
+										tok_tran[TOK_ID+id]=TOK_EOF+I
+									for tok,I in part.pattern
+										tok_new=tok_tran[tok]
+										if tok_new:
+											part.pattern[I]=tok_new
+								cur_combo.code=sdataz[cur_combo.epos0:toks[i].epos0-1]
+								g_combo_by_id[cur_combo.id]=cur_combo
+								g_combos_parsed=0
+							cur_combo=CQICombo.NULL
+							common_combo_args=int[].NULL
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-part",11)==0:
+							if cur_combo:
+								FlushComboPattern()
+								//parse the prototype
+								toks_proto=tokenize(sdataz[j+18:epos1-1])
+								p_cproto=0L
+								if p_cproto<toks_proto.n&&(toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID:
+									//create a combo
+									cur_combo.parts.push(TComboPart(){
+										id:toks_proto[p_cproto]-TOK_ID,
+										id_params:new(common_combo_args),
+										pattern:new int[],
+									})
+									p_cproto++
+									id_params=cur_combo.parts.back().id_params
+									while p_cproto<toks_proto.n:
+										if (toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID:
+											id_params.push(toks_proto[p_cproto]-TOK_ID)
+										p_cproto++
+								ptok_combo_ptn_last=i+1
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-slot",11)==0:
+							if cur_combo&&cur_combo.parts.n:
+								FlushComboPattern()
+								cur_combo.parts.back().pattern.push(TOK_COMBO_SLOT)
+								//todo: args
+								ptok_combo_ptn_last=i+1
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
 							//create a CQIFunc from scratch, with alternative call sequence
 							//todo
 			epos_var_comment=-1L
@@ -3255,6 +3398,25 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		final_ret["objs"]=js_objs
 		final_ret["funcs"]=js_funcs
 		return JS.Return(final_ret)
+	}
+	JS_UI["ED_ParseAsCombo"]=function(JSContext JS){
+		//parse a bunch of text into combos
+		doc=JS.Param(0).as(JSObject)
+		options=doc["plugin_language_desc"].as(JSObject)
+		ed=doc["ed"].as(CEditableText)
+		if !options:return 0
+		if !ed:return JS.ReturnError("invalid editor object")
+		ccnt0=JS.Param(1).as(i64)
+		ccnt1=JS.Param(2).as(i64)
+		sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
+		sdataz[iptr(ccnt1-ccnt0)]=char(0)
+		toks0=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),1)
+		//////////////////////
+		//build the combo DFA, do not track slot match during the first pass
+		if !g_combos_parsed:
+			BuildComboDFA()
+			g_combos_parsed=1
+		!?
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
