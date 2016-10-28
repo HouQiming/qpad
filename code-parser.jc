@@ -654,7 +654,7 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 				can_merge=1
 				if ENABLE_EXPERIMENTAL_FEATURES:
 					for j=efeed0:min(ptr,efeed0+3)-1
-						if feed[j]=='@':
+						if int(feed[j])==int('@'):
 							can_merge=0
 							break
 				if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
@@ -677,7 +677,7 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 				can_merge=1
 				if ENABLE_EXPERIMENTAL_FEATURES:
 					for j=efeed0:min(ptr,efeed0+3)-1
-						if feed[j]=='@':
+						if int(feed[j])==int('@'):
 							can_merge=0
 							break
 				if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
@@ -1632,86 +1632,57 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 					qi_funcs.push(qif)
 	return (objs,qi_funcs)
 
-struct TComboPart
-	int id
-	int[] id_params
-	int[] pattern
-class CQICombo
-	int id
-	int epos0
-	string code
-	TComboPart[] parts
 if ENABLE_EXPERIMENTAL_FEATURES:
+	struct TComboPart
+		int id
+		int[] id_params
+		int[] pattern
+	class CQICombo
+		int id
+		int epos0
+		string code
+		parts=new TComboPart[]
 	g_combo_by_id=new CQICombo[int]
 	g_combos_parsed=0
-
-auto BuildComboDFA()
 	struct TNFAPattern
 		int id_combo
-		int id_part
+		int ord_part
+		int n_slots,n_params
 		int[] pattern
-	all_patterns=new TNFAPattern[]
+	g_all_patterns=new TNFAPattern[]
+	g_first_token=new int[][int]
+
+auto BuildComboNFA()
+	g_all_patterns.clear()
+	p_slots=0L
 	for combo,id in g_combo_by_id
 		for part,I in combo.parts
 			//we must have at least 2 tokens in each part
+			while part.pattern.n&&part.pattern.back()==TOK_COMBO_SLOT:
+				part.pattern.pop()
 			if part.pattern.n<2:continue
-			all_patterns.push(TNFAPattern(){
+			g_all_patterns.push(TNFAPattern(){
 				id_combo:id,
-				id_part:I,
+				ord_part:int(I),
+				n_slots:int([1 for id in part.pattern if id==TOK_COMBO_SLOT].n),
+				n_params:int(part.id_params.n),
 				pattern:part.pattern,
 			})
 	//build the meaningful token map - the param tokens are tranformed into TOK_EOF+#
 	//also build the first-token map
-	token_map=new int[int]
-	token_list=new int[]
-	token_list.push(0)
-	token_list.push(TOK_ID)
-	!? //todo: bracket forking support... the merge on pop, it could be too much - use NFA instead
-	first_token=new int[][int]
-	for ptn,I in all_patterns
-		for tok in ptn.pattern
-			if tok!=TOK_COMBO_SLOT&&(tok&TOK_TYPE_MASK)!=TOK_EOF:
-				if !token_map[tok]:
-					token_map[tok]=token_list.n
-					token_list.push(tok)
-		tok0=token_map[ptn.pattern[0]]
-		if !tok0:
-			if tok0==TOK_COMBO_SLOT:
-				//can't start with slots
-				continue
-			if (tok0&TOK_TYPE_MASK)==TOK_EOF:
-				tok0=1
-		pptns=first_token[tok0]
+	g_first_token=new int[][int]
+	for ptn,I in g_all_patterns
+		tok0=ptn.pattern[0]
+		if tok0==TOK_COMBO_SLOT:
+			//can't start with slots
+			continue
+		if (tok0&TOK_TYPE_MASK)==TOK_EOF:
+			tok0=TOK_ID
+		pptns=g_first_token[tok0]
 		if !pptns:
 			pptns=new int[]
-			first_token[tok0]=pptns
+			g_first_token[tok0]=pptns
 		pptns.push(I)
-	n_token_types=token_list.n //use 0 for "anything else" and 1 for "other id"
-	state_map=new int[i64[]]
-	Q=[new i64[]]
-	state_map[Q[0]]=1
-	phead=0L
-	sts=[first_token[i]?[(i64(pid)<<32)+1LL for pid in first_token[i]]:new i64[] for i=0:n_token_types-1]
-	n0s=[st.n for st in sts]
-	while phead<Q.n:
-		st=Q[phead]
-		for i=0:n_token_types-1
-			sts[i].n=n0s[i]
-		for sti in st
-			pid=int(sti>>32)
-			ptr=int(sti)
-			tok_theirs=all_patterns[pid].pattern[ptr]
-			if (tok_theirs&TOK_TYPE_MASK)==TOK_EOF:
-				for i=0:n_token_types-1
-					if (token_list[i]&TOK_TYPE_MASK)==TOK_ID:
-						sts[i].push(sti+1LL)
-			else if tok_theirs==TOK_COMBO_SLOT:
-				!? //anything that is not a bracket
-				//and we need to model the split
-			else
-				//we must match it
-				!?
-		!?
 
 g_class_ids=[getid("class"),getid("struct"),getid("union"),getid("namespace"),getid("module")]
 g_function_ids=[getid("function"),getid("function*"),getid("inline"),getid('def')]
@@ -1721,6 +1692,7 @@ g_in_parse_queue=new int[int]
 g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
+g_zero_byte_string=[char(0)]
 MAX_POSTDECL_GARBAGE=8 //# of ids between () and {}, like const / override / throw / ...
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	has_post_ctor_initializer=options["has_post_ctor_initializer"].or(0)
@@ -2234,7 +2206,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					if cur_combo&&cur_combo.parts.n:
 						auto pattern=cur_combo.parts.back().pattern
 						for j=ptok_combo_ptn_last:i-1
-							pattern.push(toks[j].tok)
+							if toks[j].tok!=TOK_COMMENT:
+								pattern.push(toks[j].tok)
 						ptok_combo_ptn_last=i
 				}
 				for j=epos0:min(epos1,epos0+3)-1
@@ -2265,18 +2238,18 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								searchDepFile(getid(sdataz[pid0:pid1-1]),int(i))
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-begin",12)==0:
 							//parse the prototype
-							toks_proto=tokenize(sdataz[j+18:epos1-1])
+							toks_proto=tokenize(sdataz[j+13:epos1-1]+g_zero_byte_string,1,0)
 							p_cproto=0L
-							if p_cproto<toks_proto.n&&(toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID&&i<toks.n-1:
+							if p_cproto<toks_proto.n&&(toks_proto[p_cproto].tok&TOK_TYPE_MASK)==TOK_ID&&i<toks.n-1:
 								//create a combo
 								cur_combo=new CQICombo
 								cur_combo.epos0=toks[i+1].epos0
 								common_combo_args=new int[]
-								cur_combo.id=toks_proto[p_cproto]-TOK_ID
+								cur_combo.id=toks_proto[p_cproto].tok-TOK_ID
 								p_cproto++
 								while p_cproto<toks_proto.n:
-									if (toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID:
-										common_combo_args.push(toks_proto[p_cproto]-TOK_ID)
+									if (toks_proto[p_cproto].tok&TOK_TYPE_MASK)==TOK_ID:
+										common_combo_args.push(toks_proto[p_cproto].tok-TOK_ID)
 									p_cproto++
 								ptok_combo_ptn_last=i+1
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-end",10)==0:
@@ -2285,7 +2258,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								for part in cur_combo.parts
 									tok_tran=new int[int]
 									for id,I in part.id_params
-										tok_tran[TOK_ID+id]=TOK_EOF+I
+										tok_tran[TOK_ID+id]=int(TOK_EOF+I)
 									for tok,I in part.pattern
 										tok_new=tok_tran[tok]
 										if tok_new:
@@ -2299,26 +2272,28 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							if cur_combo:
 								FlushComboPattern()
 								//parse the prototype
-								toks_proto=tokenize(sdataz[j+18:epos1-1])
+								toks_proto=tokenize(sdataz[j+13:epos1-1]+g_zero_byte_string,1,0)
 								p_cproto=0L
-								if p_cproto<toks_proto.n&&(toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID:
+								if p_cproto<toks_proto.n&&(toks_proto[p_cproto].tok&TOK_TYPE_MASK)==TOK_ID:
 									//create a combo
 									cur_combo.parts.push(TComboPart(){
-										id:toks_proto[p_cproto]-TOK_ID,
+										id:toks_proto[p_cproto].tok-TOK_ID,
 										id_params:new(common_combo_args),
 										pattern:new int[],
 									})
 									p_cproto++
 									id_params=cur_combo.parts.back().id_params
 									while p_cproto<toks_proto.n:
-										if (toks_proto[p_cproto]&TOK_TYPE_MASK)==TOK_ID:
-											id_params.push(toks_proto[p_cproto]-TOK_ID)
+										if (toks_proto[p_cproto].tok&TOK_TYPE_MASK)==TOK_ID:
+											id_params.push(toks_proto[p_cproto].tok-TOK_ID)
 										p_cproto++
 								ptok_combo_ptn_last=i+1
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-slot",11)==0:
 							if cur_combo&&cur_combo.parts.n:
 								FlushComboPattern()
-								cur_combo.parts.back().pattern.push(TOK_COMBO_SLOT)
+								pattern=cur_combo.parts.back().pattern
+								if pattern.n&&pattern.back()!=TOK_COMBO_SLOT:
+									pattern.push(TOK_COMBO_SLOT)
 								//todo: args
 								ptok_combo_ptn_last=i+1
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
@@ -3410,13 +3385,253 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ccnt1=JS.Param(2).as(i64)
 		sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
 		sdataz[iptr(ccnt1-ccnt0)]=char(0)
-		toks0=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),1)
+		toks=tokenize(sdataz,!options["indent_as_parenthesis"].or(0),1)
 		//////////////////////
 		//build the combo DFA, do not track slot match during the first pass
 		if !g_combos_parsed:
-			BuildComboDFA()
+			BuildComboNFA()
 			g_combos_parsed=1
-		!?
+		//todo
+		//Writeln(g_all_patterns)
+		Writeln('>>> patterns')
+		for ptn,I in g_all_patterns
+			Write('#',I,': ')
+			for tok in ptn.pattern
+				if (tok&TOK_TYPE_MASK)==TOK_ID:
+					Write(getIdString(tok-TOK_ID))
+				else if (tok&TOK_TYPE_MASK)==TOK_EOF:
+					Write(' @',tok-TOK_EOF,' ')
+				else if tok==TOK_COMBO_SLOT:
+					Write(' ... ')
+				else
+					Write(char(tok))
+			Writeln()
+			Writeln(' ',ptn.n_slots,' ',ptn.n_params)
+		Writeln(g_first_token)
+		//todo
+		st_stack=new int3[][]
+		st=new int3[]
+		st_new=new int3[]
+		st_stay=new int3[]
+		struct TPartMatchRough
+			int pid
+			int ptok0,ptok1
+		//gen matches here, do detailed matching in a later pass
+		matches=new TPartMatchRough[]
+		got_pid=new int[g_all_patterns.n]
+		got_pid_t=0
+		for tok_text,I in toks
+			//if st.n:Writeln(I,' ',tok_text.tok,' ',st)
+			st_new.n=0
+			if tok_text.tok=='('||tok_text.tok=='['||tok_text.tok=='{':
+				dbra=1
+			else if tok_text.tok==')'||tok_text.tok==']'||tok_text.tok=='}':
+				dbra=-1
+			else
+				dbra=0
+			if dbra:
+				st_stay.n=0
+				for sti in st
+					py=sti.y
+					pattern=g_all_patterns[sti.x].pattern
+					tok_pattern=pattern[py]
+					if tok_pattern==TOK_COMBO_SLOT:
+						st_stay.push(int3(sti.x,py,sti.z))
+					if tok_pattern==tok_text.tok:
+						if py+1>=pattern.n:
+							matches.push(TPartMatchRough(){
+								pid:sti.x,
+								ptok0:sti.z,ptok1:int(I+1)
+							})
+						else
+							st_new.push(int3(sti.x,py+1,sti.z))
+				if dbra>0:
+					st_stack.push(st_stay)
+					st_stay=new int3[]
+					tmp=st;st=st_new;st_new=tmp
+				else
+					if st_stack.n:
+						st=st_stack.pop()
+					else
+						st=new int3[]
+					st.push(st_new)
+					st.Sort()
+					st.Unique()
+			else
+				for sti in st
+					py=sti.y
+					pattern=g_all_patterns[sti.x].pattern
+					tok_pattern=pattern[py]
+					if tok_pattern==TOK_COMBO_SLOT:
+						st_new.push(int3(sti.x,py,sti.z))
+						py++
+						tok_pattern=g_all_patterns[sti.x].pattern[py]
+					if tok_pattern==tok_text.tok||((tok_pattern&TOK_TYPE_MASK)==TOK_EOF&&(tok_text.tok&TOK_TYPE_MASK)==TOK_ID):
+						if py+1>=pattern.n:
+							matches.push(TPartMatchRough(){
+								pid:sti.x,
+								ptok0:sti.z,ptok1:int(I+1)
+							})
+						else
+							st_new.push(int3(sti.x,py+1,sti.z))
+				tmp=st;st=st_new;st_new=tmp
+			firsts=g_first_token[tok_text.tok]
+			if firsts:
+				got_pid_t++
+				for sti in st
+					got_pid[sti.x]=got_pid_t
+				for pid in firsts
+					//add firsts, but not if we're already matching that pattern
+					if got_pid[pid]!=got_pid_t:
+						st.push(int3(pid,1,int(I)))
+		Writeln(matches)//todo
+		struct TPartMatchRefined
+			int2[] slot_bindings
+			int[] param_bindings
+			int id_combo
+			int ord_part
+			int epos0,epos1
+		matches_refined=new TPartMatchRefined[]
+		for match in matches
+			//bind param ids and slots
+			pattern=g_all_patterns[match.pid].pattern
+			n_slots=g_all_patterns[match.pid].n_slots
+			slot_tran=new int[pattern.n]
+			pslot=0
+			for i=0:pattern.n-1
+				slot_tran[i]=pslot
+				if pattern[i]==TOK_COMBO_SLOT:pslot+=2
+			//ptok, blevel, slots, params
+			//the slots store ptok+1
+			sz_save=2+n_slots*2+g_all_patterns[match.pid].n_params
+			saves=new int[sz_save]
+			saves_new=new int[]
+			blevel=0
+			for ptok_text=match.ptok0:match.ptok1-1
+				tok_text=toks[ptok_text].tok
+				saves_new.n=0
+				blevel_new=blevel
+				if tok_text=='('||tok_text=='['||tok_text=='{':
+					blevel_new++
+				else if tok_text==')'||tok_text==']'||tok_text=='}':
+					blevel_new--
+				for i=0:sz_save:saves.n-sz_save
+					ptok_pattern=saves[i]
+					if ptok_pattern>=pattern.n:
+						assert(0)
+						continue
+					tok_pattern=pattern[ptok_pattern]
+					if tok_pattern==TOK_COMBO_SLOT:
+						//keep it and match the next token
+						psave=i+2+slot_tran[ptok_pattern]
+						if !saves[psave]:saves[psave]=ptok_text+1
+						saves[psave+1]=ptok_text+2
+						for j=0:sz_save-1
+							saves_new.push(saves[i+j])
+						ptok_pattern++
+						tok_pattern=pattern[ptok_pattern]
+					if blevel==saves[i+1]:
+						if (tok_pattern&TOK_TYPE_MASK)==TOK_EOF&&(tok_text&TOK_TYPE_MASK)==TOK_ID:
+							psave=i+2+n_slots*2+(tok_pattern-TOK_EOF)
+							if !saves[psave]:
+								saves[psave]=tok_text-TOK_ID
+							if saves[psave]==tok_text-TOK_ID:
+								n0_new=saves_new.n
+								for j=0:sz_save-1
+									saves_new.push(saves[i+j])
+								saves_new[n0_new]++
+						else if tok_pattern==tok_text:
+							n0_new=saves_new.n
+							for j=0:sz_save-1
+								saves_new.push(saves[i+j])
+							saves_new[n0_new]++
+							saves_new[n0_new+1]=blevel_new
+				blevel=blevel_new
+				tmp=saves;saves=saves_new;saves_new=tmp
+			for i=0:sz_save:saves.n-sz_save
+				ptok_pattern=saves[i]
+				if ptok_pattern>=pattern.n:
+					//the match is valid, generate a refined match
+					matches_refined.push(TPartMatchRefined(){
+						slot_bindings:[int2(toks[saves[j]-1].epos0,toks[saves[j+1]-1].epos0) for j=i+2:2:i+2+n_slots*2-2],
+						param_bindings:saves[i+2+n_slots*2:],
+						id_combo:g_all_patterns[match.pid].id_combo,
+						ord_part:g_all_patterns[match.pid].ord_part,
+						epos0:toks[match.ptok0].epos0,
+						epos1:toks[match.ptok1-1].epos1,
+					})
+					break
+		Writeln(matches_refined)//todo
+		//per-combo matches_refined collection - search the first non-optional part
+		//we need the first part to be reasonably unique
+		//for this shit to work, we need an obj that appears in all parts
+		mid_by_combo_part=new int[][int2]
+		for match,I in matches_refined
+			mids=mid_by_combo_part[int2(match.id_combo,match.ord_part)]
+			if !mids:
+				mids=new int[]
+				mid_by_combo_part[int2(match.id_combo,match.ord_part)]=mids
+			mids.push(I)
+		final_ret=JS.NewArray()
+		p_final_ret=0
+		for match,I in matches_refined
+			if match.ord_part!=0:continue
+			combo_param_bindings=new int[int]
+			combo=g_combo_by_id[match.id_combo]
+			part_match_ids=new int[combo.parts.n]
+			part_match_ids[0]=I
+			failed=0
+			for j=0:combo.parts[0].id_params.n-1
+				if match.param_bindings[j]:
+					combo_param_bindings[combo.parts[0].id_params[j]]=match.param_bindings[j]
+			for i=1:combo.parts.n-1
+				mids=mid_by_combo_part[int2(match.id_combo,int(i))]
+				if !mids:
+					failed=1
+					break
+				best_dist=0x7fffffff
+				for mid_i in mids
+					match_i=matches_refined[mid_i]
+					if match_i.ord_part<0:continue
+					is_bad=0
+					for j=0:combo.parts[i].id_params.n-1
+						if match_i.param_bindings[j]:
+							id_j=combo.parts[i].id_params[j]
+							if combo_param_bindings[id_j]&&combo_param_bindings[id_j]!=match_i.param_bindings[j]:
+								is_bad=1
+								break
+					if is_bad:continue
+					dist=min(abs(match_i.epos0-matches_refined[part_match_ids[i-1]].epos0),abs(match_i.epos1-matches_refined[part_match_ids[i-1]].epos1))
+					if best_dist>dist:
+						best_dist=dist
+						part_match_ids[i]=mid_i
+					break
+				if best_dist==0x7fffffff:
+					failed=1
+					break
+				for j=0:combo.parts[i].id_params.n-1
+					if matches_refined[part_match_ids[i]].param_bindings[j]:
+						id_j=combo.parts[i].id_params[j]
+						combo_param_bindings[id_j]=matches_refined[part_match_ids[i]].param_bindings[j]
+			if !failed:
+				obj_I=JS.New()
+				final_ret[p_final_ret]=obj_I
+				obj_I["name"]=getIdString(match.id_combo)
+				obj_parts=JS.NewArray()
+				obj_I["parts"]=obj_parts
+				for j=0:combo.parts.n-1
+					obj_part_j=JS.New()
+					obj_parts[j]=obj_part_j
+					obj_part_j["epos0"]=matches_refined[part_match_ids[j]].epos0
+					obj_part_j["epos1"]=matches_refined[part_match_ids[j]].epos1
+					obj_part_j["slot_bindings"]=matches_refined[part_match_ids[j]].slot_bindings.ConvertToAsBinary(int)
+					//also remove the matched stuff
+					matches_refined[part_match_ids[j]].ord_part=-1
+				obj_params=JS.New()
+				obj_I["params"]=obj_params
+				for d,k in combo_param_bindings
+					obj_params[getIdString(k)]=getIdString(d)
+		return JS.Return(final_ret)
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)

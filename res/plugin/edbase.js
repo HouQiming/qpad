@@ -3393,6 +3393,10 @@ UI.RegisterEditorPlugin(function(){
 				this.StartACWithCandidates(cands);
 			}
 		}.bind(this)});
+		menu_tools.AddNormalItem({text:"Debug: parse combo...",key:"SHIFT+CTRL+E",enable_hotkey:1,action:function(){
+			var ret=UI.ED_ParseAsCombo(this,0,this.ed.GetTextSize());
+			console.log(JSON.stringify(ret));//todo
+		}.bind(this)});
 		menu_tools=undefined;
 	})
 });
