@@ -3372,31 +3372,33 @@ UI.RegisterEditorPlugin(function(){
 });
 
 //QInfo
-UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	this.AddEventHandler('global_menu',function(){
-		var menu_tools=UI.BigMenu("&Tools")
-		menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
-			//coulddo: size-limiting
-			var ret=UI.ED_QueryQInfo(this,0,this.sel1.ccnt);
-			var cands=[];
-			var BIG_WEIGHT=1048576;
-			for(var i=0;i<ret.objs.length;i++){
-				if(!ret.objs[i].id!='~'){
-					cands.push({name:ret.objs[i].id,weight:BIG_WEIGHT,brief:ret.objs[i].brief});
+if(UI.ENABLE_EXPERIMENTAL_FEATURES){
+	UI.RegisterEditorPlugin(function(){
+		if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+		this.AddEventHandler('global_menu',function(){
+			var menu_tools=UI.BigMenu("&Tools")
+			menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
+				//coulddo: size-limiting
+				var ret=UI.ED_QueryQInfo(this,0,this.sel1.ccnt);
+				var cands=[];
+				var BIG_WEIGHT=1048576;
+				for(var i=0;i<ret.objs.length;i++){
+					if(!ret.objs[i].id!='~'){
+						cands.push({name:ret.objs[i].id,weight:BIG_WEIGHT,brief:ret.objs[i].brief});
+					}
 				}
-			}
-			for(var i=0;i<ret.funcs.length;i++){
-				cands.push({name:ret.funcs[i].id,weight:BIG_WEIGHT,brief:ret.funcs[i].brief});
-			}
-			if(cands.length){
-				this.StartACWithCandidates(cands);
-			}
-		}.bind(this)});
-		menu_tools.AddNormalItem({text:"Debug: parse combo...",key:"SHIFT+CTRL+E",enable_hotkey:1,action:function(){
-			var ret=UI.ED_ParseAsCombo(this,0,this.ed.GetTextSize());
-			console.log(JSON.stringify(ret));//todo
-		}.bind(this)});
-		menu_tools=undefined;
-	})
-});
+				for(var i=0;i<ret.funcs.length;i++){
+					cands.push({name:ret.funcs[i].id,weight:BIG_WEIGHT,brief:ret.funcs[i].brief});
+				}
+				if(cands.length){
+					this.StartACWithCandidates(cands);
+				}
+			}.bind(this)});
+			menu_tools.AddNormalItem({text:"Debug: parse combo...",key:"SHIFT+CTRL+E",enable_hotkey:1,action:function(){
+				var ret=UI.ED_ParseAsCombo(this,0,this.ed.GetTextSize());
+				console.log(JSON.stringify(ret));//todo
+			}.bind(this)});
+			menu_tools=undefined;
+		})
+	});
+}

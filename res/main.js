@@ -11,6 +11,7 @@ var Language=require("res/lib/langdef");
 var MAX_STALE_TIME=3600*24;
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
+UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
 
 if(UI.TestOption('software_srgb')){
 	//UI.SetSRGBEnabling(0);
@@ -904,5 +905,3 @@ UI.EventFilter=function(event){
 		UI.m_need_metadata_save=0;
 	}
 })();
-
-	

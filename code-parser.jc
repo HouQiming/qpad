@@ -12,7 +12,7 @@ import TextBox.*
 import TextBox.detail.*
 import Encoding.*
 
-ENABLE_EXPERIMENTAL_FEATURES=1
+ENABLE_EXPERIMENTAL_FEATURES=(Platform.BUILD=="debug")
 
 /////////////////////////////////////
 //parser utility from compiler code
@@ -3374,7 +3374,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		final_ret["funcs"]=js_funcs
 		return JS.Return(final_ret)
 	}
-	JS_UI["ED_ParseAsCombo"]=function(JSContext JS){
+	JS_UI["ENABLE_EXPERIMENTAL_FEATURES"]=ENABLE_EXPERIMENTAL_FEATURES;
+	if ENABLE_EXPERIMENTAL_FEATURES:JS_UI["ED_ParseAsCombo"]=function(JSContext JS){
 		//parse a bunch of text into combos
 		doc=JS.Param(0).as(JSObject)
 		options=doc["plugin_language_desc"].as(JSObject)

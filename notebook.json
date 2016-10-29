@@ -24,22 +24,22 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code -awin64 qpad.jc --run\n",
-   "m_text_out": "s7main.c\r\n   Creating library ./bin/win64/qpad.lib and object ./bin/win64/qpad.exp\r\ncreating FBO: 1920 1017\r\n>>> patterns\r\n#0: var @0 ={};\r\n 0 4\r\n#1: var @4 =function( ...  @3  ... ){var @5 = @0 [ @3 ];if(! @5 ){ ...  @0 [ @3 ]= @5 ;}return @5 ;};\r\n 3 6\r\n{,m_data:[{k:0,v:NULL},{k:1073741855,v:[0,1]}],m_hash:[0,0,0,0,0,0,1,0],szbytes:16}\r\n[{pid:0,ptok0:175,ptok1:181},{pid:0,ptok0:191,ptok1:197},{pid:0,ptok0:1331,ptok1:1337},{pid:0,ptok0:2931,ptok1:2937},{pid:0,ptok0:4354,ptok1:4360}]\r\n[{slot_bindings:[],param_bindings:[61,0,0,0],id_combo:414,ord_part:0,epos0:2009,epos1:2029},{slot_bindings:[],param_bindings:[65,0,0,0],id_combo:414,ord_part:0,epos0:2072,epos1:2095},{slot_bindings:[],param_bindings:[96,0,0,0],id_combo:414,ord_part:0,epos0:6668,epos1:6679},{slot_bindings:[],param_bindings:[270,0,0,0],id_combo:414,ord_part:0,epos0:12321,epos1:12343},{slot_bindings:[],param_bindings:[349,0,0,0],id_combo:414,ord_part:0,epos0:18226,epos1:18240}]\r\n[]\r\n",
+   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library ./bin/win64/qpad.lib and object ./bin/win64/qpad.exp\r\ncreating FBO: 1920 1017\r\n",
    "m_cell_id": 1,
    "m_completion_time": [
     2016,
     9,
-    27,
-    21,
-    17,
-    29,
-    5
+    28,
+    11,
+    1,
+    24,
+    6
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug",
-   "m_unknown_progress": 0.6579887058753766,
-   "m_t_unknown_progress": 28626799876,
+   "m_unknown_progress": 0.25,
+   "m_t_unknown_progress": 4018806274,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -48,7 +48,7 @@
   },
   {
    "m_language": "Windows BAT",
-   "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
+   "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\ngit log --pretty=format:\"%H\" -n 1 > res/misc/commit.txt\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
    "m_text_out": "s7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\ns7res.c\r\n   Creating library ./bin/win32_release/qpad.lib and object ./bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4579840 bytes (4473 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1547663 bytes (1512 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4847616 bytes (4734 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1631172 bytes (1593 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
    "m_cell_id": 2,
    "m_has_any_error": 0,
@@ -105,7 +105,31 @@
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
    "out_m_enable_wrapping": 0
+  },
+  {
+   "m_language": "Windows BAT",
+   "m_text_in": "@echo off\nrem build script for 'code-parser.jc'\ncd /d .\njc code-parser.jc --run\n",
+   "m_text_out": "Stopped...\nc:/tp/qpad/notebook.json:1:1: fatal error: the script has returned an error 1\n",
+   "m_cell_id": 5,
+   "m_button_name": "• code-parser.jc",
+   "m_has_any_error": 1,
+   "m_unknown_progress": 1.0974438316923592,
+   "m_t_unknown_progress": 4065718489,
+   "m_current_path": "c:/tp/qpad",
+   "m_completion_time": [
+    2016,
+    9,
+    28,
+    11,
+    1,
+    44,
+    6
+   ],
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "out_m_current_wrap_width": 512,
+   "out_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 10
 }

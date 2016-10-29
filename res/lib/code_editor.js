@@ -4547,7 +4547,7 @@ var fnewpage_findbar_plugin=function(){
 				UI.Refresh();
 				return;
 			}
-			if(cur_item.is_tree_view&&cur_item.parent){
+			if(cur_item.is_tree_view&&cur_item.parent&&obj.file_list&&obj.file_list.items){
 				//go to parent *AND* fold
 				for(var i=0;i<obj.file_list.items.length;i++){
 					if(obj.file_list.items[i]==cur_item.parent){
@@ -4593,7 +4593,7 @@ var fnewpage_findbar_plugin=function(){
 	this.AddEventHandler('PGUP',fpassthrough)
 	this.AddEventHandler('PGDN',fpassthrough)
 	this.AddEventHandler('TAB',function(key,event){
-		var s_search_text=this.ed.GetText()
+		var s_search_text=(this.ed.GetText()||"")
 		var spath=s_search_text
 		var ccnt=Duktape.__byte_length(spath)
 		if(spath.length&&this.sel0.ccnt==ccnt&&this.sel1.ccnt==ccnt){
@@ -7906,6 +7906,7 @@ W.OptionsPage=function(id,attrs){
 			plugin_items["About"]=[
 				{license_line:UI.Format("QPad v@1, by Qiming HOU",UI.g_version),text_color_license:UI.default_styles.feature_item.text_color},
 				{license_line:UI._("Contact: hqm03ster@gmail.com"),text_color_license:UI.default_styles.feature_item.text_color},
+				{license_line:UI.Format("Commit: @1",UI.g_commit)},
 			];
 			/////////////////
 			//OSS licenses
