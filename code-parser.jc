@@ -1633,10 +1633,16 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 	return (objs,qi_funcs)
 
 if ENABLE_EXPERIMENTAL_FEATURES:
+	//struct TComboSlot
+	//	int id
+	//	int2[] annotations
+	TComboSlot=TQIType
 	struct TComboPart
 		int id
 		int[] id_params
 		int[] pattern
+		int2[] annotations
+		TComboSlot[] slots
 	class CQICombo
 		int id
 		int epos0
@@ -1656,6 +1662,7 @@ auto BuildComboNFA()
 	g_all_patterns.clear()
 	p_slots=0L
 	for combo,id in g_combo_by_id
+		if !combo:continue
 		for part,I in combo.parts
 			//we must have at least 2 tokens in each part
 			while part.pattern.n&&part.pattern.back()==TOK_COMBO_SLOT:
@@ -2271,31 +2278,27 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-part",11)==0:
 							if cur_combo:
 								FlushComboPattern()
-								//parse the prototype
-								toks_proto=tokenize(sdataz[j+13:epos1-1]+g_zero_byte_string,1,0)
-								p_cproto=0L
-								if p_cproto<toks_proto.n&&(toks_proto[p_cproto].tok&TOK_TYPE_MASK)==TOK_ID:
-									//create a combo
-									cur_combo.parts.push(TComboPart(){
-										id:toks_proto[p_cproto].tok-TOK_ID,
-										id_params:new(common_combo_args),
-										pattern:new int[],
-									})
-									p_cproto++
-									id_params=cur_combo.parts.back().id_params
-									while p_cproto<toks_proto.n:
-										if (toks_proto[p_cproto].tok&TOK_TYPE_MASK)==TOK_ID:
-											id_params.push(toks_proto[p_cproto].tok-TOK_ID)
-										p_cproto++
+								//parse the prototype - allow location hints in annotations
+								//toks_proto=tokenize(sdataz[j+12:epos1-1]+g_zero_byte_string,1,0)
+								t_part=ParseQIType(sdataz[j+12:epos1-1])
+								cur_combo.parts.push(TComboPart(){
+									id:t_part.id,
+									id_params:new(common_combo_args),
+									pattern:new int[],
+									annotations:t_part.annotations,
+									slots:new TComboSlot[],
+								})
 								ptok_combo_ptn_last=i+1
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-slot",11)==0:
 							if cur_combo&&cur_combo.parts.n:
 								FlushComboPattern()
+								//slot auto-available annotations
+								t_slot=ParseQIType(sdataz[j+12:epos1-1])
 								pattern=cur_combo.parts.back().pattern
 								if pattern.n&&pattern.back()!=TOK_COMBO_SLOT:
 									pattern.push(TOK_COMBO_SLOT)
-								//todo: args
 								ptok_combo_ptn_last=i+1
+								cur_combo.parts.back().slots.push(t_slot)
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
 							//create a CQIFunc from scratch, with alternative call sequence
 							//todo
@@ -3376,12 +3379,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	}
 	JS_UI["ENABLE_EXPERIMENTAL_FEATURES"]=ENABLE_EXPERIMENTAL_FEATURES;
 	if ENABLE_EXPERIMENTAL_FEATURES:JS_UI["ED_ParseAsCombo"]=function(JSContext JS){
+		//todo: cross-file combos
 		//parse a bunch of text into combos
 		doc=JS.Param(0).as(JSObject)
 		options=doc["plugin_language_desc"].as(JSObject)
 		ed=doc["ed"].as(CEditableText)
 		if !options:return 0
 		if !ed:return JS.ReturnError("invalid editor object")
+		//todo: multi-file
 		ccnt0=JS.Param(1).as(i64)
 		ccnt1=JS.Param(2).as(i64)
 		sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
@@ -3567,6 +3572,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					})
 					break
 		//Writeln(matches_refined)
+		struct TPlace
+			int epos0,epos1
+			int2[] annotations
+			int[int] final_annotations
 		//per-combo matches_refined collection - search the first non-optional part
 		//we need the first part to be reasonably unique
 		//for this shit to work, we need an obj that appears in all parts
@@ -3577,8 +3586,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				mids=new int[]
 				mid_by_combo_part[int2(match.id_combo,match.ord_part)]=mids
 			mids.push(I)
-		final_ret=JS.NewArray()
-		p_final_ret=0
+		js_matcheds=JS.NewArray()
+		p_js_matcheds=0
+		places=new TPlace[]
 		for match,I in matches_refined
 			if match.ord_part!=0:continue
 			combo_param_bindings=new int[int]
@@ -3620,11 +3630,18 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						combo_param_bindings[id_j]=matches_refined[part_match_ids[i]].param_bindings[j]
 			if !failed:
 				obj_I=JS.New()
-				final_ret[p_final_ret]=obj_I
+				js_matcheds[p_js_matcheds++]=obj_I
 				obj_I["name"]=getIdString(match.id_combo)
 				obj_parts=JS.NewArray()
 				obj_I["parts"]=obj_parts
 				for j=0:combo.parts.n-1
+					slot_bindings=matches_refined[part_match_ids[j]].slot_bindings
+					for slot,I in slot_bindings
+						places.push(TPlace(){
+							epos0:slot.x,
+							epos1:slot.y,
+							annotations:combo.parts[j].slots[I].annotations
+						})
 					obj_part_j=JS.New()
 					obj_parts[j]=obj_part_j
 					obj_part_j["epos0"]=matches_refined[part_match_ids[j]].epos0
@@ -3636,6 +3653,64 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				obj_I["params"]=obj_params
 				for d,k in combo_param_bindings
 					obj_params[getIdString(k)]=getIdString(d)
+		//organize the places - nested place handling
+		struct TPlaceEvent
+			int epos,side,place_id
+		evts=new TPlaceEvent[]
+		for pl,I in places
+			evts.push(TPlaceEvent(){epos:pl.epos0,side:0,place_id:int(I)})
+			evts.push(TPlaceEvent(){epos:pl.epos1,side:1,place_id:int(I)})
+		evts.Sortby(byMember("epos"))
+		cur_places=new int[]
+		for e in evts
+			if e.side==0:
+				cur_places.push(e.place_id)
+				if cur_places.n>1:
+					new_annotations=new int[int]
+					for plid in cur_places
+						for ai in places[plid].annotations
+							new_annotations[ai.x]=ai.y
+					places[e.place_id].final_annotations=new_annotations
+			else
+				for j=cur_places.n-1:-1:0
+					if cur_places[j]==e.place_id:
+						cur_places[j]=cur_places[cur_places.n-1]
+						cur_places.pop()
+						break
+		//annotation-based combo part searching - enum all known combos
+		//compute availability and score
+		js_availables=JS.NewArray()
+		p_js_availables=0
+		for combo,id in g_combo_by_id
+			if !combo:continue
+			n_annotations_max=0
+			is_available=1
+			for part,I in combo.parts
+				if !part.annotations||!part.annotations.n:continue
+				if n_annotations_max<part.annotations.n:
+					n_annotations_max=part.annotations.n
+				is_available_part_I=0
+				for pl,J in places
+					is_available_part_I_place_J=1
+					for ai in part.annotations
+						if pl.final_annotations[ai.x]!=ai.y:
+							is_available_part_I_place_J=0
+							break
+					if is_available_part_I_place_J:
+						is_available_part_I=1
+						break
+				if !is_available_part_I:
+					is_available=0
+					break
+			if !is_available:continue
+			//available, score it at n_annotations_max
+			obj_combo=JS.New()
+			obj_combo["id"]=getIdString(id)
+			obj_combo["score"]=n_annotations_max
+			js_availables[p_js_availables]=obj_combo
+		final_ret=JS.New()
+		final_ret["matched"]=js_matcheds
+		final_ret["available"]=js_availables
 		return JS.Return(final_ret)
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){

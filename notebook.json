@@ -2,7 +2,7 @@
  "cells": [
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\n(test) qcombo parsing\n\tmatching pattern 1\nactual qinfo / qcombo ac\n\tfill the params\n(test) double click on shader error\nqcombo could have typed args\nqinfo\n\tgraph-without-annotations: matching algorithm\n\t\twe only need to distinguish *one* node's connections\n\t\tslots are like inline function calls\n\t\tparts are like function bodies\n\t\twe're attempting to tell them apart using pattern matching / keyword matching\n\t\t\tideally without the algorithm being too complex\n\t\t\tthe input is usually well-defined\n\t\t\t\tbut this may not hold if we disregard the inter-part connection\n\t\ttoken-level pattern match\n\t\t\tregexp-like interpreted-language matching\n\t\t\t\tthe only wildcard-like pattern is the slot - a bunch of tokens *with internally-matching brackets*\n\t\t\tNFA with a stack:\n\t\t\t\tbrackets inside the pattern advances the state along the stack direction\n\t\t\tideally we should use a DFA-with-a-stack\n\t\t\tconversion-from-NFA should be possible\n\t\tthe find-all-parts game\n\t\t\tfind individual parts using pattern matching\n\t\t\tthen bind the params for each first-part and see if we can match the later parts\n\t\tthis provides an interpretation of the entire file... but what about the AC?\n\t\t\tgraph-like add-something interface\n\t\t\tgraph-like reconnecting\n\t\t\tparameter co-editing\n\timplement the unique-per pattern\n\tAudio:\n\t\tqinfo member\n\t\tauto-qinfo for new\n\t\t\tqinfo-fn...\n\tby-topic qinfo files\n\t\tGL\n\t\t\ttype-to-acquire function AC\n\t\tHTML5\n\t\t\tAudio\n\t\t\tthe callback protocols\n\t\t\t\tformulate the callback-setting as qinfo-fn?\n\t\t\t\tor as a template?\n\t\t\t\tco-occuring code\n\t\t\t\t\tAC and maintenance\n\t\t\t\t\tpersistent memory of them\n\t\t\t\t\t\thow do humans do that?\n\t\t\t\t\t\tCTRL+F\n\t\t\t\t\t\tthere is always a keyword linking them all together\n\t\t\t\t\t\t\tthe variable name in object tending\n\t\t\t\t\t\t\tthe method name in C++ method crap\n\t\t\t\t\t\t\tand the comment / qinfo explaining what the hell it is\n\t\t\t\t\t\talgo:\n\t\t\t\t\t\t\tparse the keyword-describing qinfos\n\t\t\t\t\t\t\tthen attempt to locate a keyword near the query\n\t\t\t\t\t\t\tif a match is found, test the context against those templates\n\tqinfo-in should count as qinfo-vars inside the function in question...\n\tparam briefs\n\t\tif qinfo AC were helpful *at all*, we don't need it\n\tfunction call AC\n\t\tis it useful?\n\tmaybe trigger on idle\n\t\tor change the default tab behavior\n\texample document\n\tkey concepts\n\t\ttemplate: code / asset / manual jobs that contribute to the *code*\n\t\t\ttemplates can have annotations too\n\t\t\t\tspecify parameters and their class requirements\n\t\t\ttemplates can create places\n\t\t\t\te.g. MUnityCharacterBehavior::per_frame_callback\n\t\t\ttemplates can fulfill functionalities\n\t\tplace: a marked code range that can hold annotations\n\t\t\tmember place - objects defined here can be obtained from any object of a specific class\n\t\tfunctionality: a state change / object creation that specifies some human-side goal\n\t\tobject / class: runtime concepts as in their standard meanings\n\t\t\tclass can be additionally annotated with semantical metadata\n\t\t\t\te.g. CImage.int(width)\n\t\t\tmetadata-classes can inherit each other\n\t\t\t\tmeta_class MUnity:MGameEngine\n\t\tstate: a set of assertions optionally attached to an object\n\t\t\te.g.\n\t\t\t\tgame_running\n\t\t\t\ttemp_buf0.holding_vertex_data\n\t\ttools: shell scripts intended for human application\n\t\t\te.g. \"run unity\"\n\tplace requirements\n\t\te.g. GL shaders have to be created during GL initialization\n\t\tcould be expressed by specifying the global state as a parameter requirement\n\tuse it to interpret the modelo frontend?\n\tsurpress common string test in qinfo AC?\nbring function hints / ... near the cursor\ndbl-clicking a partially-out-of-view notebook cell caption\nstyle enforcement\n\tpotentially per-project\ntagged code in md\n\thotkeys for browsing help\n\t\thelp window focus issues in general\n\tbad focus in the help window\n(reproduce?) project-in-unopenable-location crash\niOS bluetooth keyboard support\n\t- keyCommands\ngraph\n\teach tag as a node, with order-aware drag-connecting\n\t\tand maybe a description\n\t\tjust drag the code into the editor window\n\t\t\twith potential positioning hints\n\t\t\t\t(function(){})() indicates init code, etc.\n\t\t\tcarrying a tag\n\t\tcould provide tag-specific completion\n\t\t\tor just modify the code in the doc on the fly based on some more intuitive UI\n\t\t\tor something auto-edit-like\n\t\ttest: game programming course\n\tshow tag-related documentation on F1\n\t----\n\tthe point is the component-based programming\n\t\tvariable meaning list in holder tags\n\t\tvariable-type list\n\t\t\tannotate type with semantics\n\t\t\tuse type as goals and to select actions (APIs)\nstop / clear buttons in notebook v2\nF5/CTRL+F5 indicators\ntouch: scrolling, touch detection, ac modes, mouse over, typos\n\ttouch-awareness\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\n\tthe smart rerendering FBO... one FBO for each window? only one FBO for the frontmost?\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\ncode beautifier\n\thelp code / smart paste auto beautification\ndiff to generate undo ops on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\n\t\tor just buy a keyboard with Fn keys\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\tdisplay a \"how to replace\" hint when one presses ctrl+r\n\t[ new window ] and [ button: ... ] in help\npeek definition:\n\tCEO and hide cannot overlap\n",
+   "m_text_in": "# TODO LIST\ngraph view for adding available combos\n\tcomments to provide places explicitly\n\t\tfor the global places, it's a bad idea to parse it as a combo\nactual qinfo / qcombo ac\n\tslot analysis + a command list\n\t--\n\tqinfo - fill the params\n\tTOK_COMMENT: exact match\n\tcross-file combos\n\tqcombo - location-specific pieces\n\t\te.g. handle another URL in an HTTP server\n\t\tprefered location of combo parts\n\t\t\tpart-to-slot match\n\t\t--- UI design\n\t\tgraph-like?\n\t\tor just a list of available qcombo / qifunc s\n\t\tcould use ~ in combos\n\t\t\tvoid{location=globals}\n\t\t\twhich is messy\n\t\t\tone could just provide suggestions on graph node selection\n\t\t\t\tgraph is an *interpretation*\n\t\t\t\tjust build it and expose the ops\n\t\t\t\t\tfocus on \"add node\" and the game course\n(test) double click on shader error\nweird bookmark display in tophint for certain folding setups\nqcombo could have typed args\nbring function hints / ... near the cursor\ndbl-clicking a partially-out-of-view notebook cell caption\nstyle enforcement\n\tpotentially per-project\ntagged code in md\n\thotkeys for browsing help\n\t\thelp window focus issues in general\n\tbad focus in the help window\n(reproduce?) project-in-unopenable-location crash\niOS bluetooth keyboard support\n\t- keyCommands\ngraph\n\teach tag as a node, with order-aware drag-connecting\n\t\tand maybe a description\n\t\tjust drag the code into the editor window\n\t\t\twith potential positioning hints\n\t\t\t\t(function(){})() indicates init code, etc.\n\t\t\tcarrying a tag\n\t\tcould provide tag-specific completion\n\t\t\tor just modify the code in the doc on the fly based on some more intuitive UI\n\t\t\tor something auto-edit-like\n\t\ttest: game programming course\n\tshow tag-related documentation on F1\n\t----\n\tthe point is the component-based programming\n\t\tvariable meaning list in holder tags\n\t\tvariable-type list\n\t\t\tannotate type with semantics\n\t\t\tuse type as goals and to select actions (APIs)\nstop / clear buttons in notebook v2\nF5/CTRL+F5 indicators\ntouch: scrolling, touch detection, ac modes, mouse over, typos\n\ttouch-awareness\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\n\tthe smart rerendering FBO... one FBO for each window? only one FBO for the frontmost?\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\ncode beautifier\n\thelp code / smart paste auto beautification\ndiff to generate undo ops on reload\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\ndedicated mobile/mobile-like UI / console UI\n\tonly use the typeable part of a keyboard\n\tbuttons for common actions\n\t(maybe) vi-like commands\n\tterminal / mobile keyboard support\n\t\tor just buy a keyboard with Fn keys\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\tdisplay a \"how to replace\" hint when one presses ctrl+r\n\t[ new window ] and [ button: ... ] in help\npeek definition:\n\tCEO and hide cannot overlap\n",
    "m_text_out": "",
    "m_cell_id": 0,
    "m_has_any_error": 0,
@@ -24,22 +24,22 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code -awin64 qpad.jc --run\n",
-   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library ./bin/win64/qpad.lib and object ./bin/win64/qpad.exp\r\ncreating FBO: 1920 1017\r\n",
+   "m_text_out": "creating FBO: 1920 1017\r\n",
    "m_cell_id": 1,
    "m_completion_time": [
     2016,
-    9,
-    28,
-    11,
-    1,
-    24,
+    10,
+    4,
+    20,
+    2,
+    39,
     6
    ],
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug",
-   "m_unknown_progress": 0.25,
-   "m_t_unknown_progress": 4018806274,
+   "m_unknown_progress": 0.4707524460323823,
+   "m_t_unknown_progress": 113494864866,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -48,23 +48,23 @@
   },
   {
    "m_language": "Windows BAT",
-   "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\ngit log --pretty=format:\"%H\" -n 1 > res/misc/commit.txt\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
-   "m_text_out": "s7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\ns7res.c\r\n   Creating library ./bin/win32_release/qpad.lib and object ./bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4579840 bytes (4473 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1547663 bytes (1512 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4847616 bytes (4734 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1631172 bytes (1593 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
+   "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\ngit log --pretty=format:%%H -n 1 > res/misc/commit.txt\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
+   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\ns7main.c\r\ns7res.c\r\n   Creating library ./bin/win32_release/qpad.lib and object ./bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4598272 bytes (4491 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1553735 bytes (1518 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4869120 bytes (4755 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1638458 bytes (1601 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
    "m_cell_id": 2,
    "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_completion_time": [
     2016,
-    9,
-    6,
-    22,
-    21,
-    52,
-    5
+    10,
+    1,
+    15,
+    17,
+    46,
+    3
    ],
    "m_button_name": "Release",
-   "m_unknown_progress": 0.5474049147738855,
-   "m_t_unknown_progress": 5140280740,
+   "m_unknown_progress": 0.25,
+   "m_t_unknown_progress": 63062316431,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -105,31 +105,7 @@
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
    "out_m_enable_wrapping": 0
-  },
-  {
-   "m_language": "Windows BAT",
-   "m_text_in": "@echo off\nrem build script for 'code-parser.jc'\ncd /d .\njc code-parser.jc --run\n",
-   "m_text_out": "Stopped...\nc:/tp/qpad/notebook.json:1:1: fatal error: the script has returned an error 1\n",
-   "m_cell_id": 5,
-   "m_button_name": "• code-parser.jc",
-   "m_has_any_error": 1,
-   "m_unknown_progress": 1.0974438316923592,
-   "m_t_unknown_progress": 4065718489,
-   "m_current_path": "c:/tp/qpad",
-   "m_completion_time": [
-    2016,
-    9,
-    28,
-    11,
-    1,
-    44,
-    6
-   ],
-   "in_m_current_wrap_width": 512,
-   "in_m_enable_wrapping": 0,
-   "out_m_current_wrap_width": 512,
-   "out_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 10
+ "m_last_focus_cell_id": 0
 }
