@@ -3,6 +3,7 @@ import "bin-editor.jc"
 import "code-editor.jc"
 import "code-parser.jc"
 import "encoding.jc"
+import "g-l.jc"
 //import "txtx-editor.jc"
 //import "zip-doc.jc"
 //import "ooc-mipmap.jc"
@@ -11,6 +12,7 @@ import Gui2D.*
 import Javascript.*
 import System.Console.*
 import System.Algorithm.*
+import GL.*
 //import Uisandbox.*
 
 __generate_json("js_units","gui2d/ui.js")
@@ -76,9 +78,10 @@ if Platform.IS_WINDOWS:
 	__generate_json("lib_files","kernel32.lib")
 	__generate_json("lib_files","user32.lib")
 	__generate_json("lib_files","gdi32.lib")
-	if Platform.BUILD!="debug":
-		__generate_json("subsystem","windows")
-		__generate_json("c_files","jc_winmain.c")
+	//like Nuke, we could use a console
+	//if Platform.BUILD!="debug":
+	//	__generate_json("subsystem","windows")
+	//	__generate_json("c_files","jc_winmain.c")
 	__generate_json("vc_versions","11")
 //if Platform.ARCH=="win32":
 //	//use VC2008 for XP support
@@ -188,7 +191,206 @@ if Platform.BUILD=="debug":
 		}
 	})
 
+g_js_std_header="function(input,output)";
+MODE_INPUT=1
+MODE_OUTPUT=2
+inline StripLeadingSpaces(string s)
+	p=0L
+	while p<s.n&&(s[p]==' '||s[p]=='\t'):
+		p++
+	return s[p:]
+
+auto ParsePortDescs(JSObject ret,string scode)
+	//just ignore all errors
+	obj_ports=ret["m_ports"].as(JSObject)
+	p=obj_ports["length"].as(iptr)
+	prev_port=JSObject.NULL
+	for sline in scode.Tokenize("\r\n")
+		isin=1
+		pport=sline.IndexOf('@in=')
+		if pport>=0:
+			pport+=4
+		else
+			pport=sline.IndexOf('@out=')
+			if pport>=0:
+				pport+=5
+				isin=0
+			else
+				psticker=sline.IndexOf('@sticker=')
+				if psticker>=0&&prev_port:
+					psticker+=9
+					ssticker=sline[psticker:]
+					pspace=ssticker.IndexOf(' ')
+					if pspace>=0:
+						astickers=prev_port["stickers"].as(JSObject)
+						if !astickers:
+							astickers=JS.NewArray()
+							prev_port["stickers"]=astickers
+						n0=astickers["length"].as(iptr)
+						astickers[n0]=ssticker[:pspace-1]
+						astickers[n0+1]=ssticker[pspace+1:]
+				continue
+		words=[StripLeadingSpaces(s) for s in sline[pport:].Tokenize(",")]
+		sname=words[0]
+		//if obj_id2port:
+		//	obj_port=obj_id2port[sname].as(JSObject)
+		//	if Platform.BUILD=="debug":
+		//		if !obj_port:
+		//			Writeln('port not found: ',sname)
+		//else
+		obj_port=JSObject.NULL
+		if !obj_port:
+			obj_port=JS.New()
+			obj_ports[p]=obj_port; p++
+			obj_port["id"]=sname
+			obj_port["dir"]=(isin?"input":"output")
+		for i=1:words.n-1
+			s_word=words[i]
+			pcolon=s_word.IndexOf('=')
+			if pcolon<0:continue
+			s_key=s_word[:pcolon-1]
+			s_value=s_word[pcolon+1:]
+			if s_value.n&&s_value[0]>='0'&&s_value[0]<='9':
+				if s_value.StartsWith('0x'):
+					obj_port[s_key]=s_value[2:].asHex(int)
+				else
+					obj_port[s_key]=s_value.as(double)
+			else
+				obj_port[s_key]=s_value
+		prev_port=obj_port
+
+EnumWords=inline(scode){
+	return {forEach:inline(fbody){
+		plast=0L
+		foreach ch,I in scode
+			isalnum=(ch>='a'&&ch<='z'||ch>='A'&&ch<='Z'||ch>='0'&&ch<='9'||ch=='_'||ch>=128)
+			word0=plast
+			word1=-1L
+			ch_delimiter=ch
+			if !isalnum:
+				word1=I
+			else if isalnum&&I==scode.n-1:
+				word1=scode.n
+				ch_delimiter=char(0)
+			if word0<word1:
+				s_word=scode[word0:word1-1]
+				fbody(s_word,ch_delimiter,word0,word1)
+			if !isalnum:
+				plast=word1+1
+	}}
+}
+
+auto ParseJSNode(string scode)
+	//pnewline=scode0.IndexOf('\n')
+	//scode=scode0[pnewline+1:]
+	if !scode.StartsWith(g_js_std_header):
+		return JS.ReturnError('JS nodes must begin with "@1"'.Replace(["@1",g_js_std_header]))
+	obj_func=JS["eval"].Call(JSObject,"(function(){return "+scode+"})()")
+	///////////////
+	ports=[new string[] for i=0:1]
+	//got=new int[string]
+	//word_mode=0
+	//for s_word,ch in EnumWords(scode)
+	//	if word_mode>0:
+	//		if !(got[s_word]&(1<<(word_mode-1))):
+	//			ports[word_mode-1].push(s_word)
+	//			got[s_word]|=(1<<(word_mode-1))
+	//		word_mode=0
+	//	else
+	//		word_mode=0
+	//		if ch=='.':
+	//			if s_word=='input':
+	//				word_mode=MODE_INPUT
+	//			else if s_word=='output':
+	//				word_mode=MODE_OUTPUT
+	//we still need @type for type labels
+	ret=JS.New()
+	ret["m_script"]=obj_func
+	obj_ports=JS.NewArray()
+	ret["m_ports"]=obj_ports
+	//obj_id2port=JS.New()
+	//p=0L
+	//for i=0:1
+	//	for s in ports[i]
+	//		obj=JS.New()
+	//		obj_ports[p]=obj;p++
+	//		obj["id"]=s
+	//		obj["dir"]=(i==0?"input":"output")
+	//		obj_id2port[s]=obj
+	//ParsePortDescs(ret,obj_id2port,scode)
+	ParsePortDescs(ret,scode)
+	return JS.Return(ret)
+
+JS=new JSContext
+auto ParseTextNode(string scode)
+	//make @out lines hard separators
+	obj_code_blocks=JS.NewArray()
+	p=0L
+	s_port_name=string.NULL
+	sblock=new string
+	for sline,I in scode.TokenizeEx("\r\n",scode.TOKENIZE_ALLOW_EMPTY|scode.TOKENIZE_INCLUDE_SEPARATOR)
+		pport=sline.IndexOf('@out=')
+		if pport<0:
+			if sline.IndexOf('@in=')<0&&sline.IndexOf('@sticker=')<0:
+				sblock.push(sline)
+			continue
+		else
+			//found a separator
+			if s_port_name&&sblock.n:
+				obj_code_blocks[p+0]=s_port_name
+				obj_code_blocks[p+1]=sblock
+				p+=2
+			sblock=new string
+			pport+=5
+			s_port_name=StripLeadingSpaces(sline[pport:])
+			pcomma=s_port_name.IndexOf(',')
+			if pcomma>=0:
+				s_port_name.n=pcomma
+	if s_port_name&&sblock.n:
+		obj_code_blocks[p+0]=s_port_name
+		obj_code_blocks[p+1]=sblock
+		p+=2
+	ret=JS.New()
+	ret["m_blocks"]=obj_code_blocks
+	obj_ports=JS.NewArray()
+	ret["m_ports"]=obj_ports
+	ParsePortDescs(ret,scode)
+	is_in_port=new int[string]
+	n_ports=obj_ports["length"].as(iptr)
+	for i=0:n_ports-1
+		s_id=obj_ports[i]["id"].as(string)
+		if obj_ports[i]["dir"].as(string)=="input":
+			is_in_port[s_id]=1
+	for i=1:2:p-1
+		sblock=obj_code_blocks[i].as(string)
+		p_splits=new iptr[]
+		p_splits.push(0L)
+		for s_word,ch,p0,p1 in EnumWords(sblock)
+			if is_in_port[s_word]:
+				p_splits.push(p0)
+				p_splits.push(p1)
+		p_splits.push(sblock.n)
+		obj_block=JS.NewArray()
+		for i=0:p_splits.n-2
+			obj_block[i]=sblock[p_splits[i]:p_splits[i+1]-1]
+		obj_code_blocks[i]=obj_block
+	return JS.Return(ret)
+
+auto CountLeadingSpaces(string s)
+	for i=0:s.n-1
+		if s[i]!=' '&&s[i]!='\t':return i
+	return s.n
+
+//#b+814459e6fe91
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	JS_UI["ParseJSNode"]=function(JSContext JS)
+		scode=JS.Param(0).as(string)
+		return ParseJSNode(scode)
+	JS_UI["ParseTextNode"]=function(JSContext JS)
+		scode=JS.Param(0).as(string)
+		return ParseTextNode(scode)
+	JS_UI["m_node_dir"]=System.Env.GetExecutablePath()+"../../nodes"
+	///////////////////////////
 	g_edge_vbo=new float[]
 	g_vbo_tech=GLTechnique.NULL
 	JS_UI["RenderEdge"]=function(JSContext JS){
@@ -276,11 +478,212 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		dir_tar=JS.Param(1).as(string)
 		return JS.Return(RecursiveCopy(dir_src,dir_tar))
 	}
+	JS_UI["ParseSyncTags"]=function(JSContext JS){
+		auto fn=JS.Param(0).as(string)
+		auto scode=System.IO.ReadAll(fn)
+		if !scode:
+			return JS.Return('cannot read the file')
+		struct TSyncStackItem
+			string id,port
+			string buf
+			int pindent,strip_next
+		auto stk=new TSyncStackItem[]
+		auto sync_jobs=new TSyncStackItem[]
+		for sline in scode.TokenizeEx("\r\n",scode.TOKENIZE_ALLOW_EMPTY|scode.TOKENIZE_INCLUDE_SEPARATOR)
+			psync=sline.IndexOf('@sync_')
+			if psync>=0:
+				sync_op=0
+				if sline[psync+6:].StartsWith('in='):
+					//input knob, insert as is, *WITHOUT THE NEWLINE*
+					if stk.n:
+						s_port=sline[psync+9:]
+						//if s_port.n&&s_port.back()=='\n':
+						//	s_port.n--
+						//if s_port.n&&s_port.back()=='\r':
+						//	s_port.n--
+						pspace=s_port.IndexOf(' ')
+						if pspace>=0:
+							pt=psync-s_port[:pspace-1].as(int)
+							if pt>=0&&pt<psync:
+								//indent plus port name
+								sindent=sline[:pt-1]
+								stk[stk.n-1].buf.push(sindent[min(stk[stk.n-1].pindent,CountLeadingSpaces(sindent)):])
+								stk[stk.n-1].buf.push(s_port[pspace+1:])
+								stk[stk.n-1].strip_next=1
+								continue
+				else if sline[psync+6:].StartsWith('push='):
+					sync_op=1
+				else if sline[psync+6:].StartsWith('pop='):
+					sync_op=-1
+				if sync_op!=0:
+					ssyncdata=sline[psync+(sync_op>0?11:10):]
+					pportid=ssyncdata.IndexOf('?')
+					if pportid>=0:
+						s_node=ssyncdata[:pportid-1]
+						s_port=ssyncdata[pportid+1:]
+						if s_port.n&&s_port.back()=='\n':
+							s_port.n--
+						if s_port.n&&s_port.back()=='\r':
+							s_port.n--
+						if sync_op==1:
+							if stk.n&&stk[stk.n-1].strip_next==1:
+								stk[stk.n-1].strip_next=2
+								last_buf=stk[stk.n-1].buf
+								if last_buf.n&&last_buf.back()=='\n':
+									last_buf.pop()
+									if last_buf.n&&last_buf.back()=='\r':
+										last_buf.pop()
+							stk.push(TSyncStackItem(){
+								id:s_node,port:s_port,
+								buf:new string,
+								pindent:CountLeadingSpaces(sline)
+							})
+						else
+							//in pop, s_port contains another = and we need to keep whatever coming after it, with the newline
+							//pequ=s_port.IndexOf('=')
+							//if pequ>=0:
+							//	if stk.n:
+							//		stk[stk.n-1].buf.push(ssyncdata[pportid+1+pequ+1:])
+							//	s_port=s_port[:pequ-1]
+							if !stk.n:return JS.Return(FormatAsText("'",sline[psync:],"' does't match any sync_push"))
+							si=stk.pop()
+							s_node0=si.id
+							s_port0=si.port
+							if s_node0!=s_node||s_port0!=s_port:
+								return JS.Return(FormatAsText("'",sline[psync:],"' does't match '@sync_push="+s_node0+"="+s_port0+"'"))
+							//create jobs on pop... no real difference though
+							sync_jobs.push(si)
+						continue
+			if stk.n:
+				//parse mid-line sync tags
+				auto s=sline[min(stk[stk.n-1].strip_next==2?0x7fffffff:stk[stk.n-1].pindent,CountLeadingSpaces(sline)):]
+				auto buf=stk[stk.n-1].buf
+				stk[stk.n-1].strip_next=0
+				for(;;){
+					pmidline_tag=s.IndexOf("/*[")
+					if pmidline_tag<0:
+						buf.push(s)
+						break
+					//////
+					buf.push(s[:pmidline_tag-1])
+					s=s[pmidline_tag+3:]
+					pmidline_tag=s.IndexOf("*/")
+					if pmidline_tag<0:
+						buf.push("/*[")
+						continue
+					//////
+					buf.push(s[:pmidline_tag-1])
+					s=s[pmidline_tag+2:]
+					pmidline_tag=s.IndexOf('/*]*/')
+					if pmidline_tag<0:
+						buf.push("*/")
+						continue
+					s=s[pmidline_tag+5:]
+				}
+		if stk.n:
+			si=stk.pop()
+			s_node0=si.id
+			s_port0=si.port
+			return JS.Return(FormatAsText("'@sync_push="+s_node0+"="+s_port0+"' has no matching push"))
+		sync_jobs.Sort(inline(a,b){return a.id<b.id||a.id==b.id&&a.port<b.port})
+		//merge with existing in-file data, apply the changes to unsaved editor windows
+		auto ret=JS.NewArray();
+		auto lg_ret=0
+		for id,grp in sync_jobs.Groupby(byMember("id"))
+			ret_i=JS.New()
+			ret_i["m_id"]=id
+			obj_port_jobs=JS.NewArray()
+			ret_i["m_port_jobs"]=obj_port_jobs
+			nobj=0
+			for si in grp
+				obj_port_jobs[nobj++]=si.port
+				obj_port_jobs[nobj++]=si.buf
+			ret[lg_ret++]=ret_i
+		return JS.Return(ret)
+	}
+	JS_UI["SyncOneFile"]=function(JSContext JS){
+		ed=JS.Param(0).as(TextBox.detail.CEditableText)
+		if !ed:return 0
+		port2code=JS.Param(1).as(JSObject)
+		if !port2code:return 0
+		////////////////////////////
+		//per-line port reconstruction
+		scode=ed.GetText(0LL,ed.GetTextSize())
+		scode_new=new string
+		do_echo=0
+		for sline,I in scode.TokenizeEx("\r\n",scode.TOKENIZE_ALLOW_EMPTY|scode.TOKENIZE_INCLUDE_SEPARATOR)
+			//preserve the @in and @sticker stuff
+			if sline.IndexOf('@in=')>=0||sline.IndexOf('@sticker=')>=0:
+				scode_new.push(sline)
+				continue
+			else 
+				pport=sline.IndexOf('@out=')
+				if pport>=0:
+					scode_new.push(sline)
+					//reconstruct from the sync job... if we could find the port
+					s_portname=sline[pport+5:]
+					pcomma=s_portname.IndexOf(',')
+					if pcomma>=0:
+						s_portname.n=pcomma
+					s_code=port2code[s_portname].as(string)
+					if s_code:
+						scode_new.push(s_code)
+						if s_code.n&&s_code.back()!='\n':
+							scode_new.push('\n')
+						do_echo=0
+					else
+						do_echo=1
+				else
+					if do_echo:scode_new.push(sline)
+		////////////////////////////
+		dmp_diff_to_i64_list=__c_function(int,"dmp_diff_to_i64_list","dmp.h","c_files","dmp.c")
+		dmp_diff_new=__c_function(int,"dmp_diff_new","dmp.h","c_files","dmp.c")
+		dmp_diff_free=__c_function(int,"dmp_diff_free","dmp.h","c_files","dmp.c")
+		diff=NULL
+		dmp_diff_new(__C(__pointer,"(dmp_diff**)@1",&diff),NULL, scode,scode.n, scode_new,scode_new.n);
+		if !diff:return 0
+		n=dmp_diff_to_i64_list(diff,NULL)
+		rawdiff=new i64[n]
+		n=dmp_diff_to_i64_list(diff,rawdiff)
+		assert(n==rawdiff.n)
+		dmp_diff_free(diff)
+		diff=NULL
+		////////////////////////////
+		ops=new TextBox.detail.TEditop[]
+		for i=0:3:rawdiff.n-3
+			if rawdiff[i+2]:
+				//insert
+				ops.push(TextBox.detail.TEditop(){
+					ccnt:rawdiff[i+0],
+					sz:0LL,
+					s:scode_new[iptr(rawdiff[i+2])-scode_new.d:iptr(rawdiff[i+2]+rawdiff[i+1])-scode_new.d-1]
+				})
+			else
+				//delete
+				ops.push(TextBox.detail.TEditop(){
+					ccnt:rawdiff[i+0],
+					sz:rawdiff[i+1],
+				})
+		if ops.n:
+			ed.Edit(ops)
+		//we need to keep scode_new until here - there are references inside it... well, it's represented as slices
+		//scode_new.discard()
+		scode.discard();
+		return JS.Return(1)
+	}
+	JS_UI["GetFileDigest"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		sdata=System.IO.ReadAll(fn)
+		if sdata:
+			return JS.Return(SHA1Digest(sdata))
+		else
+			return 0
+	}
 });
+//#b-814459e6fe91
 
 (function(){
 	//Gui2D.ProvideGLFunctions()
-	JS=new JSContext
 	JS_script_sandbox=new JSContext
 	sbox=setupModuleSystem(JS,1)
 	if Platform.IS_MOBILE:
@@ -320,6 +723,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return JS.Return(s)
 		else
 			return 0
+	}
+	jsio["CreateDirectory"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		if !fn:return 0
+		return JS.Return(System.IO.CreateDirectory(fn))
 	}
 	jsio["CreateFile"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
@@ -606,11 +1014,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			proc.Terminate()
 			return 0
 		}
+		JS_WaitForever=function(JSContext JS){
+			proc.WaitForever()
+			return 0
+		}
 		__JS_prototype=function(JSObject proto){
 			proto.ExportMethod(this,"Read",JS_Read)
 			proto.ExportMethod(this,"GetExitCode",JS_ExitCode)
 			proto.ExportMethod(this,"IsRunning",JS_IsRunning)
 			proto.ExportMethod(this,"Terminate",JS_Terminate)
+			proto.ExportMethod(this,"WaitForever",JS_WaitForever)
 		}
 	jsio["RunProcess"]=function(JSContext JS){
 		auto shell_args=JS.Param(0).as(JSObject)
@@ -618,13 +1031,18 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto show=JS.Param(2).or(1)
 		n=shell_args["length"].as(iptr)
 		args=[shell_args[i].as(string) for i=0:n-1]
-		pproc=System.Processes.Run(args,spath,show,"new_job,new_console")
+		pproc=System.Processes.Run(args,spath,show&1,show&2?"new_job":"new_job,new_console")
 		if !pproc:
 			//job object creation may fail
-			pproc=System.Processes.Run(args,spath,show,"new_console")
+			pproc=System.Processes.Run(args,spath,show&1,show&2?"":"new_console")
 		if !pproc:
 			return 0
 		return JS.Return(new CProcessWrapper(){proc:pproc})
+	}
+	jsio["SetCurrentDirectory"]=function(JSContext JS){
+		auto s=JS.Param(0).as(string)
+		if !s:return 0;
+		return JS.Return(System.IO.SetCurrentDirectory(s));
 	}
 	jsio["RunToolRedirected"]=function(JSContext JS){
 		auto shell_args=JS.Param(0).as(JSObject)

@@ -109,6 +109,10 @@ Language.Register({
 	has_pointer_ops:1,
 	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
+	port_template:{
+		'in':"//@in=___,type=c_code code,format=indented",
+		'out':"//@out=___,type=c_code code",
+	},
 	rules:function(lang){
 		return f_C_like(lang,{
 			keyword:['__asm','__declspec','if','else','switch','case','default','break','continue','goto','return','for','while','do','const','static','try','catch','finally','throw','volatile','virtual','friend','public','private','protected','struct','union','class','sizeof','new','delete','import','export','typedef','inline','namespace','private','protected','public','operator','friend','mutable','enum','template','this','extern','__stdcall','__cdecl','__fastcall','__thiscall','true','false','using'],
@@ -148,6 +152,10 @@ Language.Register({
 	auto_include:['__builtin.jc'],
 	file_icon_color:0xff9a3d6a,
 	file_icon:'プ',
+	port_template:{
+		'in':"//@in=___,type=jc_code code,format=indented",
+		'out':"//@out=___,type=jc_code code",
+	},
 	rules:function(lang){
 		return f_C_like(lang,{
 			'keyword':['enum','if','else','elif','switch','case','default','break','continue','return','for','const','struct','class','function','sizeof','new','delete','import','export','typedef','inline','__inline_loop_body','operator','foreach','in','this','module','true','false','while'],
@@ -260,6 +268,10 @@ Language.Register({
 	extensions:['js','json'],
 	file_icon_color:0xffb4771f,
 	file_icon:'プ',
+	port_template:{
+		'in':"//@in=___,type=js_code code,format=indented",
+		'out':"//@out=___,type=js_code code",
+	},
 	rules:function(lang){
 		lang.DefineDefaultColor("color_symbol")
 		//match (/, but only count the '/' part as the token
@@ -1198,7 +1210,7 @@ UI.RegisterEditorPlugin(function(){
 UI.RegisterBuildEnv("TeX/LaTeX",{
 	name:"pdftexify",
 	CreateBuildScript:function(fname,doc){
-		var fname_pdf=UI.RemoveExtension(fname)
+		var fname_pdf=UI.RemoveExtension(fname)+'.pdf';
 		var cmdline_viewer=[
 				"SumatraPDF","-reuse-instance",fname_pdf,
 				"-inverse-search",'"'+IO.m_my_name+'" "%f" --seek %l'];

@@ -2,6 +2,10 @@
 
 ## Feature Test
 
+We can insert code reference:
+
+![](qtag://814459e6fe91)
+
 We have active ops.
 
 Run:

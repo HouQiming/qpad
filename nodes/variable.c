@@ -1,0 +1,1 @@
+//@out=var,type=variable code,format=var

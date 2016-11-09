@@ -5,6 +5,7 @@ require("res/lib/bin_editor");
 require("res/lib/subwin");
 require("res/lib/notebook_v2");
 require("res/lib/help_page");
+require("res/lib/graphview");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
@@ -12,6 +13,18 @@ var MAX_STALE_TIME=3600*24;
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
+
+UI.g_git_email="invalid";
+(function(){
+	var s_git_config=IO.ReadAll(IO.ProcessUnixFileName("~/.gitconfig"));
+	if(!s_git_config){
+		return;
+	}
+	var match_email=s_git_config.match(/\n[ \t]*email[ \t]*=[ \t]*(.*)/);
+	if(match_email){
+		UI.g_git_email=match_email[1];
+	}
+})();
 
 if(UI.TestOption('software_srgb')){
 	//UI.SetSRGBEnabling(0);
@@ -417,7 +430,7 @@ var CreateMenus=function(){
 			UI.top.app.document_area.CloseTab();
 		}
 		UI.UpdateNewDocumentSearchPath()
-		UI.NewCodeEditorTab()
+		UI.OpenGraphTab(undefined)
 		UI.Refresh()
 	}})
 	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
@@ -514,7 +527,7 @@ var CreateMenus=function(){
 				//	//hack: put the tab at the end of it
 				//	UI.top.app.document_area.current_tab_id=g_all_document_windows.length-1;
 				//}
-				UI.OpenEditorWindow(fn);
+				UI.OpenFile(fn);
 				UI.Refresh();
 			}
 		}})
@@ -653,7 +666,7 @@ UI.Application=function(id,attrs){
 	UI.Begin(attrs);
 		///////////////////
 		var app=UI.Begin(W.Window('app',{
-				title:'QPad',w:1280,h:720,
+				title:'Graph Editor',w:1280,h:720,
 				bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
 				flags:(UI.Platform.ARCH=="web"?0:(UI.IS_MOBILE?UI.SDL_WINDOW_FULLSCREEN:UI.SDL_WINDOW_MAXIMIZED))|UI.SDL_WINDOW_RESIZABLE,
@@ -725,6 +738,8 @@ UI.Application=function(id,attrs){
 					UI.OpenUtilTab(workspace[i].util_type)
 				}else if(workspace[i].document_type=='notebook'){
 					UI.OpenNoteBookTab(workspace[i].file_name)
+				}else if(workspace[i].document_type=='graph'){
+					UI.OpenGraphTab(workspace[i].file_name)
 				}else{
 					UI.OpenEditorWindow(workspace[i].file_name,undefined,'restore_workspace')
 				}
@@ -826,6 +841,10 @@ UI.OpenFile=function(fn){
 	if(IO.DirExists(fn)){
 		UI.AddProjectDir(fn);
 	}else if(IO.FileExists(fn)){
+		if(UI.GetFileNameExtension(fn).toLowerCase()=='zg'){
+			UI.OpenGraphTab(fn);
+			return;
+		}
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
 			if(UI.g_all_document_windows[i].file_name==fn){
 				if(UI.TestOption("explicit_open_mtf")){

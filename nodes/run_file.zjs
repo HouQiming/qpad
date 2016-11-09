@@ -1,0 +1,16 @@
+function(input,output){
+	//@in=name,type=path string
+	//@in=cmdline,type=string,ui=editbox,color=0xffb4771f
+	if(!input.name.length){return;}
+	var cmdline=input.cmdline.join('').split(' ');
+	var p_name=cmdline.indexOf('__name__');
+	if(p_name>=0){
+		cmdline=cmdline.slice(0,p_name).concat(input.name,cmdline.slice(p_name+1));
+	}else{
+		cmdline=cmdline.concat(input.name);
+		//for(var j=0;j<input.name.length;j++){
+		//	cmdline.push(input.name[j]);
+		//}
+	}
+	IO.RunProcess(cmdline,IO.m_build_path,1);
+};
