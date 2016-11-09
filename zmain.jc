@@ -314,6 +314,7 @@ auto CountLeadingSpaces(string s)
 		if s[i]!=' '&&s[i]!='\t':return i
 	return s.n
 
+//#b+814459e6fe91
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["ParseJSNode"]=function(JSContext JS)
 		scode=JS.Param(0).as(string)
@@ -612,6 +613,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return 0
 	}
 });
+//#b-814459e6fe91
 
 (function(){
 	//Gui2D.ProvideGLFunctions()
