@@ -1,0 +1,14 @@
+\!note.txt
+git.shist
+bin/
+pm_tmp/
+test/
+$dynamic.png
+*.pdb
+spap_release.keystore
+build/unused_fonts
+dev.mobileprovision
+dist.mobileprovision
+build/translation.json
+build/translation.txt
+res/misc/commit.txt
