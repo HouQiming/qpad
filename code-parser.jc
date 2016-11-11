@@ -3574,6 +3574,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//Writeln(matches_refined)
 		struct TPlace
 			int epos0,epos1
+			int combo_id,slot_id
 			int2[] annotations
 			int[int] final_annotations
 		//per-combo matches_refined collection - search the first non-optional part
@@ -3589,6 +3590,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		js_matcheds=JS.NewArray()
 		p_js_matcheds=0
 		places=new TPlace[]
+		matched_combo_ids=new int[]
 		for match,I in matches_refined
 			if match.ord_part!=0:continue
 			combo_param_bindings=new int[int]
@@ -3629,6 +3631,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						id_j=combo.parts[i].id_params[j]
 						combo_param_bindings[id_j]=matches_refined[part_match_ids[i]].param_bindings[j]
 			if !failed:
+				matched_combo_ids.push(match.id_combo)
 				obj_I=JS.New()
 				js_matcheds[p_js_matcheds++]=obj_I
 				obj_I["name"]=getIdString(match.id_combo)
@@ -3636,11 +3639,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				obj_I["parts"]=obj_parts
 				for j=0:combo.parts.n-1
 					slot_bindings=matches_refined[part_match_ids[j]].slot_bindings
-					for slot,I in slot_bindings
+					for slot,J in slot_bindings
 						places.push(TPlace(){
 							epos0:slot.x,
 							epos1:slot.y,
-							annotations:combo.parts[j].slots[I].annotations
+							combo_id:int(j),
+							slot_id:int(J),
+							annotations:combo.parts[j].slots[J].annotations
 						})
 					obj_part_j=JS.New()
 					obj_parts[j]=obj_part_j
@@ -3654,6 +3659,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				for d,k in combo_param_bindings
 					obj_params[getIdString(k)]=getIdString(d)
 		//organize the places - nested place handling
+		//also construct the graph - creates an edge to each place from its nesting host
+		edges=new int4[]
 		struct TPlaceEvent
 			int epos,side,place_id
 		evts=new TPlaceEvent[]
@@ -3666,11 +3673,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if e.side==0:
 				cur_places.push(e.place_id)
 				if cur_places.n>1:
-					new_annotations=new int[int]
-					for plid in cur_places
-						for ai in places[plid].annotations
-							new_annotations[ai.x]=ai.y
-					places[e.place_id].final_annotations=new_annotations
+					plid_parent=cur_places[cur_places.n-2]
+					edges.push(int4(
+						places[plid_parent].combo_id,places[plid_parent].slot_id,
+						places[e.place_id].combo_id,places[e.place_id].slot_id))
+				//////////
+				new_annotations=new int[int]
+				for plid in cur_places
+					for ai in places[plid].annotations
+						new_annotations[ai.x]=ai.y
+				places[e.place_id].final_annotations=new_annotations
 			else
 				for j=cur_places.n-1:-1:0
 					if cur_places[j]==e.place_id:
@@ -3688,7 +3700,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			for part,I in combo.parts
 				if !part.annotations||!part.annotations.n:continue
 				if n_annotations_max<part.annotations.n:
-					n_annotations_max=part.annotations.n
+					n_annotations_max=int(part.annotations.n)
 				is_available_part_I=0
 				for pl,J in places
 					is_available_part_I_place_J=1
@@ -3708,9 +3720,33 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			obj_combo["id"]=getIdString(id)
 			obj_combo["score"]=n_annotations_max
 			js_availables[p_js_availables]=obj_combo
+		js_edges=JS.NewArray()
+		p_js_edges=0
+		name_appeared=new int[string]
+		matched_combo_names=new string[matched_combo_ids.n]
+		for i=0:matched_combo_ids.n-1
+			id=matched_combo_ids[i]
+			ord_i=0
+			s=getIdString(id)
+			while name_appeared[s]:
+				ord_i++
+				s=FormatAsText(getIdString(id),'_',ord_i)
+			name_appeared[s]=1
+			matched_combo_names[i]=s
+			js_matcheds[i]["__id__"]=s
+		for e in edges
+			obj_edge=JS.New()
+			js_edges[p_js_edges++]=obj_edge
+			combo0=g_combo_by_id[matched_combo_ids[e.x]]
+			combo1=g_combo_by_id[matched_combo_ids[e.z]]
+			obj_edge["id0"]=matched_combo_names[e.x]
+			obj_edge["port0"]=getIdString(combo0.parts[e.y].id)
+			obj_edge["id1"]=matched_combo_names[e.z]
+			obj_edge["port1"]=getIdString(combo0.parts[e.w].id)
 		final_ret=JS.New()
 		final_ret["matched"]=js_matcheds
 		final_ret["available"]=js_availables
+		final_ret["edges"]=js_edges
 		return JS.Return(final_ret)
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){

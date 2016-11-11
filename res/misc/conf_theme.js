@@ -591,6 +591,7 @@ UI.CustomTheme=function(){
 			accands_shadow_color:C_shadow_dark_aware,
 			accands_shadow_size:8,
 			accands_bgcolor:L?0xccffffff:0xcc555555,
+			accands_bgcolor_brief:L?0xccddffff:0xcc405555,
 			accands_round:4,
 			accands_border_width:0,
 			accands_border_color:0xff000000,

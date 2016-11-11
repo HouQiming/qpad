@@ -763,6 +763,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 							fhctx={
 								m_prototypes:prototypes,
 								m_ccnt_fcall_bracket:ccnt_fcall_bracket,
+								m_ccnt_fcall_word0:ccnt_fcall_word0,
 								m_function_id:function_id,
 							}
 						}
@@ -5949,7 +5950,8 @@ W.CodeEditor=function(id,attrs){
 					}
 					var s_notification=(fhctx&&fhctx.s_notification);
 					if(s_notification){
-						obj.CreateNotification({id:'function_proto',text:s_notification},"quiet")
+						//obj.CreateNotification({id:'function_proto',text:s_notification},"quiet")
+						obj.DismissNotification('function_proto')
 					}else if(all_docvars.length){
 						var msg_docvar=[];
 						for(var i=0;i<all_docvars.length;i+=2){
@@ -7068,6 +7070,44 @@ W.CodeEditor=function(id,attrs){
 				x:obj.x+w_obj_area-w_scrolling_area, y:y_scrolling_area,
 				w:1, h:h_scrolling_area-(desc_x_scroll_bar?obj.w_scroll_bar-1:0),
 				color:obj.separator_color})
+		}
+		var fhctx=doc.m_fhint_ctx;
+		var s_notification=(fhctx&&fhctx.s_notification);
+		if(s_notification){
+			if(!fhctx.m_cached_prt||s_notification!=fhctx.m_cached_text){
+				fhctx.m_cached_prt=UI.ED_FormatRichText(
+					Language.GetHyphenator(UI.m_ui_language),
+					s_notification,4,obj.accands_w_brief,UI.default_styles.code_editor_notification.styles);
+				fhctx.m_cached_text=s_notification;
+			}
+			var xy_fbrief=doc.ed.XYFromCcnt(fhctx.m_ccnt_fcall_word0);
+			var x_fbrief=obj.x+w_line_numbers+xy_fbrief.x;
+			var y_fbrief=obj.y+(xy_fbrief.y-doc.visible_scroll_y);
+			var w_fbrief=fhctx.m_cached_prt.m_w_line+obj.accands_sel_padding*4;
+			var h_fbrief=fhctx.m_cached_prt.m_h_text+obj.accands_sel_padding*4;
+			//if(doc.m_ac_context&&doc.m_ac_context.m_n_cands>1&&!doc.m_is_help_page_preview){
+			//	//we also have accands, gotta move it above
+			//	y_fbrief-=h_fbrief;
+			//}else{
+			//	//just put it below
+			//	y_fbrief+=hc;
+			//}
+			y_fbrief+=hc;
+			UI.RoundRect({
+				x:x_fbrief-obj.accands_shadow_size, y:y_fbrief,
+				w:w_fbrief+obj.accands_shadow_size*2, h:h_fbrief+obj.accands_shadow_size,
+				round:obj.accands_shadow_size,
+				border_width:-obj.accands_shadow_size,
+				color:obj.accands_shadow_color})
+			UI.RoundRect({
+				x:x_fbrief, y:y_fbrief,
+				w:w_fbrief, h:h_fbrief,
+				border_width:obj.accands_border_width,
+				border_color:obj.accands_border_color,
+				round:obj.accands_round,
+				color:obj.accands_bgcolor_brief})
+			UI.ED_RenderRichText(fhctx.m_cached_prt,s_notification,
+				x_fbrief+obj.accands_sel_padding*2,y_fbrief+obj.accands_sel_padding*2)
 		}
 		if(doc.m_ac_context&&doc.m_ac_context.m_n_cands>1&&!doc.m_is_help_page_preview){
 			RenderACCands(obj,w_obj_area,h_obj_area);

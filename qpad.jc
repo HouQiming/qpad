@@ -3,10 +3,12 @@ import "bin-editor.jc"
 import "code-editor.jc"
 import "code-parser.jc"
 import "encoding.jc"
+import "g-l.jc"
 //import "txtx-editor.jc"
 //import "zip-doc.jc"
 //import "ooc-mipmap.jc"
 //import "uisandbox.jc"
+import GL.*
 import Gui2D.*
 import Javascript.*
 import System.Console.*
