@@ -5,7 +5,7 @@ require("res/lib/bin_editor");
 require("res/lib/subwin");
 require("res/lib/notebook_v2");
 require("res/lib/help_page");
-require("res/lib/graphview");
+//require("res/lib/graphview");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
@@ -13,18 +13,6 @@ var MAX_STALE_TIME=3600*24;
 
 UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
-
-UI.g_git_email="invalid";
-(function(){
-	var s_git_config=IO.ReadAll(IO.ProcessUnixFileName("~/.gitconfig"));
-	if(!s_git_config){
-		return;
-	}
-	var match_email=s_git_config.match(/\n[ \t]*email[ \t]*=[ \t]*(.*)/);
-	if(match_email){
-		UI.g_git_email=match_email[1];
-	}
-})();
 
 if(UI.TestOption('software_srgb')){
 	//UI.SetSRGBEnabling(0);

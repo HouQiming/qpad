@@ -791,7 +791,8 @@ W.notebook_prototype={
 		err.cell_id=id;
 		var fn_raw=err.file_name;
 		if(cell_i.m_current_path&&!(err.file_name.search(g_regexp_abspath)>=0)&&!IO.FileExists(err.file_name)){
-			err.file_name=cell_i.m_current_path+'/'+err.file_name;
+			var fn_search_found=UI.ED_SearchIncludeFile(cell_i.m_current_path+'/'+err.file_name,err.file_name,{},0);
+			err.file_name=(fn_search_found||cell_i.m_current_path+'/'+err.file_name);
 		}
 		err.file_name=IO.NormalizeFileName(err.file_name);
 		//coulddo: UI.ED_SearchIncludeFile, but shouldn't need it
