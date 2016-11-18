@@ -53,15 +53,15 @@ UI.wheel_message_mode="over";
 //UI.fallback_font_names=["res/fonts/dsanscn.ttc"]
 
 UI.ReadOptionalConfigScript=function(fn){
-	var fn_full=IO.GetStoragePath()+"/"+fn;
-	var s0=IO.ReadAll(fn_full);
+	//var fn_full=IO.GetStoragePath()+"/"+fn;
+	//var s0=IO.ReadAll(fn_full);
+	//if(!s0){
+	var fn_full="res/misc/"+fn;
+	s0=IO.UIReadAll(fn_full);
 	if(!s0){
-		fn_full="res/misc/"+fn;
-		s0=IO.UIReadAll(fn_full);
-		if(!s0){
-			return;
-		}
+		return;
 	}
+	//}
 	try{
 		eval(s0);
 	}catch(error){
@@ -76,6 +76,11 @@ UI.ApplyTheme=function(custom_styles){
 		s0[key]=custom_styles[key]
 	}
 }
+
+//if(UI.StartupBenchmark){
+//	console.log("--- before translation")
+//	UI.StartupBenchmark();
+//}
 
 UI.ReadOptionalConfigScript("conf_translation.js");
 
@@ -418,7 +423,7 @@ var CreateMenus=function(){
 			UI.top.app.document_area.CloseTab();
 		}
 		UI.UpdateNewDocumentSearchPath()
-		UI.OpenGraphTab(undefined)
+		UI.NewCodeEditorTab();
 		UI.Refresh()
 	}})
 	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
@@ -650,11 +655,13 @@ var CreateMenus=function(){
 }
 
 UI.Application=function(id,attrs){
+	//UI.TimingEvent("UI.Application")
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
 		///////////////////
+		//UI.TimingEvent("before W.Window")
 		var app=UI.Begin(W.Window('app',{
-				title:'Graph Editor',w:1280,h:720,
+				title:'QPad Text Editor',w:1280,h:720,
 				bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
 				flags:(UI.Platform.ARCH=="web"?0:(UI.IS_MOBILE?UI.SDL_WINDOW_FULLSCREEN:UI.SDL_WINDOW_MAXIMIZED))|UI.SDL_WINDOW_RESIZABLE,
@@ -668,6 +675,7 @@ UI.Application=function(id,attrs){
 				OnClose:function(){
 					return this.document_area.OnClose();
 				}}));
+			//UI.TimingEvent("after W.Window")
 			if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
 				W.Hotkey("",{key:"ALT+F4",action:function(){if(!app.OnClose()){UI.DestroyWindow(app)}}});
 			}
@@ -693,6 +701,7 @@ UI.Application=function(id,attrs){
 			//	})
 			//}else{
 			UI.m_invalid_util_tabs=[];
+			//UI.TimingEvent("before W.TabbedDocument")
 			W.TabbedDocument("document_area",{
 				'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
 				'x':0,'y':0,'w':app.w,//obj_panel.x,
@@ -711,6 +720,7 @@ UI.Application=function(id,attrs){
 		UI.End();
 	UI.End();
 	if(!UI.g_app_inited){
+		//UI.TimingEvent("!UI.g_app_inited")
 		var workspace=UI.m_ui_metadata["<workspace_v2>"]
 		var fn_current_tab=UI.m_ui_metadata["<current_tab>"]
 		if(workspace){
@@ -829,10 +839,10 @@ UI.OpenFile=function(fn){
 	if(IO.DirExists(fn)){
 		UI.AddProjectDir(fn);
 	}else if(IO.FileExists(fn)){
-		if(UI.GetFileNameExtension(fn).toLowerCase()=='zg'){
-			UI.OpenGraphTab(fn);
-			return;
-		}
+		//if(UI.GetFileNameExtension(fn).toLowerCase()=='zg'){
+		//	UI.OpenGraphTab(fn);
+		//	return;
+		//}
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
 			if(UI.g_all_document_windows[i].file_name==fn){
 				if(UI.TestOption("explicit_open_mtf")){
@@ -863,6 +873,10 @@ UI.EventFilter=function(event){
 };
 
 (function(){
+	//if(UI.StartupBenchmark){
+	//	console.log("--- entering main")
+	//	UI.StartupBenchmark();
+	//}
 	var argv=IO.m_argv;
 	if(argv.length>0){argv.shift();}
 	if(argv.length>=2&&argv[0]=='--internal-tool'){

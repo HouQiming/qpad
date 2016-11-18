@@ -276,6 +276,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				this.CancelAutoCompletion()
 				this.m_ac_activated=0
 				this.m_user_just_typed_char=0
+				this.m_fhint_ctx=undefined;
 				var renderer=this.GetRenderer();
 				renderer.RemoveAllEmbeddedObjects();
 				//////////
@@ -473,8 +474,11 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		if(loaded_metadata.m_hidden_ranges){
+			var ccnt_tot=this.ed.GetTextSize();
 			for(var i=0;i<loaded_metadata.m_hidden_ranges.length;i+=2){
-				renderer.HideRange(this.ed,loaded_metadata.m_hidden_ranges[i],loaded_metadata.m_hidden_ranges[i+1])
+				if(loaded_metadata.m_hidden_ranges[i+1]<=ccnt_tot){
+					renderer.HideRange(this.ed,loaded_metadata.m_hidden_ranges[i],loaded_metadata.m_hidden_ranges[i+1])
+				}
 			}
 		}
 		this.AutoScroll("center")
@@ -692,7 +696,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			if(is_valid_only){
 				var ccnt2=this.SnapToValidLocation(ccnt,1)
 				if(ccnt2>ccnt&&this.SnapToValidLocation(ccnt,-1)<ccnt){
-					var ln_real=this.GetLC(ccnt2)[0]
+					//console.log(ret[0],ccnt,ccnt2,line0,line1_exclusive,ed.GetTextSize());
+					var ln_real=this.GetLC(ccnt2)[0];
 					if(ln_real>i){
 						//some lines are hidden
 						if(ln_real>line1_exclusive){
@@ -7075,7 +7080,7 @@ W.CodeEditor=function(id,attrs){
 				color:obj.separator_color})
 		}
 		if(UI.TestOption("function_info_at_the_cursor")){
-			var fhctx=doc.m_fhint_ctx;
+			var fhctx=doc&&doc.m_fhint_ctx;
 			var s_notification=(fhctx&&fhctx.s_notification);
 			if(s_notification){
 				if(!fhctx.m_cached_prt||s_notification!=fhctx.m_cached_text){
@@ -7085,8 +7090,9 @@ W.CodeEditor=function(id,attrs){
 					fhctx.m_cached_text=s_notification;
 				}
 				var xy_fbrief=doc.ed.XYFromCcnt(fhctx.m_ccnt_fcall_word0);
+				var ed_caret=doc.GetIMECaretXY();
 				var x_fbrief=obj.x+w_line_numbers+xy_fbrief.x;
-				var y_fbrief=obj.y+(xy_fbrief.y-doc.visible_scroll_y);
+				var y_fbrief=obj.y+(Math.max(xy_fbrief.y,ed_caret.y)-doc.visible_scroll_y);
 				var w_fbrief=fhctx.m_cached_prt.m_w_line+obj.accands_sel_padding*4;
 				var h_fbrief=fhctx.m_cached_prt.m_h_text+obj.accands_sel_padding*4;
 				//if(doc.m_ac_context&&doc.m_ac_context.m_n_cands>1&&!doc.m_is_help_page_preview){
@@ -8268,3 +8274,7 @@ UI.RegisterSpecialFile("project_list",{
 	},
 });
 //UI.enable_timing=1
+//if(UI.StartupBenchmark){
+//	console.log("--- code editor loaded")
+//	UI.StartupBenchmark();
+//}

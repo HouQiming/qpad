@@ -3385,6 +3385,16 @@ UI.RegisterEditorPlugin(function(){
 
 //QInfo
 if(UI.ENABLE_EXPERIMENTAL_FEATURES){
+	UI.BuildComboGraph=function(parsed_combos){
+		//ret.matched
+		//ret.edges
+		//combo to graph: we should render it on top of the current editor tab - it's temporary
+		//console.log(JSON.stringify(parsed_combos));
+		//need to compute a layout - sort by ccnt for y, nested level for x
+		ret.matched.push({
+			__id__:"<root>",
+		})
+	};
 	UI.RegisterEditorPlugin(function(){
 		if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 		this.AddEventHandler('global_menu',function(){
@@ -3408,8 +3418,7 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 			}.bind(this)});
 			menu_tools.AddNormalItem({text:"Debug: parse combo...",key:"SHIFT+CTRL+E",enable_hotkey:1,action:function(){
 				var ret=UI.ED_ParseAsCombo(this,0,this.ed.GetTextSize());
-				//todo: apply combo
-				console.log(JSON.stringify(ret));
+				UI.BuildComboGraph(ret);
 			}.bind(this)});
 			menu_tools=undefined;
 		})

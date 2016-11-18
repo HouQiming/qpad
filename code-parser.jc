@@ -3574,7 +3574,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//Writeln(matches_refined)
 		struct TPlace
 			int epos0,epos1
-			int combo_id,slot_id
+			int match_id,part_id,slot_id
 			int2[] annotations
 			int[int] final_annotations
 		//per-combo matches_refined collection - search the first non-optional part
@@ -3643,7 +3643,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						places.push(TPlace(){
 							epos0:slot.x,
 							epos1:slot.y,
-							combo_id:int(j),
+							match_id:I,
+							part_id:int(j),
 							slot_id:int(J),
 							annotations:combo.parts[j].slots[J].annotations
 						})
@@ -3660,7 +3661,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					obj_params[getIdString(k)]=getIdString(d)
 		//organize the places - nested place handling
 		//also construct the graph - creates an edge to each place from its nesting host
-		edges=new int4[]
+		edges=new int2[]
 		struct TPlaceEvent
 			int epos,side,place_id
 		evts=new TPlaceEvent[]
@@ -3674,9 +3675,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				cur_places.push(e.place_id)
 				if cur_places.n>1:
 					plid_parent=cur_places[cur_places.n-2]
-					edges.push(int4(
-						places[plid_parent].combo_id,places[plid_parent].slot_id,
-						places[e.place_id].combo_id,places[e.place_id].slot_id))
+					edges.push(int2(plid_parent,e.place_id))
+				else
+					//from-file edge
+					edges.push(int2(-1,e.place_id))
 				//////////
 				new_annotations=new int[int]
 				for plid in cur_places
@@ -3737,12 +3739,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		for e in edges
 			obj_edge=JS.New()
 			js_edges[p_js_edges++]=obj_edge
-			combo0=g_combo_by_id[matched_combo_ids[e.x]]
-			combo1=g_combo_by_id[matched_combo_ids[e.z]]
-			obj_edge["id0"]=matched_combo_names[e.x]
-			obj_edge["port0"]=getIdString(combo0.parts[e.y].id)
+			if e.x>=0:
+				combo0=g_combo_by_id[matched_combo_ids[places[e.x].match_id]]
+			else
+				combo0=CQICombo.NULL
+			combo1=g_combo_by_id[matched_combo_ids[places[e.y].match_id]]
+			obj_edge["id0"]=combo0?matched_combo_names[e.x]:"<root>"
+			obj_edge["port0"]=combo0?getIdString(combo0.parts[places[e.x].part_id].id):"code"
 			obj_edge["id1"]=matched_combo_names[e.z]
-			obj_edge["port1"]=getIdString(combo0.parts[e.w].id)
+			obj_edge["port1"]=getIdString(combo1.parts[places[e.y].part_id].slots[places[e.y].slot_id].id)
 		final_ret=JS.New()
 		final_ret["matched"]=js_matcheds
 		final_ret["available"]=js_availables

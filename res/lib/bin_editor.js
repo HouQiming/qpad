@@ -354,6 +354,10 @@ W.BinaryEditor_prototype={
 		//change tracking / rendering / undo / redo
 		sz=Math.min(sz,this.m_data.length-addr);
 		var buf=new Buffer(this.m_data.slice(addr,addr+sz));
+		if(this.m_undo_queue.length<this.saved_point){
+			this.saved_point=-1;
+			this.m_redo_queue=[];
+		}
 		this.m_undo_queue.push({addr:addr,buf:buf});
 		//this.SetRange(addr,addr+sz,{color:this.color_edited});
 	},
@@ -867,6 +871,7 @@ W.BinaryEditor=function(id,attrs){
 			//draw edit history - we won't be editing much
 			var Q=obj.m_undo_queue;
 			var phead=(obj.saved_point||0);
+			if(phead<0){phead=0;}
 			if(phead>Q.length){
 				Q=obj.m_redo_queue;
 				phead=Math.max(Q.length-(phead-obj.m_undo_queue.length),0);

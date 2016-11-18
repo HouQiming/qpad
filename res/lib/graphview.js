@@ -2456,7 +2456,7 @@ var ReindexPackages=function(){
 		return ret;
 	});
 };
-ReindexPackages();
+//ReindexPackages();
 
 var GetPackageByName=function(cache,s_package){
 	var nd_package=cache.m_local_packages[s_package];

@@ -190,6 +190,7 @@ if Platform.BUILD=="debug":
 		}
 	})
 
+g_startup_tick=System.Time.tick64();
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	g_edge_vbo=new float[]
 	g_vbo_tech=GLTechnique.NULL
@@ -262,6 +263,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch/4)
 		return 0
 	}
+	/*
 	auto RecursiveCopy(string dir_src,string dir_tar)
 		System.IO.CreateDirectory(dir_tar)
 		if !System.IO.DirExists(dir_tar):return 0
@@ -278,6 +280,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		dir_tar=JS.Param(1).as(string)
 		return JS.Return(RecursiveCopy(dir_src,dir_tar))
 	}
+	*/
+	//JS_UI["StartupBenchmark"]=function(JSContext JS){
+	//	Writeln(formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-g_startup_tick)*1000.0,{frac:2}),'ms since startup');
+	//	return 0
+	//}
 });
 
 (function(){
@@ -700,6 +707,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	//for fn in sbox.m_ui_zip.AllFileNames()
 	//	Writeln(fn)
 	//Writeln('main: ',sbox.UIReadAll("res/main.js"))
+	//Writeln(formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-g_startup_tick)*1000.0,{frac:2}),'ms since startup - sbox.UIRunJS');
 	sbox.UIRunJS(JS,"res/main.js")
 	//if Platform.IS_WINDOWS&&System.IO.FileExists(System.Env.GetExecutablePath()+"/opengl32.dll"):
 	//	//LLVMPipe tends to crash

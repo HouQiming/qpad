@@ -362,48 +362,49 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		w_bytes=obj["m_w_bytes"].as(int)
 		color0=obj["text_color"].as(int)
 		w_true=int(w_bytes)
-		h_true=int(ceil(h))
-		tex_data=[addr0+i64(i)<data.n?ramp[int(u8(data[addr0+i64(i)]))]:0 for i=0:w_true*h_true-1]
-		if g_minimap_tex&&(g_minimap_w!=w_true||g_minimap_h!=h_true):
-			texs=[g_minimap_tex]
-			glDeleteTextures(1,__pointer(texs.d))
-			texs[0]=0u
-			g_minimap_tex=0u
-		if !g_minimap_tex:
-			g_minimap_tex=glCreateTexture(GL_RGBA8,w_true,h_true,GL_LINEAR,GL_CLAMP,GL_CLAMP,NULL)
-		g_minimap_w=w_true
-		g_minimap_h=h_true
-		glBindTexture(GL_TEXTURE_2D,g_minimap_tex)
-		glTexSubImage2D(GL_TEXTURE_2D,0,0,0,w_true,h_true,GL_RGBA,GL_UNSIGNED_BYTE,__pointer(tex_data.d))
-		glBindTexture(GL_TEXTURE_2D,0u)
-		tex_data.discard()
-		tech=JS_UI["g_binary_minimap_technique"].as(GLTechnique)
-		if !tech:
-			tech=new GLTechnique
-			tech.SetVarying("vec2 uv;")
-			tech.SetVertexShader("
-			void main(){
-				vec2 P_scr=P*scale;
-				gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
-				uv=uv_vert;
-			}")
-			tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
-			//tech.SetFragmentShader("void main(){vec4 C=texture2D(tex0,uv);gl_FragColor=vec4(1.0,0.0,1.0,1.0);}")
-			JS_UI["g_binary_minimap_technique"]=tech
-		prev_viewport=new int[4]
-		glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
-		tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
-		tech.SetTexture2D("tex0",g_minimap_tex)
-		xf=floor(x)
-		yf=floor(y)
-		vbo=Gui2D.detail.g_renderer.UploadMiniVBO([
-			xf,yf, xf+float(w_true),yf, xf+float(w_true),yf+float(h_true), xf,yf+float(h_true),
-			0.f,0.f, 1.f,0.f, 1.f,1.f, 0.f,1.f].ConvertToAsBinary(int))
-		//tech.SetVertexArray("P",[float2(xf,yf), float2(xf+float(w_true),yf), float2(xf+float(w_true),yf+float(h_true)), float2(xf,yf+float(h_true))])
-		//tech.SetVertexArray("uv_vert",[float2(0.f,0.f), float2(1.f,0.f), float2(1.f,1.f), float2(0.f,1.f)])
-		tech.SetVertexPointer("P",2,GL_FLOAT,0,0,0L)
-		tech.SetVertexPointer("uv_vert",2,GL_FLOAT,0,0,8*sizeof(float))
-		tech.Draw(vbo,GL_TRIANGLE_FAN,4)
+		if data&&ramp:
+			h_true=int(ceil(h))
+			tex_data=[addr0+i64(i)<data.n?ramp[int(u8(data[addr0+i64(i)]))]:0 for i=0:w_true*h_true-1]
+			if g_minimap_tex&&(g_minimap_w!=w_true||g_minimap_h!=h_true):
+				texs=[g_minimap_tex]
+				glDeleteTextures(1,__pointer(texs.d))
+				texs[0]=0u
+				g_minimap_tex=0u
+			if !g_minimap_tex:
+				g_minimap_tex=glCreateTexture(GL_RGBA8,w_true,h_true,GL_LINEAR,GL_CLAMP,GL_CLAMP,NULL)
+			g_minimap_w=w_true
+			g_minimap_h=h_true
+			glBindTexture(GL_TEXTURE_2D,g_minimap_tex)
+			glTexSubImage2D(GL_TEXTURE_2D,0,0,0,w_true,h_true,GL_RGBA,GL_UNSIGNED_BYTE,__pointer(tex_data.d))
+			glBindTexture(GL_TEXTURE_2D,0u)
+			tex_data.discard()
+			tech=JS_UI["g_binary_minimap_technique"].as(GLTechnique)
+			if !tech:
+				tech=new GLTechnique
+				tech.SetVarying("vec2 uv;")
+				tech.SetVertexShader("
+				void main(){
+					vec2 P_scr=P*scale;
+					gl_Position=vec4(P_scr.x-1.0,1.0-P_scr.y,1.0,1.0);
+					uv=uv_vert;
+				}")
+				tech.SetFragmentShader("void main(){gl_FragColor=texture2D(tex0,uv);}")
+				//tech.SetFragmentShader("void main(){vec4 C=texture2D(tex0,uv);gl_FragColor=vec4(1.0,0.0,1.0,1.0);}")
+				JS_UI["g_binary_minimap_technique"]=tech
+			prev_viewport=new int[4]
+			glGetIntegerv(GL_VIEWPORT,__pointer(prev_viewport.d));
+			tech.SetUniform("scale",float2(2.f/f32(prev_viewport[2]),2.f/f32(prev_viewport[3])))
+			tech.SetTexture2D("tex0",g_minimap_tex)
+			xf=floor(x)
+			yf=floor(y)
+			vbo=Gui2D.detail.g_renderer.UploadMiniVBO([
+				xf,yf, xf+float(w_true),yf, xf+float(w_true),yf+float(h_true), xf,yf+float(h_true),
+				0.f,0.f, 1.f,0.f, 1.f,1.f, 0.f,1.f].ConvertToAsBinary(int))
+			//tech.SetVertexArray("P",[float2(xf,yf), float2(xf+float(w_true),yf), float2(xf+float(w_true),yf+float(h_true)), float2(xf,yf+float(h_true))])
+			//tech.SetVertexArray("uv_vert",[float2(0.f,0.f), float2(1.f,0.f), float2(1.f,1.f), float2(0.f,1.f)])
+			tech.SetVertexPointer("P",2,GL_FLOAT,0,0,0L)
+			tech.SetVertexPointer("uv_vert",2,GL_FLOAT,0,0,8*sizeof(float))
+			tech.Draw(vbo,GL_TRIANGLE_FAN,4)
 		return JS.Return(w_true)
 	}
 	JS_UI["BIN_float2half"]=function(JSContext JS){
