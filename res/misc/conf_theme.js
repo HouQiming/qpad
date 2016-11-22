@@ -1280,7 +1280,7 @@ UI.CustomTheme=function(){
 		},
 		graph_view:{
 			//todo: dark theme support
-			color:0xffe8e8e8,
+			color:0x7fe8e8e8,
 			node_style:{
 				font_port:UI.Font(UI.font_name,16),
 				port_w_sep:16,
@@ -1314,6 +1314,7 @@ UI.CustomTheme=function(){
 				node_selection_color:0xff2ca033,
 				node_selection_width:4,
 				node_rebuild_bar_height:3,
+				node_padding:8,
 				shadow_color:C_shadow,
 				shadow_size:6,
 				//////////
@@ -1387,7 +1388,7 @@ UI.CustomTheme=function(){
 			shadow_color:0xaa000000,
 		},
 		package_page:{
-			color:L?0xffc0c0c0:0xff333333,
+			color:L?0x7fc0c0c0:0x7f333333,
 			bgcolor:L?0xffffffff:0xff555555,
 			//border_color:C,
 			//border_width:2,

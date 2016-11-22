@@ -3385,18 +3385,23 @@ UI.RegisterEditorPlugin(function(){
 
 //QInfo
 if(UI.ENABLE_EXPERIMENTAL_FEATURES){
-	UI.BuildComboGraph=function(parsed_combos){
-		//ret.matched
-		//ret.edges
-		//combo to graph: we should render it on top of the current editor tab - it's temporary
-		//console.log(JSON.stringify(parsed_combos));
-		//need to compute a layout - sort by ccnt for y, nested level for x
-		ret.matched.push({
-			__id__:"<root>",
-		})
-	};
+	require("res/lib/graphview2");
 	UI.RegisterEditorPlugin(function(){
 		if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+		this.AddEventHandler('render',function(){
+			//this is a rendering hook
+			if(!this.m_graph||!this.owner){return;}
+			UI.RoundRect({x:this.x,y:this.y,w:this.w,h:this.h,color:UI.default_styles.graph_view.color});
+			var obj_graphview=W.GraphView("__graph__",{
+				x:this.x,y:this.y,w:this.w*0.618,h:this.h,
+				graph:this.m_graph,
+			});
+			W.PackagePage("__package__",{
+				x:this.x+this.w*0.618,y:this.y,w:this.w*0.382,h:this.h,
+				available:this.m_graph.available,
+				graphview:obj_graphview,
+			});
+		})
 		this.AddEventHandler('global_menu',function(){
 			var menu_tools=UI.BigMenu("&Tools")
 			menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
@@ -3418,7 +3423,7 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 			}.bind(this)});
 			menu_tools.AddNormalItem({text:"Debug: parse combo...",key:"SHIFT+CTRL+E",enable_hotkey:1,action:function(){
 				var ret=UI.ED_ParseAsCombo(this,0,this.ed.GetTextSize());
-				UI.BuildComboGraph(ret);
+				this.m_graph=UI.BuildComboGraph(ret);
 			}.bind(this)});
 			menu_tools=undefined;
 		})

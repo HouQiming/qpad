@@ -121,6 +121,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_event_hooks['close']=[]
 		this.m_event_hooks['parse']=[]
 		this.m_event_hooks['menu']=[]
+		this.m_event_hooks['render']=[]
 		this.m_event_hooks['wrap']=[]
 		this.m_event_hooks['global_menu']=[]
 		this.m_event_hooks['beforeEdit']=[]
@@ -6814,6 +6815,7 @@ W.CodeEditor=function(id,attrs){
 				menu_edit=undefined;
 				menu_search=undefined;
 			}
+			doc.CallHooks('render');
 			if(!got_gotodef_notification){
 				obj.DismissNotification("definition_id")
 			}

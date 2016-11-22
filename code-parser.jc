@@ -1644,7 +1644,7 @@ if ENABLE_EXPERIMENTAL_FEATURES:
 		int2[] annotations
 		TComboSlot[] slots
 	class CQICombo
-		int id
+		int id,id_desc
 		int epos0
 		string code
 		parts=new TComboPart[]
@@ -2259,6 +2259,10 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 										common_combo_args.push(toks_proto[p_cproto].tok-TOK_ID)
 									p_cproto++
 								ptok_combo_ptn_last=i+1
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-desc",12)==0:
+							if cur_combo:
+								pdoc=PoolDoxygenComment(sdataz[j+13:])
+								cur_combo.id_desc=getid(doc_string_pool[pdoc.x:])
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-end",10)==0:
 							if cur_combo:
 								FlushComboPattern()
@@ -3635,24 +3639,47 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				obj_I=JS.New()
 				js_matcheds[p_js_matcheds++]=obj_I
 				obj_I["name"]=getIdString(match.id_combo)
-				obj_parts=JS.NewArray()
-				obj_I["parts"]=obj_parts
+				if combo.id_desc:
+					obj_I["desc"]=getIdString(combo.id_desc)
+				//todo: desc
+				//obj_parts=JS.NewArray()
+				//obj_I["parts"]=obj_parts
+				//port -> place list... just the names
+				obj_in_ports=JS.New()
+				p_in_ports=0L
+				obj_out_ports=JS.New()
+				p_out_ports=0L
+				obj_I["in_ports"]=obj_in_ports
+				obj_I["out_ports"]=obj_out_ports
+				obj_I["epos_part0"]=matches_refined[part_match_ids[0]].epos0
 				for j=0:combo.parts.n-1
+					obj_out_ports[p_out_ports]=getIdString(combo.parts[j].id)
+					p_out_ports++
 					slot_bindings=matches_refined[part_match_ids[j]].slot_bindings
 					for slot,J in slot_bindings
+						obj_in_ports[p_in_ports]=getIdString(combo.parts[j].slots[J].id)
+						p_in_ports++
 						places.push(TPlace(){
 							epos0:slot.x,
 							epos1:slot.y,
-							match_id:I,
+							match_id:int(matched_combo_ids.n-1),
 							part_id:int(j),
 							slot_id:int(J),
-							annotations:combo.parts[j].slots[J].annotations
+							annotations:combo.parts[j].slots[J].annotations,
 						})
-					obj_part_j=JS.New()
-					obj_parts[j]=obj_part_j
-					obj_part_j["epos0"]=matches_refined[part_match_ids[j]].epos0
-					obj_part_j["epos1"]=matches_refined[part_match_ids[j]].epos1
-					obj_part_j["slot_bindings"]=matches_refined[part_match_ids[j]].slot_bindings.ConvertToAsBinary(int)
+					places.push(TPlace(){
+						epos0:matches_refined[part_match_ids[j]].epos0,
+						epos1:matches_refined[part_match_ids[j]].epos1,
+						match_id:int(matched_combo_ids.n-1),
+						part_id:int(j),
+						slot_id:-1,
+						annotations:int2[].NULL,//combo.parts[j].annotations
+					})
+					//obj_part_j=JS.New()
+					//obj_parts[j]=obj_part_j
+					//obj_part_j["epos0"]=matches_refined[part_match_ids[j]].epos0
+					//obj_part_j["epos1"]=matches_refined[part_match_ids[j]].epos1
+					//obj_part_j["slot_bindings"]=matches_refined[part_match_ids[j]].slot_bindings.ConvertToAsBinary(int)
 					//also remove the matched stuff
 					matches_refined[part_match_ids[j]].ord_part=-1
 				obj_params=JS.New()
@@ -3672,25 +3699,29 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		cur_places=new int[]
 		for e in evts
 			if e.side==0:
-				cur_places.push(e.place_id)
-				if cur_places.n>1:
-					plid_parent=cur_places[cur_places.n-2]
-					edges.push(int2(plid_parent,e.place_id))
+				if places[e.place_id].slot_id<0:
+					cur_places.push(e.place_id)
 				else
-					//from-file edge
-					edges.push(int2(-1,e.place_id))
-				//////////
-				new_annotations=new int[int]
-				for plid in cur_places
-					for ai in places[plid].annotations
-						new_annotations[ai.x]=ai.y
-				places[e.place_id].final_annotations=new_annotations
+					if cur_places.n>1:
+						plid_parent=cur_places[cur_places.n-2]
+						edges.push(int2(plid_parent,e.place_id))
+					else
+						//from-file edge
+						edges.push(int2(-1,e.place_id))
+					//////////
+					new_annotations=new int[int]
+					for plid in cur_places
+						if places[plid].annotations:
+							for ai in places[plid].annotations
+								new_annotations[ai.x]=ai.y
+					places[e.place_id].final_annotations=new_annotations
 			else
-				for j=cur_places.n-1:-1:0
-					if cur_places[j]==e.place_id:
-						cur_places[j]=cur_places[cur_places.n-1]
-						cur_places.pop()
-						break
+				if places[e.place_id].slot_id<0:
+					for j=cur_places.n-1:-1:0
+						if cur_places[j]==e.place_id:
+							cur_places[j]=cur_places[cur_places.n-1]
+							cur_places.pop()
+							break
 		//annotation-based combo part searching - enum all known combos
 		//compute availability and score
 		js_availables=JS.NewArray()
@@ -3719,7 +3750,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if !is_available:continue
 			//available, score it at n_annotations_max
 			obj_combo=JS.New()
-			obj_combo["id"]=getIdString(id)
+			obj_combo["name"]=getIdString(id)
+			if combo.id_desc:
+				obj_combo["desc"]=getIdString(combo.id_desc)
 			obj_combo["score"]=n_annotations_max
 			js_availables[p_js_availables]=obj_combo
 		js_edges=JS.NewArray()
@@ -3744,10 +3777,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			else
 				combo0=CQICombo.NULL
 			combo1=g_combo_by_id[matched_combo_ids[places[e.y].match_id]]
-			obj_edge["id0"]=combo0?matched_combo_names[e.x]:"<root>"
-			obj_edge["port0"]=combo0?getIdString(combo0.parts[places[e.x].part_id].id):"code"
-			obj_edge["id1"]=matched_combo_names[e.z]
-			obj_edge["port1"]=getIdString(combo1.parts[places[e.y].part_id].slots[places[e.y].slot_id].id)
+			obj_edge["id0"]=combo0?matched_combo_names[places[e.x].match_id]:"<root>"
+			obj_edge["port0"]=combo0?getIdString(combo0.parts[places[e.x].part_id].slots[places[e.x].slot_id].id):"code"
+			obj_edge["id1"]=matched_combo_names[places[e.y].match_id]
+			obj_edge["port1"]=getIdString(combo1.parts[places[e.y].part_id].id)
 		final_ret=JS.New()
 		final_ret["matched"]=js_matcheds
 		final_ret["available"]=js_availables
