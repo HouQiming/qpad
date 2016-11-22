@@ -3391,13 +3391,20 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 		this.AddEventHandler('render',function(){
 			//this is a rendering hook
 			if(!this.m_graph||!this.owner){return;}
-			UI.RoundRect({x:this.x,y:this.y,w:this.w,h:this.h,color:UI.default_styles.graph_view.color});
+			var owner=this.owner;
+			UI.RoundRect({x:owner.x,y:owner.y,w:owner.w,h:owner.h,color:UI.default_styles.graph_view.color});
+			var graph0=owner.__graph__;
 			var obj_graphview=W.GraphView("__graph__",{
-				x:this.x,y:this.y,w:this.w*0.618,h:this.h,
+				x:owner.x,y:owner.y,w:owner.w*0.618,h:owner.h,
 				graph:this.m_graph,
+				editor:this,
 			});
+			if(!graph0){
+				UI.SetFocus(obj_graphview);
+			}
+			graph0=undefined;
 			W.PackagePage("__package__",{
-				x:this.x+this.w*0.618,y:this.y,w:this.w*0.382,h:this.h,
+				x:owner.x+owner.w*0.618,y:owner.y,w:owner.w*0.382,h:owner.h,
 				available:this.m_graph.available,
 				graphview:obj_graphview,
 			});
@@ -3423,7 +3430,7 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 			}.bind(this)});
 			menu_tools.AddNormalItem({text:"Debug: parse combo...",key:"SHIFT+CTRL+E",enable_hotkey:1,action:function(){
 				var ret=UI.ED_ParseAsCombo(this,0,this.ed.GetTextSize());
-				this.m_graph=UI.BuildComboGraph(ret);
+				this.m_graph=UI.BuildComboGraph(this,ret);
 			}.bind(this)});
 			menu_tools=undefined;
 		})

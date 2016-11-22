@@ -3539,7 +3539,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						//keep it and match the next token
 						psave=i+2+slot_tran[ptok_pattern]
 						if !saves[psave]:saves[psave]=ptok_text+1
-						saves[psave+1]=ptok_text+2
+						saves[psave+1]=ptok_text+1
 						for j=0:sz_save-1
 							saves_new.push(saves[i+j])
 						ptok_pattern++
@@ -3645,19 +3645,36 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//obj_parts=JS.NewArray()
 				//obj_I["parts"]=obj_parts
 				//port -> place list... just the names
-				obj_in_ports=JS.New()
+				obj_in_ports=JS.NewArray()
 				p_in_ports=0L
-				obj_out_ports=JS.New()
+				obj_out_ports=JS.NewArray()
 				p_out_ports=0L
 				obj_I["in_ports"]=obj_in_ports
 				obj_I["out_ports"]=obj_out_ports
 				obj_I["epos_part0"]=matches_refined[part_match_ids[0]].epos0
 				for j=0:combo.parts.n-1
-					obj_out_ports[p_out_ports]=getIdString(combo.parts[j].id)
+					obj_port=JS.New()
+					obj_out_ports[p_out_ports]=obj_port
+					obj_port["id"]=getIdString(combo.parts[j].id)
+					obj_port["epos0"]=matches_refined[part_match_ids[j]].epos0
+					obj_port["epos1"]=matches_refined[part_match_ids[j]].epos1
 					p_out_ports++
+					places.push(TPlace(){
+						epos0:matches_refined[part_match_ids[j]].epos0,
+						epos1:matches_refined[part_match_ids[j]].epos1,
+						match_id:int(matched_combo_ids.n-1),
+						part_id:int(j),
+						slot_id:-1,
+						annotations:int2[].NULL,//combo.parts[j].annotations
+					})
+					///////////
 					slot_bindings=matches_refined[part_match_ids[j]].slot_bindings
 					for slot,J in slot_bindings
-						obj_in_ports[p_in_ports]=getIdString(combo.parts[j].slots[J].id)
+						obj_port=JS.New()
+						obj_in_ports[p_in_ports]=obj_port
+						obj_port["id"]=getIdString(combo.parts[j].slots[J].id)
+						obj_port["epos0"]=slot.x
+						obj_port["epos1"]=slot.y
 						p_in_ports++
 						places.push(TPlace(){
 							epos0:slot.x,
@@ -3667,14 +3684,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 							slot_id:int(J),
 							annotations:combo.parts[j].slots[J].annotations,
 						})
-					places.push(TPlace(){
-						epos0:matches_refined[part_match_ids[j]].epos0,
-						epos1:matches_refined[part_match_ids[j]].epos1,
-						match_id:int(matched_combo_ids.n-1),
-						part_id:int(j),
-						slot_id:-1,
-						annotations:int2[].NULL,//combo.parts[j].annotations
-					})
 					//obj_part_j=JS.New()
 					//obj_parts[j]=obj_part_j
 					//obj_part_j["epos0"]=matches_refined[part_match_ids[j]].epos0
@@ -3699,7 +3708,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		cur_places=new int[]
 		for e in evts
 			if e.side==0:
-				if places[e.place_id].slot_id<0:
+				if places[e.place_id].slot_id>=0:
 					cur_places.push(e.place_id)
 				else
 					if cur_places.n>1:
@@ -3716,7 +3725,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 								new_annotations[ai.x]=ai.y
 					places[e.place_id].final_annotations=new_annotations
 			else
-				if places[e.place_id].slot_id<0:
+				if places[e.place_id].slot_id>=0:
 					for j=cur_places.n-1:-1:0
 						if cur_places[j]==e.place_id:
 							cur_places[j]=cur_places[cur_places.n-1]
