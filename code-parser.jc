@@ -1103,9 +1103,88 @@ auto ParseQIType(string feed)
 			if ptr<feed.n&&feed[ptr]=='=':
 				ptr++
 				skipchars(CharSet.spaces_newline)
-				ptr0=ptr
-				skipToChars(CharSet.qi_separator)
-				id_b=getid(feed[ptr0:ptr-1])
+				if ptr<feed.n&&(feed[ptr]=='"'||feed[ptr]=='\''):
+					c0=feed[ptr]
+					ptr++
+					efeed0=ptr
+					isrecover=0
+					str=new string
+					for(;;)
+						if ptr>=feed.n:
+							if isrecover:
+								ptr--
+								break
+							ptr--
+							ptr=efeed0
+							isrecover=1
+							str.clear()
+							continue
+						c=int(feed[ptr]);ptr++
+						if c=='\\':
+							ch=int(feed[ptr])
+							if ch=='\r'||ch=='\n':
+								ptr++;ch=int(feed[ptr])
+								if ch=='\r'||ch=='\n':
+									ptr++;ch=int(feed[ptr])
+								str.push('\n')
+								continue
+							c=ch;ptr++;
+							switch c{
+							case 'n':
+								c=int('\n');break;
+							case 'r':
+								c=int('\r');break;
+							case 't':
+								c=int('\t');break;
+							case 'b':
+								c=int('\b');break;
+							case 'e':
+								c=27;
+								break;
+							case 'x','u':
+								chu=0
+								for j=0:(c=='u'?3:1)
+									chj=int(feed[ptr])
+									if !CharSet.has(CharSet.hexdigit,chj):
+										break
+									if chj:ptr++
+									si=((chj-'0')&0x1f)
+									if si>=0x10:si-=7
+									chu=chu*16+(si&0xf)
+								if c=='x':
+									str.push(char(chu))
+								else
+									if chu>=2048:
+										str.push(char(((chu>>12)&0xf)+0xe0))
+										str.push(char(0x80+((chu>>6)&63)))
+										str.push(char(0x80+(chu&63)))
+									else if chu>=128:
+										str.push(char((chu>>6)+0xc0))
+										str.push(char(0x80+(chu&63)))
+									else
+										str.push(char(chu))
+								continue
+							default:
+								if CharSet.has(CharSet.digits,c):
+									ptr--
+									s=ptr
+									skipchars(CharSet.digits)
+									c=0
+									for(;s!=ptr;s++)
+										si=int(feed[s])
+										c=c*8+(si-'0')
+								break
+							}
+							str.push(char(c))
+						else
+							if c==c0:break;
+							if isrecover&&(c=='\r'||c=='\n'):break
+							str.push(char(c))
+					id_b=getid(str)
+				else
+					ptr0=ptr
+					skipToChars(CharSet.qi_separator)
+					id_b=getid(feed[ptr0:ptr-1])
 			skipchars(CharSet.spaces_newline)
 			if ptr<feed.n&&feed[ptr]==',':
 				ptr++
@@ -2259,10 +2338,12 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 										common_combo_args.push(toks_proto[p_cproto].tok-TOK_ID)
 									p_cproto++
 								ptok_combo_ptn_last=i+1
-						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-desc",12)==0:
+						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-desc",11)==0:
 							if cur_combo:
-								pdoc=PoolDoxygenComment(sdataz[j+13:])
-								cur_combo.id_desc=getid(doc_string_pool[pdoc.x:])
+								pdoc=PoolDoxygenComment(sdataz[j+12:])
+								s_id=doc_string_pool[pdoc.x:]
+								cur_combo.id_desc=getid(s_id)
+								s_id.discard()
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-end",10)==0:
 							if cur_combo:
 								FlushComboPattern()
@@ -2303,9 +2384,6 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 									pattern.push(TOK_COMBO_SLOT)
 								ptok_combo_ptn_last=i+1
 								cur_combo.parts.back().slots.push(t_slot)
-						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qinfo-fn",8)==0:
-							//create a CQIFunc from scratch, with alternative call sequence
-							//todo
 			epos_var_comment=-1L
 			epos0=toks[i].epos0
 			epos1=toks[i].epos1
@@ -3424,11 +3502,21 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		struct TPartMatchRough
 			int pid
 			int ptok0,ptok1
+		struct TRootSlot
+			int id
+			int epos0,epos1
+		struct TCurrentRootSlot
+			int blevel,rsid
 		//gen matches here, do detailed matching in a later pass
+		//todo: @slot should label all the way to the next closing bracket at the same level
+		root_slots=new TRootSlot[]
+		root_slots.push(TRootSlot(){id:getid("-"),epos0:0,epos1:int(ccnt1-ccnt0)})
+		cur_root_slots=new TCurrentRootSlot[]
 		matches=new TPartMatchRough[]
 		got_pid=new int[g_all_patterns.n]
 		got_pid_t=0
 		//debug_max_1=0
+		blevel=0
 		for tok_text,I in toks
 			//for sti in st
 			//	if sti.x==1&&sti.y>debug_max_1:
@@ -3437,10 +3525,30 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			st_new.n=0
 			if tok_text.tok=='('||tok_text.tok=='['||tok_text.tok=='{':
 				dbra=1
+				blevel++
 			else if tok_text.tok==')'||tok_text.tok==']'||tok_text.tok=='}':
+				blevel--
+				while cur_root_slots.n>0&&blevel<cur_root_slots.back().blevel:
+					root_slots[cur_root_slots.back().rsid].epos1=toks[I-1].epos1
+					cur_root_slots.pop()
 				dbra=-1
 			else
 				dbra=0
+			if tok_text.tok==TOK_COMMENT:
+				epos0=tok_text.epos0
+				epos1=tok_text.epos1
+				for j=epos0:min(epos1,epos0+3)-1
+					if __basic_api.memcmp(__pointer(sdataz.d+j),"@slot",5)==0&&(sdataz[j+5]==' '||sdataz[j+5]=='\t'):
+						//root slot
+						auto pid0=j+6
+						while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
+							pid0++
+						while cur_root_slots.n>0&&blevel<=cur_root_slots.back().blevel:
+							root_slots[cur_root_slots.back().rsid].epos1=toks[I-1].epos1
+							cur_root_slots.pop()
+						root_slots.push(TRootSlot(){id:getid(sdataz[pid0:epos1-1]),epos0:int(epos0),epos1:int(epos1)})
+						cur_root_slots.push(TCurrentRootSlot(){blevel:blevel,rsid:int(root_slots.n)-1})
+						break
 			if dbra:
 				st_stay.n=0
 				for sti in st
@@ -3498,6 +3606,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					//add firsts, but not if we're already matching that pattern
 					if got_pid[pid]!=got_pid_t:
 						st.push(int3(pid,1,int(I)))
+		for crs in cur_root_slots
+			root_slots[crs.rsid].epos1=int(ccnt1-ccnt0)
 		//Writeln(matches)
 		struct TPartMatchRefined
 			int2[] slot_bindings
@@ -3695,6 +3805,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				obj_I["params"]=obj_params
 				for d,k in combo_param_bindings
 					obj_params[getIdString(k)]=getIdString(d)
+		obj_root_slots=JS.NewArray()
+		pobj_root_slots=0L
+		for root_slot_i,I in root_slots
+			places.push(TPlace(){
+				epos0:root_slot_i.epos0,
+				epos1:root_slot_i.epos1,
+				match_id:-1,
+				part_id:0,
+				slot_id:int(I),
+				annotations:int2[].NULL,
+			})
+			obj_slot_i=JS.New()
+			obj_slot_i["id"]=getIdString(root_slot_i.id)
+			obj_slot_i["epos0"]=root_slot_i.epos0
+			obj_slot_i["epos1"]=root_slot_i.epos1
+			obj_root_slots[pobj_root_slots++]=obj_slot_i
 		//organize the places - nested place handling
 		//also construct the graph - creates an edge to each place from its nesting host
 		edges=new int2[]
@@ -3704,19 +3830,24 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		for pl,I in places
 			evts.push(TPlaceEvent(){epos:pl.epos0,side:0,place_id:int(I)})
 			evts.push(TPlaceEvent(){epos:pl.epos1,side:1,place_id:int(I)})
-		evts.Sortby(byMember("epos"))
+		evts.Sortby(inline(a){return a.epos*2+a.side})
+		//Writeln(evts)
+		//Writeln(places)
 		cur_places=new int[]
 		for e in evts
 			if e.side==0:
 				if places[e.place_id].slot_id>=0:
 					cur_places.push(e.place_id)
 				else
-					if cur_places.n>1:
-						plid_parent=cur_places[cur_places.n-2]
+					if cur_places.n>0:
+						plid_parent=cur_places[cur_places.n-1]
 						edges.push(int2(plid_parent,e.place_id))
 					else
 						//from-file edge
-						edges.push(int2(-1,e.place_id))
+						//edges.push(int2(-1,e.place_id))
+						//one of those root slots must have covered it
+						Writeln(e)//todo
+						assert(0)
 					//////////
 					new_annotations=new int[int]
 					for plid in cur_places
@@ -3728,7 +3859,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				if places[e.place_id].slot_id>=0:
 					for j=cur_places.n-1:-1:0
 						if cur_places[j]==e.place_id:
-							cur_places[j]=cur_places[cur_places.n-1]
+							for j2=j:cur_places.n-2
+								cur_places[j]=cur_places[j+1]
 							cur_places.pop()
 							break
 		//annotation-based combo part searching - enum all known combos
@@ -3763,7 +3895,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if combo.id_desc:
 				obj_combo["desc"]=getIdString(combo.id_desc)
 			obj_combo["score"]=n_annotations_max
-			js_availables[p_js_availables]=obj_combo
+			js_availables[p_js_availables++]=obj_combo
 		js_edges=JS.NewArray()
 		p_js_edges=0
 		name_appeared=new int[string]
@@ -3781,19 +3913,20 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		for e in edges
 			obj_edge=JS.New()
 			js_edges[p_js_edges++]=obj_edge
-			if e.x>=0:
+			if places[e.x].match_id>=0:
 				combo0=g_combo_by_id[matched_combo_ids[places[e.x].match_id]]
 			else
 				combo0=CQICombo.NULL
 			combo1=g_combo_by_id[matched_combo_ids[places[e.y].match_id]]
 			obj_edge["id0"]=combo0?matched_combo_names[places[e.x].match_id]:"<root>"
-			obj_edge["port0"]=combo0?getIdString(combo0.parts[places[e.x].part_id].slots[places[e.x].slot_id].id):"code"
+			obj_edge["port0"]=getIdString(combo0?combo0.parts[places[e.x].part_id].slots[places[e.x].slot_id].id:root_slots[places[e.x].slot_id].id)
 			obj_edge["id1"]=matched_combo_names[places[e.y].match_id]
 			obj_edge["port1"]=getIdString(combo1.parts[places[e.y].part_id].id)
 		final_ret=JS.New()
 		final_ret["matched"]=js_matcheds
 		final_ret["available"]=js_availables
 		final_ret["edges"]=js_edges
+		final_ret["root_slots"]=obj_root_slots
 		return JS.Return(final_ret)
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){

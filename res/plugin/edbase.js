@@ -3323,9 +3323,10 @@ var CreateFileTag=function(){
 	return [UI.g_git_name,UI.g_git_email,(new Date()).toISOString()].join('_').replace(/[\-: ]/g,'_');
 };
 
-if(!UI.m_ui_metadata["<tag_cache>"]){
-	UI.m_ui_metadata["<tag_cache>"]={};
-}
+//if(!UI.m_ui_metadata["<tag_cache>"]){
+//	UI.m_ui_metadata["<tag_cache>"]={};
+//}
+/*
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
@@ -3355,13 +3356,14 @@ UI.RegisterEditorPlugin(function(){
 					sel[1],0,sindent1+s_line_comment+'#b-'+stag+'\n']);
 				this.SetSelection(sel[0],this.SeekLC(line1+2,0))
 				UI.SDL_SetClipboardText(['\n![](qtag://',stag,')\n\n'].join(''));
-				UI.m_ui_metadata["<tag_cache>"][stag]=this.m_file_name;
+				//UI.m_ui_metadata["<tag_cache>"][stag]=this.m_file_name;
 				UI.Refresh();
 			}.bind(this)});
 		}
 		menu_tools=undefined;
 	})
 });
+*/
 
 //markdown
 UI.RegisterEditorPlugin(function(){
