@@ -157,7 +157,7 @@ module CharSet
 	spaces=charset("\r\t ")
 	spaces_newline=charset("\r\n\t ")
 	qi_typename=charset("~$._[]0-9A-Za-z\200-\377")
-	qi_separator=charset("\r\n,}")
+	qi_separator=charset("\r\n,)")
 	//qi_call_ptn_separator=charset(",;)]}")
 	newlines=charset("\r\n")
 	inline has(u32[] ok,int c)
@@ -1087,12 +1087,12 @@ auto ParseQIType(string feed)
 	id=getid(feed[ptr0:ptr-1])
 	skipchars(CharSet.spaces_newline)
 	annotations=int2[].NULL
-	if ptr<feed.n&&feed[ptr]=='{':
+	if ptr<feed.n&&feed[ptr]=='(':
 		annotations=new int2[]
 		ptr++
 		while ptr<feed.n:
 			skipchars(CharSet.spaces_newline)
-			if feed[ptr]=='}':
+			if feed[ptr]==')':
 				break
 			ptr0=ptr
 			skipchars(CharSet.qi_typename)
@@ -3460,15 +3460,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return JS.Return(final_ret)
 	}
 	JS_UI["ENABLE_EXPERIMENTAL_FEATURES"]=ENABLE_EXPERIMENTAL_FEATURES;
-	if ENABLE_EXPERIMENTAL_FEATURES:JS_UI["ED_ParseAsCombo"]=function(JSContext JS){
+	if ENABLE_EXPERIMENTAL_FEATURES:{
+	CreateJSAnnotations=function(JSContext JS,int2[] annotations){
+		obj=JS.New()
+		for ai in annotations
+			obj[getIdString(ai.x)]=getIdString(ai.y)
+		return obj
+	}
+	JS_UI["ED_ParseAsCombo"]=function(JSContext JS){
 		//todo: cross-file combos
+		//todo: multi-file
 		//parse a bunch of text into combos
 		doc=JS.Param(0).as(JSObject)
 		options=doc["plugin_language_desc"].as(JSObject)
 		ed=doc["ed"].as(CEditableText)
 		if !options:return 0
 		if !ed:return JS.ReturnError("invalid editor object")
-		//todo: multi-file
 		ccnt0=JS.Param(1).as(i64)
 		ccnt1=JS.Param(2).as(i64)
 		sdataz=ed.GetText(ccnt0,ccnt1-ccnt0+1LL)
@@ -3751,7 +3758,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				obj_I["name"]=getIdString(match.id_combo)
 				if combo.id_desc:
 					obj_I["desc"]=getIdString(combo.id_desc)
-				//todo: desc
 				//obj_parts=JS.NewArray()
 				//obj_I["parts"]=obj_parts
 				//port -> place list... just the names
@@ -3768,6 +3774,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					obj_port["id"]=getIdString(combo.parts[j].id)
 					obj_port["epos0"]=matches_refined[part_match_ids[j]].epos0
 					obj_port["epos1"]=matches_refined[part_match_ids[j]].epos1
+					if combo.parts[j].annotations:
+						obj_annotations=CreateJSAnnotations(JS,combo.parts[j].annotations)
+						obj_port["annotations"]=obj_annotations
 					p_out_ports++
 					places.push(TPlace(){
 						epos0:matches_refined[part_match_ids[j]].epos0,
@@ -3783,8 +3792,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						obj_port=JS.New()
 						obj_in_ports[p_in_ports]=obj_port
 						obj_port["id"]=getIdString(combo.parts[j].slots[J].id)
+						obj_port["part_id"]=j
 						obj_port["epos0"]=slot.x
 						obj_port["epos1"]=slot.y
+						if combo.parts[j].slots[J].annotations:
+							obj_annotations=CreateJSAnnotations(JS,combo.parts[j].slots[J].annotations)
+							obj_port["annotations"]=obj_annotations
 						p_in_ports++
 						places.push(TPlace(){
 							epos0:slot.x,
@@ -3800,7 +3813,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					//obj_part_j["epos1"]=matches_refined[part_match_ids[j]].epos1
 					//obj_part_j["slot_bindings"]=matches_refined[part_match_ids[j]].slot_bindings.ConvertToAsBinary(int)
 					//also remove the matched stuff
-					matches_refined[part_match_ids[j]].ord_part=-1
+					//keep the match to allow reuse
+					//matches_refined[part_match_ids[j]].ord_part=-1
 				obj_params=JS.New()
 				obj_I["params"]=obj_params
 				for d,k in combo_param_bindings
@@ -3848,13 +3862,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						//one of those root slots must have covered it
 						Writeln(e)//todo
 						assert(0)
-					//////////
-					new_annotations=new int[int]
-					for plid in cur_places
-						if places[plid].annotations:
-							for ai in places[plid].annotations
-								new_annotations[ai.x]=ai.y
-					places[e.place_id].final_annotations=new_annotations
+				//////////
+				new_annotations=new int[int]
+				for plid in cur_places
+					if places[plid].annotations:
+						for ai in places[plid].annotations
+							new_annotations[ai.x]=ai.y
+				places[e.place_id].final_annotations=new_annotations
 			else
 				if places[e.place_id].slot_id>=0:
 					for j=cur_places.n-1:-1:0
@@ -3928,6 +3942,58 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		final_ret["edges"]=js_edges
 		final_ret["root_slots"]=obj_root_slots
 		return JS.Return(final_ret)
+	}
+	JS_UI["ED_CreateComboNode"]=function(JSContext JS){
+		auto id=getid(JS.Param(0).as(string))
+		combo=g_combo_by_id[id]
+		if !combo:
+			return 0
+		obj_I=JS.New()
+		obj_I["name"]=getIdString(combo.id)
+		if combo.id_desc:
+			obj_I["desc"]=getIdString(combo.id_desc)
+		obj_in_ports=JS.NewArray()
+		p_in_ports=0L
+		obj_out_ports=JS.NewArray()
+		p_out_ports=0L
+		obj_I["in_ports"]=obj_in_ports
+		obj_I["out_ports"]=obj_out_ports
+		//epos_part0 is only used as a sort key in the initial layouting code
+		//obj_I["epos_part0"]=matches_refined[part_match_ids[0]].epos0
+		for j=0:combo.parts.n-1
+			obj_port=JS.New()
+			obj_out_ports[p_out_ports]=obj_port
+			obj_port["id"]=getIdString(combo.parts[j].id)
+			if combo.parts[j].annotations:
+				obj_annotations=CreateJSAnnotations(JS,combo.parts[j].annotations)
+				obj_port["annotations"]=obj_annotations
+			//don't provide epos0 / epos1 initially
+			//obj_port["epos0"]=matches_refined[part_match_ids[j]].epos0
+			//obj_port["epos1"]=matches_refined[part_match_ids[j]].epos1
+			p_out_ports++
+			///////////
+			for slot,J in combo.parts[j].slots
+				obj_port=JS.New()
+				obj_in_ports[p_in_ports]=obj_port
+				obj_port["id"]=getIdString(slot.id)
+				obj_port["part_id"]=j
+				if slot.annotations:
+					obj_annotations=CreateJSAnnotations(JS,slot.annotations)
+					obj_port["annotations"]=obj_annotations
+				//obj_port["epos0"]=slot.x
+				//obj_port["epos1"]=slot.y
+				p_in_ports++
+		obj_params=JS.New()
+		obj_I["params"]=obj_params
+		return JS.Return(obj_I)
+	}
+	JS_UI["ED_GetAllComboNames"]=function(JSContext JS){
+		obj=JS.New()
+		pobj=0L
+		for combo,id in g_combo_by_id
+			obj[pobj++]=getIdString(id)
+		return JS.Return(obj)
+	}
 	}
 	JS_UI["ED_CountCommas"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
