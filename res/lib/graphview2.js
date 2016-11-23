@@ -352,19 +352,8 @@ var PreprocessNode=function(ndi){
 		}
 	}
 };
-UI.BuildComboGraph=function(doc,parsed_combos){
-	var nds=parsed_combos.matched;
-	var es=parsed_combos.edges;
-	nds.push({__id__:"<root>",
-		name:UI.GetSmartTabName(doc.m_file_name),
-		in_ports:parsed_combos.root_slots,
-		out_ports:[],params:[],epos_part0:0})
-	//layout individual nodes
+var UpdateGraph=function(nds,es){
 	var style=UI.default_styles.graph_view.node_style;
-	for(var ni=0;ni<nds.length;ni++){
-		var ndi=nds[ni];
-		PreprocessNode(ndi);
-	}
 	//automatic layout - nested level for x
 	var node_map={},port_maps=[],degs=[],es_topo=[],es_gather=[];
 	var n=nds.length,m=es.length;
@@ -386,6 +375,7 @@ UI.BuildComboGraph=function(doc,parsed_combos){
 		if(v0==undefined||v1==undefined){continue;}
 		es_topo[v0].push(v1);
 		es_gather[v1].push({v0:v0,port0:port_maps[v0][e.port0],port1:port_maps[v1][e.port1]});
+		//console.log(JSON.stringify(e),JSON.stringify({v0:v0,port0:port_maps[v0][e.port0],port1:port_maps[v1][e.port1]}));
 		degs[v1]++;
 	}
 	var Q=[],head=0,tail=0,depth=style.node_padding,w_max=0;
@@ -415,16 +405,6 @@ UI.BuildComboGraph=function(doc,parsed_combos){
 		console.log('panic: bad graph');
 	}
 	////////////////
-	//automatic layout - sort by ccnt for y
-	var y_currents={};
-	nds.sort(function(a,b){return a.epos_part0-b.epos_part0;})
-	for(var i=0;i<nds.length;i++){
-		var key_x=(nds[i].x|0);
-		var y_current=(y_currents[key_x]||style.node_padding);
-		nds[i].y=y_current;
-		y_currents[key_x]=y_current+nds[i].m_h+style.node_padding;
-	}
-	////////////////
 	//compute combined annotations at slots - slot-part correspondences
 	for(var i=0;i<Q.length;i++){
 		var v1=Q[i];
@@ -432,9 +412,11 @@ UI.BuildComboGraph=function(doc,parsed_combos){
 		var esi=es_gather[v1];
 		for(var j=0;j<esi.length;j++){
 			//others->port inheritance
-			var ndv0=nds[esi.v0];
-			var final_annotations=ndv0.m_ports[esi.port0].final_annotations;
-			var port1=ndi.m_ports[esi.port1];
+			var e=esi[j];
+			var ndv0=nds[e.v0];
+			var final_annotations=ndv0.m_ports[e.port0].final_annotations;
+			var port1=ndi.m_ports[e.port1];
+			//console.log(JSON.stringify(e),ndi.__id__,ndi.m_ports.length,v1,JSON.stringify(Q),JSON.stringify(node_map));
 			if(!port1.final_annotations){
 				port1.final_annotations={};
 			}
@@ -460,8 +442,72 @@ UI.BuildComboGraph=function(doc,parsed_combos){
 		}
 	}
 	////////////////
-	parsed_combos.available.sort(function(a,b){return b.score-a.score;})
-	var ret={nds:nds,es:es,available:parsed_combos.available};
+	//automatic layout - sort by ccnt for y
+	//this invalidates all the graph structures above!
+	var y_currents={};
+	nds.sort(function(a,b){return a.epos_part0-b.epos_part0;})
+	for(var i=0;i<nds.length;i++){
+		var key_x=(nds[i].x|0);
+		var y_current=(y_currents[key_x]||style.node_padding);
+		nds[i].y=y_current;
+		y_currents[key_x]=y_current+nds[i].m_h+style.node_padding;
+	}
+	////////////////////////////////
+	//search available combos
+	var all_combos=UI.ED_GetAllComboNames();
+	var available=[];
+	var all_ports=[];
+	for(var i=0;i<nds.length;i++){
+		var ndi=nds[i];
+		for(var j=0;j<ndi.in_ports.length;j++){
+			all_ports.push(ndi.in_ports[j])
+		}
+	}
+	for(var i=0;i<all_combos.length;i++){
+		var nd_combo=UI.ED_CreateComboNode(all_combos[i]);
+		var is_available=1;
+		var score=0;
+		for(var j=0;j<nd_combo.out_ports.length;j++){
+			var annotations=nd_combo.out_ports[j].annotations;
+			if(!annotations){continue;}
+			var got_port=0;
+			for(var j2=0;j2<all_ports.length;j2++){
+				if(canConnect(all_ports[j2],annotations)){
+					got_port=1;
+					break;
+				}
+			}
+			if(!got_port){
+				is_available=0;
+				break;
+			}
+		}
+		if(is_available){
+			available.push({name:nd_combo.name,desc:nd_combo.desc,score:score})
+		}
+	}
+	available.sort(function(a,b){
+		var dscore=b.score-a.score;
+		if(dscore){return dscore;}
+		return (a.name<b.name?-1:(a.name>b.name?1:0));
+	})
+	return available;
+};
+UI.BuildComboGraph=function(doc,parsed_combos){
+	var nds=parsed_combos.matched;
+	var es=parsed_combos.edges;
+	nds.push({__id__:"<root>",
+		name:UI.GetSmartTabName(doc.m_file_name),
+		in_ports:parsed_combos.root_slots,
+		out_ports:[],params:[],epos_part0:0})
+	//layout individual nodes
+	for(var ni=0;ni<nds.length;ni++){
+		var ndi=nds[ni];
+		PreprocessNode(ndi);
+	}
+	var available=UpdateGraph(nds,es);
+	////////////////
+	var ret={nds:nds,es:es,available:available};
 	ret.__proto__=graph_prototype;
 	return ret;
 };
@@ -711,6 +757,13 @@ W.graphview_prototype={
 		Array.prototype.push.apply(this.graph.es,gr.es);
 		this.graph.SignalEdit(gr.nds)
 		return gr;
+	},
+	UpdateGraph:function(){
+		var graph=this.graph;
+		graph.available=UpdateGraph(graph.nds,graph.es);
+		if(this.editor&&this.editor.owner){
+			this.editor.owner.__package__=undefined;
+		}
 	},
 };
 var canConnect=function(port,annotations){
@@ -1152,6 +1205,11 @@ W.PackageItem_prototype={
 		}
 		//create the new node
 		var nd_new=UI.ED_CreateComboNode(this.s_combo);
+		if(!graph.node_counter){
+			graph.node_counter=0;
+		}
+		graph.node_counter++;
+		nd_new.__id__=['__new',this.s_combo,graph.node_counter].join('_');
 		PreprocessNode(nd_new);
 		graph.nds.push(nd_new);
 		//enum and test all ports
@@ -1191,25 +1249,26 @@ W.PackageItem_prototype={
 				}
 			}
 			if(port_best){
+				//we have switched the edge sides, it's now input->output
 				if(port_pi.dir=='output'){
 					graph.es.push({
-						id0:nd_new.__id__, port0:port_pi.id,
-						id1:port_best.nd.__id__, port1:port_best.port,
+						id0:port_best.nd.__id__, port0:port_best.port,
+						id1:nd_new.__id__, port1:port_pi.id,
 					})
 					al_x_max=Math.max(al_x_max,port_best.nd.x+port_best.nd.m_w);
 					al_y_avg+=port_best.nd.y;
 					al_n++;
 				}else{
 					graph.es.push({
-						id0:port_best.nd.__id__, port0:port_best.port,
-						id1:nd_new.__id__, port1:port_pi.id,
+						id0:nd_new.__id__, port0:port_pi.id,
+						id1:port_best.nd.__id__, port1:port_best.port,
 					})
 				}
 			}
 		}
 		if(al_n){
 			//connection-based auto-layout: x_max+margin, y_average
-			nd_new.x=al_x_max+32;
+			nd_new.x=al_x_max+UI.default_styles.graph_view.node_style.node_padding;
 			nd_new.y=al_y_avg/al_n;
 		}else{
 			//by default, add it "down"
@@ -1235,6 +1294,8 @@ W.PackageItem_prototype={
 			//param autobinding
 			//code with slot comments stripped
 		}
+		//re-query availabilities
+		obj.UpdateGraph();
 		UI.Refresh()
 	},
 };

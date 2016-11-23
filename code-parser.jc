@@ -3883,12 +3883,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		p_js_availables=0
 		for combo,id in g_combo_by_id
 			if !combo:continue
-			n_annotations_max=0
+			score=0
 			is_available=1
 			for part,I in combo.parts
 				if !part.annotations||!part.annotations.n:continue
-				if n_annotations_max<part.annotations.n:
-					n_annotations_max=int(part.annotations.n)
+				score+=int(part.annotations.n)
 				is_available_part_I=0
 				for pl,J in places
 					is_available_part_I_place_J=1
@@ -3903,12 +3902,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					is_available=0
 					break
 			if !is_available:continue
-			//available, score it at n_annotations_max
+			//available, sort those with the worst dependencies first
 			obj_combo=JS.New()
 			obj_combo["name"]=getIdString(id)
 			if combo.id_desc:
 				obj_combo["desc"]=getIdString(combo.id_desc)
-			obj_combo["score"]=n_annotations_max
+			obj_combo["score"]=score
 			js_availables[p_js_availables++]=obj_combo
 		js_edges=JS.NewArray()
 		p_js_edges=0
@@ -3988,7 +3987,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return JS.Return(obj_I)
 	}
 	JS_UI["ED_GetAllComboNames"]=function(JSContext JS){
-		obj=JS.New()
+		obj=JS.NewArray()
 		pobj=0L
 		for combo,id in g_combo_by_id
 			obj[pobj++]=getIdString(id)
