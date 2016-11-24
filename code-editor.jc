@@ -3967,15 +3967,30 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			str=System.detail.pcharToString(s_pchar)
 		if str.IndexOf('\n')<0L:return 0
 		s_target_indent=JS.Param(0).or("")
+		is_folded=0
+		if str.n&&str[0]=='\n':
+			//could be folded text, go into smart paste with the initial newline stripped
+			str=str[1:]
+			is_folded=1
+		else if str.n>=2&&str[0]=='\r'&&str[1]=='\n':
+			str=str[2:]
+			is_folded=1
 		p_trailing_space=str.n
 		while p_trailing_space>0&&(str[p_trailing_space-1]==' '||str[p_trailing_space-1]=='\t')&&p_trailing_space>str.n-MAX_INDENT:
 			p_trailing_space--
 		if p_trailing_space>0&&str[p_trailing_space-1]=='\n':
-			//gotta rearrange it
-			str2=str[p_trailing_space:]+str[:p_trailing_space-1]
+			//indent in the end, gotta rearrange it
+			if is_folded:
+				//downright ignore the space in the folding mode
+				str2=str[:p_trailing_space-1]
+			else
+				//move it to the front in the non-folding mode
+				str2=str[p_trailing_space:]+str[:p_trailing_space-1]
 		else
 			str2=str
 		if str2.n&&str2.back()=='\n':
+			str2=str2[:str2.n-2]
+		if str2.n&&str2.back()=='\r':
 			str2=str2[:str2.n-2]
 		got_first_indent=0
 		pindent_first=0

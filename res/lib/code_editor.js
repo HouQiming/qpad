@@ -1439,7 +1439,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		match minimal indent with current line
 			ignore paste location as long as it's inside the indent
 		*/
-		var ccnt_corrected=ed.MoveToBoundary(sel[1],1,"space");
+		var ccnt_corrected=ed.MoveToBoundary(this.SeekLC(this.GetLC(sel[1])[0],0),1,"space");
 		if(sel[1]>sel[0]&&ed.MoveToBoundary(sel[0],-1,"space")<sel[0]){
 			//line overwrite mode, use sel[0]
 			ccnt_corrected=sel[0];
@@ -1448,10 +1448,16 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_corrected){
 				//empty line: simply paste before this line, do nothing
 			}else{
-				//paste to the next line if called on at eoln
+				//paste to the next line if called at eoln
 				ccnt_corrected++;
 				ccnt_corrected=ed.MoveToBoundary(ccnt_corrected,1,"space")
 			}
+		}else if(sel[0]==sel[1]&&sel[1]<ccnt_corrected){
+			//we're inside the indent
+			//do nothing - use the indent
+		}else if(sel[0]==sel[1]&&sel[0]>ccnt_corrected){
+			//we're *after the indent
+			//do nothing - use the indent
 		}else{
 			ccnt_corrected=sel[0];
 		}
