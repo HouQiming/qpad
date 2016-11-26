@@ -800,38 +800,7 @@ W.notebook_prototype={
 			UI.OpenEditorWindow(err.file_name,function(){
 				var go_prev_line=0
 				if(err.is_in_active_doc==undefined){return;}
-				if(err.line1==undefined){
-					err.line1=err.line0
-				}
-				if(err.col0==undefined){
-					err.col0=0;
-					err.col1=0;
-					if(err.line0==err.line1){
-						err.line1++
-						go_prev_line=1
-					}
-				}else if(err.col1==undefined){
-					err.col1=1e9;
-				}
-				//if(err.col0==err.col1&&err.line0==err.line1){
-				//	err.col1++;
-				//}
-				//for(var shit in this){
-				//	print(shit,this[shit])
-				//}
-				err.ccnt0=this.SeekLC(err.line0,err.col0)
-				err.ccnt1=this.SeekLC(err.line1,err.col1)
-				if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
-				if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
-				/////////////////
-				AddErrorToEditor(this,err)
-			},"quiet")
-		}
-		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
-			if(!err.is_in_active_doc){
-				UI.OpenEditorWindow(err.file_name,function(){
-					var go_prev_line=0
-					if(err.is_in_active_doc==undefined){return;}
+				if(err.ccnt0==undefined||err.ccnt1==undefined){
 					if(err.line1==undefined){
 						err.line1=err.line0
 					}
@@ -845,12 +814,48 @@ W.notebook_prototype={
 					}else if(err.col1==undefined){
 						err.col1=1e9;
 					}
+					//if(err.col0==err.col1&&err.line0==err.line1){
+					//	err.col1++;
+					//}
+					//for(var shit in this){
+					//	print(shit,this[shit])
+					//}
 					err.ccnt0=this.SeekLC(err.line0,err.col0)
 					err.ccnt1=this.SeekLC(err.line1,err.col1)
+				}
+				if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
+				if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
+				/////////////////
+				AddErrorToEditor(this,err)
+			},"quiet")
+		}
+		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
+			if(!err.is_in_active_doc){
+				UI.OpenEditorWindow(err.file_name,function(){
+					var go_prev_line=0
+					//if(err.is_in_active_doc==undefined){return;}
+					if(err.ccnt0==undefined||err.ccnt1==undefined){
+						if(err.line1==undefined){
+							err.line1=err.line0
+						}
+						if(err.col0==undefined){
+							err.col0=0;
+							err.col1=0;
+							if(err.line0==err.line1){
+								err.line1++
+								go_prev_line=1
+							}
+						}else if(err.col1==undefined){
+							err.col1=1e9;
+						}
+						err.ccnt0=this.SeekLC(err.line0,err.col0)
+						err.ccnt1=this.SeekLC(err.line1,err.col1)
+					}
 					if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
 					if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
 					/////////////////
-					AddErrorToEditor(this,err)
+					//AddErrorToEditor(this,err)
+					this.SetSelection(err.ccnt0,err.ccnt1);
 				})
 			}else{
 				UI.OpenEditorWindow(err.file_name,function(){

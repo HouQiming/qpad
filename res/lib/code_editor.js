@@ -1456,7 +1456,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			//we're inside the indent
 			//do nothing - use the indent
 		}else if(sel[0]==sel[1]&&sel[0]>ccnt_corrected){
-			//we're *after the indent
+			//we're *after* the indent
 			//do nothing - use the indent
 		}else{
 			ccnt_corrected=sel[0];
@@ -2357,12 +2357,14 @@ var find_context_prototype={
 					fn_display=fn_display.substr(s_repo_path.length+1);
 				}
 				var text_dim=UI.MeasureText(edstyle.find_message_font,fn_display)
-				UI.RoundRect({
-					x:(w_find_items-8-text_dim.w),y:y,
-					w:text_dim.w,h:text_dim.h,
-					round:2,
-					color:edstyle.bgcolor&0xaaffffff,
-				})
+				if(i==this.m_current_merged_item){
+					UI.RoundRect({
+						x:(w_find_items-8-text_dim.w),y:y,
+						w:text_dim.w,h:text_dim.h,
+						round:2,
+						color:edstyle.bgcolor&0xaaffffff,
+					})
+				}
 				W.Text("",{
 					x:(w_find_items-8-text_dim.w),y:y,
 					font:edstyle.find_message_font,color:edstyle.editor_style.color_symbol,

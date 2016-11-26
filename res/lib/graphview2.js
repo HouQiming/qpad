@@ -425,15 +425,22 @@ var UpdateGraph=function(nds,es){
 			}
 		}
 		if(ndi.__id__!="<root>"){
+			var params=ndi.params;
 			for(var j=0;j<ndi.in_ports.length;j++){
-				//port->slot inheritance, slot annotations, flatten
+				//flatten the annotations at this slot
+				var obj_out={};
+				//port->slot inheritance
 				var port_j=ndi.in_ports[j];
 				var obj0=ndi.out_ports[port_j.part_id].final_annotations;
-				var obj1=port_j.annotations;
-				var obj_out={};
 				for(var k in obj0){
 					obj_out[k]=obj0[k];
 				}
+				//combo params
+				for(var k in params){
+					obj_out[k]=params[k];
+				}
+				//slot annotations
+				var obj1=port_j.annotations;
 				for(var k in obj1){
 					obj_out[k]=obj1[k];
 				}
@@ -1216,15 +1223,19 @@ W.PackageItem_prototype={
 		//keys: matched_type_id selection key x
 		//do auto-layout in the same loop
 		var al_x_max=-1e10,al_y_avg=0,al_n=0;
-		for(var pi=0;pi<nd_new.m_ports.length;pi++){
-			var port_pi=nd_new.m_ports[pi];
-			if(port_pi.dir!='output'){continue;}
+		var connected_slots=[];
+		for(var pi=0;pi<nd_new.out_ports.length;pi++){
+			var port_pi=nd_new.out_ports[pi];
+			//if(port_pi.dir!='output'){continue;}
 			var port_best=undefined;
+			var nd_root=undefined;
 			for(var i=0;i<graph.nds.length-1;i++){
 				var ndi=graph.nds[i];
-				var id_best=undefined;
-				for(var j=0;j<ndi.m_ports.length;j++){
-					var port_j=ndi.m_ports[j];
+				if(ndi.__id__=="<root>"){
+					nd_root=ndi;
+				}
+				for(var j=0;j<ndi.in_ports.length;j++){
+					var port_j=ndi.in_ports[j];
 					var type_j=port_j.type;
 					if(port_j.dir==port_pi.dir){continue;}
 					//if(port_pi.dir=='output'){
@@ -1239,32 +1250,91 @@ W.PackageItem_prototype={
 					if(!canConnect(port_j,port_pi.annotations)){
 						continue;
 					}
-					id_best=port_j.id;
+					var id_best=port_j.id;
+					if(!port_best||id_best==port_pi.id&&port_best.port!=port_pi.id||(id_best==port_pi.id)==(port_best.port==port_pi.id)&&(
+					dist_to_sel[port_best.ndid]>dist_to_sel[i]||dist_to_sel[port_best.ndid]==dist_to_sel[i]&&(
+					port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y))){
+						port_best={nd:ndi,ndid:i,port:id_best};
+					}
+					
+				}
+			}
+			if(!port_best){
+				//force-connect to root
+				port_best={nd:nd_root,port:"-"};
+			}
+			//we have switched the edge sides, it's now input->output
+			if(port_pi.dir=='output'){
+				graph.es.push({
+					id0:port_best.nd.__id__, port0:port_best.port,
+					id1:nd_new.__id__, port1:port_pi.id,
+				})
+				al_x_max=Math.max(al_x_max,port_best.nd.x+port_best.nd.m_w);
+				al_y_avg+=port_best.nd.y;
+				al_n++;
+			}else{
+				graph.es.push({
+					id0:nd_new.__id__, port0:port_pi.id,
+					id1:port_best.nd.__id__, port1:port_best.port,
+				})
+			}
+			//first write down the slots
+			connected_slots[pi]=port_best;
+		}
+		//actually insert the code
+		var doc=obj.editor;
+		var port_slot_ccnts=[];
+		for(var pi=0;pi<nd_new.out_ports.length;pi++){
+			var nd_target=connected_slots[pi].nd;
+			var port_id=connected_slots[pi].port;
+			var port=undefined;
+			for(var i=0;i<nd_target.in_ports.length;i++){
+				port=nd_target.in_ports[i]
+				if(port.id==port_id){
 					break;
 				}
-				if(id_best&&(!port_best||
-				dist_to_sel[port_best.ndid]>dist_to_sel[i]||dist_to_sel[port_best.ndid]==dist_to_sel[i]&&(
-				port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y))){
-					port_best={nd:ndi,ndid:i,port:id_best};
+			}
+			var var_bindings=port.final_annotations||{};
+			var replaced_vars={};
+			var part_data=UI.ED_GetComboPartData(nd_new.name,pi);
+			for(var i=0;i<part_data.id_params.length;i++){
+				var id_i=part_data.id_params[i];
+				if(var_bindings[id_i]){
+					replaced_vars[id_i]=var_bindings[id_i];
 				}
 			}
-			if(port_best){
-				//we have switched the edge sides, it's now input->output
-				if(port_pi.dir=='output'){
-					graph.es.push({
-						id0:port_best.nd.__id__, port0:port_best.port,
-						id1:nd_new.__id__, port1:port_pi.id,
-					})
-					al_x_max=Math.max(al_x_max,port_best.nd.x+port_best.nd.m_w);
-					al_y_avg+=port_best.nd.y;
-					al_n++;
-				}else{
-					graph.es.push({
-						id0:nd_new.__id__, port0:port_pi.id,
-						id1:port_best.nd.__id__, port1:port_best.port,
-					})
-				}
-			}
+			var scode=part_data.scode.replace(/\b[0-9a-zA-Z_$]\b/g,function(smatch){
+				return replaced_vars[smatch]||smatch;
+			});
+			var ccnt_insert=port.epos1;
+			var line_insert=doc.GetLC(ccnt_insert)[0];
+			//if(doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
+			//	line_insert--;
+			//}
+			var ccnt_lh=doc.SeekLC(line_insert,0);
+			var ccnt_after_indent=doc.ed.MoveToBoundary(ccnt_lh,1,"space");
+			var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh);
+			scode=(UI.ED_GetClipboardTextSmart(s_target_indent,scode)||scode);
+			var slot_desc=UI.ED_SlotsFromPartCode(scode);
+			scode=slot_desc.scode;
+			//ccnt_insert=doc.ed.MoveToBoundary(ccnt_insert,-1,"space");
+			doc.HookedEdit([ccnt_insert,0,scode]);
+			doc.CallOnChange()
+			var epos0=ccnt_insert;
+			var epos1=ccnt_insert+Duktape.__byte_length(scode);
+			doc.SetSelection(epos0,epos1)
+			UI.Refresh()
+			port.epos1=epos1;//expand the port
+			nd_new.out_ports[pi].epos0=epos0;
+			nd_new.out_ports[pi].epos1=epos1;
+			//save slot eposes 
+			port_slot_ccnts[pi]=slot_desc.slot_ccnts;
+		}
+		for(var pi=0;pi<nd_new.in_ports.length;pi++){
+			var part_id=nd_new.in_ports[pi].part_id;
+			var epos=(port_slot_ccnts[part_id][pi]+nd_new.out_ports[part_id].epos0||nd_new.out_ports[part_id].epos1);
+			nd_new.in_ports[pi].epos0=epos;
+			nd_new.in_ports[pi].epos1=epos;
 		}
 		if(al_n){
 			//connection-based auto-layout: x_max+margin, y_average
@@ -1287,13 +1357,6 @@ W.PackageItem_prototype={
 			graph.nds[i].m_is_selected=0;
 		}
 		nd_new.m_is_selected=1;
-		//insert the code after autoconnect
-		for(var pi=0;pi<nd_new.out_ports.length;pi++){
-			var port_pi=nd_new.out_ports[pi];
-			//todo: epos, params, slot epos
-			//param autobinding
-			//code with slot comments stripped
-		}
 		//re-query availabilities
 		obj.UpdateGraph();
 		UI.Refresh()

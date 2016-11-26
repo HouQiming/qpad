@@ -1136,7 +1136,6 @@ UI.RegisterEditorPlugin(function(){
 					try{
 						eval(IO.ReadAll(this.m_file_name))
 					}catch(e){
-						//todo: produce output in a notification
 					}
 				}else{
 					IO.Shell(args)
@@ -1437,8 +1436,12 @@ UI.RegisterEditorPlugin(function(){
 				//test left { and stuff, add ; if found
 				var ccnt_left_bra=this.FindBracket(blevel-1,ccnt_pos,-1)
 				if((ccnt_left_bra<0||ed.GetUtf8CharNeighborhood(ccnt_left_bra)[1]=='{')&&ch_lineend!='{'&&ch_lineend!='}'&&ch_lineend!=':'&&ch_lineend!=';'&&ch_lineend!=','&&ch_lineend!='\n'&&ch_lineend!='\\'&&ch_lineend){
-					if(lang.paired_comment){
-						var paired_comment1=lang.paired_comment[1]
+					var cmt_holder=lang;
+					if(lang.GetCommentStrings){
+						cmt_holder=lang.GetCommentStrings(this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],ccnt_pos,"ill")[0]);
+					}
+					if(cmt_holder.paired_comment){
+						var paired_comment1=cmt_holder.paired_comment[1]
 						if(ccnt_pos>=Duktape.__byte_length(paired_comment1)){
 							if(ed.GetText(ccnt_pos-Duktape.__byte_length(paired_comment1),Duktape.__byte_length(paired_comment1))==paired_comment1){
 								//don't add ; after /**/
