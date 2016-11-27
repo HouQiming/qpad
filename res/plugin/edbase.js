@@ -3397,10 +3397,10 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 			//this is a rendering hook
 			if(!this.m_graph||!this.owner){return;}
 			var owner=this.owner;
-			UI.RoundRect({x:owner.x,y:owner.y,w:owner.w,h:owner.h,color:UI.default_styles.graph_view.color});
+			var rect=UI.RoundRect({x:owner.x,y:owner.y,w:owner.w_tab||owner.w,h:owner.h_tab||owner.h,color:UI.default_styles.graph_view.color});
 			var graph0=owner.__graph__;
 			var obj_graphview=W.GraphView("__graph__",{
-				x:owner.x,y:owner.y,w:owner.w*0.618,h:owner.h,
+				x:rect.x,y:rect.y,w:rect.w*0.618,h:rect.h,
 				graph:this.m_graph,
 				editor:this,
 			});
@@ -3409,7 +3409,7 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 			}
 			graph0=undefined;
 			W.PackagePage("__package__",{
-				x:owner.x+owner.w*0.618,y:owner.y,w:owner.w*0.382,h:owner.h,
+				x:rect.x+rect.w*0.618,y:rect.y,w:rect.w*0.382,h:rect.h,
 				available:this.m_graph.available,
 				graphview:obj_graphview,
 			});

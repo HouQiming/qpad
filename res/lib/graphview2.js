@@ -183,7 +183,7 @@ var rproto_port={
 	},
 	OnClick:function(event){
 		if(event.clicks>=2){
-			UI.SetSelectionEx(this.owner.editor,this.port_ref.epos0,this.port_ref.epos1,"port_click")
+			UI.SetSelectionEx(this.owner.editor,this.port_ref.loc0.ccnt,this.port_ref.loc1.ccnt,"port_click")
 		}
 	},
 	OnRender:function(){
@@ -511,6 +511,11 @@ UI.BuildComboGraph=function(doc,parsed_combos){
 	for(var ni=0;ni<nds.length;ni++){
 		var ndi=nds[ni];
 		PreprocessNode(ndi);
+		for(var pi=0;pi<ndi.m_ports.length;pi++){
+			var port=ndi.m_ports[pi];
+			port.loc0=doc.ed.CreateLocator(port.epos0,-1);
+			port.loc1=doc.ed.CreateLocator(port.epos1,1);
+		}
 	}
 	var available=UpdateGraph(nds,es);
 	////////////////
@@ -1256,7 +1261,6 @@ W.PackageItem_prototype={
 					port_best.nd.x<ndi.x||port_best.nd.x==ndi.x&&port_best.nd.y<ndi.y))){
 						port_best={nd:ndi,ndid:i,port:id_best};
 					}
-					
 				}
 			}
 			if(!port_best){
@@ -1306,7 +1310,7 @@ W.PackageItem_prototype={
 			var scode=part_data.scode.replace(/\b[0-9a-zA-Z_$]\b/g,function(smatch){
 				return replaced_vars[smatch]||smatch;
 			});
-			var ccnt_insert=port.epos1;
+			var ccnt_insert=port.loc1.ccnt;
 			var line_insert=doc.GetLC(ccnt_insert)[0];
 			//if(doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
 			//	line_insert--;
@@ -1335,6 +1339,11 @@ W.PackageItem_prototype={
 			var epos=(port_slot_ccnts[part_id][pi]+nd_new.out_ports[part_id].epos0||nd_new.out_ports[part_id].epos1);
 			nd_new.in_ports[pi].epos0=epos;
 			nd_new.in_ports[pi].epos1=epos;
+		}
+		for(var pi=0;pi<nd_new.m_ports.length;pi++){
+			var port=nd_new.m_ports[pi];
+			port.loc0=doc.ed.CreateLocator(port.epos0,-1);
+			port.loc1=doc.ed.CreateLocator(port.epos1,1);
 		}
 		if(al_n){
 			//connection-based auto-layout: x_max+margin, y_average

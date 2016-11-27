@@ -46,7 +46,7 @@ W.TabLabel_prototype={
 			this.owner.m_menu_context=undefined;
 			UI.Refresh();
 		}
-		if(event.clicks>=2&&this.tabid!=undefined){
+		if(event.button==UI.SDL_BUTTON_LEFT&&event.clicks>=2&&this.tabid!=undefined){
 			this.owner.ArrangeTabs(this.tabid)
 		}
 	},

@@ -208,6 +208,7 @@ g_id_1=getid("1")
 g_id_slash=getid("-")
 g_id_return=getid("return")
 g_id_const=getid("const")
+g_id_default=getid("__default")
 g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 struct TToken
 	int tok
@@ -2299,6 +2300,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							//if toks[j].tok!=TOK_COMMENT:
 							pattern.push(toks[j].tok)
 						cur_combo.parts.back().scode.push(sdataz[toks[ptok_combo_ptn_last].epos0:toks[i-1].epos1-1])
+						//cur_combo.parts.back().scode.push(sdataz[toks[ptok_combo_ptn_last].epos0:toks[i].epos0-1])
 						ptok_combo_ptn_last=i
 				}
 				for j=epos0:min(epos1,epos0+3)-1
@@ -2353,6 +2355,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-end",10)==0:
 							if cur_combo:
 								FlushComboPattern()
+								if cur_combo.parts.n:
+									cur_combo.parts.back().scode.push('\n')
 								for part in cur_combo.parts
 									tok_tran=new int[int]
 									for id,I in part.id_params
@@ -2369,6 +2373,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-part",11)==0:
 							if cur_combo:
 								FlushComboPattern()
+								if cur_combo.parts.n:
+									cur_combo.parts.back().scode.push('\n')
 								//parse the prototype - allow location hints in annotations
 								//toks_proto=tokenize(sdataz[j+12:epos1-1]+g_zero_byte_string,1,0)
 								t_part=ParseQIType(sdataz[j+12:epos1-1])
@@ -2393,7 +2399,16 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								my_slot_id=pslot_tot++
 								cur_combo.parts.back().slots.push(t_slot)
 								//insert the spaces and stuff, put up a placeholder for the user to insert code
-								if i-1>=0&&i+1<toks.n:
+								id_default_value=0
+								if t_slot.annotations:
+									for ai in t_slot.annotations
+										if ai.x==g_id_default:
+											id_default_value=ai.y
+											break
+								if id_default_value:
+									scode=cur_combo.parts.back().scode
+									scode.push(getIdString(id_default_value))
+								else if i-1>=0&&i+1<toks.n:
 									scode=cur_combo.parts.back().scode
 									did_placeholder=0
 									for ptr_slot=toks[i-1].epos1:toks[i+1].epos0-1
@@ -3572,11 +3587,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						while pid0<epos1&&(sdataz[pid0]==' '||sdataz[pid0]=='\t'):
 							pid0++
 						while cur_root_slots.n>0&&blevel<=cur_root_slots.back().blevel:
-							root_slots[cur_root_slots.back().rsid].epos1=toks[I-1].epos1
+							//we always have // or /*, so it's -2
+							root_slots[cur_root_slots.back().rsid].epos1=epos0-2
 							cur_root_slots.pop()
 						id_new_slot=getid(sdataz[pid0:epos1-1])
+						if sdataz[epos1]=='\r':epos1++
+						if sdataz[epos1]=='\n':epos1++
 						if id_new_slot!=g_id_slash:
-							root_slots.push(TRootSlot(){id:id_new_slot,epos0:int(epos0),epos1:int(epos1)})
+							root_slots.push(TRootSlot(){id:id_new_slot,epos0:int(epos1),epos1:int(epos1)})
 							cur_root_slots.push(TCurrentRootSlot(){blevel:blevel,rsid:int(root_slots.n)-1})
 						break
 			if dbra:
@@ -3984,7 +4002,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		combo=g_combo_by_id[getid(s_combo_id)]
 		if !combo:return 0
 		auto ret=JS.New()
-		ret["scode"]=combo.parts[part_id].scode
+		scode=combo.parts[part_id].scode
+		ret["scode"]=scode
 		ret["id_params"]=JS.NewArray()
 		for j=0:combo.parts[part_id].id_params.n-1
 			ret["id_params"][j]=getIdString(combo.parts[part_id].id_params[j])

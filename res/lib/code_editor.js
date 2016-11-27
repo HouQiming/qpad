@@ -6823,7 +6823,6 @@ W.CodeEditor=function(id,attrs){
 				menu_edit=undefined;
 				menu_search=undefined;
 			}
-			doc.CallHooks('render');
 			if(!got_gotodef_notification){
 				obj.DismissNotification("definition_id")
 			}
@@ -7156,6 +7155,9 @@ W.CodeEditor=function(id,attrs){
 		}
 		///////////////////////////////////////
 		obj.m_is_rendering_good=1;
+		if(doc){
+			doc.CallHooks('render');
+		}
 	UI.End()
 	if(UI.enable_timing){
 		UI.TimingEvent("leaving CodeEditor");
@@ -7257,6 +7259,7 @@ UI.NewCodeEditorTab=function(fname0){
 			var attrs={
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
+				'w_tab':UI.context_parent.w,'h_tab':UI.context_parent.h,
 				'file_name':this.file_name,
 				'is_a_tab':1,
 			};
