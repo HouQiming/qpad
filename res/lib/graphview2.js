@@ -1311,14 +1311,20 @@ W.PackageItem_prototype={
 				return replaced_vars[smatch]||smatch;
 			});
 			var ccnt_insert=port.loc1.ccnt;
-			var line_insert=doc.GetLC(ccnt_insert)[0];
-			//if(doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
-			//	line_insert--;
-			//}
-			var ccnt_lh=doc.SeekLC(line_insert,0);
+			var line_indent=doc.GetLC(ccnt_insert)[0];
+			var is_last_line=0;
+			if(line_indent>0&&doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
+				line_indent--;
+				is_last_line=1;
+			}
+			var ccnt_lh=doc.SeekLC(line_indent,0);
 			var ccnt_after_indent=doc.ed.MoveToBoundary(ccnt_lh,1,"space");
 			var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh);
-			scode=(UI.ED_GetClipboardTextSmart(s_target_indent,scode)||scode);
+			var scode_indented=UI.ED_GetClipboardTextSmart(s_target_indent,scode);
+			if(is_last_line&&scode_indented&&scode_indented.length>=s_target_indent.length&&scode_indented.slice(scode_indented.length-s_target_indent.length)==s_target_indent){
+				scode_indented=scode_indented.slice(scode_indented.length-s_target_indent.length)+scode_indented.slice(0,scode_indented.length-s_target_indent.length);
+			}
+			scode=(scode_indented||scode);
 			var slot_desc=UI.ED_SlotsFromPartCode(scode);
 			scode=slot_desc.scode;
 			//ccnt_insert=doc.ed.MoveToBoundary(ccnt_insert,-1,"space");
