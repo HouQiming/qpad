@@ -3558,13 +3558,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		matches=new TPartMatchRough[]
 		got_pid=new int[g_all_patterns.n]
 		got_pid_t=0
-		//debug_max_1=0
+		//debug_max_1=new int[int]
 		blevel=0
 		for tok_text,I in toks
 			//for sti in st
-			//	if sti.x==1&&sti.y>debug_max_1:
-			//		debug_max_1=sti.y
-			//		Writeln(tok_text.tok,' ',I,' ',sti)
+			//	if sti.y>debug_max_1[sti.x]:
+			//		debug_max_1[sti.x]=sti.y
+			//		Writeln(tok_text.tok,' ',I,' ',sti,' ',g_all_patterns[sti.x].pattern.n)
 			st_new.n=0
 			if tok_text.tok=='('||tok_text.tok=='['||tok_text.tok=='{':
 				dbra=1
@@ -3654,9 +3654,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					//add firsts, but not if we're already matching that pattern
 					if got_pid[pid]!=got_pid_t:
 						st.push(int3(pid,1,int(I)))
+			if (tok_text.tok&TOK_TYPE_MASK)==TOK_ID:
+				firsts2=g_first_token[TOK_ID]
+				if firsts2:
+					got_pid_t++
+					for sti in st
+						got_pid[sti.x]=got_pid_t
+					for pid in firsts2
+						//add firsts, but not if we're already matching that pattern
+						if got_pid[pid]!=got_pid_t:
+							st.push(int3(pid,1,int(I)))
 		for crs in cur_root_slots
 			root_slots[crs.rsid].epos1=int(ccnt1-ccnt0)
-		//Writeln(matches)
+		//todo
+		Writeln('======== rough')
+		Writeln(matches)
+		//todo
 		struct TPartMatchRefined
 			int2[] slot_bindings
 			int[] param_bindings
@@ -3733,7 +3746,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						epos1:toks[match.ptok1-1].epos1,
 					})
 					break
-		//Writeln(matches_refined)
+		//todo
+		Writeln('======== refined')
+		Writeln(matches_refined)
+		//todo
 		struct TPlace
 			int epos0,epos1
 			int match_id,part_id,slot_id

@@ -4,13 +4,6 @@ require("res/lib/global_doc");
 require("res/lib/code_editor");
 
 var graph_prototype={
-	SignalEdit:function(nds_rebuild){
-		for(var i=0;i<nds_rebuild.length;i++){
-			nds_rebuild[i].m_need_rebuild=1;
-		}
-		//the undo queue has to be built in cache
-		this.OnChange(nds_rebuild);
-	},
 	CreateNode:function(class_name){
 		var ret={
 			__id__:[g_developer.email, (new Date()).toUTCString(), g_per_run_id++].join("&"),
@@ -31,7 +24,66 @@ var graph_prototype={
 			this.nds[i].m_is_selected=0;
 		}
 	},
-	DeleteSelection:function(is_quiet){
+	DeleteSelection:function(doc){
+		//find all children
+		var nds=this.nds;
+		var es=this.es;
+		var node_map={},es_topo=[];
+		var n=nds.length,m=es.length;
+		for(var i=0;i<n;i++){
+			node_map[nds[i].__id__]=i;
+			if(nds[i].__id__=="<root>"){
+				nds[i].m_is_selected=0;
+			}
+			es_topo[i]=[];
+		}
+		for(var i=0;i<m;i++){
+			var e=es[i];
+			var v0=node_map[e.id0];
+			var v1=node_map[e.id1];
+			if(v0==undefined||v1==undefined){continue;}
+			es_topo[v0].push(v1);
+		}
+		var Q=nds.filter(function(ndi){return ndi.m_is_selected;});
+		for(var i=0;i<Q.length;i++){
+			var esi=es_topo[node_map[Q[i].__id__]];
+			for(var j=0;j<esi.length;j++){
+				var ndj=nds[esi[j]];
+				if(!ndj.m_is_selected){
+					Q.push(ndj);
+					ndj.m_is_selected=1;
+				}
+			}
+		}
+		//delete the real code
+		var ports_to_del=[];
+		for(var i=0;i<Q.length;i++){
+			var ndi=Q[i];
+			for(var j=0;j<ndi.out_ports.length;j++){
+				var port=ndi.out_ports[j];
+				ports_to_del.push(port);
+			}
+		}
+		ports_to_del.sort(function(a,b){return a.loc0.ccnt-b.loc0.ccnt;});
+		var ops=[];
+		for(var i=0;i<ports_to_del.length;i++){
+			var ccnt0=ports_to_del[i].loc0.ccnt;
+			var ccnt1=ports_to_del[i].loc1.ccnt;
+			ports_to_del[i].loc0.discard();
+			ports_to_del[i].loc1.discard();
+			if(ops.length>0&&ops[ops.length-3]<=ccnt0&&ccnt1<=ops[ops.length-3]+ops[ops.length-2]){
+				//this part has already been deleted
+				continue;
+			}
+			ops.push(ccnt0,ccnt1-ccnt0,null);
+		}
+		if(ops.length){
+			doc.HookedEdit(ops);
+			doc.CallOnChange();
+			doc.SetSelection(ops[0],ops[0]);
+		}
+		UI.Refresh();
+		//delete the graph nodes
 		this.nds=this.nds.filter(function(ndi){return !ndi.m_is_selected;})
 		var is_valid={};
 		for(var i=0;i<this.nds.length;i++){
@@ -45,9 +97,6 @@ var graph_prototype={
 			if(nd1){signals.push(nd1);}
 			return nd0&&nd1;
 		})
-		if(!is_quiet){
-			this.SignalEdit([signals]);
-		}
 	},
 };
 
@@ -652,10 +701,15 @@ W.graphview_prototype={
 		if(0){
 		}else if(IsHotkey(event,"ESC")){
 			this.editor.m_graph=undefined;
+			if(this.editor.owner){
+				this.editor.owner.__graph__=undefined;
+				this.editor.owner.__package__=undefined;
+			}
 			UI.Refresh();
 		}else if(IsHotkey(event,"DELETE")){
 			//delete selection
-			this.graph.DeleteSelection();
+			this.graph.DeleteSelection(this.editor);
+			this.UpdateGraph();
 			UI.Refresh();
 		}
 	},
