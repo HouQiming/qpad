@@ -503,12 +503,14 @@ W.BinaryEditor_prototype={
 		for(var i=0;i<this.m_bookmarks.length;i++){
 			var bm=this.m_bookmarks[i];
 			if(!bm){continue;}
-			if(bm.addr==this.m_sel1){
+			if(bm.addr==this.m_sel1||id!=undefined&&bm.id==id){
 				//remove the bookmark instead of setting a new one
 				this.m_bookmarks[i]=this.m_bookmarks[this.m_bookmarks.length-1];
 				this.m_bookmarks.pop();
-				UI.Refresh();
-				return;
+				if(bm.addr==this.m_sel1){
+					UI.Refresh();
+					return;
+				}
 			}
 		}
 		this.m_bookmarks.push({addr:this.m_sel1,id:id});

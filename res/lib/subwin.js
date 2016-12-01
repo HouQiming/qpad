@@ -2286,6 +2286,9 @@ UI.UpdateNewDocumentSearchPath=function(){
 		UI.m_previous_document=undefined
 	}
 	UI.m_new_document_search_path=ret;
+	if(UI.m_new_document_search_path&&!IO.DirExists(UI.m_new_document_search_path)){
+		UI.m_new_document_search_path=".";
+	}
 	return ret
 }
 

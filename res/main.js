@@ -454,6 +454,7 @@ var CreateMenus=function(){
 			}});
 		}else{
 			menu_file.AddNormalItem({text:"Save &as...",key:"SHIFT+CTRL+S",enable_hotkey:1,action:function(){
+				UI.UpdateNewDocumentSearchPath();
 				UI.top.app.document_area.SaveAs();
 			}});
 		}
