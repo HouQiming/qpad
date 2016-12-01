@@ -356,6 +356,7 @@ W.CellCaption=function(id,attrs){
 					font:UI.Font(UI.icon_font_name,18),
 					text:"停",
 					style:obj.button_style,
+					tooltip:UI._("Stop"),
 					OnClick:function(){
 						obj.owner.KillCell(obj.m_cell_id);
 					}

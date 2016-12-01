@@ -1703,17 +1703,120 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 }
 
 var g_is_parse_more_running=0;
-var g_need_reparse_dangling_deps=0;
+//var g_need_reparse_dangling_deps=0;
 var g_last_color_table_update=Duktape.__ui_get_tick();
 var PARSING_SECONDS_PER_FRAME=1.0;
 var PARSING_IDLE_REQUIREMENT=0.5;
 var PARSING_COLOR_TABLE_UPDATE_INTERVAL=1.0;
+UI.g_include_jobs=[];
+UI.g_deep_include_jobs=[];
+UI.g_dangling_include_jobs=[];
+UI.g_deep_search_cache={};
 var CallParseMore=function(){
 	if(g_is_parse_more_running){return;}
 	var fcallmore=UI.HackCallback(function(){
 		var tick0=Duktape.__ui_get_tick();
 		var is_done=0;
+		var terminate_now=0;
 		for(;;){
+			while(UI.g_include_jobs.length>0){
+				if(!(UI.g_include_jobs.length&127)){
+					terminate_now|=!!UI.TestEventInPollJob();
+					if(terminate_now){
+						break;
+					}
+				}
+				var ijob=UI.g_include_jobs.pop();
+				var fn_found=UI.SearchIncludeFileShallow(ijob.fn_base,ijob.fn_include);
+				//console.log(ijob.fn_include,JSON.stringify(fn_found));
+				if(!fn_found){
+					continue;
+				}
+				if(fn_found=="<dangling>"){
+					UI.g_dangling_include_jobs.push(ijob);
+					continue;
+				}
+				if(fn_found=="<deep>"){
+					if(ijob.is_deferred!=2){
+						//is_deferred==2: h to c
+						UI.g_deep_include_jobs.push(ijob);
+					}
+					continue;
+				}
+				ijob.callback(fn_found,ijob.epos0,ijob.epos1,ijob.is_deferred);
+			}
+			if(terminate_now){UI.NextTick(fcallmore);break;}
+			if(UI.g_deep_include_jobs.length>0){
+				if(!UI.g_all_paths_ever_mentioned){
+					UI.g_deep_search_cache={};
+					if(UI.g_deep_include_jobs.length){
+						//we have to restart... if there were new paths
+						UI.g_deep_include_jobs[UI.g_deep_include_jobs.length-1].m_apem_progress=undefined;
+					}
+					UI.g_all_paths_ever_mentioned=[];
+					var hist=UI.m_ui_metadata["<history>"];
+					var arv={};
+					for(var i=hist.length-1;i>=0;i--){
+						var fn=hist[i];
+						var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
+						if(!arv[fn_path]){
+							arv[fn_path]=1;
+							UI.g_all_paths_ever_mentioned.push(fn_path);
+						}
+					}
+				}
+			}
+			var work_load=0;
+			while(UI.g_deep_include_jobs.length>0&&!terminate_now){
+				//standard include paths
+				var ijob=UI.g_deep_include_jobs.pop();
+				var fn_found=undefined;
+				var options=ijob.options;
+				if(options.include_paths){
+					var paths=options.include_paths
+					for(var i=0;i<paths.length;i++){
+						var fn=paths[i]+'/'+ijob.fn_include;
+						work_load++;
+						if(IO.FileExists(fn)){
+							fn_found=fn;
+							break;
+						}
+					}
+				}
+				if(!fn_found){
+					fn_found=UI.g_deep_search_cache[ijob.fn_include];
+				}
+				if(fn_found==undefined){
+					//all paths ever mentioned
+					fn_found=null;
+					var paths=UI.g_all_paths_ever_mentioned;
+					for(var i=(ijob.m_apem_progress||0);i<paths.length;i++){
+						var fn=paths[i]+'/'+ijob.fn_include;
+						if(IO.FileExists(fn)){
+							fn_found=fn;
+							break;
+						}
+						work_load++;
+						if(work_load>=MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
+							work_load=0;
+							terminate_now|=!!UI.TestEventInPollJob();
+							if(terminate_now){
+								ijob.m_apem_progress=i+1;
+								UI.g_deep_include_jobs.push(ijob);
+								fn_found=undefined;
+								break;
+							}
+						}
+					}
+					if(fn_found!=undefined){
+						UI.g_deep_search_cache[ijob.fn_include]=fn_found;
+					}
+				}
+				if(fn_found){
+					ijob.callback(fn_found,ijob.epos0,ijob.epos1,ijob.is_deferred);
+				}
+			}
+			if(terminate_now){UI.NextTick(fcallmore);break;}
 			//var fn_parsing=(UI.ED_GetRemainingParsingJobs()||{}).fn_next;
 			var ret=UI.ED_ParseMore()
 			//var secs=Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick());
@@ -1730,26 +1833,23 @@ var CallParseMore=function(){
 						}
 					})
 				}
-			}else{
+			}else if(!(UI.g_include_jobs.length>0)&&!(UI.g_deep_include_jobs.length>0)){
 				g_is_parse_more_running=0;
-				if(g_need_reparse_dangling_deps){
-					//avoid parse-git-parse loops: only do ED_ReparseDanglingDeps once after all other files have been parsed
-					g_need_reparse_dangling_deps=0;
-					if(UI.ED_ReparseDanglingDeps()){
-						CallParseMore()
-					}
-				}
+				//if(g_need_reparse_dangling_deps){
+				//	//avoid parse-git-parse loops: only do ED_ReparseDanglingDeps once after all other files have been parsed
+				//	g_need_reparse_dangling_deps=0;
+				//	if(UI.ED_ReparseDanglingDeps()){
+				//		CallParseMore()
+				//	}
+				//}
 				is_done=1;
 				break;
 			}
 			var tick1=Duktape.__ui_get_tick()
 			//print(Duktape.__ui_seconds_between_ticks(tick0,tick1))
 			//if(UI.TestEventInPollJob())
-			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>PARSING_SECONDS_PER_FRAME||UI.TestEventInPollJob()){
-				//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),UI.TestEventInPollJob()?'event':'timeout');
-				UI.NextTick(fcallmore);
-				break;
-			}
+			terminate_now|=!!(Duktape.__ui_seconds_between_ticks(tick0,tick1)>PARSING_SECONDS_PER_FRAME||UI.TestEventInPollJob());
+			if(terminate_now){UI.NextTick(fcallmore);break;}
 		}
 		var tick1=Duktape.__ui_get_tick();
 		if(is_done||Duktape.__ui_seconds_between_ticks(g_last_color_table_update,tick1)>PARSING_COLOR_TABLE_UPDATE_INTERVAL){
@@ -1765,6 +1865,16 @@ var CallParseMore=function(){
 	//}else{
 	UI.NextTick(fcallmore);
 	//}
+};
+
+var ReparseDanglingDeps=function(){
+	if(UI.g_dangling_include_jobs.length>0){
+		for(var i=0;i<UI.g_dangling_include_jobs.length;i++){
+			UI.g_include_jobs.push(UI.g_dangling_include_jobs[i]);
+		}
+		UI.g_dangling_include_jobs=[];
+		CallParseMore();
+	}
 };
 
 var fsave_code_editor=UI.HackCallback(function(){
@@ -3594,7 +3704,6 @@ var QueueProjectParser=function(f){
 		f();
 	}
 };
-var g_repo_ever_parsed={}; //per-session cache to prevent excessive *file* reparsing
 var ParseGit=function(spath){
 	if(g_repo_list[spath]){return;}
 	var my_repo={name:spath,is_parsing:1,files:[]}
@@ -3618,16 +3727,6 @@ var ParseGit=function(spath){
 			my_repo.files.push(fname)
 		}.bind(undefined,g_repo_from_file),function(){
 			//some dangling dependencies may have been resolved
-			if(!g_repo_ever_parsed[spath]){
-				g_repo_ever_parsed[spath]=1;
-				if(g_is_parse_more_running){
-					g_need_reparse_dangling_deps=1;
-				}else{
-					if(UI.ED_ReparseDanglingDeps()){
-						CallParseMore()
-					}
-				}
-			}
 			//"git status --short --ignored"
 			//IO.RunTool(["git","ls-files","--modified"],spath, ".*",function(match){
 			IO.RunTool(["git","status","--porcelain","--ignored"],spath, "(..) (([^>]+) -> )?([^>]+)",function(g_repo_from_file,match){
@@ -3655,7 +3754,8 @@ var ParseGit=function(spath){
 				repos[spath]=match[1]
 			}.bind(undefined,g_repo_from_file),function(g_repo_parsing_context){
 				UI.ED_8bitStringSort(my_repo.files)
-				my_repo.is_parsing=0
+				my_repo.is_parsing=0;
+				ReparseDanglingDeps();
 				ResumeProjectParsing(g_repo_parsing_context);
 				UI.Refresh()
 			}.bind(undefined,g_repo_parsing_context), 30)
@@ -4043,6 +4143,7 @@ var ParseProject=function(spath){
 			}else{
 				UI.ED_8bitStringSort(my_repo.files)
 				my_repo.is_parsing=0
+				ReparseDanglingDeps();
 				ResumeProjectParsing(g_repo_parsing_context);
 			}
 		}.bind(undefined,g_repo_parsing_context);
@@ -5200,34 +5301,36 @@ UI.ED_ParseMore_callback=function(fn){
 	var s_ext=UI.GetFileNameExtension(fn)
 	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
 	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
-	var ret=Language.GetDescObjectByName(language_id)
-	if(s_ext=="h"){
-		var fn_main=UI.GetMainFileName(fn);
-		var exts=[".c",".cpp",".cxx",".cc",".C",".m",".cu"]
-		for(var i=0;i<exts.length;i++){
-			var fn_c=UI.ED_SearchIncludeFile(fn,fn_main+exts[i],ret,1)
-			if(fn_c){UI.ED_ParserQueueFile(fn_c);break;}
-		}
-	}
-	return ret;
+	return Language.GetDescObjectByName(language_id);
+	//var ret=Language.GetDescObjectByName(language_id)
+	//var fn_h_to_c=undefined;
+	//if(s_ext=="h"||s_ext=="hpp"){
+	//	var fn_main=UI.GetMainFileName(fn);
+	//	var exts=[".c",".cpp",".cxx",".cc",".C",".m",".cu"]
+	//	for(var i=0;i<exts.length;i++){
+	//		var fn_c=UI.SearchIncludeFileShallow(fn,fn_main+exts[i])
+	//		if(fn_c&&fn_c!='<dangling>'&&fn_c!='<deep>'){
+	//			fn_h_to_c=fn_c;
+	//			break;
+	//		}
+	//	}
+	//}
+	//return {options:ret,fn_h_to_c:fn_h_to_c};
 }
 
-UI.ED_SearchIncludeFile=function(fn_base,fn_include,options,is_base_only){
-	//console.log('UI.ED_SearchIncludeFile',fn_base,fn_include);
+UI.SearchIncludeFileShallow=function(fn_base,fn_include){
+	//console.log('UI.SearchIncludeFile',fn_base,fn_include);
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		fn_include=fn_include.toLowerCase().replace(/\\/g,"/")
 	}
 	if(fn_include.indexOf('js_module@')==0){
 		fn_include=fn_include.substr(10);
 		//npm module search
-		DetectRepository(fn_base)
-		var repos=g_repo_from_file[fn_base]
-		if(repos){
-			for(var spath in repos){
-				var fn=spath+"/node_modules/"+fn_include+"/index.js";
-				if(IO.FileExists(fn)){
-					return fn;
-				}
+		var spath_repo=DetectRepository(fn_base)
+		if(spath_repo){
+			var fn=spath_repo+"/node_modules/"+fn_include+"/index.js";
+			if(IO.FileExists(fn)){
+				return fn;
 			}
 		}
 		var spath=undefined;
@@ -5249,10 +5352,14 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options,is_base_only){
 	if(IO.FileExists(fn)){return fn;}
 	//git
 	DetectRepository(fn_base)
-	var repos=g_repo_from_file[fn_base]
-	if(repos){
-		for(var spath in repos){
-			var files=g_repo_list[spath].files
+	var spath_repo=g_repo_from_file[fn_base]
+	if(spath_repo){
+		var repo=g_repo_list[spath_repo];
+		if(repo&&repo.is_parsing){
+			return '<dangling>';
+		}
+		if(repo){
+			var files=repo.files;
 			for(var i=0;i<files.length;i++){
 				var fn_i=files[i]
 				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
@@ -5265,37 +5372,7 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options,is_base_only){
 			}
 		}
 	}
-	if(is_base_only){return '';}
-	//standard include paths
-	if(options.include_paths){
-		var paths=options.include_paths
-		for(var i=0;i<paths.length;i++){
-			var fn=paths[i]+'/'+fn_include
-			if(IO.FileExists(fn)){return fn}
-		}
-	}
-	//all paths ever mentioned
-	if(!UI.g_all_paths_ever_mentioned){
-		UI.g_all_paths_ever_mentioned=[];
-		var hist=UI.m_ui_metadata["<history>"];
-		var arv={};
-		for(var i=hist.length-1;i>=0;i--){
-			var fn=hist[i];
-			var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
-			if(!arv[fn_path]){
-				arv[fn_path]=1;
-				UI.g_all_paths_ever_mentioned.push(fn_path);
-			}
-		}
-	}
-	var paths=UI.g_all_paths_ever_mentioned;
-	for(var i=0;i<paths.length;i++){
-		var fn=paths[i]+'/'+fn_include;
-		if(IO.FileExists(fn)){
-			return fn;
-		}
-	}
-	return '';
+	return '<deep>';
 };
 
 var MAX_PARSABLE_FCALL=4096

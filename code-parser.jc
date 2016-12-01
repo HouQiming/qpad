@@ -1020,7 +1020,11 @@ class CFileIndex
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
 	//dependency
+	int m_dep_files_sorted
 	int[] m_dep_files
+	int m_weak_dep_files_sorted
+	int[] m_weak_dep_files
+	int m_dep_file_name_tokens_sorted
 	int3[] m_dep_file_name_tokens
 	//////////////////
 	//transient items
@@ -1788,11 +1792,11 @@ g_id_if=getid("if")
 g_id_while=getid("while")
 g_in_parse_queue=new int[int]
 g_c_like_parse_queue=new int[]
-g_dangling_deps_queue=new int[]
 g_color_table_time=1L
 g_color_table_time_dense=1L
 g_zero_byte_string=[char(0)]
 MAX_POSTDECL_GARBAGE=8 //# of ids between () and {}, like const / override / throw / ...
+g_h_to_c_exts=[".c",".cpp",".cxx",".cc",".C",".m",".cu"]
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	has_post_ctor_initializer=options["has_post_ctor_initializer"].or(0)
 	has_pointer_ops=options["has_pointer_ops"].or(0)
@@ -1827,28 +1831,55 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	has_dangling_deps=0
 	///////////////////
 	dep_files=new int[]
-	//fdep_adder=function(JSContext JS){
-	//	auto fn_found=JS.Param(0).as(string)
-	//	dep_files
-	//}
-	dep_file_name_tokens=new int3[]
-	auto searchDepFile(int idfn_include,int ptok)
-		auto fn_found=JS.GetGlobal()["UI"].CallMethod(string,"ED_SearchIncludeFile",fn_base,getIdString(idfn_include),options)
-		if !fn_found||!fn_found.n:
-			has_dangling_deps=1
-			return
+	fidx=new CFileIndex
+	fidx.m_weak_dep_files=new int[]
+	fdep_adder=JS.ConvertToObject(function(JSContext JS){
+		auto fn_found=JS.Param(0).as(string)
+		auto epos0=JS.Param(1).as(int)
+		auto epos1=JS.Param(2).as(int)
+		auto is_deferred=JS.Param(3).as(int)
 		fn_found=System.Env.NormalizeFileName(fn_found)
-		idfn_found=getid(fn_found)
-		dep_files.push(idfn_found)
-		if !g_in_parse_queue[idfn_found]:
-			g_in_parse_queue[idfn_found]=1
-			g_c_like_parse_queue.push(idfn_found)
-		dep_file_name_tokens.push(int3(toks[ptok].epos0,toks[ptok].epos1,idfn_found))
+		auto idfn_found=getid(fn_found)
+		if !is_deferred:
+			fidx.m_dep_files.push(idfn_found)
+			fidx.m_dep_files_sorted=0
+			if !g_in_parse_queue[idfn_found]:
+				g_in_parse_queue[idfn_found]=1
+				g_c_like_parse_queue.push(idfn_found)
+		else
+			fidx.m_weak_dep_files.push(idfn_found)
+			fidx.m_weak_dep_files_sorted=0
+		if epos0>0:
+			fidx.m_dep_file_name_tokens_sorted=0
+			fidx.m_dep_file_name_tokens.push(int3(epos0,epos1,idfn_found))
+		fidx.m_temp_color_table_time=0
+		return 0
+	})
+	dep_file_name_tokens=new int3[]
+	dep_dedup=new int[int]
+	auto searchDepFile(int idfn_include,int ptok,int is_deferred)
+		if dep_dedup[idfn_include]:return
+		dep_dedup[idfn_include]=1
+		auto dep_obj=JS.New()
+		dep_obj.set({
+			"callback":fdep_adder,
+			"fn_base":fn_base,
+			"fn_include":getIdString(idfn_include),
+			"options":options,
+			"epos0":ptok>=0?toks[ptok].epos0:-1,
+			"epos1":ptok>=0?toks[ptok].epos1:-1,
+			"is_deferred":is_deferred,
+		})
+		JS["UI"]["g_include_jobs"].CallMethod(int,"push",dep_obj)
 	a_auto_include=options["auto_include"].as(JSObject)
 	if a_auto_include:
 		n_auto_include=a_auto_include["length"].as(iptr)
 		for i=0:n_auto_include-1
-			searchDepFile(getid(a_auto_include[i].as(string)),0)
+			searchDepFile(getid(a_auto_include[i].as(string)),-1,0)
+	if is_header:
+		fn_to_dot=fn_base[:pdot-1]
+		for s_h_to_c_ext in g_h_to_c_exts
+			searchDepFile(getid(fn_to_dot+s_h_to_c_ext),-1,2)
 	///////////////////
 	struct TStkEntry
 		int m_function_id
@@ -2161,7 +2192,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					tok1=nextToken()
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
 						idfn_include=tok1-TOK_STRING
-						searchDepFile(idfn_include,int(PNextToken(i)))
+						searchDepFile(idfn_include,int(PNextToken(i)),0)
 				else if tok_i==TOK_ID+g_id_require:
 					//JS require
 					tok1=nextToken()
@@ -2171,16 +2202,16 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						if (tok2&TOK_TYPE_MASK)==TOK_STRING:
 							s_require=cite_raw(iptr(toks[i_plus_2].epos0),iptr(toks[i_plus_2].epos1))
 							idfn_require=getid(s_require+".js")
-							searchDepFile(idfn_require,int(i_plus_2))
+							searchDepFile(idfn_require,int(i_plus_2),0)
 							idfn_require=getid("js_module@"+s_require)
-							searchDepFile(idfn_require,int(i_plus_2))
+							searchDepFile(idfn_require,int(i_plus_2),0)
 				else if tok_i==TOK_ID+g_id_import:
 					//JC import
 					tok1=nextToken()
 					i_plus_1=PNextToken(i)
 					if (tok1&TOK_TYPE_MASK)==TOK_STRING:
 						idfn_import=getid(cite_raw(iptr(toks[i_plus_1].epos0),iptr(toks[i_plus_1].epos1)))
-						searchDepFile(idfn_import,int(i_plus_1))
+						searchDepFile(idfn_import,int(i_plus_1),0)
 				else if tok_i==TOK_ID+g_id_define:
 					//do nothing, next id does it
 					//just disqualify #define itself as decl
@@ -2301,9 +2332,12 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 										pdoc:PoolDoxygenComment(s_comment[pbrief+5:])})
 							last_var_id=id
 			else if (tok_i&TOK_TYPE_MASK)==TOK_STRING:
-				if function_id==g_id___c_function&&param_id==2||function_id==g_id___generate_json&&param_id==1:
+				if function_id==g_id___c_function&&param_id==2:
 					//jc C import
-					searchDepFile(getid(cite_raw(toks[i].epos0,toks[i].epos1)),int(i))
+					searchDepFile(getid(cite_raw(toks[i].epos0,toks[i].epos1)),int(i),0)
+				else if function_id==g_id___generate_json&&param_id==1:
+					//jc __generate_json, only parse it when parent file gets explicitly opened
+					searchDepFile(getid(cite_raw(toks[i].epos0,toks[i].epos1)),int(i),1)
 			break
 		case TOK_COMMENT:
 			ptok_last_comment=i
@@ -2345,7 +2379,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							while pid1<epos1&&(sdataz[pid1]!='\r'&&sdataz[pid1]!='\n'):
 								pid1++
 							if pid0<pid1:
-								searchDepFile(getid(sdataz[pid0:pid1-1]),int(i))
+								searchDepFile(getid(sdataz[pid0:pid1-1]),int(i),0)
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-begin",12)==0:
 							//parse the prototype
 							toks_proto=tokenize(sdataz[j+13:epos1-1]+g_zero_byte_string,1,0)
@@ -2635,27 +2669,22 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	all_doc_vars.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
 	//all_key_decls.Sortby(inline(di){return (u64(di.id_type)<<32)+u64(di.epos0)})
 	all_key_decls.Sortby(byMember("epos0"))
-	if has_dangling_deps:
-		g_dangling_deps_queue.push(idfn_base)
-	dep_files.Sort()
-	dep_files.Unique()
-	return new CFileIndex(){
-		m_ids:unique_ids,
-		m_ppm_pool:ppm_pool,
-		m_name_dot_index:name_dot_index,
-		m_function_bracket_index:function_bracket_index,
-		m_all_decls:all_decls,
-		m_all_key_decls:all_key_decls,
-		m_dep_files:dep_files,
-		m_dep_file_name_tokens:dep_file_name_tokens,
-		m_all_prototypes:all_prototypes,
-		m_p_prototypes:p_prototypes,
-		m_toplevel_ids:toplevel_ids,
-		m_doc_string_pool:doc_string_pool,
-		m_doc_vars:all_doc_vars,
-		m_id_briefs:id_briefs,
-		m_all_qifuncs:all_qifuncs,
-	}
+	fidx.m_ids=unique_ids
+	fidx.m_ppm_pool=ppm_pool
+	fidx.m_name_dot_index=name_dot_index
+	fidx.m_function_bracket_index=function_bracket_index
+	fidx.m_all_decls=all_decls
+	fidx.m_all_key_decls=all_key_decls
+	fidx.m_dep_files=dep_files
+	fidx.m_dep_file_name_tokens=dep_file_name_tokens
+	fidx.m_all_prototypes=all_prototypes
+	fidx.m_p_prototypes=p_prototypes
+	fidx.m_toplevel_ids=toplevel_ids
+	fidx.m_doc_string_pool=doc_string_pool
+	fidx.m_doc_vars=all_doc_vars
+	fidx.m_id_briefs=id_briefs
+	fidx.m_all_qifuncs=all_qifuncs
+	return fidx
 
 auto parseAsText(string sdata,JSObject options)
 	//CJK-ignorant tokenization
@@ -2756,7 +2785,7 @@ class CKeyDeclFile
 	llnodes=new int[]
 	u64 timestamp
 	CFileIndex fidx
-	int[] idfn_parsemore_deps
+	//int[] idfn_parsemore_deps
 	auto discard()
 		//Writeln('UnindexQIFunc ',iptr(fidx))
 		foreach p in llnodes
@@ -2832,7 +2861,7 @@ auto PrecomputeIndices(CFileIndex fidx)
 		return
 	//if fidx.m_temp_color_table_time!=g_color_table_time||!fidx.m_all_dep_files_considered&&fidx.m_temp_color_table_time_dense!=g_color_table_time_dense:
 	if fidx.m_temp_color_table_time!=g_color_table_time:
-		tick0=System.Time.tick64()//todo
+		//tick0=System.Time.tick64()
 		kd_ids=new int[]
 		temp_color_table=new int[int]
 		temp_p_prototypes=new TPrototypeItem[]
@@ -2861,6 +2890,20 @@ auto PrecomputeIndices(CFileIndex fidx)
 					pdoc:idb.pdoc,
 				})
 		if fidx.m_dep_files:
+			if !fidx.m_dep_files_sorted:
+				fidx.m_dep_files_sorted=1
+				fidx.m_dep_files.Sort()
+				fidx.m_dep_files.Unique()
+			if !fidx.m_weak_dep_files_sorted:
+				fidx.m_weak_dep_files_sorted=1
+				fidx.m_weak_dep_files.Sort()
+				fidx.m_weak_dep_files.Unique()
+				//queue
+				for idfn_found in fidx.m_weak_dep_files
+					if !g_key_decl_files[idfn_found]:
+						if !g_in_parse_queue[idfn_found]:
+							g_in_parse_queue[idfn_found]=1
+							g_c_like_parse_queue.push(idfn_found)
 			arv=new int[int]
 			auto dfs(int idfn_dep)
 				if arv[idfn_dep]:return
@@ -2915,7 +2958,7 @@ auto PrecomputeIndices(CFileIndex fidx)
 		fidx.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
 		fidx.m_temp_p_prototypes=temp_p_prototypes
 		fidx.m_temp_id_briefs=temp_id_briefs
-		Writeln('PrecomputeIndices ',getIdString(fidx.m_idfn),' ',all_dep_files_considered,' ',formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-tick0)*1000.f,{frac:1}),'ms')//todo
+		//Writeln('PrecomputeIndices ',getIdString(fidx.m_idfn),' ',all_dep_files_considered,' ',formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-tick0)*1000.f,{frac:1}),'ms')
 
 inline WriteToken(s,tok)
 	if tok&TOK_TYPE_MASK:
@@ -2962,9 +3005,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				jsret["file_index"]=prev_kdf.fidx
 				return JS.Return(jsret)
 			//call JS to get the language desc
-			n0_parsemore=g_c_like_parse_queue.n
+			//n0_parsemore=g_c_like_parse_queue.n
 			options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
-			n1_parsemore=g_c_like_parse_queue.n
+			//n1_parsemore=g_c_like_parse_queue.n
 			sparser=options["parser"].or("text")
 			if sparser=="none":
 				ids=new int[]
@@ -2978,7 +3021,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				else
 					sdata=System.IO.ReadAll(fn)
 				if !sdata:continue
-				tick0=System.Time.tick64()//todo
+				//tick0=System.Time.tick64()
 				encoding=DetectEncoding(sdata)
 				if encoding!=ENCODING_UTF8&&encoding!=ENCODING_INVALID:
 					(s_utf8,s_lingering)=ConvertToUTF8(encoding,sdata)
@@ -2992,14 +3035,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//Writeln('parse ',idfn,' ',getIdString(idfn),' ',!!ret.m_all_key_decls)
 				if ret.m_all_key_decls:
 					kdf=ApplyKeyDecls(idfn,ret,timestamp)
-					if n0_parsemore<n1_parsemore:
-						kdf.idfn_parsemore_deps=new(g_c_like_parse_queue[n0_parsemore:n1_parsemore-1])
+					//if n0_parsemore<n1_parsemore:
+					//	kdf.idfn_parsemore_deps=new(g_c_like_parse_queue[n0_parsemore:n1_parsemore-1])
 				g_color_table_time_dense++
-				//todo
-				secs=System.Time.TicksToSeconds(System.Time.tick64()-tick0)
-				if secs>0.1f:
-					Writeln('parse ',getIdString(idfn),' ',formatNumber(secs*1000.f,{frac:1}),'ms')
-				//todo
+				//secs=System.Time.TicksToSeconds(System.Time.tick64()-tick0)
+				//if secs>0.1f:
+				//	Writeln('parse ',getIdString(idfn),' ',formatNumber(secs*1000.f,{frac:1}),'ms')
 			jsret=JS.New()
 			jsret["file_name"]=fn
 			jsret["file_index"]=ret
@@ -3365,6 +3406,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ccnt=JS.Param(1).as(int)
 		if !fidx||!fidx.m_dep_file_name_tokens:return 0
 		if !ed:return JS.ReturnError("invalid editor object")
+		if !fidx.m_dep_file_name_tokens_sorted:
+			fidx.m_dep_file_name_tokens_sorted=1
+			fidx.m_dep_file_name_tokens.Sortby(byMember("x"))
 		p=fidx.m_dep_file_name_tokens.InlineBisect(inline(a){return a.x<=ccnt})-1
 		if p>=0L:
 			tokinfo=fidx.m_dep_file_name_tokens[p]
@@ -4162,16 +4206,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			}
 		return JS.Return(ncomma)
 	}
-	JS_UI["ED_ReparseDanglingDeps"]=function(JSContext JS){
-		if !g_dangling_deps_queue.n:return 0
-		foreach idfn in g_dangling_deps_queue
-			prev_kdf=g_key_decl_files[idfn]
-			if prev_kdf:
-				prev_kdf.timestamp=0uLL//force reparse
-		g_c_like_parse_queue.push(g_dangling_deps_queue)
-		g_dangling_deps_queue.discard()
-		return JS.Return(1)
-	}
+	//JS_UI["ED_ReparseDanglingDeps"]=function(JSContext JS){
+	//	if !g_dangling_deps_queue.n:return 0
+	//	foreach idfn in g_dangling_deps_queue
+	//		prev_kdf=g_key_decl_files[idfn]
+	//		if prev_kdf:
+	//			prev_kdf.timestamp=0uLL//force reparse
+	//	g_c_like_parse_queue.push(g_dangling_deps_queue)
+	//	g_dangling_deps_queue.discard()
+	//	return JS.Return(1)
+	//}
 	JS_UI["ED_CopyCase"]=function(JSContext JS){
 		s_src=Utf8ToUnicode32(JS.Param(0).as(string))
 		s_src_lower=Utf8ToUnicode32(JS.Param(1).as(string))
@@ -4194,12 +4238,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			//Writeln('igc_mark: ',getIdString(idfn))
 			kdf.gc_flag=1
 			fidx=kdf.fidx
-			if fidx&&fidx.m_dep_files:
-				foreach idfn2 in fidx.m_dep_files
-					igc_mark(idfn2)
-			if kdf.idfn_parsemore_deps:
-				foreach idfn2 in kdf.idfn_parsemore_deps
-					igc_mark(idfn2)
+			if fidx:
+				if fidx.m_dep_files:
+					foreach idfn2 in fidx.m_dep_files
+						igc_mark(idfn2)
+				if fidx.m_weak_dep_files:
+					foreach idfn2 in fidx.m_weak_dep_files
+						igc_mark(idfn2)
+			//if kdf.idfn_parsemore_deps:
+			//	foreach idfn2 in kdf.idfn_parsemore_deps
+			//		igc_mark(idfn2)
 	}
 	JS_UI["ED_IndexGCMark"]=function(JSContext JS){
 		fn=JS.Param(0).as(string)
