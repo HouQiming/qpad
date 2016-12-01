@@ -104,6 +104,22 @@ var graph_prototype={
 	},
 };
 
+var ReindentCode=function(doc,ccnt_insert,scode){
+	var line_indent=doc.GetLC(ccnt_insert)[0];
+	var is_last_line=0;
+	if(line_indent>0&&doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
+		line_indent--;
+		is_last_line=1;
+	}
+	var ccnt_lh=doc.SeekLC(line_indent,0);
+	var ccnt_after_indent=doc.ed.MoveToBoundary(ccnt_lh,1,"space");
+	var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh);
+	var scode_indented=UI.ED_GetClipboardTextSmart(s_target_indent,scode);
+	if(is_last_line&&scode_indented&&scode_indented.length>=s_target_indent.length&&scode_indented.slice(scode_indented.length-s_target_indent.length)==s_target_indent){
+		scode_indented=scode_indented.slice(scode_indented.length-s_target_indent.length)+scode_indented.slice(0,scode_indented.length-s_target_indent.length);
+	}
+	return scode_indented||scode;
+};
 var CreatePartInsertionEditOp=function(doc,port,s_combo_name,part_id){
 	var var_bindings=port.final_annotations||{};
 	var replaced_vars={};
@@ -118,20 +134,7 @@ var CreatePartInsertionEditOp=function(doc,port,s_combo_name,part_id){
 		return replaced_vars[smatch]||smatch;
 	});
 	var ccnt_insert=port.loc1.ccnt;
-	var line_indent=doc.GetLC(ccnt_insert)[0];
-	var is_last_line=0;
-	if(line_indent>0&&doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
-		line_indent--;
-		is_last_line=1;
-	}
-	var ccnt_lh=doc.SeekLC(line_indent,0);
-	var ccnt_after_indent=doc.ed.MoveToBoundary(ccnt_lh,1,"space");
-	var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh);
-	var scode_indented=UI.ED_GetClipboardTextSmart(s_target_indent,scode);
-	if(is_last_line&&scode_indented&&scode_indented.length>=s_target_indent.length&&scode_indented.slice(scode_indented.length-s_target_indent.length)==s_target_indent){
-		scode_indented=scode_indented.slice(scode_indented.length-s_target_indent.length)+scode_indented.slice(0,scode_indented.length-s_target_indent.length);
-	}
-	scode=(scode_indented||scode);
+	scode=ReindentCode(doc,ccnt_insert,scode);
 	return [ccnt_insert,0,scode];
 };
 
@@ -244,6 +247,7 @@ var rproto_port={
 	},
 	OnMouseUp:function(event){
 		this.OnMouseMove(event);
+		if(!this.owner.m_temp_ui_desc){return;}
 		var v0=this.owner.m_temp_ui_desc.v0;
 		var v1=this.owner.m_temp_ui_desc.v1;
 		var old_eid=this.owner.m_temp_ui_desc.old_eid;
@@ -281,26 +285,15 @@ var rproto_port={
 							break;
 						}
 					}
-					var ccnt_del_0=port_part.loc0.ccnt;
-					var ccnt_del_1=port_part.loc1.ccnt;
 					var doc=this.owner.editor;
-					var ops_insertion=CreatePartInsertionEditOp(doc,port_slot,nd_part.name,part_id);
-					var ops;
-					var ccnt_insert=ops_insertion[0];
-					var scode=ops_insertion[2];
-					var slot_desc=UI.ED_SlotsFromPartCode(scode);
-					scode=slot_desc.scode;
-					ops_insertion[2]=scode;
-					if(ccnt_insert<ccnt_del_1){
-						ops=[ccnt_insert,ops_insertion[1],ops_insertion[2], ccnt_del_0,ccnt_del_1-ccnt_del_0,null];
-					}else{
-						ops=[ccnt_del_0,ccnt_del_1-ccnt_del_0,null, ccnt_insert,ops_insertion[1],ops_insertion[2]];
-						ccnt_insert-=(ccnt_del_1-ccnt_del_0);
-					}
 					//before the actual editting, we have to save the locator ccnts... of all slots and child nodes
 					//they all get smashed during doc.HookedEdit
-					var delta_ccnt=ccnt_insert-ccnt_del_0;
+					var ccnt_del_0=port_part.loc0.ccnt;
+					var ccnt_del_1=port_part.loc1.ccnt;
+					var ccnt_insert=port_slot.loc1.ccnt;
 					var Q;
+					var backup_ops=[];
+					var backup_ports=[];
 					{
 						var nds=this.owner.graph.nds;
 						var es=this.owner.graph.es;
@@ -330,17 +323,30 @@ var rproto_port={
 								}
 							}
 						}
-						!? //gotta backup loc to *TEXT* - the indentation / ... have changed
-						//gotta pick up code from *TEXT*
-						//backup loc to epos
+						//gotta backup loc to the *TEXT* - the indentation / ... have changed
+						//gotta pick up code from the *TEXT*
 						for(var i=0;i<Q.length;i++){
 							var ndi=Q[i];
 							for(var j=0;j<ndi.m_ports.length;j++){
 								var port_j=ndi.m_ports[j];
-								port_j.epos0=port_j.loc0.ccnt;
-								port_j.epos1=port_j.loc1.ccnt;
+								backup_ops.push(port_j.loc0.ccnt-ccnt_del_0,0x100000+backup_ports.length*2+0);
+								backup_ops.push(port_j.loc1.ccnt-ccnt_del_0,0x100000+backup_ports.length*2+1);
+								backup_ports.push(port_j);
 							}
 						}
+					}
+					var scode=doc.ed.GetText(ccnt_del_0,ccnt_del_1-ccnt_del_0);
+					console.log(JSON.stringify(backup_ops));//todo
+					scode=UI.ED_InsertUnicodeTags(scode,backup_ops);
+					scode=ReindentCode(doc,ccnt_insert,scode);
+					var slot_desc=UI.ED_SlotsFromPartCode(scode);
+					scode=slot_desc.scode;
+					var ops;
+					if(ccnt_insert<ccnt_del_1){
+						ops=[ccnt_insert,0,scode, ccnt_del_0,ccnt_del_1-ccnt_del_0,null];
+					}else{
+						ops=[ccnt_del_0,ccnt_del_1-ccnt_del_0,null, ccnt_insert,0,scode];
+						ccnt_insert-=(ccnt_del_1-ccnt_del_0);
 					}
 					//put it in action
 					doc.HookedEdit(ops);
@@ -349,13 +355,11 @@ var rproto_port={
 					var epos1=ccnt_insert+Duktape.__byte_length(scode);
 					doc.SetSelection(epos0,epos1)
 					UI.Refresh()
-					for(var i=0;i<Q.length;i++){
-						var ndi=Q[i];
-						for(var j=0;j<ndi.m_ports.length;j++){
-							var port_j=ndi.m_ports[j];
-							port_j.loc0.ccnt=port_j.epos0+delta_ccnt;
-							port_j.loc1.ccnt=port_j.epos1+delta_ccnt;
-						}
+					console.log(JSON.stringify(slot_desc.slot_ccnts));//todo
+					for(var i=0;i<backup_ports.length;i++){
+						var port_j=backup_ports[i];
+						port_j.loc0.ccnt=epos0+slot_desc.slot_ccnts[i*2+0];
+						port_j.loc1.ccnt=epos0+slot_desc.slot_ccnts[i*2+1];
 					}
 					this.owner.graph.es[old_eid]=new_edge;
 				}else{
@@ -364,9 +368,8 @@ var rproto_port={
 				}
 				//this.owner.graph.SignalEdit([v1.region.nd]);
 			}else{
-				//self-click, do nothing
-				//this.owner.m_temp_ui="rename_port";
-				//this.owner.m_temp_ui_desc={region:this};
+				//self-click, seek to the code... which has been done in OnClick
+				//do nothing
 			}
 		}
 		UI.ReleaseMouse(this);

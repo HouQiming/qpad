@@ -4030,7 +4030,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	}
 	JS_UI["ED_SlotsFromPartCode"]=function(JSContext JS){
 		scode=JS.Param(0).as(string)
-		js_slot_ccnts=JS.New()
+		js_slot_ccnts=JS.NewArray()
 		ret=JS.New()
 		ret["slot_ccnts"]=js_slot_ccnts
 		sret=new string
@@ -4040,6 +4040,30 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			else
 				sret.PushUnicode(ch)
 		ret["scode"]=sret
+		return JS.Return(ret)
+	}
+	JS_UI["ED_InsertUnicodeTags"]=function(JSContext JS){
+		auto scode=JS.Param(0).as(string)
+		auto ops=JS.Param(1).as(JSObject)
+		auto n=ops["length"].as(iptr)
+		auto ret=new string
+		auto to_sort=new int2[]
+		for i=0:2:n-2
+			auto p=ops[i].as(int)
+			auto ch=ops[i+1].as(int)
+			to_sort.push(int2(p,ch))
+		to_sort.Sortby(byMember("x"))
+		p0=0L
+		for item in to_sort
+			p=iptr(item.x)
+			ch=item.y
+			if p0<p:
+				ret.push(scode[p0:p-1])
+				p0=p
+			ret.PushUnicode(ch)
+		if p0<scode.n:
+			ret.push(scode[p0:])
+			p0=scode.n
 		return JS.Return(ret)
 	}
 	}
