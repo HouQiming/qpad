@@ -974,7 +974,7 @@ class CQIFunc
 	int2[] tmp_param_match_slots
 	////////////
 	JS_toJSON=function(JSContext JS){
-		//todo: give some documentation to aid the user
+		//coulddo: give some documentation to aid the user
 		auto ret=JS.New()
 		ret["id"]=getIdString(id)
 		auto params=JS.NewArray()

@@ -1702,6 +1702,27 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 	//ctx.m_backward_frontier=-1
 }
 
+var PrepareAPEM=function(){
+	if(!UI.g_all_paths_ever_mentioned){
+		UI.g_deep_search_cache={};
+		if(UI.g_deep_include_jobs.length){
+			//we have to restart... if there were new paths
+			UI.g_deep_include_jobs[UI.g_deep_include_jobs.length-1].m_apem_progress=undefined;
+		}
+		UI.g_all_paths_ever_mentioned=[];
+		var hist=UI.m_ui_metadata["<history>"];
+		var arv={};
+		for(var i=hist.length-1;i>=0;i--){
+			var fn=hist[i];
+			var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
+			if(!arv[fn_path]){
+				arv[fn_path]=1;
+				UI.g_all_paths_ever_mentioned.push(fn_path);
+			}
+		}
+	}
+}
+
 var g_is_parse_more_running=0;
 //var g_need_reparse_dangling_deps=0;
 var g_last_color_table_update=Duktape.__ui_get_tick();
@@ -1747,24 +1768,7 @@ var CallParseMore=function(){
 			}
 			if(terminate_now){UI.NextTick(fcallmore);break;}
 			if(UI.g_deep_include_jobs.length>0){
-				if(!UI.g_all_paths_ever_mentioned){
-					UI.g_deep_search_cache={};
-					if(UI.g_deep_include_jobs.length){
-						//we have to restart... if there were new paths
-						UI.g_deep_include_jobs[UI.g_deep_include_jobs.length-1].m_apem_progress=undefined;
-					}
-					UI.g_all_paths_ever_mentioned=[];
-					var hist=UI.m_ui_metadata["<history>"];
-					var arv={};
-					for(var i=hist.length-1;i>=0;i--){
-						var fn=hist[i];
-						var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
-						if(!arv[fn_path]){
-							arv[fn_path]=1;
-							UI.g_all_paths_ever_mentioned.push(fn_path);
-						}
-					}
-				}
+				PrepareAPEM();
 			}
 			var work_load=0;
 			while(UI.g_deep_include_jobs.length>0&&!terminate_now){
@@ -5373,6 +5377,30 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 		}
 	}
 	return '<deep>';
+};
+
+UI.SearchIncludeFile=function(fn_base,fn_include){
+	var fn_found=UI.SearchIncludeFileShallow(fn_base,fn_include);
+	if(fn_found=='<dangling>'||fn_found=='<deep>'){
+		PrepareAPEM();
+	}
+	fn_found=UI.g_deep_search_cache[fn_include];
+	if(fn_found==undefined){
+		//all paths ever mentioned
+		fn_found=null;
+		var paths=UI.g_all_paths_ever_mentioned;
+		for(var i=0;i<paths.length;i++){
+			var fn=paths[i]+'/'+fn_include;
+			if(IO.FileExists(fn)){
+				fn_found=fn;
+				break;
+			}
+		}
+		if(fn_found!=undefined){
+			UI.g_deep_search_cache[fn_include]=fn_found;
+		}
+	}
+	return fn_found;
 };
 
 var MAX_PARSABLE_FCALL=4096
