@@ -199,7 +199,9 @@ W.cell_caption_prototype={
 			dragging_dy:this.y+this.h*0.5-event.y,
 			rendering_dy:this.y-event.y,
 		};
+		this.owner.m_sel_rendering_y0=this.y;
 		this.owner.m_sel_rendering_y=this.y;
+		this.owner.m_caption_dragged=0;
 		for(var i=0;i<this.owner.m_cells.length;i++){
 			this.owner.m_cells[i].m_temp_unique_name='$temp_'+i.toString();
 			if(this.owner.cell_list){
@@ -214,6 +216,9 @@ W.cell_caption_prototype={
 		var cell_list=this.owner.cell_list;
 		if(!cell_list){UI.Refresh();return;}
 		this.owner.m_sel_rendering_y=ctx.rendering_dy+event.y;
+		if(Math.abs(this.owner.m_sel_rendering_y0-this.owner.m_sel_rendering_y)>=4){
+			this.owner.m_caption_dragged=1;
+		}
 		UI.SetFocus(cell_list);
 		var cells1=[];
 		var did=0;
@@ -243,7 +248,7 @@ W.cell_caption_prototype={
 			cells1.push(ctx.cells0[ctx.dragging_cell_id]);
 			did=1;
 		}
-		if(!is_invalid&&ctx.m_dragged){
+		if(!is_invalid&&ctx.m_dragged&&this.owner.m_caption_dragged){
 			this.owner.m_cells=cells1;
 		}
 		UI.Refresh();
@@ -344,6 +349,18 @@ W.CellCaption=function(id,attrs){
 				x:obj.x+8,y:obj.y+(obj.h-dims.h)*0.5-2,
 				font:font,text:obj.text,color:name_color,
 			});
+			if(obj.is_running){
+				//stop button
+				W.Button("stop",{
+					x:obj.x+obj.w-32,y:obj.y,w:32,h:obj.h,
+					font:UI.Font(UI.icon_font_name,18),
+					text:"停",
+					style:obj.button_style,
+					OnClick:function(){
+						obj.owner.KillCell(obj.m_cell_id);
+					}
+				});
+			}
 			if(obj.progress>0){
 				var y_progress_bar=obj.y+(obj.h-dims.h)*0.5+dims.h-1;
 				var w_bar=(obj.w-16);
@@ -1212,7 +1229,15 @@ W.NotebookView=function(id,attrs){
 					s_btn_name=s_btn_name+'*';
 				}
 			}
-			buttons.push({id:cell_i.m_temp_unique_name,m_cell_id:i,text:s_btn_name,h:obj.panel_style.h_button,progress:progress,progress_mode:progress_mode});
+			buttons.push({
+				id:cell_i.m_temp_unique_name,
+				m_cell_id:i,
+				text:s_btn_name,
+				h:obj.panel_style.h_button,
+				progress:progress,
+				progress_mode:progress_mode,
+				is_running:!!cell_i.m_proc,
+			});
 		}
 	}
 	var w_buttons=96;
@@ -1441,7 +1466,7 @@ W.NotebookView=function(id,attrs){
 	}
 	W.ListView('cell_list',cell_list_attrs);
 	obj.m_cell_list_old_position=undefined;
-	if(obj.m_sel_rendering_y!=undefined||!had_cell_list){
+	if(obj.m_sel_rendering_y!=undefined&&obj.m_caption_dragged||!had_cell_list){
 		var pos0=(obj.cell_list.position||0);
 		obj.cell_list.AutoScroll();
 		if(pos0!=obj.cell_list.position){

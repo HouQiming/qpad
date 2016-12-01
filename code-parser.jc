@@ -2291,7 +2291,6 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			ptok_last_comment=i
 			epos0=toks[i].epos0
 			epos1=toks[i].epos1
-			pslot_tot=0
 			if ENABLE_EXPERIMENTAL_FEATURES:
 				FlushComboPattern=inline(){
 					if cur_combo&&cur_combo.parts.n:
@@ -2396,7 +2395,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								if pattern.n&&pattern.back()!=TOK_COMBO_SLOT:
 									pattern.push(TOK_COMBO_SLOT)
 								ptok_combo_ptn_last=i+1
-								my_slot_id=pslot_tot++
+								my_slot_id=pslot_tot
+								pslot_tot++
 								cur_combo.parts.back().slots.push(t_slot)
 								//insert the spaces and stuff, put up a placeholder for the user to insert code
 								id_default_value=0
@@ -2407,17 +2407,25 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 											break
 								if id_default_value:
 									scode=cur_combo.parts.back().scode
+									scode.PushUnicode(0x100000+int(my_slot_id*2+0))
 									scode.push(getIdString(id_default_value))
+									scode.PushUnicode(0x100000+int(my_slot_id*2+1))
 								else if i-1>=0&&i+1<toks.n:
 									scode=cur_combo.parts.back().scode
 									did_placeholder=0
+									after_newline=0
 									for ptr_slot=toks[i-1].epos1:toks[i+1].epos0-1
 										auto ch=sdataz[ptr_slot]
 										if !CharSet.has(CharSet.spaces_newline,int(ch)):
 											if !did_placeholder:
 												did_placeholder=1
-												scode.PushUnicode(0x100000+int(my_slot_id))
-										scode.push(ch)
+										else
+											if did_placeholder&&(ch=='\n'||ch=='\r'):
+												after_newline=1
+											if after_newline:
+												scode.push(ch)
+									scode.PushUnicode(0x100000+int(my_slot_id*2+0))
+									scode.PushUnicode(0x100000+int(my_slot_id*2+1))
 									//if !did_placeholder:
 									//	scode.push(s_placeholder)
 			epos_var_comment=-1L
@@ -3756,6 +3764,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//for this shit to work, we need an obj that appears in all parts
 		mid_by_combo_part=new int[][int2]
 		for match,I in matches_refined
+			//fix indentation: the spaces before, the enter after
+			epos0=match.epos0
+			epos1=match.epos1
+			while epos0>0&&(sdataz[epos0-1]=='\t'||sdataz[epos0-1]==' '):
+				epos0--
+			if epos1<sdataz.n&&sdataz[epos1]=='\r':
+				epos1++
+			if epos1<sdataz.n&&sdataz[epos1]=='\n':
+				epos1++
+			matches_refined[I].epos0=epos0
+			matches_refined[I].epos1=epos1
 			mids=mid_by_combo_part[int2(match.id_combo,match.ord_part)]
 			if !mids:
 				mids=new int[]
@@ -3841,7 +3860,16 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					})
 					///////////
 					slot_bindings=matches_refined[part_match_ids[j]].slot_bindings
-					for slot,J in slot_bindings
+					for slot0,J in slot_bindings
+						//fix indentation: the spaces before, the enter after
+						//this is needed to generate correct nesting relationships
+						slot=slot0
+						while slot.x>0&&(sdataz[slot.x-1]=='\t'||sdataz[slot.x-1]==' '):
+							slot.x--
+						if slot.y<sdataz.n&&sdataz[slot.y]=='\r':
+							slot.y++
+						if slot.y<sdataz.n&&sdataz[slot.y]=='\n':
+							slot.y++
 						obj_port=JS.New()
 						obj_in_ports[p_in_ports]=obj_port
 						obj_port["id"]=getIdString(combo.parts[j].slots[J].id)
@@ -3913,7 +3941,6 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						//from-file edge
 						//edges.push(int2(-1,e.place_id))
 						//one of those root slots must have covered it
-						Writeln(e)//todo
 						assert(0)
 				//////////
 				new_annotations=new int[int]

@@ -1,3 +1,4 @@
+"use strict"
 /*
 output = part
 input = slot
@@ -113,11 +114,9 @@ var ReindentCode=function(doc,ccnt_insert,scode){
 	}
 	var ccnt_lh=doc.SeekLC(line_indent,0);
 	var ccnt_after_indent=doc.ed.MoveToBoundary(ccnt_lh,1,"space");
-	var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh);
-	var scode_indented=UI.ED_GetClipboardTextSmart(s_target_indent,scode);
-	if(is_last_line&&scode_indented&&scode_indented.length>=s_target_indent.length&&scode_indented.slice(scode_indented.length-s_target_indent.length)==s_target_indent){
-		scode_indented=scode_indented.slice(scode_indented.length-s_target_indent.length)+scode_indented.slice(0,scode_indented.length-s_target_indent.length);
-	}
+	var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh)||"";
+	var scode_indented=UI.ED_GetClipboardTextSmart(s_target_indent,scode,is_last_line);
+	//console.log(JSON.stringify(s_target_indent),scode,scode_indented)
 	return scode_indented||scode;
 };
 var CreatePartInsertionEditOp=function(doc,port,s_combo_name,part_id){
@@ -329,14 +328,15 @@ var rproto_port={
 							var ndi=Q[i];
 							for(var j=0;j<ndi.m_ports.length;j++){
 								var port_j=ndi.m_ports[j];
-								backup_ops.push(port_j.loc0.ccnt-ccnt_del_0,0x100000+backup_ports.length*2+0);
-								backup_ops.push(port_j.loc1.ccnt-ccnt_del_0,0x100000+backup_ports.length*2+1);
-								backup_ports.push(port_j);
+								if(ccnt_del_0<=port_j.loc0.ccnt&&port_j.loc1.ccnt<=ccnt_del_1){
+									backup_ops.push(port_j.loc0.ccnt-ccnt_del_0,0x100000+backup_ports.length*2+0);
+									backup_ops.push(port_j.loc1.ccnt-ccnt_del_0,0x100000+backup_ports.length*2+1);
+									backup_ports.push(port_j);
+								}
 							}
 						}
 					}
 					var scode=doc.ed.GetText(ccnt_del_0,ccnt_del_1-ccnt_del_0);
-					console.log(JSON.stringify(backup_ops));//todo
 					scode=UI.ED_InsertUnicodeTags(scode,backup_ops);
 					scode=ReindentCode(doc,ccnt_insert,scode);
 					var slot_desc=UI.ED_SlotsFromPartCode(scode);
@@ -355,7 +355,6 @@ var rproto_port={
 					var epos1=ccnt_insert+Duktape.__byte_length(scode);
 					doc.SetSelection(epos0,epos1)
 					UI.Refresh()
-					console.log(JSON.stringify(slot_desc.slot_ccnts));//todo
 					for(var i=0;i<backup_ports.length;i++){
 						var port_j=backup_ports[i];
 						port_j.loc0.ccnt=epos0+slot_desc.slot_ccnts[i*2+0];
@@ -1498,11 +1497,14 @@ W.PackageItem_prototype={
 			//ccnt_insert=doc.ed.MoveToBoundary(ccnt_insert,-1,"space");
 			var ops=CreatePartInsertionEditOp(doc,port,nd_new.name,pi);
 			var scode=ops[2];
+			//console.log(scode);
 			var slot_desc=UI.ED_SlotsFromPartCode(scode);
+			//console.log(JSON.stringify(slot_desc.slot_ccnts));
 			scode=slot_desc.scode;
 			ops[2]=scode;
 			doc.HookedEdit(ops);
 			doc.CallOnChange()
+			var ccnt_insert=ops[0];
 			var epos0=ccnt_insert;
 			var epos1=ccnt_insert+Duktape.__byte_length(scode);
 			doc.SetSelection(epos0,epos1)
@@ -1510,20 +1512,26 @@ W.PackageItem_prototype={
 			port.epos1=epos1;//expand the port
 			nd_new.out_ports[pi].epos0=epos0;
 			nd_new.out_ports[pi].epos1=epos1;
-			//save slot eposes 
+			nd_new.out_ports[pi].loc0=doc.ed.CreateLocator(epos0,-1);
+			nd_new.out_ports[pi].loc1=doc.ed.CreateLocator(epos1,1);
+			//save slot eposes
 			port_slot_ccnts[pi]=slot_desc.slot_ccnts;
 		}
 		for(var pi=0;pi<nd_new.in_ports.length;pi++){
 			var part_id=nd_new.in_ports[pi].part_id;
-			var epos=(port_slot_ccnts[part_id][pi]+nd_new.out_ports[part_id].epos0||nd_new.out_ports[part_id].epos1);
-			nd_new.in_ports[pi].epos0=epos;
-			nd_new.in_ports[pi].epos1=epos;
+			var epos0=(port_slot_ccnts[part_id][pi*2+0]+nd_new.out_ports[part_id].loc0.ccnt||nd_new.out_ports[part_id].loc1.ccnt);
+			var epos1=(port_slot_ccnts[part_id][pi*2+1]+nd_new.out_ports[part_id].loc0.ccnt||nd_new.out_ports[part_id].loc1.ccnt);
+			nd_new.in_ports[pi].epos0=epos0;
+			nd_new.in_ports[pi].epos1=epos1;
+			nd_new.in_ports[pi].loc0=doc.ed.CreateLocator(epos0,-1);
+			nd_new.in_ports[pi].loc1=doc.ed.CreateLocator(epos1,1);
 		}
-		for(var pi=0;pi<nd_new.m_ports.length;pi++){
-			var port=nd_new.m_ports[pi];
-			port.loc0=doc.ed.CreateLocator(port.epos0,-1);
-			port.loc1=doc.ed.CreateLocator(port.epos1,1);
-		}
+		//for(var pi=0;pi<nd_new.m_ports.length;pi++){
+		//	var port=nd_new.m_ports[pi];
+		//	port.loc0=doc.ed.CreateLocator(port.epos0,-1);
+		//	port.loc1=doc.ed.CreateLocator(port.epos1,1);
+		//	//console.log(port.id,port.epos0,port.epos1,!!port.loc0,!!port.loc1,doc.ed.GetTextSize());
+		//}
 		if(al_n){
 			//connection-based auto-layout: x_max+margin, y_average
 			nd_new.x=al_x_max+UI.default_styles.graph_view.node_style.node_padding;

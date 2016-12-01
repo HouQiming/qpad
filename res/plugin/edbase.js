@@ -2539,6 +2539,10 @@ UI.RegisterEditorPlugin(function(){
 				ccnt_lend--;
 			}
 			if(ccnt_reend<ccnt_lend){
+				if(this.sel1.ccnt==ccnt_lend&&this.ed.GetUtf8CharNeighborhood(this.ed.MoveToBoundary(this.sel1.ccnt,-1,"space"))[0]==10){
+					//all-space line, don't do anything
+					return 0;
+				}
 				this.HookedEdit([ccnt_reend,ccnt_lend-ccnt_reend,null])
 				this.CallOnChange()
 				this.SetCaretTo(ccnt_reend)

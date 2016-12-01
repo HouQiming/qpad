@@ -3967,6 +3967,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			str=System.detail.pcharToString(s_pchar)
 		if str.IndexOf('\n')<0L:return 0
 		s_target_indent=JS.Param(0).or("")
+		indent_in_front=JS.Param(2).as(int)
+		if ENABLE_EXPERIMENTAL_FEATURES:
+			s_tag_tail=string.NULL
+			if str.n>=4&&(int(str[str.n-4])&0xf0)==0xf0:
+				s_tag_tail=str[str.n-4:]
+				str=str[:str.n-5]
 		is_folded=0
 		if str.n&&str[0]=='\n':
 			//could be folded text, go into smart paste with the initial newline stripped
@@ -3997,11 +4003,20 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		sinsert=new string
 		foreach sline,I0,I1 in str2.TokenizeEx("\n",str2.TOKENIZE_ALLOW_EMPTY)
 			pindent=0
+			if ENABLE_EXPERIMENTAL_FEATURES:
+				s_tag_char=string.NULL
+				if sline.n>=4&&((int(sline[0])&0xf0)==0xf0):
+					//tag char
+					s_tag_char=sline[0:3]
+					sline=sline[4:]
 			while pindent<sline.n&&pindent<MAX_INDENT&&(sline[pindent]==' '||sline[pindent]=='\t'):
 				pindent++
 			if !got_first_indent:
 				pindent_first=pindent
 				got_first_indent=1
+			if ENABLE_EXPERIMENTAL_FEATURES:
+				if s_tag_char:
+					sinsert.push(s_tag_char)
 			if pindent<pindent_first:
 				if !pindent&&!sline.n:
 					//empty line, keep it empty but add the full indent
@@ -4011,14 +4026,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					sinsert.push(s_target_indent[:max(s_target_indent.n+pindent-pindent_first,0)-1])
 					sinsert.push(sline[pindent:])
 			else
-				if sinsert.n:
+				if sinsert.n||indent_in_front:
 					sinsert.push(s_target_indent)
 				sinsert.push(sline[pindent_first:])
 			if sinsert.n&&sinsert[sinsert.n-1]=='\r':
 				sinsert.pop()
 			sinsert.push('\n')
-		if sinsert.n:
+		if sinsert.n&&!indent_in_front:
 			sinsert.push(s_target_indent)
+		if ENABLE_EXPERIMENTAL_FEATURES:
+			if s_tag_tail:
+				sinsert.push(s_tag_tail)
 		//sinsert.pop()
 		return JS.Return(sinsert)
 	}
