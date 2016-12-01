@@ -1704,14 +1704,23 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 
 var g_is_parse_more_running=0;
 var g_need_reparse_dangling_deps=0;
-var PARSING_SECONDS_PER_FRAME=0.1;
+var g_last_color_table_update=Duktape.__ui_get_tick();
+var PARSING_SECONDS_PER_FRAME=1.0;
+var PARSING_IDLE_REQUIREMENT=0.5;
+var PARSING_COLOR_TABLE_UPDATE_INTERVAL=1.0;
 var CallParseMore=function(){
 	if(g_is_parse_more_running){return;}
 	var fcallmore=UI.HackCallback(function(){
-		var tick0=Duktape.__ui_get_tick()
+		var tick0=Duktape.__ui_get_tick();
+		var is_done=0;
 		for(;;){
+			//var fn_parsing=(UI.ED_GetRemainingParsingJobs()||{}).fn_next;
 			var ret=UI.ED_ParseMore()
-			//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),'UI.ED_ParseMore()');
+			//var secs=Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick());
+			//if(secs>0.1){
+			//	console.log(secs.toFixed(2),'UI.ED_ParseMore()',fn_parsing,IO.GetFileSize(fn_parsing));
+			//}
+			//tick0=Duktape.__ui_get_tick();
 			if(ret){
 				var doc_arr=UI.g_editor_from_file[ret.file_name];
 				if(doc_arr){
@@ -1730,17 +1739,24 @@ var CallParseMore=function(){
 						CallParseMore()
 					}
 				}
+				is_done=1;
 				break;
 			}
 			var tick1=Duktape.__ui_get_tick()
 			//print(Duktape.__ui_seconds_between_ticks(tick0,tick1))
+			//if(UI.TestEventInPollJob())
 			if(Duktape.__ui_seconds_between_ticks(tick0,tick1)>PARSING_SECONDS_PER_FRAME||UI.TestEventInPollJob()){
 				//console.log(Duktape.__ui_seconds_between_ticks(tick0,Duktape.__ui_get_tick()).toFixed(2),UI.TestEventInPollJob()?'event':'timeout');
-				UI.NextTick(fcallmore)
+				UI.NextTick(fcallmore);
 				break;
 			}
 		}
-		UI.RefreshAllTabs();
+		var tick1=Duktape.__ui_get_tick();
+		if(is_done||Duktape.__ui_seconds_between_ticks(g_last_color_table_update,tick1)>PARSING_COLOR_TABLE_UPDATE_INTERVAL){
+			g_last_color_table_update=tick1;
+			UI.ED_InvalidatePrecomputedIndices();
+			UI.RefreshAllTabs();
+		}
 	});
 	g_is_parse_more_running=1;
 	//in-global-search test
@@ -5274,7 +5290,7 @@ UI.ED_SearchIncludeFile=function(fn_base,fn_include,options,is_base_only){
 	}
 	var paths=UI.g_all_paths_ever_mentioned;
 	for(var i=0;i<paths.length;i++){
-		var fn=paths[i]+'/'+fn_include
+		var fn=paths[i]+'/'+fn_include;
 		if(IO.FileExists(fn)){
 			return fn;
 		}

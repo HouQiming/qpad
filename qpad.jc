@@ -78,9 +78,11 @@ if Platform.IS_WINDOWS:
 	__generate_json("lib_files","kernel32.lib")
 	__generate_json("lib_files","user32.lib")
 	__generate_json("lib_files","gdi32.lib")
-	if Platform.BUILD!="debug":
-		__generate_json("subsystem","windows")
-		__generate_json("c_files","jc_winmain.c")
+	//todo
+	//if Platform.BUILD!="debug":
+	//	__generate_json("subsystem","windows")
+	//	__generate_json("c_files","jc_winmain.c")
+	//todo
 	__generate_json("vc_versions","11")
 //if Platform.ARCH=="win32":
 //	//use VC2008 for XP support

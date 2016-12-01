@@ -1024,10 +1024,11 @@ class CFileIndex
 	int3[] m_dep_file_name_tokens
 	//////////////////
 	//transient items
-	//int m_all_dep_files_considered
+	int m_all_dep_files_considered
 	int[int] m_temp_color_table
 	int2[] m_temp_ids
-	iptr m_temp_color_table_time //~g_color_table_time
+	iptr m_temp_color_table_time
+	iptr m_temp_color_table_time_dense
 	TPrototypeItem[] m_temp_p_prototypes
 	TIDBriefWithFile[] m_temp_id_briefs
 	JS_hasDecls=function(JSContext JS){
@@ -1789,6 +1790,7 @@ g_in_parse_queue=new int[int]
 g_c_like_parse_queue=new int[]
 g_dangling_deps_queue=new int[]
 g_color_table_time=1L
+g_color_table_time_dense=1L
 g_zero_byte_string=[char(0)]
 MAX_POSTDECL_GARBAGE=8 //# of ids between () and {}, like const / override / throw / ...
 auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
@@ -1825,6 +1827,10 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	has_dangling_deps=0
 	///////////////////
 	dep_files=new int[]
+	//fdep_adder=function(JSContext JS){
+	//	auto fn_found=JS.Param(0).as(string)
+	//	dep_files
+	//}
 	dep_file_name_tokens=new int3[]
 	auto searchDepFile(int idfn_include,int ptok)
 		auto fn_found=JS.GetGlobal()["UI"].CallMethod(string,"ED_SearchIncludeFile",fn_base,getIdString(idfn_include),options)
@@ -2824,13 +2830,14 @@ auto ApplyKeyDecls(int idfn,CFileIndex fidx,u64 timestamp)
 auto PrecomputeIndices(CFileIndex fidx)
 	if !fidx.m_all_key_decls:
 		return
-	//!fidx.m_all_dep_files_considered&&
+	//if fidx.m_temp_color_table_time!=g_color_table_time||!fidx.m_all_dep_files_considered&&fidx.m_temp_color_table_time_dense!=g_color_table_time_dense:
 	if fidx.m_temp_color_table_time!=g_color_table_time:
+		tick0=System.Time.tick64()//todo
 		kd_ids=new int[]
 		temp_color_table=new int[int]
 		temp_p_prototypes=new TPrototypeItem[]
 		temp_id_briefs=new TIDBriefWithFile[]
-		//all_dep_files_considered=1
+		all_dep_files_considered=1
 		for kd in fidx.m_all_key_decls
 			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
 			//Writeln(getIdString(kd.id_type&~KEY_DECL_MASK),' ',int(u32(kd.id_type)/u32(TOK_TYPE)))
@@ -2861,7 +2868,7 @@ auto PrecomputeIndices(CFileIndex fidx)
 				kdfile=g_key_decl_files[idfn_dep]
 				//Writeln('test ',idfn_dep,' ',getIdString(idfn_dep),' ',!!kdfile)
 				if !kdfile:
-					//all_dep_files_considered=0
+					all_dep_files_considered=0
 					return
 				foreach p in kdfile.llnodes
 					gkd=g_key_decls[p]
@@ -2894,9 +2901,10 @@ auto PrecomputeIndices(CFileIndex fidx)
 			//Writeln('PrecomputeIndices ',g_color_table_time)
 			foreach idfn_dep in fidx.m_dep_files
 				dfs(idfn_dep)
-		//fidx.m_all_dep_files_considered=all_dep_files_considered
+		fidx.m_all_dep_files_considered=all_dep_files_considered
 		fidx.m_temp_color_table=temp_color_table
 		fidx.m_temp_color_table_time=g_color_table_time
+		fidx.m_temp_color_table_time_dense=g_color_table_time_dense
 		////
 		temp_p_prototypes.Sort(inline(a,b){
 			return a.id<b.id||a.id==b.id&&a.ptr_prototype<b.ptr_prototype
@@ -2907,6 +2915,7 @@ auto PrecomputeIndices(CFileIndex fidx)
 		fidx.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
 		fidx.m_temp_p_prototypes=temp_p_prototypes
 		fidx.m_temp_id_briefs=temp_id_briefs
+		Writeln('PrecomputeIndices ',getIdString(fidx.m_idfn),' ',all_dep_files_considered,' ',formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-tick0)*1000.f,{frac:1}),'ms')//todo
 
 inline WriteToken(s,tok)
 	if tok&TOK_TYPE_MASK:
@@ -2933,6 +2942,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return 1
 	}
 	//coulddo: budgeted parse
+	JS_UI["ED_InvalidatePrecomputedIndices"]=function(JSContext JS){
+		g_color_table_time++
+		return 0
+	}
 	JS_UI["ED_ParseMore"]=function(JSContext JS){
 		while g_c_like_parse_queue.n:
 			idfn=g_c_like_parse_queue.pop()
@@ -2965,6 +2978,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				else
 					sdata=System.IO.ReadAll(fn)
 				if !sdata:continue
+				tick0=System.Time.tick64()//todo
 				encoding=DetectEncoding(sdata)
 				if encoding!=ENCODING_UTF8&&encoding!=ENCODING_INVALID:
 					(s_utf8,s_lingering)=ConvertToUTF8(encoding,sdata)
@@ -2980,7 +2994,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					kdf=ApplyKeyDecls(idfn,ret,timestamp)
 					if n0_parsemore<n1_parsemore:
 						kdf.idfn_parsemore_deps=new(g_c_like_parse_queue[n0_parsemore:n1_parsemore-1])
-			g_color_table_time++
+				g_color_table_time_dense++
+				//todo
+				secs=System.Time.TicksToSeconds(System.Time.tick64()-tick0)
+				if secs>0.1f:
+					Writeln('parse ',getIdString(idfn),' ',formatNumber(secs*1000.f,{frac:1}),'ms')
+				//todo
 			jsret=JS.New()
 			jsret["file_name"]=fn
 			jsret["file_index"]=ret
