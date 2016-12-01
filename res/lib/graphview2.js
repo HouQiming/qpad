@@ -1,3 +1,7 @@
+/*
+output = part
+input = slot
+*/
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/global_doc");
@@ -100,6 +104,37 @@ var graph_prototype={
 	},
 };
 
+var CreatePartInsertionEditOp=function(doc,port,s_combo_name,part_id){
+	var var_bindings=port.final_annotations||{};
+	var replaced_vars={};
+	var part_data=UI.ED_GetComboPartData(s_combo_name,part_id);
+	for(var i=0;i<part_data.id_params.length;i++){
+		var id_i=part_data.id_params[i];
+		if(var_bindings[id_i]){
+			replaced_vars[id_i]=var_bindings[id_i];
+		}
+	}
+	var scode=part_data.scode.replace(/\b[0-9a-zA-Z_$]\b/g,function(smatch){
+		return replaced_vars[smatch]||smatch;
+	});
+	var ccnt_insert=port.loc1.ccnt;
+	var line_indent=doc.GetLC(ccnt_insert)[0];
+	var is_last_line=0;
+	if(line_indent>0&&doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
+		line_indent--;
+		is_last_line=1;
+	}
+	var ccnt_lh=doc.SeekLC(line_indent,0);
+	var ccnt_after_indent=doc.ed.MoveToBoundary(ccnt_lh,1,"space");
+	var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh);
+	var scode_indented=UI.ED_GetClipboardTextSmart(s_target_indent,scode);
+	if(is_last_line&&scode_indented&&scode_indented.length>=s_target_indent.length&&scode_indented.slice(scode_indented.length-s_target_indent.length)==s_target_indent){
+		scode_indented=scode_indented.slice(scode_indented.length-s_target_indent.length)+scode_indented.slice(0,scode_indented.length-s_target_indent.length);
+	}
+	scode=(scode_indented||scode);
+	return [ccnt_insert,0,scode];
+};
+
 var PointDist=function(a,b){
 	var dx=(a.x-b.x);
 	var dy=(a.y-b.y);
@@ -167,13 +202,17 @@ var rproto_node={
 };
 var rproto_port={
 	//tentative edge system - temp UI
-	OnMouseDown:function(event){
+	OnMouseDown:function(event,old_eid){
+		if(old_eid==undefined){
+			return;
+		}
 		//the initial position shouldn't matter
 		UI.SetFocus(this.owner);UI.Refresh();
 		this.m_drag_ctx=1;
 		this.owner.m_temp_ui="edge";
 		this.owner.m_temp_ui_desc={};
 		this.owner.m_temp_ui_desc.v0={x:this.x-this.dx+this.pdx,y:this.y-this.dy+this.pdy,region:this};
+		this.owner.m_temp_ui_desc.old_eid=old_eid;
 		UI.CaptureMouse(this);
 	},
 	OnMouseMove:function(event){
@@ -207,25 +246,127 @@ var rproto_port={
 		this.OnMouseMove(event);
 		var v0=this.owner.m_temp_ui_desc.v0;
 		var v1=this.owner.m_temp_ui_desc.v1;
+		var old_eid=this.owner.m_temp_ui_desc.old_eid;
 		this.owner.m_temp_ui=undefined;
 		this.owner.m_temp_ui_desc=undefined;
 		this.m_drag_ctx=undefined;
 		if(v1){
 			if(v1.region){
 				//create edge
-				if(v0.region.dir=='input'){
+				if(v0.region.dir=='output'){
 					//all edges should be output -> input
 					var tmp=v0;v0=v1;v1=tmp;
 				}
-				this.owner.graph.es.push({
+				var new_edge={
 					id0:v0.region.nd.__id__, port0:v0.region.port,
 					id1:v1.region.nd.__id__, port1:v1.region.port,
-				})
-				this.owner.graph.SignalEdit([v1.region.nd]);
+				};
+				if(old_eid!=undefined){
+					//move the edge... and move the code
+					var nd_part=v1.region.nd;
+					var port_part=undefined;
+					var part_id=0;
+					for(var i=0;i<nd_part.out_ports.length;i++){
+						if(nd_part.out_ports[i].id==v1.region.port){
+							port_part=nd_part.out_ports[i];
+							part_id=i;
+							break;
+						}
+					}
+					var nd_slot=v0.region.nd;
+					var port_slot=undefined;
+					for(var i=0;i<nd_slot.in_ports.length;i++){
+						if(nd_slot.in_ports[i].id==v0.region.port){
+							port_slot=nd_slot.in_ports[i];
+							break;
+						}
+					}
+					var ccnt_del_0=port_part.loc0.ccnt;
+					var ccnt_del_1=port_part.loc1.ccnt;
+					var doc=this.owner.editor;
+					var ops_insertion=CreatePartInsertionEditOp(doc,port_slot,nd_part.name,part_id);
+					var ops;
+					var ccnt_insert=ops_insertion[0];
+					var scode=ops_insertion[2];
+					var slot_desc=UI.ED_SlotsFromPartCode(scode);
+					scode=slot_desc.scode;
+					ops_insertion[2]=scode;
+					if(ccnt_insert<ccnt_del_1){
+						ops=[ccnt_insert,ops_insertion[1],ops_insertion[2], ccnt_del_0,ccnt_del_1-ccnt_del_0,null];
+					}else{
+						ops=[ccnt_del_0,ccnt_del_1-ccnt_del_0,null, ccnt_insert,ops_insertion[1],ops_insertion[2]];
+						ccnt_insert-=(ccnt_del_1-ccnt_del_0);
+					}
+					//before the actual editting, we have to save the locator ccnts... of all slots and child nodes
+					//they all get smashed during doc.HookedEdit
+					var delta_ccnt=ccnt_insert-ccnt_del_0;
+					var Q;
+					{
+						var nds=this.owner.graph.nds;
+						var es=this.owner.graph.es;
+						var node_map={},es_topo=[];
+						var n=nds.length,m=es.length;
+						for(var i=0;i<n;i++){
+							node_map[nds[i].__id__]=i;
+							es_topo[i]=[];
+							nds[i].m_is_queued=0;
+						}
+						for(var i=0;i<m;i++){
+							var e=es[i];
+							var v0=node_map[e.id0];
+							var v1=node_map[e.id1];
+							if(v0==undefined||v1==undefined){continue;}
+							es_topo[v0].push(v1);
+						}
+						Q=[nd_part];
+						nd_part.m_is_queued=1;
+						for(var i=0;i<Q.length;i++){
+							var esi=es_topo[node_map[Q[i].__id__]];
+							for(var j=0;j<esi.length;j++){
+								var ndj=nds[esi[j]];
+								if(!ndj.m_is_queued){
+									Q.push(ndj);
+									ndj.m_is_queued=1;
+								}
+							}
+						}
+						!? //gotta backup loc to *TEXT* - the indentation / ... have changed
+						//gotta pick up code from *TEXT*
+						//backup loc to epos
+						for(var i=0;i<Q.length;i++){
+							var ndi=Q[i];
+							for(var j=0;j<ndi.m_ports.length;j++){
+								var port_j=ndi.m_ports[j];
+								port_j.epos0=port_j.loc0.ccnt;
+								port_j.epos1=port_j.loc1.ccnt;
+							}
+						}
+					}
+					//put it in action
+					doc.HookedEdit(ops);
+					doc.CallOnChange();
+					var epos0=ccnt_insert;
+					var epos1=ccnt_insert+Duktape.__byte_length(scode);
+					doc.SetSelection(epos0,epos1)
+					UI.Refresh()
+					for(var i=0;i<Q.length;i++){
+						var ndi=Q[i];
+						for(var j=0;j<ndi.m_ports.length;j++){
+							var port_j=ndi.m_ports[j];
+							port_j.loc0.ccnt=port_j.epos0+delta_ccnt;
+							port_j.loc1.ccnt=port_j.epos1+delta_ccnt;
+						}
+					}
+					this.owner.graph.es[old_eid]=new_edge;
+				}else{
+					//we should never reach here
+					this.owner.graph.es.push(new_edge);
+				}
+				//this.owner.graph.SignalEdit([v1.region.nd]);
 			}else{
-				//self-click, rename
-				this.owner.m_temp_ui="rename_port";
-				this.owner.m_temp_ui_desc={region:this};
+				//self-click, do nothing
+				//this.owner.m_temp_ui="rename_port";
+				//this.owner.m_temp_ui_desc={region:this};
 			}
 		}
 		UI.ReleaseMouse(this);
@@ -583,7 +724,7 @@ W.graphview_prototype={
 		var event_edge={
 			x:event.x/this.graph.tr.scale,
 			y:event.y/this.graph.tr.scale,
-		}
+		};
 		var best_dist2=this.edge_style.region_width;
 		var best_eid=undefined;
 		best_dist2*=best_dist2;
@@ -634,13 +775,12 @@ W.graphview_prototype={
 				//}else{
 				//	side=1;
 				//}
-				//todo: auto-reconnect on not-reconnected mouseup
-				//delete edge and trigger dragging on the *opposite* end
+				//trigger new-edge dragging on the *opposite* end, set old_eid for later replacement
 				var rg_trigger=(1-side)==0?pos0.region:pos1.region;
-				this.graph.es[best_eid]=this.graph.es[this.graph.es.length-1]
-				this.graph.es.pop();
+				//this.graph.es[best_eid]=this.graph.es[this.graph.es.length-1]
+				//this.graph.es.pop();
 				//this.graph.SignalEdit([pos1.region.nd]);
-				rg_trigger.OnMouseDown(event_edge)
+				rg_trigger.OnMouseDown(event_edge,best_eid)
 				rg_trigger.OnMouseMove(event_edge)
 				return;
 			}
@@ -1352,37 +1492,13 @@ W.PackageItem_prototype={
 					break;
 				}
 			}
-			var var_bindings=port.final_annotations||{};
-			var replaced_vars={};
-			var part_data=UI.ED_GetComboPartData(nd_new.name,pi);
-			for(var i=0;i<part_data.id_params.length;i++){
-				var id_i=part_data.id_params[i];
-				if(var_bindings[id_i]){
-					replaced_vars[id_i]=var_bindings[id_i];
-				}
-			}
-			var scode=part_data.scode.replace(/\b[0-9a-zA-Z_$]\b/g,function(smatch){
-				return replaced_vars[smatch]||smatch;
-			});
-			var ccnt_insert=port.loc1.ccnt;
-			var line_indent=doc.GetLC(ccnt_insert)[0];
-			var is_last_line=0;
-			if(line_indent>0&&doc.ed.GetUtf8CharNeighborhood(ccnt_insert)[1]=='}'.charCodeAt(0)){
-				line_indent--;
-				is_last_line=1;
-			}
-			var ccnt_lh=doc.SeekLC(line_indent,0);
-			var ccnt_after_indent=doc.ed.MoveToBoundary(ccnt_lh,1,"space");
-			var s_target_indent=doc.ed.GetText(ccnt_lh,ccnt_after_indent-ccnt_lh);
-			var scode_indented=UI.ED_GetClipboardTextSmart(s_target_indent,scode);
-			if(is_last_line&&scode_indented&&scode_indented.length>=s_target_indent.length&&scode_indented.slice(scode_indented.length-s_target_indent.length)==s_target_indent){
-				scode_indented=scode_indented.slice(scode_indented.length-s_target_indent.length)+scode_indented.slice(0,scode_indented.length-s_target_indent.length);
-			}
-			scode=(scode_indented||scode);
+			//ccnt_insert=doc.ed.MoveToBoundary(ccnt_insert,-1,"space");
+			var ops=CreatePartInsertionEditOp(doc,port,nd_new.name,pi);
+			var scode=ops[2];
 			var slot_desc=UI.ED_SlotsFromPartCode(scode);
 			scode=slot_desc.scode;
-			//ccnt_insert=doc.ed.MoveToBoundary(ccnt_insert,-1,"space");
-			doc.HookedEdit([ccnt_insert,0,scode]);
+			ops[2]=scode;
+			doc.HookedEdit(ops);
 			doc.CallOnChange()
 			var epos0=ccnt_insert;
 			var epos1=ccnt_insert+Duktape.__byte_length(scode);

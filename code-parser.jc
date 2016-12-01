@@ -3551,7 +3551,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		struct TCurrentRootSlot
 			int blevel,rsid
 		//gen matches here, do detailed matching in a later pass
-		//todo: @slot should label all the way to the next closing bracket at the same level
+		//@slot labels all the way to the next closing bracket at the same level
 		root_slots=new TRootSlot[]
 		root_slots.push(TRootSlot(){id:getid("-"),epos0:0,epos1:int(ccnt1-ccnt0)})
 		cur_root_slots=new TCurrentRootSlot[]
@@ -3666,10 +3666,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 							st.push(int3(pid,1,int(I)))
 		for crs in cur_root_slots
 			root_slots[crs.rsid].epos1=int(ccnt1-ccnt0)
-		//todo
-		Writeln('======== rough')
-		Writeln(matches)
-		//todo
+		//Writeln('======== rough')
+		//Writeln(matches)
 		struct TPartMatchRefined
 			int2[] slot_bindings
 			int[] param_bindings
@@ -3746,10 +3744,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						epos1:toks[match.ptok1-1].epos1,
 					})
 					break
-		//todo
-		Writeln('======== refined')
-		Writeln(matches_refined)
-		//todo
+		//Writeln('======== refined')
+		//Writeln(matches_refined)
 		struct TPlace
 			int epos0,epos1
 			int match_id,part_id,slot_id
