@@ -209,6 +209,8 @@ g_id_slash=getid("-")
 g_id_return=getid("return")
 g_id_const=getid("const")
 g_id_default=getid("__default")
+g_id___c_function=getid("__c_function")
+g_id___generate_json=getid("__generate_json")
 g_sta_tr0=[-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,4,-1,-1,-1,4,10,-1,3,-1,4,5,-1,6,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,7,9,8,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,-1,4,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,11,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1]
 struct TToken
 	int tok
@@ -646,10 +648,13 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 			if ch=='/':
 				ptr++
 				efeed0=ptr
-				for(;;)
-					ch=int(feed[ptr])
-					if ch==0||ch=='\n':break
-					ptr++
+				if ENABLE_EXPERIMENTAL_FEATURES&&ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad ",6)==0:
+					ptr+=6
+				else
+					for(;;)
+						ch=int(feed[ptr])
+						if ch==0||ch=='\n':break
+						ptr++
 				if last_significant_newline_position==toks.n:
 					last_line_comment_position=toks.n
 				//merge comments to avoid perf issues during token neib lookup
@@ -669,12 +674,15 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 				ptr++
 				efeed0=ptr
 				auto c=0;
-				for(;;)
-					ch=int(feed[ptr])
-					if ch==0:break
-					ptr++
-					if ch=='/'&&c=='*':break;
-					c=ch;
+				if ENABLE_EXPERIMENTAL_FEATURES&&ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad ",6)==0:
+					ptr+=6
+				else
+					for(;;)
+						ch=int(feed[ptr])
+						if ch==0:break
+						ptr++
+						if ch=='/'&&c=='*':break;
+						c=ch;
 				//merge comments to avoid perf issues during token neib lookup
 				can_merge=1
 				if ENABLE_EXPERIMENTAL_FEATURES:
@@ -2286,6 +2294,10 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 										id:id,
 										pdoc:PoolDoxygenComment(s_comment[pbrief+5:])})
 							last_var_id=id
+			else if (tok_i&TOK_TYPE_MASK)==TOK_STRING:
+				if function_id==g_id___c_function&&param_id==2||function_id==g_id___generate_json&&param_id==1:
+					//jc C import
+					searchDepFile(getid(cite_raw(toks[i].epos0,toks[i].epos1)),int(i))
 			break
 		case TOK_COMMENT:
 			ptok_last_comment=i
