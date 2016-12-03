@@ -318,6 +318,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		else
 			return JS.Return(ret)
 	}
+	jsio["ReportError"]=function(JSContext JS){
+		err=JS.Param(0).as(JSObject)
+		if err:
+			sbox.ReportError(err)
+		return 0
+	}
 	jsio["ReadLimited"]=function(JSContext JS){
 		fn=JS.Param(0).or(new string)
 		sz=JS.Param(1).as(iptr)

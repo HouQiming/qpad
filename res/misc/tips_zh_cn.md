@@ -47,3 +47,13 @@
 #@プ@ 关键变量贴士
 
 可以在程序中添加`//@qpadvar kv A variable used for important things`这样的注释。这样当光标移动到和注释同一层的地方之后，QPad会自动给出此类内容的贴士。
+
+#@本@ Notebook Tricks
+
+You can write `[button: Cell Name]` in a notebook cell to give it a name (replace the `Cell Name` part). The text can be put in a batch file or shell script comment.
+
+You can write `[new window]` in a notebook cell to make it run in a new window.
+
+#@プ@ Searching for Headers
+
+When QPad failed to locate some symbol in a dependent file automatically (e.g. when `MessageBox` appears black even though you did `#include <windows.h>`), just open the dependent file (e.g. `windows.h`) manually. QPad would learn to search that location the next time.

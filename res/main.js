@@ -427,6 +427,7 @@ var CreateMenus=function(){
 		UI.Refresh()
 	}})
 	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
+		//throw new Error("test");
 		UI.UpdateNewDocumentSearchPath()
 		var fn=IO.DoFileDialog(0,undefined,UI.m_new_document_search_path);
 		if(!fn){return;}
@@ -871,6 +872,14 @@ UI.EventFilter=function(event){
 		}
 	}
 	return 1;
+};
+
+UI.HandleError=function(error){
+	if(UI.Platform.BUILD=="debug"){
+		throw error;
+	}else{
+		IO.ReportError(error);
+	}
 };
 
 (function(){

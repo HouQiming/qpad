@@ -272,6 +272,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 						}
 					}
 				}
+				obj.DismissNotification('diff_reload_prompt');
 			})
 			this.AddEventHandler('ESC',function(){
 				this.CancelAutoCompletion()
@@ -2800,6 +2801,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 	return ctx;
 }
 
+var RELOAD_DIFF_MAX_SIZE=16<<20;
 var CheckEditorExternalChange=function(obj){
 	if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
 		if(obj.doc.ed.saving_context){return;}//saving docs are OK
@@ -2814,7 +2816,21 @@ var CheckEditorExternalChange=function(obj){
 			obj.doc.saved_point=-1;
 		}else{
 			//what is reload? nuke it
-			obj.Reload()
+			var size_cur=obj.doc.ed.GetTextSize();
+			var size_new=IO.GetFileSize(obj.doc.m_file_name);
+			var is_diff_update=0;
+			if(size_cur+size_new<RELOAD_DIFF_MAX_SIZE){
+				//diff-based update for small files
+				is_diff_update=UI.ED_DiffUpdateToFile(obj.doc.ed,obj.doc.m_file_name);
+			}
+			if(is_diff_update){
+				obj.CreateNotification({id:'diff_reload_prompt',icon:'警',text:"FILE RELOADED!\n - Use Edit-Undo to restore\n - Make any change to dismiss this"});
+				obj.doc.ResetSaveDiff()
+				obj.doc.m_loaded_time=IO.GetFileTimestamp(obj.doc.m_file_name);
+				obj.doc.saved_point=obj.doc.ed.GetUndoQueueLength();
+			}else{
+				obj.Reload();
+			}
 		}
 	}
 };

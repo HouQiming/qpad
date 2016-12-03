@@ -4903,6 +4903,46 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			myBlitFBO(JS,x0,y0,x1,y1,g_rtt_tab_backup,pdraw_fbo[0])
 		return 0;
 	}
+	JS_UI["ED_DiffUpdateToFile"]=function(JSContext JS){
+		ed=JS.Param(0).as(CEditableText)
+		if !ed:return 0
+		s_file_name=JS.Param(1).as(string)
+		scode_new=System.IO.ReadAll(s_file_name);
+		if !scode_new:return 0
+		scode=ed.GetText(0L,ed.GetTextSize())
+		dmp_diff_to_i64_list=__c_function(int,"dmp_diff_to_i64_list","dmp/dmp.h","c_files","dmp/dmp.c")
+		dmp_diff_new=__c_function(int,"dmp_diff_new","dmp/dmp.h","c_files","dmp/dmp.c")
+		dmp_diff_free=__c_function(int,"dmp_diff_free","dmp/dmp.h","c_files","dmp/dmp.c")
+		diff=NULL
+		dmp_diff_new(__C(__pointer,"(dmp_diff**)@1",&diff),NULL, scode,scode.n, scode_new,scode_new.n);
+		if !diff:return 0
+		n=dmp_diff_to_i64_list(diff,NULL)
+		rawdiff=new i64[n]
+		n=dmp_diff_to_i64_list(diff,rawdiff)
+		assert(n==rawdiff.n)
+		dmp_diff_free(diff)
+		diff=NULL
+		ops=new TextBox.detail.TEditop[]
+		for i=0:3:rawdiff.n-3
+			if rawdiff[i+2]:
+				//insert
+				ops.push(TextBox.detail.TEditop(){
+					ccnt:rawdiff[i+0],
+					sz:0LL,
+					s:scode_new[iptr(rawdiff[i+2])-scode_new.d:iptr(rawdiff[i+2]+rawdiff[i+1])-scode_new.d-1]
+				})
+			else
+				//delete
+				ops.push(TextBox.detail.TEditop(){
+					ccnt:rawdiff[i+0],
+					sz:rawdiff[i+1],
+				})
+		if ops.n:
+			ed.Edit(ops)
+			return JS.Return(1)
+		else
+			return 0
+	}
 	/////////////////////////////
 	g_model_cn=new CEncodingModel(sbox.UIReadAll("assets/bayesian_cn.bin").ConvertToAsBinary(u32))
 	g_model_jp=new CEncodingModel(sbox.UIReadAll("assets/bayesian_jp.bin").ConvertToAsBinary(u32))

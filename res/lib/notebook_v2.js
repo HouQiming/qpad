@@ -353,8 +353,8 @@ W.CellCaption=function(id,attrs){
 				//stop button
 				W.Button("stop",{
 					x:obj.x+obj.w-32,y:obj.y,w:32,h:obj.h,
-					font:UI.Font(UI.icon_font_name,18),
-					text:"停",
+					font:UI.Font(UI.icon_font_name,16),
+					text:"✕",
 					style:obj.button_style,
 					tooltip:UI._("Stop"),
 					OnClick:function(){

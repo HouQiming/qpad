@@ -47,3 +47,13 @@ You can also type a line number to go to a certain line. The line number can be 
 #@プ@ Sticker for Key Variables
 
 You can add comments like `//@qpadvar kv A variable used for important things` in your program. QPad will show the relevant information in a sticker whenever your cursor falls in the same scope as the comment.
+
+#@本@ Notebook Tricks
+
+You can write `[button: Cell Name]` in a notebook cell to give it a name (replace the `Cell Name` part). The text can be put in a batch file or shell script comment.
+
+You can write `[new window]` in a notebook cell to make it run in a new window.
+
+#@プ@ Searching for Headers
+
+When QPad failed to locate some symbol in a dependent file automatically (e.g. when `MessageBox` appears black even though you did `#include <windows.h>`), just open the dependent file (e.g. `windows.h`) manually. QPad would learn to search that location the next time.
