@@ -489,13 +489,9 @@ W.notebook_prototype={
 					crange.loc1.discard()
 					crange.hlobj.discard()
 					var err=crange.err;
-					if(err.is_in_active_doc){
-						//print("cleared error: ",i,err.message)
-						err.is_in_active_doc=0;
-						err.sel_ccnt0.discard()
-						err.sel_ccnt1.discard()
-						err.highlight.discard()
-					}
+					if(err.sel_ccnt0){err.sel_ccnt0.discard();err.sel_ccnt0=undefined;}
+					if(err.sel_ccnt1){err.sel_ccnt1.discard();err.sel_ccnt1=undefined;}
+					if(err.highlight){err.highlight.discard();err.highlight=undefined;}
 					err.is_in_active_doc=undefined;
 				}
 				this.m_clickable_ranges=[]
@@ -814,40 +810,7 @@ W.notebook_prototype={
 			err.file_name=(fn_search_found||cell_i.m_current_path+'/'+err.file_name);
 		}
 		err.file_name=IO.NormalizeFileName(err.file_name);
-		if(!err.is_quiet&&IO.FileExists(err.file_name)){
-			UI.OpenEditorWindow(err.file_name,function(){
-				var go_prev_line=0
-				if(err.is_in_active_doc==undefined){return;}
-				if(err.ccnt0==undefined||err.ccnt1==undefined){
-					if(err.line1==undefined){
-						err.line1=err.line0
-					}
-					if(err.col0==undefined){
-						err.col0=0;
-						err.col1=0;
-						if(err.line0==err.line1){
-							err.line1++
-							go_prev_line=1
-						}
-					}else if(err.col1==undefined){
-						err.col1=1e9;
-					}
-					//if(err.col0==err.col1&&err.line0==err.line1){
-					//	err.col1++;
-					//}
-					//for(var shit in this){
-					//	print(shit,this[shit])
-					//}
-					err.ccnt0=this.SeekLC(err.line0,err.col0)
-					err.ccnt1=this.SeekLC(err.line1,err.col1)
-				}
-				if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
-				if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
-				/////////////////
-				AddErrorToEditor(this,err)
-			},"quiet")
-		}
-		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1){
+		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1,adding_to_existing){
 			if(!err.is_in_active_doc){
 				UI.OpenEditorWindow(err.file_name,function(){
 					var go_prev_line=0
@@ -872,19 +835,28 @@ W.notebook_prototype={
 					if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
 					if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
 					/////////////////
-					//AddErrorToEditor(this,err)
-					this.SetSelection(err.ccnt0,err.ccnt1);
-				})
+					AddErrorToEditor(this,err)
+					if(!adding_to_existing){
+						this.SetSelection(err.ccnt0,err.ccnt1);
+						if(do_onfocus){
+							UI.SetFocus(this)
+						}
+					}
+				},adding_to_existing?"quite":undefined);
 			}else{
 				UI.OpenEditorWindow(err.file_name,function(){
-					this.SetSelection(err.sel_ccnt0.ccnt,err.sel_ccnt0.ccnt)
-					this.CallOnSelectionChange();
-					if(do_onfocus){
-						UI.SetFocus(this)
+					if(!adding_to_existing){
+						this.SetSelection(err.sel_ccnt0.ccnt,err.sel_ccnt0.ccnt)
+						this.CallOnSelectionChange();
+						if(do_onfocus){
+							UI.SetFocus(this)
+						}
 					}
-				})
+				},adding_to_existing?"quite":undefined)
 			}
-			this.SetSelection(ccnt_lh,ccnt_next)
+			if(!adding_to_existing){
+				this.SetSelection(ccnt_lh,ccnt_next)
+			}
 		}
 		var doc=cell_i.m_text_out;
 		cell_i.m_has_any_error=1;
@@ -900,6 +872,12 @@ W.notebook_prototype={
 			hlobj:hlobj,
 			err:err,
 			f:fclick_callback})
+		//search for already-open windows
+		if(UI.SearchForEditorTab(err.file_name)){
+			//if found, add it to the existing tab
+			fclick_callback(0,0,0,1);
+		}
+		////////
 		doc=undefined;
 		UI.RefreshAllTabs()
 	},

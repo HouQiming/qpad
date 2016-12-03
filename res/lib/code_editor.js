@@ -2824,7 +2824,7 @@ var CheckEditorExternalChange=function(obj){
 				is_diff_update=UI.ED_DiffUpdateToFile(obj.doc.ed,obj.doc.m_file_name);
 			}
 			if(is_diff_update){
-				obj.CreateNotification({id:'diff_reload_prompt',icon:'警',text:"FILE RELOADED!\n - Use Edit-Undo to restore\n - Make any change to dismiss this"});
+				obj.CreateNotification({id:'diff_reload_prompt',icon:'警',text:"EXTERNAL CHANGES LOADED!\n - Use Edit-Undo to revert\n - Make more changes to dismiss this"});
 				obj.doc.ResetSaveDiff()
 				obj.doc.m_loaded_time=IO.GetFileTimestamp(obj.doc.m_file_name);
 				obj.doc.saved_point=obj.doc.ed.GetUndoQueueLength();
@@ -7514,6 +7514,15 @@ UI.NewCodeEditorTab=function(fname0){
 		},
 		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
 	})
+};
+
+UI.SearchForEditorTab=function(fname){
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		if(UI.g_all_document_windows[i].file_name==fname){
+			return UI.g_all_document_windows[i]
+		}
+	}
+	return undefined;
 };
 
 UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
