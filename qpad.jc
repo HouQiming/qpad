@@ -319,9 +319,18 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return JS.Return(ret)
 	}
 	jsio["ReportError"]=function(JSContext JS){
-		err=JS.Param(0).as(JSObject)
-		if err:
-			sbox.ReportError(err)
+		s_error=JS.Param(0).as(string)
+		if !s_error:
+			s_error="unknown crash"
+		if Gui2D.g_log_file:
+			if !System.IO.FileExists(Gui2D.g_log_file):
+				f=System.IO.CreateFile(Gui2D.g_log_file)
+			else
+				f=System.IO.fopen(Gui2D.g_log_file,System.IO.OPEN_READ|System.IO.OPEN_WRITE)
+				f.SeekFromEnd(0L)
+			if f:
+				f.Write("\n"+s_error)
+				f.Close()
 		return 0
 	}
 	jsio["ReadLimited"]=function(JSContext JS){
