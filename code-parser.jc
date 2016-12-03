@@ -650,24 +650,25 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 				efeed0=ptr
 				if ENABLE_EXPERIMENTAL_FEATURES&&ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad ",6)==0:
 					ptr+=6
+					push_token(TOK_COMMENT,int(efeed0-2),int(ptr))
 				else
 					for(;;)
 						ch=int(feed[ptr])
 						if ch==0||ch=='\n':break
 						ptr++
-				if last_significant_newline_position==toks.n:
-					last_line_comment_position=toks.n
-				//merge comments to avoid perf issues during token neib lookup
-				can_merge=1
-				if ENABLE_EXPERIMENTAL_FEATURES:
-					for j=efeed0:min(ptr,efeed0+3)-1
-						if int(feed[j])==int('@'):
-							can_merge=0
-							break
-				if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
-					toks[toks.n-1].epos1=int(ptr)
-				else
-					push_token(TOK_COMMENT,int(efeed0),int(ptr))
+					if last_significant_newline_position==toks.n:
+						last_line_comment_position=toks.n
+					//merge comments to avoid perf issues during token neib lookup
+					can_merge=1
+					if ENABLE_EXPERIMENTAL_FEATURES:
+						for j=efeed0:min(ptr,efeed0+3)-1
+							if int(feed[j])==int('@'):
+								can_merge=0
+								break
+					if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
+						toks[toks.n-1].epos1=int(ptr)
+					else
+						push_token(TOK_COMMENT,int(efeed0),int(ptr))
 				//parseComment(feed,efeed0,ptr+1)
 				continue
 			if ch=='*':{
@@ -676,6 +677,7 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 				auto c=0;
 				if ENABLE_EXPERIMENTAL_FEATURES&&ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad ",6)==0:
 					ptr+=6
+					push_token(TOK_COMMENT,int(efeed0-2),int(ptr))
 				else
 					for(;;)
 						ch=int(feed[ptr])
@@ -683,17 +685,17 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 						ptr++
 						if ch=='/'&&c=='*':break;
 						c=ch;
-				//merge comments to avoid perf issues during token neib lookup
-				can_merge=1
-				if ENABLE_EXPERIMENTAL_FEATURES:
-					for j=efeed0:min(ptr,efeed0+3)-1
-						if int(feed[j])==int('@'):
-							can_merge=0
-							break
-				if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
-					toks[toks.n-1].epos1=int(ptr-2)
-				else
-					push_token(TOK_COMMENT,int(efeed0),int(ptr-2))
+					//merge comments to avoid perf issues during token neib lookup
+					can_merge=1
+					if ENABLE_EXPERIMENTAL_FEATURES:
+						for j=efeed0:min(ptr,efeed0+3)-1
+							if int(feed[j])==int('@'):
+								can_merge=0
+								break
+					if can_merge&&toks.n>0&&toks.back().tok==TOK_COMMENT:
+						toks[toks.n-1].epos1=int(ptr-2)
+					else
+						push_token(TOK_COMMENT,int(efeed0),int(ptr-2))
 				//parseComment(feed,efeed0,ptr)
 				continue
 			}

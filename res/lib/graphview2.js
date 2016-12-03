@@ -385,6 +385,7 @@ var rproto_port={
 };
 var PreprocessNode=function(ndi){
 	var style=UI.default_styles.graph_view.node_style;
+	//compute the port dimensions
 	var wr=style.port_w_min,wl=style.port_w_min, nr=0,nl=0;
 	ndi.m_ports=[];
 	for(var i=0;i<ndi.in_ports.length;i++){
@@ -407,6 +408,9 @@ var PreprocessNode=function(ndi){
 		wl=Math.max(wl,w_port);
 		nl++;
 	}
+	//compute the param-binding dimensions
+	!?
+	//compute the final node dimension
 	var s_caption=ndi.name;
 	var s_desc='';
 	var pcolon=s_caption.indexOf(': ');
@@ -427,7 +431,6 @@ var PreprocessNode=function(ndi){
 	ndi.m_rects=[];
 	ndi.m_texts=[];
 	ndi.m_regions=[];
-	ndi.m_param_widgets=[];
 	//ndi.m_param_panel=[];
 	ndi.m_w=w_final;
 	ndi.m_h=h_final;
@@ -472,8 +475,6 @@ var PreprocessNode=function(ndi){
 		});
 		y_caption+=h_desc;
 	}
-	//multi-connect case - use node y for ordering with edge dragging
-	//if one really needs it, one could use helper boards
 	//generate editor UI
 	var xl=-style.port_extrude,xr=w_final+style.port_extrude-wr,
 		pxl=-0.5*style.port_extrude,pxr=w_final+0.5*style.port_extrude,
@@ -1111,15 +1112,6 @@ W.GraphView=function(id,attrs){
 			var rg=W.Region(item_i.name,item_i,item_i.proto);
 			if(rg.OnRender){
 				rg.OnRender();
-			}
-		}
-		for(var i=0;i<cache_item.m_param_widgets.length;i++){
-			var item_i=cache_item.m_param_widgets[i];
-			item_i.x=x+item_i.dx;
-			item_i.y=y+item_i.dy;
-			var fwidget=g_panel_ui_widgets[item_i.port_ref.ui[0].toLowerCase()];
-			if(fwidget){
-				fwidget.call(item_i,obj, item_i.x,item_i.y,item_i.w,item_i.h);
 			}
 		}
 		//create UI panel

@@ -873,8 +873,14 @@ UI.EventFilter=function(event){
 	return 1;
 };
 
+var g_errors_reported={};
 UI.HandleError=function(error){
-	IO.ReportError([(new Date()).toUTCString()," commit ",UI.g_commit," ",(error.stack||""),"\n"].join(""));
+	var s_error=(error.stack||"");
+	if(g_errors_reported[s_error]){
+		g_errors_reported[s_error]=1;
+		return;
+	}
+	IO.ReportError([(new Date()).toUTCString()," commit ",UI.g_commit," ",s_error,"\n"].join(""));
 	if(UI.Platform.BUILD=="debug"){
 		throw error;
 	}	
