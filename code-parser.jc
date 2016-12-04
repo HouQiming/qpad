@@ -1735,7 +1735,6 @@ if ENABLE_EXPERIMENTAL_FEATURES:
 	TComboSlot=TQIType
 	struct TComboPart
 		int id
-		int[] id_params
 		int[] pattern
 		string scode
 		int2[] annotations
@@ -1743,6 +1742,7 @@ if ENABLE_EXPERIMENTAL_FEATURES:
 	class CQICombo
 		int id,id_desc
 		int epos0
+		int[] id_params
 		string code
 		parts=new TComboPart[]
 	g_combo_by_id=new CQICombo[int]
@@ -1769,7 +1769,7 @@ auto BuildComboNFA()
 				id_combo:id,
 				ord_part:int(I),
 				n_slots:int([1 for id in part.pattern if id==TOK_COMBO_SLOT].n),
-				n_params:int(part.id_params.n),
+				n_params:int(combo.id_params.n),
 				pattern:part.pattern,
 			})
 	//build the meaningful token map - the param tokens are tranformed into TOK_EOF+#
@@ -2390,12 +2390,12 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								//create a combo
 								cur_combo=new CQICombo
 								cur_combo.epos0=toks[i+1].epos0
-								common_combo_args=new int[]
+								cur_combo.id_params=new int[]
 								cur_combo.id=toks_proto[p_cproto].tok-TOK_ID
 								p_cproto++
 								while p_cproto<toks_proto.n:
 									if (toks_proto[p_cproto].tok&TOK_TYPE_MASK)==TOK_ID:
-										common_combo_args.push(toks_proto[p_cproto].tok-TOK_ID)
+										cur_combo.id_params.push(toks_proto[p_cproto].tok-TOK_ID)
 									p_cproto++
 								ptok_combo_ptn_last=i+1
 								pslot_tot=0
@@ -2412,7 +2412,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 									cur_combo.parts.back().scode.push('\n')
 								for part in cur_combo.parts
 									tok_tran=new int[int]
-									for id,I in part.id_params
+									for id,I in cur_combo.id_params
 										tok_tran[TOK_ID+id]=int(TOK_EOF+I)
 									for tok,I in part.pattern
 										tok_new=tok_tran[tok]
@@ -2422,7 +2422,6 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								g_combo_by_id[cur_combo.id]=cur_combo
 								g_combos_parsed=0
 							cur_combo=CQICombo.NULL
-							common_combo_args=int[].NULL
 						else if __basic_api.memcmp(__pointer(sdataz.d+j+1),"qcombo-part",11)==0:
 							if cur_combo:
 								FlushComboPattern()
@@ -2433,7 +2432,6 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								t_part=ParseQIType(sdataz[j+12:epos1-1])
 								cur_combo.parts.push(TComboPart(){
 									id:t_part.id,
-									id_params:new(common_combo_args),
 									pattern:new int[],
 									scode:new string,
 									annotations:t_part.annotations,
@@ -3868,9 +3866,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			part_match_ids=new int[combo.parts.n]
 			part_match_ids[0]=I
 			failed=0
-			for j=0:combo.parts[0].id_params.n-1
+			for j=0:combo.id_params.n-1
 				if match.param_bindings[j]:
-					combo_param_bindings[combo.parts[0].id_params[j]]=match.param_bindings[j]
+					combo_param_bindings[combo.id_params[j]]=match.param_bindings[j]
 			for i=1:combo.parts.n-1
 				mids=mid_by_combo_part[int2(match.id_combo,int(i))]
 				if !mids:
@@ -3881,9 +3879,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					match_i=matches_refined[mid_i]
 					if match_i.ord_part<0:continue
 					is_bad=0
-					for j=0:combo.parts[i].id_params.n-1
+					for j=0:combo.id_params.n-1
 						if match_i.param_bindings[j]:
-							id_j=combo.parts[i].id_params[j]
+							id_j=combo.id_params[j]
 							if combo_param_bindings[id_j]&&combo_param_bindings[id_j]!=match_i.param_bindings[j]:
 								is_bad=1
 								break
@@ -3896,9 +3894,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				if best_dist==0x7fffffff:
 					failed=1
 					break
-				for j=0:combo.parts[i].id_params.n-1
+				for j=0:combo.id_params.n-1
 					if matches_refined[part_match_ids[i]].param_bindings[j]:
-						id_j=combo.parts[i].id_params[j]
+						id_j=combo.id_params[j]
 						combo_param_bindings[id_j]=matches_refined[part_match_ids[i]].param_bindings[j]
 			if !failed:
 				matched_combo_ids.push(match.id_combo)
@@ -3973,6 +3971,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					//also remove the matched stuff
 					//keep the match to allow reuse
 					//matches_refined[part_match_ids[j]].ord_part=-1
+				obj_I["id_params"]=JS.NewArray()
+				for j=0:combo.id_params.n-1
+					obj_I["id_params"][j]=getIdString(combo.id_params[j])
 				obj_params=JS.New()
 				obj_I["params"]=obj_params
 				for d,k in combo_param_bindings
@@ -4109,6 +4110,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				p_in_ports++
 		obj_params=JS.New()
 		obj_I["params"]=obj_params
+		obj_I["id_params"]=JS.NewArray()
+		for j=0:combo.id_params.n-1
+			obj_I["id_params"][j]=getIdString(combo.id_params[j])
 		return JS.Return(obj_I)
 	}
 	JS_UI["ED_GetComboPartData"]=function(JSContext JS){
@@ -4121,8 +4125,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		scode=combo.parts[part_id].scode
 		ret["scode"]=scode
 		ret["id_params"]=JS.NewArray()
-		for j=0:combo.parts[part_id].id_params.n-1
-			ret["id_params"][j]=getIdString(combo.parts[part_id].id_params[j])
+		for j=0:combo.id_params.n-1
+			ret["id_params"][j]=getIdString(combo.id_params[j])
 		return JS.Return(ret)
 	}
 	JS_UI["ED_GetAllComboNames"]=function(JSContext JS){

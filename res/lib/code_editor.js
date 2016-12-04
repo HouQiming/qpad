@@ -1150,22 +1150,29 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		return range
 	},
-	SmartReplace:function(ccnt0,ccnt1,s_regexp,fcallback){
+	SmartReplace:function(ccnt0,ccnt1,s_regexp,fcallback,flags){
 		var rctx={
 			m_ccnt0:ccnt0,
 			m_ccnt1:ccnt1,
 			m_frontier:ccnt0,
 			m_match_cost:64,
 			m_s_replace:"",
-			m_s_replace_callback:fcallback,
 			m_owner:this,
+		}
+		if(typeof(fcallback)=='string'){
+			rctx.m_s_replace=fcallback;
+		}else{
+			rctx.m_s_replace_callback=fcallback;
 		}
 		if(this.owner){
 			this.owner.AcquireEditLock();
 		}
+		if(flags==undefined){
+			flags=(UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_HIDDEN|UI.SEARCH_FLAG_REGEXP);
+		}
 		var ffind_next=(function(){
 			//print("replace: ffind_next ",rctx.m_frontier)
-			rctx.m_frontier=UI.ED_Search(this.ed,rctx.m_frontier,1,s_regexp,UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_HIDDEN|UI.SEARCH_FLAG_REGEXP,
+			rctx.m_frontier=UI.ED_Search(this.ed,rctx.m_frontier,1,s_regexp,flags,
 				1048576,undefined,rctx)
 			//print("search finished ",s_replace)
 			var ccnt_frontier=UI.GetSearchFrontierCcnt(rctx.m_frontier)

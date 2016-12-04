@@ -1321,6 +1321,13 @@ UI.CustomTheme=function(){
 				dragsel_bgcolor:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				dragsel_border_color:C,
 				dragsel_border_width:0,
+				//////////
+				font_param:UI.Font(UI.font_name,16),
+				param_h:18,
+				param_h_sep:4,
+				param_w:96,
+				param_padding:4,
+				param_text_color:0xff444444,
 			},
 			ui_style:{
 				font_widgets:UI.Font(UI.font_name,16),

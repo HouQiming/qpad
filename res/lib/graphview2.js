@@ -409,7 +409,11 @@ var PreprocessNode=function(ndi){
 		nl++;
 	}
 	//compute the param-binding dimensions
-	!?
+	var w_param_name=0;
+	for(var i=0;i<ndi.id_params.length;i++){
+		var dims=UI.MeasureText(style.font_port,ndi.id_params[i]);
+		w_param_name=Math.max(w_param_name,dims.w);
+	}
 	//compute the final node dimension
 	var s_caption=ndi.name;
 	var s_desc='';
@@ -426,11 +430,16 @@ var PreprocessNode=function(ndi){
 	}else{
 		h_desc=0;
 	}
-	var w_final=Math.max(dims.w+style.caption_padding*2, (wl-style.port_extrude)+(wr-style.port_extrude)+style.port_w_sep);
-	var h_final=h_caption+h_desc+Math.max(nl,nr)*(style.port_h+style.port_h_sep)+style.port_h_sep;
+	var w_final=Math.max(Math.max(dims.w+style.caption_padding*2, (wl-style.port_extrude)+(wr-style.port_extrude)+style.port_w_sep),w_param_name+style.param_w);
+	var h_ports=Math.max(nl,nr)*(style.port_h+style.port_h_sep)+style.port_h_sep;
+	var h_final=(h_caption+h_desc+
+		h_ports+
+		ndi.id_params.length*(style.param_h+style.param_h_sep)+(ndi.id_params.length?style.param_h_sep:0));
+	//precompute the rendering elements
 	ndi.m_rects=[];
 	ndi.m_texts=[];
 	ndi.m_regions=[];
+	ndi.m_editboxes=[];
 	//ndi.m_param_panel=[];
 	ndi.m_w=w_final;
 	ndi.m_h=h_final;
@@ -461,26 +470,26 @@ var PreprocessNode=function(ndi){
 		nd:ndi,
 		proto:rproto_node,
 	})
-	var y_caption=0;
+	var y_current=0;
 	ndi.m_texts.push({
 		dx:style.caption_padding,dy:(h_caption-UI.GetCharacterHeight(style.font_caption))*0.5,
 		font:style.font_caption,text:s_caption,color:style.caption_text_color
 	});
-	y_caption+=h_caption;
+	y_current+=h_caption;
 	if(s_desc){
 		//render node description
 		ndi.m_texts.push({
-			dx:style.caption_padding,dy:y_caption+(h_desc-UI.GetCharacterHeight(style.font_desc))*0.5,
+			dx:style.caption_padding,dy:y_current+(h_desc-UI.GetCharacterHeight(style.font_desc))*0.5,
 			font:style.font_desc,text:s_desc,color:style.caption_desc_color
 		});
-		y_caption+=h_desc;
+		y_current+=h_desc;
 	}
-	//generate editor UI
+	//generate the port part
 	var xl=-style.port_extrude,xr=w_final+style.port_extrude-wr,
 		pxl=-0.5*style.port_extrude,pxr=w_final+0.5*style.port_extrude,
-		yl=y_caption,yr=y_caption,
-		dyl=(h_final-yl-style.port_h*nl)/(nl+1),
-		dyr=(h_final-yr-style.port_h*nr)/(nr+1);
+		yl=y_current,yr=y_current,
+		dyl=(h_ports-style.port_h*nl)/(nl+1),
+		dyr=(h_ports-style.port_h*nr)/(nr+1);
 	var port_padding_y=(style.port_h-UI.GetCharacterHeight(style.font_port))*0.5;
 	var endpoints={};
 	ndi.m_endpoints=endpoints;
@@ -543,6 +552,41 @@ var PreprocessNode=function(ndi){
 			});
 			yl+=style.port_h;
 		}
+	}
+	y_current+=h_ports+style.param_h_sep;
+	//generate the variable binding part
+	for(var i=0;i<ndi.id_params.length;i++){
+		var name=ndi.id_params[i];
+		var dims=UI.MeasureText(style.font_param,name);
+		ndi.m_texts.push({
+			dx:style.param_padding,dy:y_current,
+			font:style.font_param,text:name,color:style.param_text_color,
+		});
+		ndi.m_editboxes.push({
+			dx:style.param_padding*2+dims.w,dy:y_current,
+			w:w_final-(style.param_padding*3+dims.w),h:style.param_h,
+			font:style.font_param,
+			id:"editbox_"+name,
+			name:name,
+			border_width:1,
+			OnChange:function(value){
+				//fix the code - replace all the parts - SmartReplace
+				var value0=(ndi.params[this.name]||this.name);
+				ndi.params[this.name]=value;
+				var doc=this.owner.editor;
+				for(var i=0;i<ndi.out_ports.length;i++){
+					var ccnt0=ndi.out_ports[i].loc0.ccnt;
+					var ccnt1=ndi.out_ports[i].loc1.ccnt;
+					doc.SmartReplace(ccnt0,ccnt1,value0,value,
+						UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_WHOLE_WORD|UI.SEARCH_FLAG_HIDDEN|UI.SEARCH_FLAG_CODE_ONLY);
+				}
+				//force reparse
+				var ret=UI.ED_ParseAsCombo(doc,0,doc.ed.GetTextSize());
+				doc.m_graph=UI.BuildComboGraph(doc,ret);
+				UI.Refresh();
+			}
+		});
+		y_current+=style.param_h_sep+style.param_h;
 	}
 };
 var UpdateGraph=function(nds,es){
@@ -698,6 +742,7 @@ UI.BuildComboGraph=function(doc,parsed_combos){
 	var es=parsed_combos.edges;
 	nds.push({__id__:"<root>",
 		name:UI.GetSmartTabName(doc.m_file_name),
+		id_params:[],
 		in_ports:parsed_combos.root_slots,
 		out_ports:[],params:[],epos_part0:0})
 	//layout individual nodes
@@ -1113,6 +1158,14 @@ W.GraphView=function(id,attrs){
 			if(rg.OnRender){
 				rg.OnRender();
 			}
+		}
+		for(var i=0;i<ndi.m_editboxes.length;i++){
+			var item_i=ndi.m_editboxes[i];
+			item_i.x=x+item_i.dx;
+			item_i.y=y+item_i.dy;
+			item_i.value=(ndi.params[item_i.name]||item_i.name);
+			item_i.owner=obj;
+			W.EditBox(item_i.id+"_"+ndi.__id__,item_i)
 		}
 		//create UI panel
 		//if(ndi.m_is_selected&&cache_item.m_param_panel.length>0){
