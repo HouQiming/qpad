@@ -13,6 +13,7 @@ import TextBox.detail.*
 import Encoding.*
 
 ENABLE_EXPERIMENTAL_FEATURES=(Platform.BUILD=="debug")
+MAX_WORD_LENGTH_TEXT=64
 
 /////////////////////////////////////
 //parser utility from compiler code
@@ -1002,6 +1003,13 @@ struct TKeyDeclItem
 	//we don't need to know the scope
 	int id_type
 	int epos0
+/// \brief Arg Name to Function-Bracket Item
+struct TAN2FBItem
+	int id
+	int id_func,ordinal
+struct TFullFunctionBracketItem
+	int id_func,ordinal
+	int epos0,epos1
 class CFileIndex
 	int m_idfn
 	//basic model, predict from variable. func()
@@ -1010,6 +1018,7 @@ class CFileIndex
 	//code-only
 	int2[int] m_name_dot_index
 	int2[int2] m_function_bracket_index //id, ordinal
+	int2[int2] m_full_function_bracket_index //id, ordinal
 	TDeclItem[] m_all_decls
 	TKeyDeclItem[] m_all_key_decls
 	int[] m_all_prototypes
@@ -1019,6 +1028,7 @@ class CFileIndex
 	string m_doc_string_pool
 	TDocedVariable[] m_doc_vars
 	CQIFunc[] m_all_qifuncs
+	TAN2FBItem[] m_argname_to_function_bracket
 	//text-only: predict by last word or last non-word char
 	int2[int] m_ppm1_index
 	//dependency
@@ -1037,6 +1047,7 @@ class CFileIndex
 	iptr m_temp_color_table_time_dense
 	TPrototypeItem[] m_temp_p_prototypes
 	TIDBriefWithFile[] m_temp_id_briefs
+	TAN2FBItem[] m_temp_argname_to_function_bracket
 	JS_hasDecls=function(JSContext JS){
 		return JS.Return(!!m_all_decls)
 	}
@@ -1825,6 +1836,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	just_ids=new int[]
 	name_dot_entries=new int2[] //name, member
 	func_param_entries=new int3[] //func, ordinal, id
+	full_func_param_entries=new int4[] //func, ordinal, epos0, epos1
 	keywords=new int[]
 	appendKeywords(keywords,options)
 	keyword_map=new int[int]
@@ -1885,7 +1897,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	///////////////////
 	struct TStkEntry
 		int m_function_id
-		int m_param_id
+		int m_param_id,m_param_epos00,m_param_epos0,m_param_epos1
 		int m_ptok_function_id
 		int m_ptok_last_comment
 		int m_last_var_id
@@ -1905,11 +1917,15 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	function_id=0
 	ptok_function_id=-1
 	param_id=0
+	param_epos00=0
+	param_epos0=0
+	param_epos1=0
 	ptok_last_comment=-1
 	last_var_id=0
 	all_prototypes=new int[]
 	p_prototypes=new int2[]
 	id_briefs=new TIDBrief[]
+	argname_to_function_bracket=new TAN2FBItem[]
 	if ENABLE_EXPERIMENTAL_FEATURES:
 		all_qifuncs=new CQIFunc[]
 		cur_combo=CQICombo.NULL
@@ -2011,6 +2027,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							auto id_param=getid(sdataz[pid0:pid1-1])
 							param_ord=param_id_map[id_param]
 							if param_ord>0&&pid1<pcomment1:
+								argname_to_function_bracket.push(TAN2FBItem(){id:id_param,id_func:function_id,ordinal:param_ord-1})
 								doc_str=PoolDoxygenComment(sdataz[pid1:pcomment1-1])
 								all_prototypes[n0+4+(param_ord-1)*2+0]=doc_str.x
 								all_prototypes[n0+4+(param_ord-1)*2+1]=doc_str.y
@@ -2181,6 +2198,13 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			return fetchTokenSafe(PPrevToken(i))
 		inline nextToken()
 			return fetchTokenSafe(PNextToken(i))
+		if function_id:
+			if tok_i!=','&&tok_i!=')':
+				if !param_epos0:
+					param_epos0=toks[i].epos0
+					if !param_epos00:
+						param_epos00=param_epos0
+				param_epos1=toks[i].epos1
 		switch(tok_i){
 		default:
 			if (tok_i&TOK_TYPE_MASK)==TOK_ID:
@@ -2509,6 +2533,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 				m_function_id:function_id,
 				m_ptok_function_id:ptok_function_id,
 				m_param_id:param_id,
+				m_param_epos00:param_epos00,
+				m_param_epos0:param_epos0,
+				m_param_epos1:param_epos1,
 				m_ptok_last_comment:ptok_last_comment,
 				m_last_var_id:last_var_id,
 			})
@@ -2548,6 +2575,9 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						if !scopes||!scopes[scopes.n-1].in_assignment:
 							ptok_function_id=int(PPrevToken(i))
 			param_id=0
+			param_epos0=0
+			param_epos00=0
+			param_epos1=0
 			///////////
 			if tok_i=='{':
 				scopes.push(TScopeEntry(){ptok0:int(i),pdecls:int(sc_decls.n)})
@@ -2557,6 +2587,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		case ')',']','}':
 			if ss.n:
 				if function_id&&tok_i==')':
+					if param_epos0&&param_epos1:
+						full_func_param_entries.push(int4(function_id,param_id,param_epos0,param_epos1))
 					//ID(...){ testing
 					ptok1=PNextToken(i)
 					//skip garbage like const / override / throw
@@ -2586,12 +2618,26 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								ptok_function_bracket=PNextToken(ptok_function_bracket)
 							parsePrototype(function_id,ptok_function_bracket,ss.back().m_ptok_last_comment)
 							ss[ss.n-1].m_ptok_last_comment=-1
+							//if it's a decl, we gotta pop to param_epos00
+							if param_epos00:
+								while full_func_param_entries.n&&full_func_param_entries.back().z>=param_epos00:
+									full_func_param_entries.pop()
 				se=ss.pop()
 				function_id=se.m_function_id
 				ptok_function_id=se.m_ptok_function_id
 				ptok_last_comment=se.m_ptok_last_comment
 				last_var_id=se.m_last_var_id
 				param_id=se.m_param_id
+				param_epos00=se.m_param_epos00
+				param_epos0=se.m_param_epos0
+				param_epos1=se.m_param_epos1
+				//////////////////
+				//the closing bracket itself counts as a part of the arg
+				if !param_epos0:
+					param_epos0=toks[i].epos0
+					if !param_epos00:
+						param_epos00=param_epos0
+				param_epos1=toks[i].epos1
 			if tok_i=='}':
 				ptok_last_comment=-1L
 				if scopes.n>1:
@@ -2608,7 +2654,11 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 			break
 		case ',':
 			if function_id:
+				if param_epos0&&param_epos1:
+					full_func_param_entries.push(int4(function_id,param_id,param_epos0,param_epos1))
 				param_id++
+				param_epos0=0
+				param_epos1=0
 			if scopes.n:
 				scopes[scopes.n-1].in_assignment=i8(0)
 			break
@@ -2653,6 +2703,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	ppm_pool=new int2[]
 	name_dot_index=new int2[int]
 	function_bracket_index=new int2[int2]
+	full_function_bracket_index=new int2[int2]
 	foreach name,members0 in name_dot_entries.Groupby(byMember("x"))
 		n0=int(ppm_pool.n)
 		members=[a foreach a in members0]
@@ -2665,6 +2716,13 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 		foreach id,duplicates in members.Groupby(byMember("z"))
 			ppm_pool.push(int2(id,int(duplicates.getForEachRepeatCount())))
 		function_bracket_index[key]=int2(n0,int(ppm_pool.n))
+	foreach key,members in full_func_param_entries.Groupby(inline(a){return int2(a.x,a.y)})
+		n0=int(ppm_pool.n)
+		foreach item in members
+			//if idfn_base==getid("m:/ddev2/nama/clouddrm.c")
+			//	Writeln(getIdString(idfn_base),' ',item.z,' ',item.w)
+			ppm_pool.push(int2(item.z,item.w))
+		full_function_bracket_index[key]=int2(n0,int(ppm_pool.n))
 	all_decls.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
 	all_doc_vars.Sortby(inline(di){return (u64(di.epos_scope)<<32)+u64(di.id)})
 	//all_key_decls.Sortby(inline(di){return (u64(di.id_type)<<32)+u64(di.epos0)})
@@ -2673,6 +2731,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	fidx.m_ppm_pool=ppm_pool
 	fidx.m_name_dot_index=name_dot_index
 	fidx.m_function_bracket_index=function_bracket_index
+	fidx.m_full_function_bracket_index=full_function_bracket_index
 	fidx.m_all_decls=all_decls
 	fidx.m_all_key_decls=all_key_decls
 	fidx.m_dep_files=dep_files
@@ -2683,6 +2742,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 	fidx.m_doc_string_pool=doc_string_pool
 	fidx.m_doc_vars=all_doc_vars
 	fidx.m_id_briefs=id_briefs
+	fidx.m_argname_to_function_bracket=argname_to_function_bracket
 	fidx.m_all_qifuncs=all_qifuncs
 	return fidx
 
@@ -2693,7 +2753,7 @@ auto parseAsText(string sdata,JSObject options)
 	pword=0
 	foreach ch,I,I2 in Utf8Chars(sdata)
 		if !isWordChar(ch)||isCJK(ch):
-			if pword<I:
+			if pword<I&&I-pword<MAX_WORD_LENGTH_TEXT:
 				id=getid(sdata[pword:I-1])
 				ids.push(TOK_ID+id)
 				ids_sorted.push(id)
@@ -2866,6 +2926,7 @@ auto PrecomputeIndices(CFileIndex fidx)
 		temp_color_table=new int[int]
 		temp_p_prototypes=new TPrototypeItem[]
 		temp_id_briefs=new TIDBriefWithFile[]
+		temp_argname_to_function_bracket=new TAN2FBItem[]
 		all_dep_files_considered=1
 		for kd in fidx.m_all_key_decls
 			temp_color_table[kd.id_type&~KEY_DECL_MASK]=int(u32(kd.id_type)/u32(TOK_TYPE))+1
@@ -2939,6 +3000,8 @@ auto PrecomputeIndices(CFileIndex fidx)
 							id:idb.id,
 							pdoc:idb.pdoc,
 						})
+				if kdfile.fidx.m_argname_to_function_bracket:
+					temp_argname_to_function_bracket.push(kdfile.fidx.m_argname_to_function_bracket)
 				foreach idfn_dep in kdfile.fidx.m_dep_files
 					dfs(idfn_dep)
 			//Writeln('PrecomputeIndices ',g_color_table_time)
@@ -2955,9 +3018,11 @@ auto PrecomputeIndices(CFileIndex fidx)
 		temp_id_briefs.Sort(inline(a,b){
 			return a.id<b.id||a.id==b.id&&(a.ptr_fidx<b.ptr_fidx||a.ptr_fidx==b.ptr_fidx&&a.epos_comment<b.epos_comment)
 		})
+		temp_argname_to_function_bracket.Sortby(byMember("id"))
 		fidx.m_temp_ids=ComputeIDOrderingMaps(kd_ids)
 		fidx.m_temp_p_prototypes=temp_p_prototypes
 		fidx.m_temp_id_briefs=temp_id_briefs
+		fidx.m_temp_argname_to_function_bracket=temp_argname_to_function_bracket
 		//Writeln('PrecomputeIndices ',getIdString(fidx.m_idfn),' ',all_dep_files_considered,' ',formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-tick0)*1000.f,{frac:1}),'ms')
 
 inline WriteToken(s,tok)
@@ -3268,6 +3333,35 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//	s_prefix:s_prefix,m_common_prefix:s_common_prefix})
 		//////////////////////////
 		return jsPrepareAccands(JS,cands,builtin_briefs,s_prefix,s_common_prefix,-1LL)
+	}
+	JS_UI["ED_QueryCompletionFromArgName"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["ed"]["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		s_argname=JS.Param(1).as(string)
+		if !fidx||!fidx.m_all_decls:return 0
+		if !ed||!s_argname:return 0
+		PrecomputeIndices(fidx)
+		an2fb=fidx.m_temp_argname_to_function_bracket
+		if !an2fb||!an2fb.n:return 0
+		id_argname=getid(s_argname)
+		p=an2fb.InlineBisect(inline(di){return di.id<id_argname})
+		fb_keys=new int2[]
+		for i=p:an2fb.n-1
+			di=an2fb[i]
+			if di.id!=id_argname:break
+			fb_keys.push(int2(di.id_func,di.ordinal))
+		fb_keys.Sort()
+		fb_keys.Unique()
+		ret=JS.NewArray()
+		pret=0
+		for key in fb_keys
+			pp=fidx.m_full_function_bracket_index[key]
+			for epos_pairs in fidx.m_ppm_pool[pp.x:pp.y-1]
+				ret[pret+0]=epos_pairs.x
+				ret[pret+1]=epos_pairs.y
+				pret+=2
+		return JS.Return(ret)
 	}
 	JS_UI["ED_QueryDecl"]=function(JSContext JS){
 		doc=JS.Param(0).as(JSObject)

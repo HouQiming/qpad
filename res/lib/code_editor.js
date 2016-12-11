@@ -793,6 +793,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				is_tail=0;
 			}
 			fhctx.m_ccnt_rbracket=ccnt_rbracket;
+			fhctx.m_current_param_doc=undefined;
+			fhctx.m_current_param_name=undefined;
 			var n_commas=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,this.sel1.ccnt);
 			var n_commas_before=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,this.sel1.ccnt-1);
 			var n_total_commas=n_commas;
@@ -859,6 +861,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 									UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+12),
 									'  ',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),
 									s_param_doc);
+								if(j==n_commas_before){
+									fhctx.m_current_param_doc=s_param_doc;
+									fhctx.m_current_param_name=proto_acceptable[j];
+								}
 							}
 						}
 					}
@@ -944,6 +950,49 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var extras=[];
 		if(this.m_explicit_accands){
 			extras.push(this.m_explicit_accands);
+		}
+		//function-related ac
+		var fhctx=this.m_fhint_ctx;
+		if(fhctx){
+			//test for whole-arg AC... from m_param_docs
+			if(fhctx.m_current_param_doc){
+				var param_extras=[];
+				fhctx.m_current_param_doc.replace(/\b[A-Z0-9_]+\b/g,function(smatch){
+					if(smatch==smatch.toLowerCase()||smatch.length<2){return;}
+					param_extras.push({name:smatch,weight:65536});
+				});
+				if(param_extras){extras.push(param_extras);}
+			}
+			if(fhctx.m_current_param_name){
+				var char0=this.ed.GetUtf8CharNeighborhood(this.ed.MoveToBoundary(this.sel1.ccnt,-1,"space"))[0];
+				var char1=this.ed.GetUtf8CharNeighborhood(this.ed.MoveToBoundary(this.sel1.ccnt,1,"space"))[1];
+				if((char0==0x2c||char0==0x28)&&(char1==0x2c||char1==0x29)){
+					//, or ( and , or )
+					var full_funarg_old_ccnts=UI.ED_QueryCompletionFromArgName(this,fhctx.m_current_param_name);
+					if(full_funarg_old_ccnts){
+						var full_funarg_extras=[];
+						var arv={};
+						var diff=this.m_diff_from_save;
+						for(var i=0;i<full_funarg_old_ccnts.length;i+=2){
+							var ccnt0=full_funarg_old_ccnts[i+0];
+							var ccnt1=full_funarg_old_ccnts[i+1];
+							if(diff){ccnt0=diff.BaseToCurrent(ccnt0);}
+							if(diff){ccnt1=diff.BaseToCurrent(ccnt1);}
+							if(ccnt0<ccnt1){
+								var id=this.ed.GetText(ccnt0,ccnt1-ccnt0);
+								if(!arv[id]){
+									arv[id]=1;
+									full_funarg_extras.push({
+										name:id,
+										weight:65536,
+									});
+								}
+							}
+						}
+						extras.push(full_funarg_extras);
+					}
+				}
+			}
 		}
 		var hk=this.m_event_hooks["autoComplete"];
 		if(hk){
@@ -3287,7 +3336,7 @@ W.CodeEditorWidget_prototype={
 		this.m_hide_find_highlight=0
 		this.m_no_more_replace=0;
 		this.DestroyReplacingContext(1)
-		var doc=this.doc
+		var doc=this.doc;
 		var ccnt=custom_needle?0:doc.sel1.ccnt
 		var ctx={
 			m_frontier:ccnt,
@@ -3312,6 +3361,8 @@ W.CodeEditorWidget_prototype={
 				return 1048576
 			},
 			ffind_next:function(){
+				var doc=this.m_owner.doc;
+				if(!doc){return;}
 				this.m_frontier=UI.ED_Search(doc.ed,this.m_frontier,direction,this.m_needle,this.m_flags,1048576,this.ReportMatch.bind(this),this)
 				if(UI.IsSearchFrontierCompleted(this.m_frontier)||this.m_match_reported){
 					UI.assert(this.m_owner.m_find_next_context==this,"panic: FindNext context overwritten")
@@ -7757,7 +7808,7 @@ Language.Register({
 	extensions:[
 		'bin',
 		'bz2','zip',
-		'exe','dll','lib','o',
+		'exe','dll','lib','o','a','so',
 		"png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr",
 		"mp4","mpg","mpeg","h264","avi","mov","rm","rmvb",
 		'ttf','otf',
