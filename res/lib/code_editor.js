@@ -172,6 +172,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				var obj=this.owner
 				if(!obj||obj.read_only){return;}
 				var show_replace_hint=0
+				//console.log(!!obj.m_current_find_context,!obj.m_replace_context,!obj.m_no_more_replace);
 				if(obj.m_current_find_context&&!obj.m_replace_context&&!obj.m_no_more_replace){
 					var ccnt=this.sel1.ccnt
 					var ctx=obj.m_current_find_context;
@@ -185,6 +186,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					}
 				}
 				if(show_replace_hint){
+					//console.log('show');
 					obj.CreateNotification({
 						id:'replace_hint',icon:'换',text:UI._('Edit the match to start replacing')
 					},"quiet")
@@ -5988,6 +5990,10 @@ W.CodeEditor=function(id,attrs){
 				}else{
 					need_new_ctx=1;
 				}
+				//if(obj.m_current_find_context&&obj.m_current_find_context.m_is_ctrl_r){
+				//	//don't renew ctx during ctrl+r sessions
+				//	need_new_ctx=0;
+				//}
 				if(show_at_scrollbar_find_minimap){
 					rendering_ccnt0=0;
 					rendering_ccnt1=doc.ed.GetTextSize();
@@ -6890,7 +6896,37 @@ W.CodeEditor=function(id,attrs){
 				///////////////////////
 				var menu_search=UI.BigMenu("&Search")
 				menu_search.AddNormalItem({text:"&Find or replace...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
-				W.Hotkey("",{key:"CTRL+R",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
+				//W.Hotkey("",{key:"CTRL+R",action:finvoke_find.bind(obj,UI.SHOW_FIND)})
+				W.Hotkey("",{key:"CTRL+R",action:function(){
+					var doc=obj.doc;
+					if(!doc){return;}
+					var sel=doc.GetSelection()
+					if(!(sel[0]<sel[1])){
+						obj.CreateNotification({
+							id:'replace_hint',icon:'换',text:UI._('You need to select the text to replace first')
+						});
+						return;
+					}
+					doc.sel1.ccnt=sel[1];
+					var sneedle=doc.ed.GetText(sel[0],sel[1]-sel[0]);
+					//UI.m_ui_metadata["<find_state>"].m_current_needle=sneedle;
+					var flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~(UI.SEARCH_FLAG_REGEXP|UI.SEARCH_FLAG_WHOLE_WORD));
+					UI.m_ui_metadata["<find_state>"].m_find_flags=flags;
+					obj.ResetFindingContext(sneedle,flags);
+					if(obj.m_current_find_context){
+						obj.m_current_find_context.m_is_ctrl_r=1;
+					}
+					//if(obj.m_current_find_context){
+					//	obj.m_current_find_context.ReportMatchBackward(doc,sel[0],sel[1]);
+					//}
+					obj.FindNext(-1);
+					obj.m_no_more_replace=0;
+					doc.CallOnSelectionChange();
+					obj.CreateNotification({
+						id:'replace_hint',icon:'换',text:UI._('Edit the match to start replacing')
+					},"quiet")
+					UI.Refresh();
+				}})
 				menu_search.AddNormalItem({text:"Find in project...",enable_hotkey:1,key:"SHIFT+CTRL+F",action:finvoke_find.bind(obj,UI.SHOW_GLOBAL_FIND)})
 				menu_search.AddButtonRow({text:"Find previous / next"},[
 					{key:"SHIFT+F3",text:"find_up",icon:"上",tooltip:'Prev - SHIFT+F3',action:function(){
