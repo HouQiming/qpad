@@ -1637,15 +1637,8 @@ var fadein=function(C,alpha){
 
 UI.non_animated_values.x_shake=1
 UI.non_animated_values.dx_shake=1
-UI.non_animated_values.ddx_shake=1
-W.NotificationItem=function(id,attrs){
-	if(!UI.context_parent[id]){
-		attrs.alpha=0;
-		attrs.dx_shake=UI.default_styles.code_editor.dx_shake_notification
-	}
-	var obj=UI.Keep(id,attrs)
-	UI.StdStyling(id,obj,attrs, "code_editor_notification");
-	//shaking
+UI.non_animated_values.ddx_shake=1;
+var SimulateShaking=function(obj){
 	if(!obj.x_shake){obj.x_shake=0}
 	if(obj.x_shake||obj.dx_shake){
 		var dt_all=Math.min(Duktape.__ui_seconds_between_ticks(UI.m_last_frame_tick,UI.m_frame_tick),1/30)
@@ -1671,6 +1664,16 @@ W.NotificationItem=function(id,attrs){
 		}
 		UI.AutoRefresh()
 	}
+};
+W.NotificationItem=function(id,attrs){
+	if(!UI.context_parent[id]){
+		attrs.alpha=0;
+		attrs.dx_shake=UI.default_styles.code_editor.dx_shake_notification
+	}
+	var obj=UI.Keep(id,attrs)
+	UI.StdStyling(id,obj,attrs, "code_editor_notification");
+	//shaking
+	SimulateShaking(obj);
 	///////////
 	if(!obj.m_cached_prt||obj.text!=obj.m_cached_text){
 		obj.m_cached_prt=UI.ED_FormatRichText(
@@ -4428,6 +4431,7 @@ var FileItem_prototype={
 		if(this.is_dir){
 			if(this.is_tree_view){
 				var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
+				this.icon_code=undefined;
 				git_treeview_metadata[this.name]=!git_treeview_metadata[this.name];
 				UI.Refresh();
 				return;
@@ -4771,6 +4775,7 @@ var fnewpage_findbar_plugin=function(){
 			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			var cur_item=obj.file_list.items[obj.file_list.value];
 			if(cur_item.is_tree_view&&cur_item.is_dir&&git_treeview_metadata[cur_item.name]){
+				cur_item.icon_code=undefined;
 				git_treeview_metadata[cur_item.name]=0;
 				UI.Refresh();
 				return;
@@ -4794,6 +4799,7 @@ var fnewpage_findbar_plugin=function(){
 			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			var cur_item=obj.file_list.items[obj.file_list.value];
 			if(cur_item.is_tree_view&&cur_item.is_dir){
+				cur_item.icon_code=undefined;
 				git_treeview_metadata[cur_item.name]=1;
 				UI.Refresh();
 				return;
@@ -5345,6 +5351,18 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,tooltips,fprev,fall,fnext
 		{key:"ALT+A",text:"edit_all",icon:"换",tooltip:'All - ALT+A',action:fall},
 		{key:"CTRL+D",text:"edit_down",icon:"下",tooltip:'Next - CTRL+D',action:fnext}])
 	if(!obj.doc.m_hide_prev_next_buttons){
+		if(!obj.button_edit_up){
+			obj.m_pna_button_shake=undefined;
+		}
+		var obj_shake=obj.m_pna_button_shake;
+		if(!obj_shake){
+			obj_shake=Object.create(UI.default_styles.code_editor.autoedit_shake_params);
+			obj_shake.dx_shake=UI.default_styles.code_editor.autoedit_button_dx_shake;
+			obj.m_pna_button_shake=obj_shake;
+		}
+		SimulateShaking(obj_shake);
+		x+=obj_shake.x_shake;
+		///////////////////
 		var sz_button=obj.autoedit_button_size;
 		var padding=obj.autoedit_button_padding;
 		var x_button_box=x-sz_button-padding*2;
