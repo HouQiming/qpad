@@ -1246,7 +1246,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 				(compiler_path+'/../../vc/bin/x86_amd64/vcvarsx86_amd64.bat').replace(/[/]/g,'\\'),
 				'"\n',
 				'cd /d ',UI.GetPathFromFilename(fname),'\n',
-				'cl /Zi /D_HAS_ITERATOR_DEBUGGING=0 /D_SECURE_SCL=0 /D_SCL_SECURE_NO_WARNINGS /MT /DPM_C_MODE /DNEED_MAIN_WRAPPING ',fname,' || exit\n',
+				'cl /Zi /D_HAS_ITERATOR_DEBUGGING=0 /D_SECURE_SCL=0 /D_SCL_SECURE_NO_WARNINGS /MT /DPM_C_MODE /DNEED_MAIN_WRAPPING ',UI.RemovePath(fname),' || exit\n',
 				UI.GetMainFileName(fname),'\n',
 			].join("");
 		}

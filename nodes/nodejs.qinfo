@@ -1,0 +1,70 @@
+//@qcombo-begin NodeProgram
+//@qcombo-desc A node.js program
+//@qcombo-part body
+//@qpad libraries
+//@qcombo-slot requires
+//@qpad initialization
+//@qcombo-slot init
+//@qpad the end
+//@qcombo-end
+
+//@qcombo-begin ExpressServer(app)
+//@qcombo-desc An express-based web server
+//@qcombo-part init
+var app = express();
+(function(){
+	//@qpad Server setup
+	//@qcombo-slot server_setup(server_setup)
+	//@qpad Listening
+	//@qcombo-slot listening(listening)
+})();
+//@qcombo-part requires
+var express = require('express');
+//@qcombo-end
+
+//@qcombo-begin GetURL(app,string_url)
+//@qcombo-desc Handle a "GET" request for a specific URL
+//@qcombo-part server_setup(server_setup)
+app.get(string_url, function(req, res) {
+	//@qcombo-slot page_handling
+});
+//@qcombo-end
+
+//@qcombo-begin ListenHttps(app)
+//@qcombo-desc Start a web server at an https port
+//@qcombo-part listening(listening)
+https.createServer(/*@qcombo-slot options(__default="{}")*/, app);
+//@qcombo-part requires
+var https = require('https');
+//@qcombo-end
+
+//@qcombo-begin PostMultipart(app,string_url)
+//@qcombo-desc Handle a "POST" request with HTML form file upload support
+//@qcombo-part server_setup(server_setup)
+app.post(string_url, multipartMiddleware, function(req, res) {
+	//@qcombo-slot page_handling
+});
+//@qcombo-part requires
+var multipart=require('connect-multiparty');
+var multipartMiddleware = multipart();
+//@qcombo-end
+
+//@qcombo-begin StaticPages(app)
+//@qcombo-desc Serving static pages at a certain path
+//@qcombo-part server_setup(server_setup)
+app.use(express.static(/*@qcombo-slot path(__default="path.join(__dirname,'public')")*/));
+//@qcombo-end
+
+//@qcombo-begin StandardErrors(app)
+//@qcombo-desc Returns error 404 when a page is not found, returns error 500 when the server encounters an error. This must come last.
+//@qcombo-part server_setup(server_setup)
+app.use("*",function(req, res, next) {
+	res.header({"Cache-Control":"no-cache"});
+	res.status(404).send('Not found');
+});
+
+app.use(function(err, req, res, next) {
+	res.header({"Cache-Control":"no-cache"});
+	res.status(500).send('Error');
+});
+//@qcombo-end

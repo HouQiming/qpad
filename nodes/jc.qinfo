@@ -1,0 +1,27 @@
+//@qcombo-begin JSFunction(js_object,string_name)
+//@qcombo-desc A JC function called from Javascript
+//@qcombo-part code
+js_object[string_name]=function(JSContext JS){
+	//@qcombo-slot js_code(js_code)
+}
+//@qcombo-end
+
+//@qcombo-begin JSParam(type,name)
+//@qcombo-desc Getting a parameter from Javascript
+//@qcombo-part js_code(js_code)
+name=JS.Param(/*@qcombo-slot id(__default='0')*/).as(type);
+//@qcombo-end
+
+//@qcombo-begin JSReturn()
+//@qcombo-desc Return a value to Javascript
+//@qcombo-part js_code(js_code)
+return JS.Return((/*@qcombo-slot value(__default='0')*/)
+//@qcombo-end
+
+//@qcombo-begin JCUIExtension(JS_UI,sbox,is_real)
+//@qcombo-desc Register native functions into the "UI" object in Javascript
+//@qcombo-part code
+registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
+	//@qcombo-slot ui_code(ui_code)
+});
+//@qcombo-end

@@ -12,7 +12,7 @@ import TextBox.*
 import TextBox.detail.*
 import Encoding.*
 
-ENABLE_EXPERIMENTAL_FEATURES=(Platform.BUILD=="debug")
+ENABLE_EXPERIMENTAL_FEATURES=1//todo: (Platform.BUILD=="debug")
 MAX_WORD_LENGTH_TEXT=64
 
 /////////////////////////////////////
@@ -170,6 +170,7 @@ TOK_CONST=1*TOK_TYPE
 TOK_ID=2*TOK_TYPE
 TOK_STRING=3*TOK_TYPE
 TOK_EOF=4*TOK_TYPE
+TOK_FLAG_COMBO_PARAM_STRING=(TOK_TYPE>>1)
 TOK_EQ=int('a')
 TOK_NE=int('b')
 TOK_LE=int('c')
@@ -2376,7 +2377,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						for j=ptok_combo_ptn_last:i-1
 							//if toks[j].tok!=TOK_COMMENT:
 							pattern.push(toks[j].tok)
-						cur_combo.parts.back().scode.push(sdataz[toks[ptok_combo_ptn_last].epos0:toks[i-1].epos1-1])
+						if ptok_combo_ptn_last<=i-1:
+							cur_combo.parts.back().scode.push(sdataz[toks[ptok_combo_ptn_last].epos0:toks[i-1].epos1-1])
 						//cur_combo.parts.back().scode.push(sdataz[toks[ptok_combo_ptn_last].epos0:toks[i].epos0-1])
 						ptok_combo_ptn_last=i
 				}
@@ -2437,7 +2439,10 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 								for part in cur_combo.parts
 									tok_tran=new int[int]
 									for id,I in cur_combo.id_params
-										tok_tran[TOK_ID+id]=int(TOK_EOF+I)
+										tok_param_I=int(TOK_EOF+I)
+										if getIdString(id).StartsWith('string_'):
+											tok_param_I|=TOK_FLAG_COMBO_PARAM_STRING
+										tok_tran[TOK_ID+id]=tok_param_I
 									for tok,I in part.pattern
 										tok_new=tok_tran[tok]
 										if tok_new:
@@ -3728,7 +3733,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		struct TCurrentRootSlot
 			int blevel,rsid
 		//gen matches here, do detailed matching in a later pass
-		//@slot labels all the way to the next closing bracket at the same level
+		//slot labels all the way to the next closing bracket at the same level
 		root_slots=new TRootSlot[]
 		root_slots.push(TRootSlot(){id:getid("-"),epos0:0,epos1:int(ccnt1-ccnt0)})
 		cur_root_slots=new TCurrentRootSlot[]
@@ -3813,7 +3818,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						st_new.push(int3(sti.x,py,sti.z))
 						py++
 						tok_pattern=g_all_patterns[sti.x].pattern[py]
-					if tok_pattern==tok_text.tok||((tok_pattern&TOK_TYPE_MASK)==TOK_EOF&&(tok_text.tok&TOK_TYPE_MASK)==TOK_ID):
+					if (tok_pattern==tok_text.tok||
+					((tok_pattern&(TOK_TYPE_MASK|TOK_FLAG_COMBO_PARAM_STRING))==TOK_EOF&&(tok_text.tok&TOK_TYPE_MASK)==TOK_ID)||
+					((tok_pattern&(TOK_TYPE_MASK|TOK_FLAG_COMBO_PARAM_STRING))==(TOK_EOF|TOK_FLAG_COMBO_PARAM_STRING)&&(tok_text.tok&TOK_TYPE_MASK)==TOK_STRING)):
 						if py+1>=pattern.n:
 							matches.push(TPartMatchRough(){
 								pid:sti.x,
@@ -3891,11 +3898,21 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 						ptok_pattern++
 						tok_pattern=pattern[ptok_pattern]
 					if blevel==saves[i+1]:
-						if (tok_pattern&TOK_TYPE_MASK)==TOK_EOF&&(tok_text&TOK_TYPE_MASK)==TOK_ID:
+						if (tok_pattern&(TOK_TYPE_MASK|TOK_FLAG_COMBO_PARAM_STRING))==TOK_EOF&&(tok_text&TOK_TYPE_MASK)==TOK_ID:
 							psave=i+2+n_slots*2+(tok_pattern-TOK_EOF)
 							if !saves[psave]:
 								saves[psave]=tok_text-TOK_ID
 							if saves[psave]==tok_text-TOK_ID:
+								n0_new=saves_new.n
+								for j=0:sz_save-1
+									saves_new.push(saves[i+j])
+								saves_new[n0_new]=ptok_pattern+1
+						else if (tok_pattern&(TOK_TYPE_MASK|TOK_FLAG_COMBO_PARAM_STRING))==(TOK_EOF|TOK_FLAG_COMBO_PARAM_STRING)&&(tok_text&TOK_TYPE_MASK)==TOK_STRING:
+							id_str=getid(sdataz[max(toks[ptok_text].epos0-1,0L):min(toks[ptok_text].epos1,sdataz.n-1)])
+							psave=i+2+n_slots*2+(tok_pattern-(TOK_EOF+TOK_FLAG_COMBO_PARAM_STRING))
+							if !saves[psave]:
+								saves[psave]=id_str
+							if saves[psave]==id_str:
 								n0_new=saves_new.n
 								for j=0:sz_save-1
 									saves_new.push(saves[i+j])
@@ -3953,6 +3970,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		p_js_matcheds=0
 		places=new TPlace[]
 		matched_combo_ids=new int[]
+		matched_combo_epos_ranges=new int2[]
+		matched_combo_epos_ranges.push(int2(0,int(sdataz.n)))
 		for match,I in matches_refined
 			if match.ord_part!=0:continue
 			combo_param_bindings=new int[int]
@@ -4009,6 +4028,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				obj_I["in_ports"]=obj_in_ports
 				obj_I["out_ports"]=obj_out_ports
 				obj_I["epos_part0"]=matches_refined[part_match_ids[0]].epos0
+				epos_min=0x7fffffff
+				epos_max=0
+				for j=0:combo.parts.n-1
+					epos_min=min(epos_min,matches_refined[part_match_ids[j]].epos0)
+					epos_max=max(epos_max,matches_refined[part_match_ids[j]].epos1)
+				matched_combo_epos_ranges.push(int2(epos_min,epos_max))
 				for j=0:combo.parts.n-1
 					obj_port=JS.New()
 					obj_out_ports[p_out_ports]=obj_port
@@ -4097,7 +4122,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		for pl,I in places
 			evts.push(TPlaceEvent(){epos:pl.epos0,side:0,place_id:int(I)})
 			evts.push(TPlaceEvent(){epos:pl.epos1,side:1,place_id:int(I)})
-		evts.Sortby(inline(a){return a.epos*2+a.side})
+		//resolve equals with the segment size - outer outer
+		evts.Sortby(inline(a){return int2(a.epos*2+a.side,a.side==0?-matched_combo_epos_ranges[places[a.place_id].match_id+1].y:-matched_combo_epos_ranges[places[a.place_id].match_id+1].x)})
 		//Writeln(evts)
 		//Writeln(places)
 		cur_places=new int[]

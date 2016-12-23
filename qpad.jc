@@ -1,3 +1,4 @@
+//@include nodes/jc.qinfo
 import "text-box.jc"
 import "bin-editor.jc"
 import "code-editor.jc"

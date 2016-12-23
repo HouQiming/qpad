@@ -1763,6 +1763,7 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 
 var PrepareAPEM=function(){
 	if(!UI.g_all_paths_ever_mentioned){
+		var check_drive=(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64");
 		UI.g_deep_search_cache={};
 		if(UI.g_deep_include_jobs.length){
 			//we have to restart... if there were new paths
@@ -1771,11 +1772,26 @@ var PrepareAPEM=function(){
 		UI.g_all_paths_ever_mentioned=[];
 		var hist=UI.m_ui_metadata["<history>"];
 		var arv={};
+		var valid_drives={"c":1};
+		if(check_drive){
+			for(var i=0;i<UI.g_all_document_windows.length;i++){
+				var obj_tab=UI.g_all_document_windows[i]
+				if(obj_tab.main_widget&&obj_tab.main_widget.doc){
+					var fn=obj_tab.main_widget.doc.m_file_name;
+					if(fn.length>2&&fn.length[1]==':'){
+						valid_drives[fn[0].toLowerCase()]=1;
+					}
+				}
+			}
+		}
 		for(var i=hist.length-1;i>=0;i--){
 			var fn=hist[i];
 			var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
 			if(!arv[fn_path]){
 				arv[fn_path]=1;
+				if(check_drive&&(fn.length<2||!valid_drives[fn_path[0]]||fn_path[1]!=':')){
+					continue;
+				}
 				UI.g_all_paths_ever_mentioned.push(fn_path);
 			}
 		}

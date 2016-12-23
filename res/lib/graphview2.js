@@ -119,17 +119,18 @@ var ReindentCode=function(doc,ccnt_insert,scode){
 	//console.log(JSON.stringify(s_target_indent),scode,scode_indented)
 	return scode_indented||scode;
 };
-var CreatePartInsertionEditOp=function(doc,port,s_combo_name,part_id){
+var CreatePartInsertionEditOp=function(doc,replaced_vars,port,s_combo_name,part_id){
 	var var_bindings=port.final_annotations||{};
-	var replaced_vars={};
 	var part_data=UI.ED_GetComboPartData(s_combo_name,part_id);
 	for(var i=0;i<part_data.id_params.length;i++){
 		var id_i=part_data.id_params[i];
 		if(var_bindings[id_i]){
 			replaced_vars[id_i]=var_bindings[id_i];
+		}else if(id_i.length>7&&id_i.slice(0,7)=="string_"&&replaced_vars[id_i]==undefined){
+			replaced_vars[id_i]='""';
 		}
 	}
-	var scode=part_data.scode.replace(/\b[0-9a-zA-Z_$]\b/g,function(smatch){
+	var scode=part_data.scode.replace(/\b[0-9a-zA-Z_$]+\b/g,function(smatch){
 		return replaced_vars[smatch]||smatch;
 	});
 	var ccnt_insert=port.loc1.ccnt;
@@ -958,6 +959,7 @@ W.graphview_prototype={
 		UI.Refresh();
 	},
 	Copy:function(){
+		//todo
 		var nds=this.graph.nds;
 		var es=this.graph.es;
 		var gr=UI.CreateGraph();
@@ -1357,7 +1359,7 @@ W.PackagePage=function(id,attrs){
 			var s_desc_i=(obj.available[i].desc||'').toLowerCase();
 			var is_bad=0;
 			var hl_ranges=[];
-			var hl_ranges_desc=[];
+			//var hl_ranges_desc=[];
 			for(var j=0;j<s_searches.length;j++){
 				var p=s_i.indexOf(s_searches[j]);
 				if(p<0){
@@ -1366,7 +1368,7 @@ W.PackagePage=function(id,attrs){
 						is_bad=1;
 						break
 					}
-					hl_ranges_desc.push(p,p+s_searches[j].length);
+					//hl_ranges_desc.push(p,p+s_searches[j].length);
 					continue;
 				}
 				hl_ranges.push(p,p+s_searches[j].length);
@@ -1376,7 +1378,7 @@ W.PackagePage=function(id,attrs){
 					s_combo:obj.available[i].name,
 					s_desc:obj.available[i].desc,
 					hl_ranges:hl_ranges,
-					hl_ranges_desc:hl_ranges_desc,
+					//hl_ranges_desc:hl_ranges_desc,
 				});
 			}
 		}
@@ -1529,6 +1531,7 @@ W.PackageItem_prototype={
 		//actually insert the code
 		var doc=obj.editor;
 		var port_slot_ccnts=[];
+		var replaced_vars=nd_new.params;
 		for(var pi=0;pi<nd_new.out_ports.length;pi++){
 			var nd_target=connected_slots[pi].nd;
 			var port_id=connected_slots[pi].port;
@@ -1540,7 +1543,7 @@ W.PackageItem_prototype={
 				}
 			}
 			//ccnt_insert=doc.ed.MoveToBoundary(ccnt_insert,-1,"space");
-			var ops=CreatePartInsertionEditOp(doc,port,nd_new.name,pi);
+			var ops=CreatePartInsertionEditOp(doc,replaced_vars,port,nd_new.name,pi);
 			var scode=ops[2];
 			//console.log(scode);
 			var slot_desc=UI.ED_SlotsFromPartCode(scode);
@@ -1632,7 +1635,7 @@ W.PackageItem=function(id,attrs){
 		W.Text("",{x:obj.x+obj.padding+4,y:obj.y+4,
 			font:name_font,text:s_title,
 			color:obj.name_color})
-		W.Text("",{x:obj.x+obj.padding+4,y:obj.y+4+28,
+		W.Text("",{x:obj.x+obj.padding+4,y:obj.y+4+28,w:obj.w-8-obj.padding*2,
 			font:obj.hint_font,text:s_hint,
 			color:obj.hint_color})
 		if(obj.hl_ranges){
@@ -1647,7 +1650,7 @@ W.PackageItem=function(id,attrs){
 				}
 			}
 		}
-		if(obj.hl_ranges_desc){
+		/*if(obj.hl_ranges_desc){
 			for(var i=0;i<obj.hl_ranges_desc.length;i+=2){
 				var p0=obj.hl_ranges_desc[i+0];
 				var p1=obj.hl_ranges_desc[i+1];
@@ -1658,7 +1661,7 @@ W.PackageItem=function(id,attrs){
 						color:obj.hint_color})
 				}
 			}
-		}
+		}*/
 		UI.PopCliprect();
 	UI.End()
 	return obj
