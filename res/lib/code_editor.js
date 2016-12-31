@@ -2879,6 +2879,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 }
 
 var RELOAD_DIFF_MAX_SIZE=16<<20;
+var RELOAD_UNDOABLE_MAX_SIZE=256<<20;
 var CheckEditorExternalChange=function(obj){
 	if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
 		if(obj.doc.ed.saving_context){return;}//saving docs are OK
@@ -2898,7 +2899,9 @@ var CheckEditorExternalChange=function(obj){
 			var is_diff_update=0;
 			if(size_cur+size_new<RELOAD_DIFF_MAX_SIZE){
 				//diff-based update for small files
-				is_diff_update=UI.ED_DiffUpdateToFile(obj.doc.ed,obj.doc.m_file_name);
+				is_diff_update=UI.ED_DiffUpdateToFile(obj.doc.ed,obj.doc.m_file_name,1);
+			}else if(size_cur+size_new<RELOAD_UNDOABLE_MAX_SIZE){
+				is_diff_update=UI.ED_DiffUpdateToFile(obj.doc.ed,obj.doc.m_file_name,0);
 			}
 			if(is_diff_update){
 				obj.CreateNotification({id:'diff_reload_prompt',icon:'警',text:"EXTERNAL CHANGES LOADED!\n - Use Edit-Undo to revert\n - Make more changes to dismiss this"});
@@ -5677,7 +5680,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 	}
 	UI.PopCliprect()
 	//render the documentation part
-	if(prt_msg_brief&&x_selected!=undefined){
+	if(prt_msg_brief&&prt_msg_brief.prt&&x_selected!=undefined){
 		var y_brief=y_accands+obj.h_accands+obj.accands_sel_padding;
 		var w_brief=prt_msg_brief.prt.m_w_line+obj.accands_sel_padding*4;
 		var h_brief=prt_msg_brief.prt.m_h_text+obj.accands_sel_padding*4;

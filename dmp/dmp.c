@@ -65,7 +65,7 @@ extern void dmp_node_release(dmp_pool *pool, dmp_pos idx);
 #include <assert.h>
 
 #define MIN_POOL	2
-#define MAX_POOL_INCREMENT	128
+#define MAX_POOL_INCREMENT	2097152
 
 int dmp_pool_alloc(dmp_pool *pool, uint32_t start_pool)
 {
@@ -319,6 +319,7 @@ static dmp_diff *alloc_diff(const dmp_options *opts)
 	return diff;
 }
 
+static int g_budget=0;
 int dmp_diff_new(
 	dmp_diff **diff_ptr,
 	const dmp_options *options,
@@ -340,6 +341,7 @@ int dmp_diff_new(
 	diff->t2 = text2;
 	diff->l2 = len2;
 
+	g_budget=256<<20;
 	return diff_main(&diff->list, diff, options, text1, len1, text2, len2);
 }
 
@@ -545,9 +547,15 @@ static int diff_bisect(
 	v1[v_offset + 1] = 0;
 	v2[v_offset + 1] = 0;
 
+	g_budget+=64*max_d;
 	for (d = 0; d < max_d; d++) {
 		int k1, k2;
-
+		int workload=(d*4-k1start-k1end-k2start-k2end);
+		if(workload<1){workload=1;}
+		g_budget-=workload;
+		if(!(g_budget>0)){
+			break;
+		}
 		/* advance the front contour */
 		for (k1 = -d + k1start; k1 <= d - k1end; k1 += 2) {
 			int k1off = v_offset + k1;

@@ -4909,34 +4909,47 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		s_file_name=JS.Param(1).as(string)
 		scode_new=System.IO.ReadAll(s_file_name);
 		if !scode_new:return 0
-		scode=ed.GetText(0L,ed.GetTextSize())
-		dmp_diff_to_i64_list=__c_function(int,"dmp_diff_to_i64_list","dmp/dmp.h","c_files","dmp/dmp.c")
-		dmp_diff_new=__c_function(int,"dmp_diff_new","dmp/dmp.h","c_files","dmp/dmp.c")
-		dmp_diff_free=__c_function(int,"dmp_diff_free","dmp/dmp.h","c_files","dmp/dmp.c")
-		diff=NULL
-		dmp_diff_new(__C(__pointer,"(dmp_diff**)@1",&diff),NULL, scode,scode.n, scode_new,scode_new.n);
-		if !diff:return 0
-		n=dmp_diff_to_i64_list(diff,NULL)
-		rawdiff=new i64[n]
-		n=dmp_diff_to_i64_list(diff,rawdiff)
-		assert(n==rawdiff.n)
-		dmp_diff_free(diff)
-		diff=NULL
-		ops=new TextBox.detail.TEditop[]
-		for i=0:3:rawdiff.n-3
-			if rawdiff[i+2]:
-				//insert
-				ops.push(TextBox.detail.TEditop(){
-					ccnt:rawdiff[i+0],
-					sz:0LL,
-					s:scode_new[iptr(rawdiff[i+2])-scode_new.d:iptr(rawdiff[i+2]+rawdiff[i+1])-scode_new.d-1]
-				})
-			else
-				//delete
-				ops.push(TextBox.detail.TEditop(){
-					ccnt:rawdiff[i+0],
-					sz:rawdiff[i+1],
-				})
+		encoding=DetectEncoding(scode_new)
+		if encoding!=ENCODING_UTF8&&encoding!=ENCODING_INVALID:
+			(s_utf8,s_lingering)=ConvertToUTF8(encoding,scode_new)
+			scode_new=s_utf8
+		do_real_diff=JS.Param(2).as(int)
+		if !do_real_diff:
+			ops=new TextBox.detail.TEditop[]
+			ops.push(TextBox.detail.TEditop(){
+				ccnt:0LL,
+				sz:ed.GetTextSize(),
+				s:scode_new,
+			})
+		else
+			scode=ed.GetText(0LL,ed.GetTextSize())
+			dmp_diff_to_i64_list=__c_function(int,"dmp_diff_to_i64_list","dmp/dmp.h","c_files","dmp/dmp.c")
+			dmp_diff_new=__c_function(int,"dmp_diff_new","dmp/dmp.h","c_files","dmp/dmp.c")
+			dmp_diff_free=__c_function(int,"dmp_diff_free","dmp/dmp.h","c_files","dmp/dmp.c")
+			diff=NULL
+			dmp_diff_new(__C(__pointer,"(dmp_diff**)@1",&diff),NULL, scode,scode.n, scode_new,scode_new.n);
+			if !diff:return 0
+			n=dmp_diff_to_i64_list(diff,NULL)
+			rawdiff=new i64[n]
+			n=dmp_diff_to_i64_list(diff,rawdiff)
+			assert(n==rawdiff.n)
+			dmp_diff_free(diff)
+			diff=NULL
+			ops=new TextBox.detail.TEditop[]
+			for i=0:3:rawdiff.n-3
+				if rawdiff[i+2]:
+					//insert
+					ops.push(TextBox.detail.TEditop(){
+						ccnt:rawdiff[i+0],
+						sz:0LL,
+						s:scode_new[iptr(rawdiff[i+2])-scode_new.d:iptr(rawdiff[i+2]+rawdiff[i+1])-scode_new.d-1]
+					})
+				else
+					//delete
+					ops.push(TextBox.detail.TEditop(){
+						ccnt:rawdiff[i+0],
+						sz:rawdiff[i+1],
+					})
 		if ops.n:
 			ed.Edit(ops)
 			return JS.Return(1)

@@ -592,7 +592,9 @@ var PreprocessNode=function(ndi){
 };
 var UpdateGraph=function(nds,es){
 	var style=UI.default_styles.graph_view.node_style;
-	//automatic layout - nested level for x
+	//sort all nodes by epos
+	nds.sort(function(a,b){return a.epos_part0-b.epos_part0;})
+	//convert the graph to something conventional first
 	var node_map={},port_maps=[],degs=[],es_topo=[],es_gather=[];
 	var n=nds.length,m=es.length;
 	for(var i=0;i<n;i++){
@@ -616,6 +618,89 @@ var UpdateGraph=function(nds,es){
 		//console.log(JSON.stringify(e),JSON.stringify({v0:v0,port0:port_maps[v0][e.port0],port1:port_maps[v1][e.port1]}));
 		degs[v1]++;
 	}
+	//automatic layout - dfs
+	var layout_shapes={};
+	var layout_node_dys={};
+	var layout_done={};
+	var TreeLayoutPass0=function(v0){
+		if(layout_shapes[v0]){return;}
+		//'shape' is organized into w,y0,y1 triplets, one triplet per layer
+		var shape=[nds[v0].m_w,0,nds[v0].m_h];
+		layout_shapes[v0]=shape;
+		var es_v0=es_topo[v0];
+		for(var i=0;i<es_v0.length;i++){
+			var v1=es_v0[i];
+			if(layout_shapes[v1]){
+				//it's a shared children, don't count it into our budget
+				continue;
+			}
+			var shape_i=TreeLayoutPass0(v1);
+			//compute the required separation
+			var dy_max=undefined;
+			for(var j=0;j<shape_i.length;j+=3){
+				if(shape[j+3]==undefined){break;}
+				//the top of the newly added layer has to come after the bottom of the previous
+				var dy_required=(shape[j+5]+(j==0?2:1)*style.node_padding)-shape_i[j+1];
+				if(dy_max==undefined||dy_max<dy_required){
+					dy_max=dy_required;
+				}
+			}
+			if(dy_max==undefined){
+				dy_max=0;
+			}
+			layout_node_dys[v1]=dy_max;
+			//apply the required separation
+			for(var j=0;j<shape_i.length;j+=3){
+				if(shape[j+3]==undefined){
+					shape[j+3]=shape_i[j];
+					shape[j+4]=dy_max+shape_i[j+1];
+				}else{
+					shape[j+3]=Math.max(shape[j+3],shape_i[j]);
+				}
+				shape[j+5]=dy_max+shape_i[j+2];
+			}
+		}
+		if(shape[3]!=undefined){
+			//re-center the first layer
+			shape[1]=(shape[4]+shape[5])*0.5-nds[v0].m_h*0.5;
+			shape[2]=shape[1]+nds[v0].m_h;
+			//adjust the layer depth based on sub-tree width
+			shape[0]+=Math.max(style.node_padding*4,((shape[5]-shape[4])*0.05)||0);
+		}
+		return shape;
+	};
+	var root_id=0;
+	for(var i=0;i<n;i++){
+		if(degs[i]==0){
+			root_id=i;
+			break;
+		}
+	}
+	var root_shape=TreeLayoutPass0(root_id);
+	//console.log(root_shape);
+	var TreeLayoutPass1=function(v0,depth,x_current,y_current){
+		if(layout_done[v0]){return;}
+		layout_done[v0]=1;
+		var shape=layout_shapes[v0];
+		y_current+=(layout_node_dys[v0]||0);
+		nds[v0].x=x_current;
+		nds[v0].y=y_current+shape[1];
+		x_current+=root_shape[depth*3];
+		var es_v0=es_topo[v0];
+		for(var i=0;i<es_v0.length;i++){
+			var v1=es_v0[i];
+			if(layout_done[v1]){continue;}
+			TreeLayoutPass1(v1,depth+1,x_current,y_current);
+		}
+	};
+	var y_initial=undefined;
+	for(var i=0;i<root_shape.length;i+=3){
+		if(y_initial==undefined||y_initial>root_shape[i+1]){
+			y_initial=root_shape[i+1];
+		}
+	}
+	TreeLayoutPass1(root_id,0,style.node_padding,style.node_padding-y_initial);
+	//create a BFS ordering
 	var Q=[],head=0,tail=0,depth=style.node_padding,w_max=0;
 	for(var i=0;i<n;i++){
 		if(degs[i]==0){
@@ -628,7 +713,7 @@ var UpdateGraph=function(nds,es){
 			tail=Q.length;
 		}
 		var v0=Q[head];
-		nds[v0].x=depth;
+		//nds[v0].x=depth;
 		w_max=Math.max(w_max,nds[v0].m_w);
 		head++;
 		var es_v0=es_topo[v0];
@@ -689,14 +774,13 @@ var UpdateGraph=function(nds,es){
 	////////////////
 	//automatic layout - sort by ccnt for y
 	//this invalidates all the graph structures above!
-	var y_currents={};
-	nds.sort(function(a,b){return a.epos_part0-b.epos_part0;})
-	for(var i=0;i<nds.length;i++){
-		var key_x=(nds[i].x|0);
-		var y_current=(y_currents[key_x]||style.node_padding);
-		nds[i].y=y_current;
-		y_currents[key_x]=y_current+nds[i].m_h+style.node_padding;
-	}
+	//var y_currents={};
+	//for(var i=0;i<nds.length;i++){
+	//	var key_x=(nds[i].x|0);
+	//	var y_current=(y_currents[key_x]||style.node_padding);
+	//	nds[i].y=y_current;
+	//	y_currents[key_x]=y_current+nds[i].m_h+style.node_padding;
+	//}
 	////////////////////////////////
 	//search available combos
 	var all_combos=UI.ED_GetAllComboNames();
