@@ -50,7 +50,8 @@ class Terminal{
 	colors= g_colors
 	theme= 'default'
 	convertEol= false
-	termName= 'xterm'
+	//termName= 'xterm'
+	termName= 'linux'
 	geometry= [80, 24]
 	cursorBlink= false
 	//visualBell= false
@@ -170,7 +171,8 @@ class Terminal{
 		scrollBottom=param_rows - 1
 		this.cols=param_cols
 		this.rows=param_rows
-		this.geometry=[param_cols,param_rows]
+		this.geometry[0]=param_cols
+		this.geometry[1]=param_rows
 		/**
 		* An array of all lines in the entire buffer, including the prompt. The lines are array of
 		* characters which are 3-length arrays where [0] is an attribute and [1] is the character.
@@ -317,12 +319,12 @@ CreateJSTerminal=function(JSContext JS,int cols,int rows){
 			fnt_scaled.SmartEmbolden(term.colors[256])
 			fnt_bold_scaled.SmartEmbolden(term.colors[256])
 		//////////////
-		//resize the terminal
+		//resize the terminal? not yet
 		w_char=g_renderer.GetCharacterAdvance(fnt_scaled,int(' '))
 		h_char=g_renderer.GetCharacterHeight(fnt_scaled)
-		cols=max(int(floor(w/w_char)),2)
-		rows=min(max(int(floor(h/h_char)),1),term.scrollback)
-		term.resize(cols,rows)
+		//cols=max(int(floor(w/w_char)),2)
+		//rows=min(max(int(floor(h/h_char)),1),term.scrollback)
+		//term.resize(cols,rows)
 		//////////////
 		//the bell shake
 		tick_now=System.Time.tick64()
@@ -958,7 +960,7 @@ Terminal_prototype.scroll=function() {
 		Terminal_prototype.moveRows(this.scrollTop,this.scrollTop+1,n_lines_kept)
 		row=this.ybase + this.scrollBottom;
 		// blank out the scrollsed line
-		__basic_api.memset(__pointer(this.lines.d+row),0,3*sizeof(int)*this.cols)
+		__basic_api.memset(__pointer(this.lines.d+row*(3*sizeof(int)*this.cols)),0,3*sizeof(int)*this.cols)
 	else
 		this.ybase++;
 		if this.ybase>=this.scrollback:
@@ -986,7 +988,7 @@ Terminal_prototype.scroll=function() {
 			this.moveRows(row+1,row,n_lines_kept_bottom);
 		}
 		// blank out the recycled line after going over it
-		__basic_api.memset(__pointer(this.lines.d+row),0,3*sizeof(int)*this.cols)
+		__basic_api.memset(__pointer(this.lines.d+row*(3*sizeof(int)*this.cols)),0,3*sizeof(int)*this.cols)
 		if this.n_valid_lines<this.scrollback:
 			this.n_valid_lines++;
 
@@ -2566,84 +2568,41 @@ Terminal_prototype.resize=function(x, y) {
 	if (x < 2): x=2;
 	if (y < 1): y=1;
 
-	!?
-	// resize cols
-	j=this.cols;
-	if (j < x) {
-		ch=[this.defAttr, ' ', 1]; // does xterm use the default attr?
-		i=this.scrollback;
-		while (i--) {
-			while (this.lines.get(i).n < x) {
-				this.lines.get(i).push(ch);
-			}
-		}
-	} else { // (j > x)
-		i=this.scrollback;
-		while (i--) {
-			while (this.lines.get(i).n > x) {
-				this.lines.get(i).pop();
-			}
-		}
-	}
+	new_lines=new int[this.scrollback*x*3]
+	ncpy=min(this.cols,x)*(3*sizeof(int))
+	for i=0:this.n_valid_lines-1
+		__basic_api.memcpy(
+			__pointer(new_lines.d+i*x*(3*sizeof(int))),
+			__pointer(this.lines.d+i*this.cols*(3*sizeof(int))),
+			ncpy)
 	this.setupStops(j);
 	this.cols=x;
 
-	// resize rows
+	// resize rows - add blank lines
 	j=this.rows;
-	addToY=0;
 	if (j < y) {
-		el=this.element;
 		while (j++ < y) {
 			// y is rows, not this.y
-			if (this.scrollback < y + this.ybase) {
-				if (this.ybase > 0 && this.scrollback <= this.ybase + this.y + addToY + 1) {
-					// There is room above the buffer and there are no empty elements below the line,
-					// scroll up
-					this.ybase--;
-					addToY++
-					if (this.ydisp > 0) {
-						// Viewport is at the top of the buffer, must increase downwards
-						this.ydisp--;
-					}
-				} else {
-					// Add a blank line if there is no buffer left at the top to scroll to, or if there
-					// are blank lines after the cursor
-					this.lines.push(this.blankLine());
-				}
-			}
-			if (this.children.n < y) {
-				this.insertRow();
-			}
+			row_clear=(this.ybase+j)%this.scrollback
+			__basic_api.memset(__pointer(this.lines.d+row_clear*(3*sizeof(int)*this.cols)),0,3*sizeof(int)*this.cols)
 		}
 	} else { // (j > y)
 		while (j-- > y) {
-			if (this.scrollback > y + this.ybase) {
-				if (this.scrollback > this.ybase + this.y + 1) {
-					// The line is a blank line below the cursor, remove it
-					this.lines.pop();
-				} else {
-					// The line is the cursor, scroll down
-					this.ybase++;
-					this.ydisp++;
-				}
-			}
-			if (this.children.n > y) {
-				el=this.children.shift();
-				if (!el) continue;
-				el.parentNode.removeChild(el);
-			}
+			this.ybase++;
+			if this.ybase>=this.scrollback:this.ybase=0
+			this.ydisp++;
+			if this.ydisp>=this.scrollback:this.ydisp=0
 		}
 	}
 	this.rows=y;
 
 	// Make sure that the cursor stays on screen
+	// how to handle the this.y<0 case?
+	if this.y<0:
+		this.y=0
 	if (this.y >= y) {
 		this.y=y - 1;
 	}
-	if (addToY) {
-		this.y += addToY;
-	}
-
 	if (this.x >= x) {
 		this.x=x - 1;
 	}
@@ -2653,10 +2612,11 @@ Terminal_prototype.resize=function(x, y) {
 
 	//this.refresh(0, this.rows - 1);
 
-	this.normal=null;
+	this.normal=typeof(this.normal).null;
 
-	this.geometry=[this.cols, this.rows];
-	this.emit('resize', {terminal: this, cols: x, rows: y});
+	this.geometry[0]=this.cols
+	this.geometry[1]=this.rows
+	//this.emit('resize', {terminal: this, cols: x, rows: y});
 };
 
 /**
@@ -2717,15 +2677,9 @@ Terminal_prototype.nextStop=function(x) {
 * @param {number} y The line in which to operate.
 */
 Terminal_prototype.eraseRight=function(x, y) {
-	auto line=this.lines.get(this.ybase + y)
-	, ch=[this.eraseAttr(), ' ', 1]; // xterm
-
-
-	for (; x < this.cols; x++) {
-		line[x]=ch;
-	}
-
-	//this.updateRange(y);
+	if x<this.cols:
+		row=(this.ybase+y)%this.scrollback
+		__basic_api.memset(__pointer(this.lines.d+(row*this.cols+x)*(3*sizeof(int))),0,3*sizeof(int)*(this.cols-x))
 };
 
 
@@ -2736,34 +2690,30 @@ Terminal_prototype.eraseRight=function(x, y) {
 * @param {number} y The line in which to operate.
 */
 Terminal_prototype.eraseLeft=function(x, y) {
-	auto line=this.lines.get(this.ybase + y)
-	, ch=[this.eraseAttr(), ' ', 1]; // xterm
-
-	x++;
-	while (x--) line[x]=ch;
-
-	//this.updateRange(y);
+	if x>0:
+		row=(this.ybase+y)%this.scrollback
+		__basic_api.memset(__pointer(this.lines.d+(row*this.cols)*(3*sizeof(int))),0,3*sizeof(int)*x)
 };
 
 /**
 * Clears the entire buffer, making the prompt line the new first line.
 */
-Terminal_prototype.clear=function() {
-	if (this.ybase == 0 && this.y == 0) {
-		// Don't clear if it's already clear
-		return;
-	}
-	this.lines.set(0, this.lines.get(this.ybase + this.y));
-	this.scrollback=1;
-	this.ydisp=0;
-	this.ybase=0;
-	this.y=0;
-	for (auto i=1; i < this.rows; i++) {
-		this.lines.push(this.blankLine());
-	}
-	//this.refresh(0, this.rows - 1);
-	this.emit('scroll', this.ydisp);
-};
+//Terminal_prototype.clear=function() {
+//	if (this.ybase == 0 && this.y == 0) {
+//		// Don't clear if it's already clear
+//		return;
+//	}
+//	this.lines.set(0, this.lines.get(this.ybase + this.y));
+//	this.scrollback=1;
+//	this.ydisp=0;
+//	this.ybase=0;
+//	this.y=0;
+//	for (auto i=1; i < this.rows; i++) {
+//		this.lines.push(this.blankLine());
+//	}
+//	//this.refresh(0, this.rows - 1);
+//	this.emit('scroll', this.ydisp);
+//};
 
 /**
 * Erase all content in the given line
@@ -2772,48 +2722,6 @@ Terminal_prototype.clear=function() {
 Terminal_prototype.eraseLine=function(y) {
 	this.eraseRight(0, y);
 };
-
-
-/**
-* Return the data array of a blank line
-* @param {number} cur First bunch of data for each "blank" character.
-*/
-Terminal_prototype.blankLine=function(cur) {
-	auto attr=cur
-	? this.eraseAttr()
-	: this.defAttr;
-
-	auto ch=[attr, ' ', 1]  // width defaults to 1 halfwidth character
-	, line=[]
-	, i=0;
-
-	for (; i < this.cols; i++) {
-		line[i]=ch;
-	}
-
-	return line;
-};
-
-
-/**
-* If cur return the back color xterm feature attribute. Else return defAttr.
-* @param {object} cur
-*/
-//Terminal_prototype.ch=function(cur) {
-//  return cur
-//    ? [this.eraseAttr(), ' ', 1]
-//  : [this.defAttr, ' ', 1];
-//};
-
-
-/**
-* Evaluate if the current erminal is the given argument.
-* @param {object} term The terminal to evaluate
-*/
-//Terminal_prototype.is=function(term) {
-//  auto name=this.termName;
-//  return (name + '').indexOf(term) == 0;
-//};
 
 
 /**
@@ -2828,22 +2736,6 @@ Terminal_prototype.handler=function(data) {
 	}
 	this.OnData(data);
 };
-
-
-/**
-* Emit the 'title' event and populate the given title.
-* @param {string} title The title to populate in the event.
-*/
-Terminal_prototype.handleTitle=function(title) {
-	/**
-	* This event is emitted when the title of the terminal is changed
-	* from inside the g_ The parameter is the new title.
-	*
-	* @event title
-	*/
-	this.emit('title', title);
-};
-
 
 /**
 * ESC
@@ -2870,6 +2762,7 @@ Terminal_prototype.index=function() {
 Terminal_prototype.reverseIndex=function() {
 	auto j;
 	if (this.y == this.scrollTop) {
+		!? //todo: memset - should be attr-aware
 		// possibly move the code below to term.reverseScroll();
 		// test: echo -ne '\e[1;1H\e[44m\eM\e[0m'
 		// blankLine(true) is xterm/linux behavior
