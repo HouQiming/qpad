@@ -125,13 +125,9 @@ class Terminal{
 	//urxvtMouse
 
 	// misc
-	//element
-	//children
-	//refreshStart
-	//refreshEnd
-	//savedX
-	//savedY
-	//savedCols
+	savedX=0
+	savedY=0
+	savedCols=0
 
 	// stream
 	readable=true
@@ -949,6 +945,13 @@ Terminal_prototype.moveRows=function(tar,src,n)
 			__basic_api.memcpy(
 				__pointer(this.lines.d+(tar+i)%this.scrollback*szrow),__pointer(this.lines.d+(src+i)%this.scrollback*szrow),szrow)
 
+Terminal_prototype.clearWithAttr=function(pchar,attr,nchar){
+	for i=0:nchar-1
+		this.lines[(pchar+i)*3+0]=attr
+		this.lines[(pchar+i)*3+1]=32
+		this.lines[(pchar+i)*3+2]=0
+}
+
 /**
 * Scroll the terminal down 1 row, creating a blank line.
 */
@@ -960,7 +963,7 @@ Terminal_prototype.scroll=function() {
 		Terminal_prototype.moveRows(this.scrollTop,this.scrollTop+1,n_lines_kept)
 		row=this.ybase + this.scrollBottom;
 		// blank out the scrollsed line
-		__basic_api.memset(__pointer(this.lines.d+row*(3*sizeof(int)*this.cols)),0,3*sizeof(int)*this.cols)
+		this.clearWithAttr(row*this.cols,this.defAttr,this.cols)
 	else
 		this.ybase++;
 		if this.ybase>=this.scrollback:
@@ -988,7 +991,7 @@ Terminal_prototype.scroll=function() {
 			this.moveRows(row+1,row,n_lines_kept_bottom);
 		}
 		// blank out the recycled line after going over it
-		__basic_api.memset(__pointer(this.lines.d+row*(3*sizeof(int)*this.cols)),0,3*sizeof(int)*this.cols)
+		this.clearWithAttr(row*this.cols,this.defAttr,this.cols)
 		if this.n_valid_lines<this.scrollback:
 			this.n_valid_lines++;
 
@@ -1133,7 +1136,7 @@ Terminal_prototype.write=function(string data0) {
 
 					// '\t'
 					case '\t':
-						this.x=this.nextStop();
+						this.x=this.nextStop(this.x);
 						break;
 
 					// shift out
@@ -1797,7 +1800,7 @@ Terminal_prototype.write=function(string data0) {
 						//   break;
 						// }
 						if (this.params.n < 2 && !this.prefix) {
-							this.scrollDown(this.params);
+							this.scrollDown(this.params.n>0?this.params[0]:1);
 						}
 						break;
 
@@ -2584,7 +2587,7 @@ Terminal_prototype.resize=function(x, y) {
 		while (j++ < y) {
 			// y is rows, not this.y
 			row_clear=(this.ybase+j)%this.scrollback
-			__basic_api.memset(__pointer(this.lines.d+row_clear*(3*sizeof(int)*this.cols)),0,3*sizeof(int)*this.cols)
+			this.clearWithAttr(row_clear*this.cols,this.defAttr,this.cols)
 		}
 	} else { // (j > y)
 		while (j-- > y) {
@@ -2663,7 +2666,6 @@ Terminal_prototype.prevStop=function(x0) {
 * @param {number} x The position to move the cursor one tab stop forward.
 */
 Terminal_prototype.nextStop=function(x) {
-	if (x == null) x=this.x;
 	while (!this.tabs[++x] && x < this.cols);
 	return x >= this.cols
 		? this.cols - 1
@@ -2679,7 +2681,7 @@ Terminal_prototype.nextStop=function(x) {
 Terminal_prototype.eraseRight=function(x, y) {
 	if x<this.cols:
 		row=(this.ybase+y)%this.scrollback
-		__basic_api.memset(__pointer(this.lines.d+(row*this.cols+x)*(3*sizeof(int))),0,3*sizeof(int)*(this.cols-x))
+		this.clearWithAttr(row*this.cols+x,this.eraseAttr(),this.cols-x)
 };
 
 
@@ -2692,7 +2694,7 @@ Terminal_prototype.eraseRight=function(x, y) {
 Terminal_prototype.eraseLeft=function(x, y) {
 	if x>0:
 		row=(this.ybase+y)%this.scrollback
-		__basic_api.memset(__pointer(this.lines.d+(row*this.cols)*(3*sizeof(int))),0,3*sizeof(int)*x)
+		this.clearWithAttr(row*this.cols,this.eraseAttr(),x)
 };
 
 /**
@@ -2762,12 +2764,11 @@ Terminal_prototype.index=function() {
 Terminal_prototype.reverseIndex=function() {
 	auto j;
 	if (this.y == this.scrollTop) {
-		!? //todo: memset - should be attr-aware
+		this.scrollDown(1)
+		this.clearWithAttr((this.y + this.ybase)%this.scrollback*this.cols,this.eraseAttr(),this.cols)
 		// possibly move the code below to term.reverseScroll();
 		// test: echo -ne '\e[1;1H\e[44m\eM\e[0m'
 		// blankLine(true) is xterm/linux behavior
-		this.lines.shiftElements(this.y + this.ybase, this.rows - 1, 1);
-		this.lines.set(this.y + this.ybase, this.blankLine(true));
 		//this.updateRange(this.scrollTop);
 		//this.updateRange(this.scrollBottom);
 	} else {
@@ -2807,10 +2808,10 @@ Terminal_prototype.tabSet=function() {
 * Cursor Up Ps Times (default=1) (CUU).
 */
 Terminal_prototype.cursorUp=function(params) {
-	auto param=params[0];
-	if (param < 1) param=1;
+	auto param=(params.n>0?params[0]:1);
+	if (param < 1): param=1;
 	this.y -= param;
-	if (this.y < 0) this.y=0;
+	if (this.y < 0): this.y=0;
 };
 
 
@@ -2819,8 +2820,8 @@ Terminal_prototype.cursorUp=function(params) {
 * Cursor Down Ps Times (default=1) (CUD).
 */
 Terminal_prototype.cursorDown=function(params) {
-	auto param=params[0];
-	if (param < 1) param=1;
+	auto param=(params.n>0?params[0]:1);
+	if (param < 1): param=1;
 	this.y += param;
 	if (this.y >= this.rows) {
 		this.y=this.rows - 1;
@@ -2833,8 +2834,8 @@ Terminal_prototype.cursorDown=function(params) {
 * Cursor Forward Ps Times (default=1) (CUF).
 */
 Terminal_prototype.cursorForward=function(params) {
-	auto param=params[0];
-	if (param < 1) param=1;
+	auto param=(params.n>0?params[0]:1);
+	if (param < 1): param=1;
 	this.x += param;
 	if (this.x >= this.cols) {
 		this.x=this.cols - 1;
@@ -2847,10 +2848,10 @@ Terminal_prototype.cursorForward=function(params) {
 * Cursor Backward Ps Times (default=1) (CUB).
 */
 Terminal_prototype.cursorBackward=function(params) {
-	auto param=params[0];
-	if (param < 1) param=1;
+	auto param=(params.n>0?params[0]:1);
+	if (param < 1): param=1;
 	this.x -= param;
-	if (this.x < 0) this.x=0;
+	if (this.x < 0): this.x=0;
 };
 
 
@@ -2861,7 +2862,7 @@ Terminal_prototype.cursorBackward=function(params) {
 Terminal_prototype.cursorPos=function(params) {
 	auto row, col;
 
-	row=params[0] - 1;
+	row=(params.n>0?params[0]:1) - 1;
 
 	if (params.n >= 2) {
 		col=params[1] - 1;
@@ -2917,7 +2918,8 @@ Terminal_prototype.eraseInDisplay=function(params) {
 			break;
 		case 2:
 			j=this.rows;
-			while (j--) this.eraseLine(j);
+			while (j--) 
+				this.eraseLine(j);
 			break;
 		case 3:
 			; // no saved lines
@@ -3023,12 +3025,7 @@ Terminal_prototype.charAttributes=function(params) {
 		return;
 	}
 
-	auto l=params.n
-	, i=0
-	, flags=this.curAttr >> 18
-	, fg=(this.curAttr >> 9) & 0x1ff
-	, bg=this.curAttr & 0x1ff
-	, p;
+	auto l=params.n, i=0, flags=this.curAttr >> 18, fg=(this.curAttr >> 9) & 0x1ff, bg=this.curAttr & 0x1ff, p;
 
 	for (; i < l; i++) {
 		p=params[i];
@@ -3158,7 +3155,7 @@ Terminal_prototype.charAttributes=function(params) {
 *   CSI ? 5 0  n  No Locator, if not.
 */
 Terminal_prototype.deviceStatus=function(params) {
-	if (!this.prefix) {
+	if (!this.prefix||!this.prefix.n) {
 		switch (params[0]) {
 			case 5:
 				// status report
@@ -3166,24 +3163,24 @@ Terminal_prototype.deviceStatus=function(params) {
 				break;
 			case 6:
 				// cursor position
-				this.send('\x1b['
-									+ (this.y + 1)
-									+ ';'
-									+ (this.x + 1)
-									+ 'R');
+				this.send(FormatAsText('\x1b['
+						, (this.y + 1)
+						, ';'
+						, (this.x + 1)
+						, 'R'));
 				break;
 		}
-	} else if (this.prefix == '?') {
+	} else if (this.prefix == "?") {
 		// modern xterm doesnt seem to
 		// respond to any of these except ?6, 6, and 5
 		switch (params[0]) {
 			case 6:
 				// cursor position
-				this.send('\x1b[?'
-									+ (this.y + 1)
-									+ ';'
-									+ (this.x + 1)
-									+ 'R');
+				this.send(FormatAsText('\x1b['
+						, (this.y + 1)
+						, ';'
+						, (this.x + 1)
+						, 'R'));
 				break;
 			case 15:
 				// no printer
@@ -3215,19 +3212,19 @@ Terminal_prototype.deviceStatus=function(params) {
 * Insert Ps (Blank) Character(s) (default=1) (ICH).
 */
 Terminal_prototype.insertChars=function(params) {
-	auto param, row, j, ch;
+	auto param, row, j;
 
 	param=params[0];
-	if (param < 1) param=1;
-
-	row=this.y + this.ybase;
+	
+	row=(this.y + this.ybase)%this.scrollback;
 	j=this.x;
-	ch=[this.eraseAttr(), ' ', 1]; // xterm
-
-	while (param-- && j < this.cols) {
-		this.lines.get(row).splice(j++, 0, ch);
-		this.lines.get(row).pop();
-	}
+	param=min(max(param,1),this.cols-j)
+	n_left=this.cols-j-param
+	__basic_api.memmove(
+		__pointer(this.lines.d+(row*this.cols+j+param)*(3*sizeof(int))),
+		__pointer(this.lines.d+(row*this.cols+j)*(3*sizeof(int))),
+		n_left*(3*sizeof(int)))
+	this.clearWithAttr(row*this.cols+j,this.eraseAttr(),param)
 };
 
 /**
@@ -3237,7 +3234,7 @@ Terminal_prototype.insertChars=function(params) {
 */
 Terminal_prototype.cursorNextLine=function(params) {
 	auto param=params[0];
-	if (param < 1) param=1;
+	if (param < 1): param=1;
 	this.y += param;
 	if (this.y >= this.rows) {
 		this.y=this.rows - 1;
@@ -3253,9 +3250,9 @@ Terminal_prototype.cursorNextLine=function(params) {
 */
 Terminal_prototype.cursorPrecedingLine=function(params) {
 	auto param=params[0];
-	if (param < 1) param=1;
+	if (param < 1): param=1;
 	this.y -= param;
-	if (this.y < 0) this.y=0;
+	if (this.y < 0): this.y=0;
 	this.x=0;
 };
 
@@ -3266,7 +3263,7 @@ Terminal_prototype.cursorPrecedingLine=function(params) {
 */
 Terminal_prototype.cursorCharAbsolute=function(params) {
 	auto param=params[0];
-	if (param < 1) param=1;
+	if (param < 1): param=1;
 	this.x=param - 1;
 };
 
@@ -3279,26 +3276,14 @@ Terminal_prototype.insertLines=function(params) {
 	auto param, row, j;
 
 	param=params[0];
-	if (param < 1) param=1;
-	row=this.y + this.ybase;
+	row=(this.y + this.ybase)%this.scrollback;
 
-	j=this.rows - 1 - this.scrollBottom;
-	j=this.rows - 1 + this.ybase - j + 1;
-
-	while (param--) {
-		if (this.scrollback == this.lines.maxLength) {
-			// Trim the start of lines to make room for the new line
-			this.lines.trimStart(1);
-			this.ybase--;
-			this.ydisp--;
-			row--;
-			j--;
-		}
-		// test: echo -e '\e[44m\e[1L\e[0m'
-		// blankLine(true) - xterm/linux behavior
-		this.lines.splice(row, 0, this.blankLine(true));
-		this.lines.splice(j, 1);
-	}
+	param=min(max(param,1),this.scrollBottom+1-this.y)
+	n_lines_kept=this.scrollBottom+1-this.y-param
+	if n_lines_kept>0:
+		this.moveRows(row+param,row,n_lines_kept)
+	for i=0:param-1
+		this.clearWithAttr((row+i)%this.scrollback*this.cols,this.curAttr,this.cols)
 
 	// this.maxRange();
 	//this.updateRange(this.y);
@@ -3314,28 +3299,14 @@ Terminal_prototype.deleteLines=function(params) {
 	auto param, row, j;
 
 	param=params[0];
-	if (param < 1) param=1;
-	row=this.y + this.ybase;
+	row=(this.y + this.ybase)%this.scrollback;
 
-	j=this.rows - 1 - this.scrollBottom;
-	j=this.rows - 1 + this.ybase - j;
-
-	while (param--) {
-		if (this.scrollback == this.lines.maxLength) {
-			// Trim the start of lines to make room for the new line
-			this.lines.trimStart(1);
-			this.ybase -= 1;
-			this.ydisp -= 1;
-		}
-		// test: echo -e '\e[44m\e[1M\e[0m'
-		// blankLine(true) - xterm/linux behavior
-		this.lines.splice(j + 1, 0, this.blankLine(true));
-		this.lines.splice(row, 1);
-	}
-
-	// this.maxRange();
-	//this.updateRange(this.y);
-	//this.updateRange(this.scrollBottom);
+	param=min(max(param,1),this.scrollBottom+1-this.y)
+	n_lines_kept=this.scrollBottom+1-this.y-param
+	if n_lines_kept>0:
+		this.moveRows(row,row+param,n_lines_kept)
+	for i=0:param-1
+		this.clearWithAttr((row+n_lines_kept+i)%this.scrollback*this.cols,this.curAttr,this.cols)
 };
 
 
@@ -3347,15 +3318,15 @@ Terminal_prototype.deleteChars=function(params) {
 	auto param, row, ch;
 
 	param=params[0];
-	if (param < 1) param=1;
-
-	row=this.y + this.ybase;
-	ch=[this.eraseAttr(), ' ', 1]; // xterm
-
-	while (param--) {
-		this.lines.get(row).splice(this.x, 1);
-		this.lines.get(row).push(ch);
-	}
+	row=(this.y + this.ybase)%this.scrollback;
+	j=this.x;
+	param=min(max(param,1),this.cols-j)
+	n_left=this.cols-j-param
+	__basic_api.memmove(
+		__pointer(this.lines.d+(row*this.cols+j)*(3*sizeof(int))),
+		__pointer(this.lines.d+(row*this.cols+j+param)*(3*sizeof(int))),
+		n_left*(3*sizeof(int)))
+	this.clearWithAttr(row*this.cols+j+n_left,this.eraseAttr(),param)
 };
 
 /**
@@ -3366,15 +3337,9 @@ Terminal_prototype.eraseChars=function(params) {
 	auto param, row, j, ch;
 
 	param=params[0];
-	if (param < 1) param=1;
-
-	row=this.y + this.ybase;
 	j=this.x;
-	ch=[this.eraseAttr(), ' ', 1]; // xterm
-
-	while (param-- && j < this.cols) {
-		this.lines.get(row)[j++]=ch;
-	}
+	param=min(max(param,1),this.cols-j)
+	this.clearWithAttr(row*this.cols+j,this.eraseAttr(),param)
 };
 
 /**
@@ -3444,29 +3409,29 @@ Terminal_prototype.HPositionRelative=function(params) {
 *   vim responds with ^[[?0c or ^[[?1c after the terminal's response (?)
 */
 Terminal_prototype.sendDeviceAttributes=function(params) {
-	if (params[0] > 0) return;
+	if (params[0] > 0): return;
 
-	if (!this.prefix) {
-		if (this.is('xterm')
-				|| this.is('rxvt-unicode')
-				|| this.is('screen')) {
+	if (!this.prefix||!this.prefix.n) {
+		if (this.termName==('xterm')
+		|| this.termName==('rxvt-unicode')
+		|| this.termName==('screen')) {
 			this.send('\x1b[?1;2c');
-		} else if (this.is('linux')) {
+		} else if (this.termName==('linux')) {
 			this.send('\x1b[?6c');
 		}
-	} else if (this.prefix == '>') {
+	} else if (this.prefix == ">") {
 		// xterm and urxvt
 		// seem to spit this
 		// out around ~370 times (?).
-		if (this.is('xterm')) {
+		if (this.termName==('xterm')) {
 			this.send('\x1b[>0;276;0c');
-		} else if (this.is('rxvt-unicode')) {
+		} else if (this.termName==('rxvt-unicode')) {
 			this.send('\x1b[>85;95;0c');
-		} else if (this.is('linux')) {
+		} else if (this.termName==('linux')) {
 			// not supported by linux console.
 			// linux console echoes parameters.
-			this.send(params[0] + 'c');
-		} else if (this.is('screen')) {
+			this.send(FormatAsText(params[0],'c'));
+		} else if (this.termName==('screen')) {
 			this.send('\x1b[>83;40003;0c');
 		}
 	}
@@ -3479,7 +3444,7 @@ Terminal_prototype.sendDeviceAttributes=function(params) {
 */
 Terminal_prototype.linePosAbsolute=function(params) {
 	auto param=params[0];
-	if (param < 1) param=1;
+	if (param < 1): param=1;
 	this.y=param - 1;
 	if (this.y >= this.rows) {
 		this.y=this.rows - 1;
@@ -3493,7 +3458,7 @@ Terminal_prototype.linePosAbsolute=function(params) {
 */
 Terminal_prototype.VPositionRelative=function(params) {
 	auto param=params[0];
-	if (param < 1) param=1;
+	if (param < 1): param=1;
 	this.y += param;
 	if (this.y >= this.rows) {
 		this.y=this.rows - 1;
@@ -3507,8 +3472,8 @@ Terminal_prototype.VPositionRelative=function(params) {
 *   [1,1]) (HVP).
 */
 Terminal_prototype.HVPosition=function(params) {
-	if (params[0] < 1) params[0]=1;
-	if (params[1] < 1) params[1]=1;
+	if (params[0] < 1): params[0]=1;
+	if (params[1] < 1): params[1]=1;
 
 	this.y=params[0] - 1;
 	if (this.y >= this.rows) {
@@ -3609,123 +3574,123 @@ Terminal_prototype.HVPosition=function(params) {
 *   http: *vt100.net/docs/vt220-rm/chapter4.html
 */
 Terminal_prototype.setMode=function(params) {
-	if (typeof params == 'object') {
-		auto l=params.n
-		, i=0;
+	if (typeof(params) == int[]) {
+		auto l=params.n, i=0;
 
 		for (; i < l; i++) {
 			this.setMode(params[i]);
 		}
 
 		return;
-	}
+	}else{
 
-	if (!this.prefix) {
-		switch (params) {
-			case 4:
-				this.insertMode=true;
-				break;
-			case 20:
-				//this.convertEol=true;
-				break;
-		}
-	} else if (this.prefix == '?') {
-		switch (params) {
-			case 1:
-				this.applicationCursor=true;
-				break;
-			case 2:
-				this.setgCharset(0, g_charsets.US);
-				this.setgCharset(1, g_charsets.US);
-				this.setgCharset(2, g_charsets.US);
-				this.setgCharset(3, g_charsets.US);
-				// set VT100 mode here
-				break;
-			case 3: // 132 col mode
-				this.savedCols=this.cols;
-				this.resize(132, this.rows);
-				break;
-			case 6:
-				this.originMode=true;
-				break;
-			case 7:
-				this.wraparoundMode=true;
-				break;
-			case 12:
-				// this.cursorBlink=true;
-				break;
-			case 66:
-				//this.log('Serial port requested application keypad.');
-				this.applicationKeypad=true;
-				//this.viewport.syncScrollArea();
-				break;
-			case 9: // X10 Mouse
-				// no release, no motion, no wheel, no modifiers.
-			case 1000: // vt200 mouse
-				// no motion.
-				// no modifiers, except control on the wheel.
-			case 1002: // button event mouse
-			case 1003: // any event mouse
-				// any event - sends motion events,
-				// even if there is no button held down.
-				this.x10Mouse=params == 9;
-				this.vt200Mouse=params == 1000;
-				this.normalMouse=params > 1000;
-				this.mouseEvents=true;
-				this.element.style.cursor='default';
-				this.log('Binding to mouse events.');
-				break;
-			case 1004: // send focusin/focusout events
-				// focusin: ^[[I
-				// focusout: ^[[O
-				this.sendFocus=true;
-				break;
-			case 1005: // utf8 ext mode mouse
-				this.utfMouse=true;
-				// for wide terminals
-				// simply encodes large values as utf8 characters
-				break;
-			case 1006: // sgr ext mode mouse
-				this.sgrMouse=true;
-				// for wide terminals
-				// does not add 32 to fields
-				// press: ^[[<b;x;yM
-				// release: ^[[<b;x;ym
-				break;
-			case 1015: // urxvt ext mode mouse
-				this.urxvtMouse=true;
-				// for wide terminals
-				// numbers for fields
-				// press: ^[[b;x;yM
-				// motion: ^[[b;x;yT
-				break;
-			case 25: // show cursor
-				this.cursorHidden=false;
-				break;
-			case 1049: // alt screen buffer cursor
-				//this.saveCursor();
-				; // FALL-THROUGH
-			case 47: // alt screen buffer
-			case 1047: // alt screen buffer
-				if (!this.normal_state) {
-					auto normal={
-						lines: this.lines,
-						ybase: this.ybase,
-						ydisp: this.ydisp,
-						x: this.x,
-						y: this.y,
-						scrollTop: this.scrollTop,
-						scrollBottom: this.scrollBottom,
-						tabs: this.tabs
-						// XXX save charset(s) here?
-						// charset: this.charset,
-						// glevel: this.glevel,
-						// charsets: this.charsets
-					};
-					this.reset();
-					this.normal=normal;
-				}
-				break;
+		if (!this.prefix||!this.prefix.n) {
+			switch (params) {
+				case 4:
+					this.insertMode=true;
+					break;
+				case 20:
+					//this.convertEol=true;
+					break;
+			}
+		} else if (this.prefix == "?") {
+			switch (params) {
+				case 1:
+					this.applicationCursor=true;
+					break;
+				case 2:
+					this.setgCharset(0, g_charsets.US);
+					this.setgCharset(1, g_charsets.US);
+					this.setgCharset(2, g_charsets.US);
+					this.setgCharset(3, g_charsets.US);
+					// set VT100 mode here
+					break;
+				case 3: // 132 col mode
+					this.savedCols=this.cols;
+					this.resize(132, this.rows);
+					break;
+				case 6:
+					this.originMode=true;
+					break;
+				case 7:
+					this.wraparoundMode=true;
+					break;
+				case 12:
+					// this.cursorBlink=true;
+					break;
+				case 66:
+					//this.log('Serial port requested application keypad.');
+					this.applicationKeypad=true;
+					//this.viewport.syncScrollArea();
+					break;
+				case 9: // X10 Mouse
+					// no release, no motion, no wheel, no modifiers.
+				case 1000: // vt200 mouse
+					// no motion.
+					// no modifiers, except control on the wheel.
+				case 1002: // button event mouse
+				case 1003: // any event mouse
+					// any event - sends motion events,
+					// even if there is no button held down.
+					this.x10Mouse=(params == 9);
+					this.vt200Mouse=(params == 1000);
+					this.normalMouse=(params > 1000);
+					this.mouseEvents=true;
+					this.element.style.cursor='default';
+					this.log('Binding to mouse events.');
+					break;
+				case 1004: // send focusin/focusout events
+					// focusin: ^[[I
+					// focusout: ^[[O
+					this.sendFocus=true;
+					break;
+				case 1005: // utf8 ext mode mouse
+					this.utfMouse=true;
+					// for wide terminals
+					// simply encodes large values as utf8 characters
+					break;
+				case 1006: // sgr ext mode mouse
+					this.sgrMouse=true;
+					// for wide terminals
+					// does not add 32 to fields
+					// press: ^[[<b;x;yM
+					// release: ^[[<b;x;ym
+					break;
+				case 1015: // urxvt ext mode mouse
+					this.urxvtMouse=true;
+					// for wide terminals
+					// numbers for fields
+					// press: ^[[b;x;yM
+					// motion: ^[[b;x;yT
+					break;
+				case 25: // show cursor
+					this.cursorHidden=false;
+					break;
+				case 1049: // alt screen buffer cursor
+					//this.saveCursor();
+					; // FALL-THROUGH
+				case 47: // alt screen buffer
+				case 1047: // alt screen buffer
+					if (!this.normal_state) {
+						auto normal={
+							lines: this.lines,
+							ybase: this.ybase,
+							ydisp: this.ydisp,
+							x: this.x,
+							y: this.y,
+							scrollTop: this.scrollTop,
+							scrollBottom: this.scrollBottom,
+							tabs: this.tabs
+							// XXX save charset(s) here?
+							// charset: this.charset,
+							// glevel: this.glevel,
+							// charsets: this.charsets
+						};
+						this.reset();
+						this.normal=normal;
+					}
+					break;
+			}
 		}
 	}
 };
@@ -3813,7 +3778,7 @@ Terminal_prototype.setMode=function(params) {
 *     Ps=2 0 0 4  -> Reset bracketed paste mode.
 */
 Terminal_prototype.resetMode=function(params) {
-	if (typeof params == 'object') {
+	if (typeof(params) == int[]) {
 		auto l=params.n
 		, i=0;
 
@@ -3822,88 +3787,89 @@ Terminal_prototype.resetMode=function(params) {
 		}
 
 		return;
-	}
+	}else{
 
-	if (!this.prefix) {
-		switch (params) {
-			case 4:
-				this.insertMode=false;
-				break;
-			case 20:
-				//this.convertEol=false;
-				break;
-		}
-	} else if (this.prefix == '?') {
-		switch (params) {
-			case 1:
-				this.applicationCursor=false;
-				break;
-			case 3:
-				if (this.cols == 132 && this.savedCols) {
-					this.resize(this.savedCols, this.rows);
-				}
-				delete this.savedCols;
-				break;
-			case 6:
-				this.originMode=false;
-				break;
-			case 7:
-				this.wraparoundMode=false;
-				break;
-			case 12:
-				// this.cursorBlink=false;
-				break;
-			case 66:
-				//this.log('Switching back to normal keypad.');
-				this.applicationKeypad=false;
-				//this.viewport.syncScrollArea();
-				break;
-			case 9: // X10 Mouse
-			case 1000: // vt200 mouse
-			case 1002: // button event mouse
-			case 1003: // any event mouse
-				this.x10Mouse=false;
-				this.vt200Mouse=false;
-				this.normalMouse=false;
-				this.mouseEvents=false;
-				this.element.style.cursor='';
-				break;
-			case 1004: // send focusin/focusout events
-				this.sendFocus=false;
-				break;
-			case 1005: // utf8 ext mode mouse
-				this.utfMouse=false;
-				break;
-			case 1006: // sgr ext mode mouse
-				this.sgrMouse=false;
-				break;
-			case 1015: // urxvt ext mode mouse
-				this.urxvtMouse=false;
-				break;
-			case 25: // hide cursor
-				this.cursorHidden=true;
-				break;
-			case 1049: // alt screen buffer cursor
-				; // FALL-THROUGH
-			case 47: // normal screen buffer
-			case 1047: // normal screen buffer - clearing it first
-				if (this.normal) {
-					this.lines=this.normal.lines;
-					this.ybase=this.normal.ybase;
-					this.ydisp=this.normal.ydisp;
-					this.x=this.normal.x;
-					this.y=this.normal.y;
-					this.scrollTop=this.normal.scrollTop;
-					this.scrollBottom=this.normal.scrollBottom;
-					this.tabs=this.normal.tabs;
-					this.normal=null;
-					// if (params == 1049) {
-					//   this.x=this.savedX;
-					//   this.y=this.savedY;
-					// }
-					//this.refresh(0, this.rows - 1);
-				}
-				break;
+		if (!this.prefix||!this.prefix.n) {
+			switch (params) {
+				case 4:
+					this.insertMode=false;
+					break;
+				case 20:
+					//this.convertEol=false;
+					break;
+			}
+		} else if (this.prefix == "?") {
+			switch (params) {
+				case 1:
+					this.applicationCursor=false;
+					break;
+				case 3:
+					if (this.cols == 132 && this.savedCols) {
+						this.resize(this.savedCols, this.rows);
+					}
+					this.savedCols=0;
+					break;
+				case 6:
+					this.originMode=false;
+					break;
+				case 7:
+					this.wraparoundMode=false;
+					break;
+				case 12:
+					// this.cursorBlink=false;
+					break;
+				case 66:
+					//this.log('Switching back to normal keypad.');
+					this.applicationKeypad=false;
+					//this.viewport.syncScrollArea();
+					break;
+				case 9: // X10 Mouse
+				case 1000: // vt200 mouse
+				case 1002: // button event mouse
+				case 1003: // any event mouse
+					this.x10Mouse=false;
+					this.vt200Mouse=false;
+					this.normalMouse=false;
+					this.mouseEvents=false;
+					this.element.style.cursor='';
+					break;
+				case 1004: // send focusin/focusout events
+					this.sendFocus=false;
+					break;
+				case 1005: // utf8 ext mode mouse
+					this.utfMouse=false;
+					break;
+				case 1006: // sgr ext mode mouse
+					this.sgrMouse=false;
+					break;
+				case 1015: // urxvt ext mode mouse
+					this.urxvtMouse=false;
+					break;
+				case 25: // hide cursor
+					this.cursorHidden=true;
+					break;
+				case 1049: // alt screen buffer cursor
+					; // FALL-THROUGH
+				case 47: // normal screen buffer
+				case 1047: // normal screen buffer - clearing it first
+					if (this.normal) {
+						this.lines=this.normal.lines;
+						this.ybase=this.normal.ybase;
+						this.ydisp=this.normal.ydisp;
+						this.x=this.normal.x;
+						this.y=this.normal.y;
+						this.scrollTop=this.normal.scrollTop;
+						this.scrollBottom=this.normal.scrollBottom;
+						this.tabs=this.normal.tabs;
+						this.normal=null;
+						// if (params == 1049) {
+						//   this.x=this.savedX;
+						//   this.y=this.savedY;
+						// }
+						//this.refresh(0, this.rows - 1);
+					}
+					break;
+			}
 		}
 	}
 };
@@ -3916,9 +3882,9 @@ Terminal_prototype.resetMode=function(params) {
 * CSI ? Pm r
 */
 Terminal_prototype.setScrollRegion=function(params) {
-	if (this.prefix) return;
-	this.scrollTop=(params[0] || 1) - 1;
-	this.scrollBottom=(params[1] || this.rows) - 1;
+	if this.prefix.n: return;
+	this.scrollTop=min(max((params.n>=1?params[0]:1) - 1,0),this.rows-1);
+	this.scrollBottom=min(max((params.n>=2?params[1]:this.rows) - 1,this.scrollTop),this.rows-1);
 	this.x=0;
 	this.y=0;
 };
@@ -3939,8 +3905,8 @@ Terminal_prototype.saveCursor=function(params) {
 *   Restore cursor (ANSI.SYS).
 */
 Terminal_prototype.restoreCursor=function(params) {
-	this.x=this.savedX || 0;
-	this.y=this.savedY || 0;
+	this.x=this.savedX;
+	this.y=this.savedY;
 };
 
 
@@ -3953,9 +3919,9 @@ Terminal_prototype.restoreCursor=function(params) {
 *   Cursor Forward Tabulation Ps tab stops (default=1) (CHT).
 */
 Terminal_prototype.cursorForwardTab=function(params) {
-	auto param=params[0] || 1;
+	auto param=params.n>=1?params[0]:1;
 	while (param--) {
-		this.x=this.nextStop();
+		this.x=this.nextStop(this.x);
 	}
 };
 
@@ -3964,8 +3930,9 @@ Terminal_prototype.cursorForwardTab=function(params) {
 * CSI Ps S  Scroll up Ps lines (default=1) (SU).
 */
 Terminal_prototype.scrollUp=function(params) {
-	auto param=params[0] || 1;
+	auto param=params.n>=1?params[0]:1;
 	while (param--) {
+		!?
 		this.lines.splice(this.ybase + this.scrollTop, 1);
 		this.lines.splice(this.ybase + this.scrollBottom, 0, this.blankLine());
 	}
@@ -3978,8 +3945,7 @@ Terminal_prototype.scrollUp=function(params) {
 /**
 * CSI Ps T  Scroll down Ps lines (default=1) (SD).
 */
-Terminal_prototype.scrollDown=function(params) {
-	auto param=params[0] || 1;
+Terminal_prototype.scrollDown=function(param) {
 	while (param--) {
 		this.lines.splice(this.ybase + this.scrollBottom, 1);
 		this.lines.splice(this.ybase + this.scrollTop, 0, this.blankLine());
@@ -4023,9 +3989,9 @@ Terminal_prototype.resetTitleModes=function(params) {
 * CSI Ps Z  Cursor Backward Tabulation Ps tab stops (default=1) (CBT).
 */
 Terminal_prototype.cursorBackwardTab=function(params) {
-	auto param=params[0] || 1;
+	auto param=params.n>=1?params[0]:1;
 	while (param--) {
-		this.x=this.prevStop();
+		this.x=this.prevStop(this.x);
 	}
 };
 
@@ -4034,11 +4000,12 @@ Terminal_prototype.cursorBackwardTab=function(params) {
 * CSI Ps b  Repeat the preceding graphic character Ps times (REP).
 */
 Terminal_prototype.repeatPrecedingCharacter=function(params) {
-	auto param=params[0] || 1
-	, line=this.lines.get(this.ybase + this.y)
-	, ch=line[this.x - 1] || [this.defAttr, ' ', 1];
+	auto param=params.n>=1?params[0]:1
+	auto line=this.lines.get(this.ybase + this.y)
+	auto ch=line[this.x - 1] || [this.defAttr, ' ', 1];
 
-	while (param--) line[this.x++]=ch;
+	while (param--) 
+		line[this.x++]=ch;
 };
 
 
@@ -4495,36 +4462,6 @@ function cancel(ev, force) {
 	return false;
 }
 
-function inherits(child, parent) {
-	function f() {
-		this.constructor=child;
-	}
-	f.prototype=parent.prototype;
-	child.prototype=new f;
-}
-
-// if bold is broken, we can't
-// use it in the g_
-function isBoldBroken(document) {
-	auto body=document.getElementsByTagName('body')[0];
-	auto el=document.createElement('span');
-	el.innerHTML='hello world';
-	body.appendChild(el);
-	auto w1=el.scrollWidth;
-	el.style.fontWeight='bold';
-	auto w2=el.scrollWidth;
-	body.removeChild(el);
-	return w1 != w2;
-}
-
-function indexOf(obj, el) {
-	auto i=obj.n;
-	while (i--) {
-		if (obj[i] == el) return i;
-	}
-	return -1;
-}
-
 function isThirdLevelShift(term, ev, is_keypress) {
 	auto thirdLevelKey =
 			(term.browser.isMac && ev.altKey && !ev.ctrlKey && !ev.metaKey) ||
@@ -4705,13 +4642,6 @@ auto wcwidth=(function(opts) {
 	}
 	return wcwidth;
 })({nul: 0, control: 0});  // configurable options
-
-/**
-* Expose
-*/
-
-g_EventEmitter=EventEmitter;
-g_inherits=inherits;
 
 /**
 * Adds an event listener to the g_
