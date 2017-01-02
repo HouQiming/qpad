@@ -726,53 +726,6 @@ UI.CustomTheme=function(){
 			x_min_shake:0.5,
 			dx_min_shake:0.5,
 		},
-		notebook_view:{
-			scroll_transition_dt:0.1,
-			max_lines:6,
-			w_scroll_bar:20,
-			h_caption:36,
-			h_separation:0,
-			h_button:32,
-			padding:12,
-			caption_padding:4,
-			caption_font:UI.Font(UI.font_name,28,-50),
-			caption_button_padding:0,
-			caption_color:C,
-			caption_text_color:0xffffffff,
-			inactive_caption_color:L?0xff7f7f7f:0xff666666,
-			inactive_caption_text_color:L?0xffffffff:0xffe8e8e8,
-			color:L?0xffc0c0c0:0xff333333,
-			shadow_size:8,
-			shadow_color:C_shadow,
-			button_area_shadow_size:6,
-			button_area_shadow_color:C_shadow,
-			scale:7/8,
-			//scale:0.75,
-			//scale:0.625,
-			button_style:{
-				transition_dt:0.1,
-				round:0,
-				font:UI.Font(UI.icon_font_name,22),border_width:0,padding:1,
-				$:{
-					out:{
-						//border_color:0xff444444,color:0xffffffff,
-						border_color:0,color:[{x:0,y:0,color:0x00ffffff},{x:0,y:1,color:0x00e8e8e8}],
-						icon_color:L?0xff7f7f7f:0xff7f7f7f,
-						text_color:L?0xff7f7f7f:0xff7f7f7f,
-					},
-					over:{
-						border_color:0xff444444,color:[{x:0,y:0,color:0xffffffff},{x:0,y:1,color:0xffe8e8e8}],
-						icon_color:0xff000000,
-						text_color:0xff000000,
-					},
-					down:{
-						border_color:0xff7f7f7f,color:[{x:0,y:0,color:0xff7f7f7f},{x:0,y:1,color:0xff7f7f7f}],
-						icon_color:0xff000000,
-						text_color:0xff000000,
-					},
-				}
-			},
-		},
 		notebook_view_v2:{
 			panel_style:{
 				h_button:32,
@@ -814,6 +767,12 @@ UI.CustomTheme=function(){
 					},
 				}
 			},
+		},
+		terminal:{
+			font:UI.Font("res/fonts/inconsolata.ttf",26),
+			embolden:200,
+			cols:80,
+			rows:40,
 		},
 		tip_window:{
 			w_text:512,

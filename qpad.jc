@@ -5,6 +5,7 @@ import "code-editor.jc"
 import "code-parser.jc"
 import "encoding.jc"
 import "g-l.jc"
+import "terminal.jc"
 //import "txtx-editor.jc"
 //import "zip-doc.jc"
 //import "ooc-mipmap.jc"
@@ -631,11 +632,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			proc.Terminate()
 			return 0
 		}
+		JS_GetNativeProcess=function(JSContext JS){
+			return JS.Return(proc)
+		}
 		__JS_prototype=function(JSObject proto){
 			proto.ExportMethod(this,"Read",JS_Read)
 			proto.ExportMethod(this,"GetExitCode",JS_ExitCode)
 			proto.ExportMethod(this,"IsRunning",JS_IsRunning)
 			proto.ExportMethod(this,"Terminate",JS_Terminate)
+			proto.ExportMethod(this,"GetNativeProcess",JS_GetNativeProcess)
 		}
 	jsio["RunProcess"]=function(JSContext JS){
 		auto shell_args=JS.Param(0).as(JSObject)

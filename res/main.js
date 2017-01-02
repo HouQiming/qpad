@@ -739,6 +739,8 @@ UI.Application=function(id,attrs){
 					UI.OpenNoteBookTab(workspace[i].file_name)
 				}else if(workspace[i].document_type=='graph'){
 					UI.OpenGraphTab(workspace[i].file_name)
+				}else if(workspace[i].document_type=='terminal'){
+					//do nothing - terminal tabs can't be restored
 				}else{
 					UI.OpenEditorWindow(workspace[i].file_name,undefined,'restore_workspace')
 				}
@@ -790,6 +792,10 @@ UI.Application=function(id,attrs){
 		UI.SetTaskbarProgress(app.__hwnd,app.progress||0);
 	}
 	if(UI.Platform.BUILD=="debug"){
+		//todo: test terminal
+		W.Hotkey("",{key:"SHIFT+CTRL+X",action:function(){
+			UI.OpenTerminalTab(["bash","-i"],".");
+		}});
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
 			UI.BeforeGC()
