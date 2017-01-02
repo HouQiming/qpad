@@ -176,11 +176,6 @@ class Terminal{
 		*/
 		this.lines=new int[this.scrollback*this.cols*3]
 		this.n_valid_lines=0
-		!? //todo: the push is a circular push
-		auto i=rows
-		while (i--) {
-			this.lines.push(this.blankLine())
-		}
 		setupStops(0);
 	}
 };
@@ -277,8 +272,6 @@ g_colors=(function() {
 //  return this.textarea.focus();
 //};
 
-!?
-//todo: event handling... make a control here - a JSObject
 CreateJSTerminal=function(JSContext JS,int cols,int rows){
 	term=new Terminal(cols,rows)
 	js_term=JS.New()
@@ -443,7 +436,6 @@ CreateJSTerminal=function(JSContext JS,int cols,int rows){
 		return 0
 	}
 	//todo: copy / paste / r-click
-	//todo: keydown / ...
 	//todo: wheel - just a viewport scroll
 	//todo: term.title
 }
@@ -946,10 +938,21 @@ Terminal_prototype.moveRows=function(tar,src,n)
 				__pointer(this.lines.d+(tar+i)%this.scrollback*szrow),__pointer(this.lines.d+(src+i)%this.scrollback*szrow),szrow)
 
 Terminal_prototype.clearWithAttr=function(pchar,attr,nchar){
-	for i=0:nchar-1
-		this.lines[(pchar+i)*3+0]=attr
-		this.lines[(pchar+i)*3+1]=32
-		this.lines[(pchar+i)*3+2]=0
+	if !(nchar>0):return
+	if pchar+nchar>this.lines.n:
+		for i=pchar:this.lines.n-1
+			this.lines[(i)*3+0]=attr
+			this.lines[(i)*3+1]=32
+			this.lines[(i)*3+2]=0
+		for i=this.lines.n:pchar+nchar-1
+			this.lines[(i-this.lines.n)*3+0]=attr
+			this.lines[(i-this.lines.n)*3+1]=32
+			this.lines[(i-this.lines.n)*3+2]=0
+	else
+		for i=0:nchar-1
+			this.lines[(pchar+i)*3+0]=attr
+			this.lines[(pchar+i)*3+1]=32
+			this.lines[(pchar+i)*3+2]=0
 }
 
 /**
@@ -961,7 +964,7 @@ Terminal_prototype.scroll=function() {
 		//we're not moving the base, nor are we adding any lines
 		n_lines_kept=this.scrollBottom-this.scrollTop
 		Terminal_prototype.moveRows(this.scrollTop,this.scrollTop+1,n_lines_kept)
-		row=this.ybase + this.scrollBottom;
+		row=(this.ybase + this.scrollBottom)%this.scrollback;
 		// blank out the scrollsed line
 		this.clearWithAttr(row*this.cols,this.defAttr,this.cols)
 	else
@@ -2224,6 +2227,7 @@ Terminal_prototype.evaluateKeyEscapeSequence=function(ev) {
 	keymod=ev["keymod"].or(0)
 	
 	auto modifiers=!!(keymod&UI.KMOD_SHIFT) << 0 | !!(keymod&UI.KMOD_ALT) << 1 | !!(keymod&UI.KMOD_CTRL) << 2 | !!(keymod&UI.KMOD_WIN) << 3;
+	!? //todo: SDL keyCode
 	switch (ev.keyCode) {
 		case 8:
 			// backspace
@@ -3214,7 +3218,7 @@ Terminal_prototype.deviceStatus=function(params) {
 Terminal_prototype.insertChars=function(params) {
 	auto param, row, j;
 
-	param=params[0];
+	param=params.n>=1?params[0]:1;
 	
 	row=(this.y + this.ybase)%this.scrollback;
 	j=this.x;
@@ -3931,14 +3935,12 @@ Terminal_prototype.cursorForwardTab=function(params) {
 */
 Terminal_prototype.scrollUp=function(params) {
 	auto param=params.n>=1?params[0]:1;
-	while (param--) {
-		!?
-		this.lines.splice(this.ybase + this.scrollTop, 1);
-		this.lines.splice(this.ybase + this.scrollBottom, 0, this.blankLine());
-	}
-	// this.maxRange();
-	//this.updateRange(this.scrollTop);
-	//this.updateRange(this.scrollBottom);
+	n_lines_area=this.scrollBottom+1-this.scrollTop
+	param=min(max(param,1),n_lines_area)
+	n_lines_kept=n_lines_area-param
+	Terminal_prototype.moveRows(this.y_base+this.scrollTop,this.y_base+this.scrollTop+param,n_lines_kept)
+	row=(this.ybase + this.scrollTop+n_lines_kept)%this.scrollback;
+	this.clearWithAttr(row*this.cols,this.defAttr,param*this.cols)
 };
 
 
@@ -3946,13 +3948,13 @@ Terminal_prototype.scrollUp=function(params) {
 * CSI Ps T  Scroll down Ps lines (default=1) (SD).
 */
 Terminal_prototype.scrollDown=function(param) {
-	while (param--) {
-		this.lines.splice(this.ybase + this.scrollBottom, 1);
-		this.lines.splice(this.ybase + this.scrollTop, 0, this.blankLine());
-	}
-	// this.maxRange();
-	//this.updateRange(this.scrollTop);
-	//this.updateRange(this.scrollBottom);
+	auto param=params.n>=1?params[0]:1;
+	n_lines_area=this.scrollBottom+1-this.scrollTop
+	param=min(max(param,1),n_lines_area)
+	n_lines_kept=n_lines_area-param
+	Terminal_prototype.moveRows(this.y_base+this.scrollTop+param,this.y_base+this.scrollTop,n_lines_kept)
+	row=(this.ybase + this.scrollTop)%this.scrollback;
+	this.clearWithAttr(row*this.cols,this.defAttr,param*this.cols)
 };
 
 
@@ -4001,11 +4003,23 @@ Terminal_prototype.cursorBackwardTab=function(params) {
 */
 Terminal_prototype.repeatPrecedingCharacter=function(params) {
 	auto param=params.n>=1?params[0]:1
-	auto line=this.lines.get(this.ybase + this.y)
-	auto ch=line[this.x - 1] || [this.defAttr, ' ', 1];
-
-	while (param--) 
-		line[this.x++]=ch;
+	
+	row=(this.y + this.ybase)%this.scrollback;
+	j=this.x;
+	param=min(max(param,1),this.cols-j)
+	pchar=row*this.cols+j
+	if this.x-1>0:
+		chvalue=int3(this.lines[pchar*3-3],this.lines[pchar*3-2],this.lines[pchar*3-1])
+	else
+		chvalue=int3(this.defAttr,32,1)
+	for i=0:param-1
+		this.lines[pchar*3+0]=chvalue.x
+		this.lines[pchar*3+1]=chvalue.y
+		this.lines[pchar*3+2]=chvalue.z
+		pchar++
+		this.x++
+	if this.x>=this.cols:
+		this.x=this.cols-1
 };
 
 
@@ -4020,9 +4034,9 @@ Terminal_prototype.repeatPrecedingCharacter=function(params) {
 Terminal_prototype.tabClear=function(params) {
 	auto param=params[0];
 	if (param <= 0) {
-		delete this.tabs[this.x];
+		this.tabs[this.x]=0;
 	} else if (param == 3) {
-		this.tabs={};
+		__basic_api.memset(__pointer(this.tabs.d),0,this.tabs.n);
 	}
 };
 
@@ -4115,9 +4129,9 @@ Terminal_prototype.softReset=function(params) {
 	this.scrollBottom=this.rows - 1;
 	this.curAttr=this.defAttr;
 	this.x=this.y=0; // ?
-	this.charset=null;
+	this.charset=int[int].NULL;
 	this.glevel=0; // ??
-	this.charsets=[null]; // ??
+	this.charsets=new int[int][int]; // ??
 };
 
 
@@ -4226,27 +4240,21 @@ Terminal_prototype.restorePrivateValues=function(params) {
 *     Ps denotes the SGR attributes to change: 0, 1, 4, 5, 7.
 * NOTE: xterm doesn't enable this code by default.
 */
-Terminal_prototype.setAttrInRectangle=function(params) {
-	auto t=params[0]
-	, l=params[1]
-	, b=params[2]
-	, r=params[3]
-	, attr=params[4];
+//Terminal_prototype.setAttrInRectangle=function(params) {
+//	auto t=params[0], l=params[1], b=params[2], r=params[3], attr=params[4];
+//	auto line, i;
 
-	auto line
-	, i;
+//	for (; t < b + 1; t++) {
+//		line=this.lines.get(this.ybase + t);
+//		for (i=l; i < r; i++) {
+//			line[i]=[attr, line[i][1]];
+//		}
+//	}
 
-	for (; t < b + 1; t++) {
-		line=this.lines.get(this.ybase + t);
-		for (i=l; i < r; i++) {
-			line[i]=[attr, line[i][1]];
-		}
-	}
-
-	// this.maxRange();
-	//this.updateRange(params[0]);
-	//this.updateRange(params[2]);
-};
+//	// this.maxRange();
+//	//this.updateRange(params[0]);
+//	//this.updateRange(params[2]);
+//};
 
 
 /**
@@ -4256,27 +4264,22 @@ Terminal_prototype.setAttrInRectangle=function(params) {
 *     Pt; Pl; Pb; Pr denotes the rectangle.
 * NOTE: xterm doesn't enable this code by default.
 */
-Terminal_prototype.fillRectangle=function(params) {
-	auto ch=params[0]
-	, t=params[1]
-	, l=params[2]
-	, b=params[3]
-	, r=params[4];
+//Terminal_prototype.fillRectangle=function(params) {
+//	auto ch=params[0], t=params[1], l=params[2], b=params[3], r=params[4];
 
-	auto line
-	, i;
+//	auto line, i;
 
-	for (; t < b + 1; t++) {
-		line=this.lines.get(this.ybase + t);
-		for (i=l; i < r; i++) {
-			line[i]=[line[i][0], String_fromCharCode(ch)];
-		}
-	}
+//	for (; t < b + 1; t++) {
+//		line=this.lines.get(this.ybase + t);
+//		for (i=l; i < r; i++) {
+//			line[i]=[line[i][0], String_fromCharCode(ch)];
+//		}
+//	}
 
-	// this.maxRange();
-	//this.updateRange(params[1]);
-	//this.updateRange(params[3]);
-};
+//	// this.maxRange();
+//	//this.updateRange(params[1]);
+//	//this.updateRange(params[3]);
+//};
 
 
 /**
@@ -4294,7 +4297,7 @@ Terminal_prototype.fillRectangle=function(params) {
 *     Pu=2  <- character cells.
 */
 Terminal_prototype.enableLocatorReporting=function(params) {
-	auto val=params[0] > 0;
+	//auto val=params[0] > 0;
 	//this.mouseEvents=val;
 	//this.decLocator=val;
 };
@@ -4306,29 +4309,23 @@ Terminal_prototype.enableLocatorReporting=function(params) {
 *     Pt; Pl; Pb; Pr denotes the rectangle.
 * NOTE: xterm doesn't enable this code by default.
 */
-Terminal_prototype.eraseRectangle=function(params) {
-	auto t=params[0]
-	, l=params[1]
-	, b=params[2]
-	, r=params[3];
+//Terminal_prototype.eraseRectangle=function(params) {
+//	auto t=params[0], l=params[1], b=params[2], r=params[3];
+//	auto line, i, ch;
 
-	auto line
-	, i
-	, ch;
+//	ch=[this.eraseAttr(), ' ', 1]; // xterm?
 
-	ch=[this.eraseAttr(), ' ', 1]; // xterm?
+//	for (; t < b + 1; t++) {
+//		line=this.lines.get(this.ybase + t);
+//		for (i=l; i < r; i++) {
+//			line[i]=ch;
+//		}
+//	}
 
-	for (; t < b + 1; t++) {
-		line=this.lines.get(this.ybase + t);
-		for (i=l; i < r; i++) {
-			line[i]=ch;
-		}
-	}
-
-	// this.maxRange();
-	//this.updateRange(params[0]);
-	//this.updateRange(params[2]);
-};
+//	// this.maxRange();
+//	//this.updateRange(params[0]);
+//	//this.updateRange(params[2]);
+//};
 
 
 /**
@@ -4336,21 +4333,18 @@ Terminal_prototype.eraseRectangle=function(params) {
 * Insert P s Column(s) (default=1) (DECIC), VT420 and up.
 * NOTE: xterm doesn't enable this code by default.
 */
-Terminal_prototype.insertColumns=function() {
-	auto param=params[0]
-	, l=this.ybase + this.rows
-	, ch=[this.eraseAttr(), ' ', 1] // xterm?
-	, i;
+//Terminal_prototype.insertColumns=function() {
+//	auto param=params[0], l=this.ybase + this.rows, ch=[this.eraseAttr(), ' ', 1], i;
 
-	while (param--) {
-		for (i=this.ybase; i < l; i++) {
-			this.lines.get(i).splice(this.x + 1, 0, ch);
-			this.lines.get(i).pop();
-		}
-	}
+//	while (param--) {
+//		for (i=this.ybase; i < l; i++) {
+//			this.lines.get(i).splice(this.x + 1, 0, ch);
+//			this.lines.get(i).pop();
+//		}
+//	}
 
-	//this.maxRange();
-};
+//	//this.maxRange();
+//};
 
 
 /**
@@ -4358,21 +4352,18 @@ Terminal_prototype.insertColumns=function() {
 * Delete P s Column(s) (default=1) (DECDC), VT420 and up
 * NOTE: xterm doesn't enable this code by default.
 */
-Terminal_prototype.deleteColumns=function() {
-	auto param=params[0]
-	, l=this.ybase + this.rows
-	, ch=[this.eraseAttr(), ' ', 1] // xterm?
-	, i;
+//Terminal_prototype.deleteColumns=function() {
+//	auto param=params[0], l=this.ybase + this.rows, ch=[this.eraseAttr(), ' ', 1], i;
 
-	while (param--) {
-		for (i=this.ybase; i < l; i++) {
-			this.lines.get(i).splice(this.x, 1);
-			this.lines.get(i).push(ch);
-		}
-	}
+//	while (param--) {
+//		for (i=this.ybase; i < l; i++) {
+//			this.lines.get(i).splice(this.x, 1);
+//			this.lines.get(i).push(ch);
+//		}
+//	}
 
-	//this.maxRange();
-};
+//	//this.maxRange();
+//};
 
 /**
 * Character Sets
@@ -4422,45 +4413,19 @@ g_charsets.SCLD={ // (0
 	'~': '\u00b7'  // '·'
 };
 
-g_charsets.UK=null; // (A
-g_charsets.US=null; // (B (USASCII)
-g_charsets.Dutch=null; // (4
-g_charsets.Finnish=null; // (C or (5
-g_charsets.French=null; // (R
-g_charsets.FrenchCanadian=null; // (Q
-g_charsets.German=null; // (K
-g_charsets.Italian=null; // (Y
-g_charsets.NorwegianDanish=null; // (E or (6
-g_charsets.Spanish=null; // (Z
-g_charsets.Swedish=null; // (H or (7
-g_charsets.Swiss=null; // (=
-g_charsets.ISOLatin=null; // /A
-
-/**
-* Helpers
-*/
-
-function on(el, type, handler, capture) {
-	if (!Array.isArray(el)) {
-		el=[el];
-	}
-	el.forEach(function (element) {
-		element.addEventListener(type, handler, capture || false);
-	});
-}
-
-function off(el, type, handler, capture) {
-	el.removeEventListener(type, handler, capture || false);
-}
-
-function cancel(ev, force) {
-	if (!this.cancelEvents && !force) {
-		return;
-	}
-	ev.preventDefault();
-	ev.stopPropagation();
-	return false;
-}
+g_charsets.UK=int[int].NULL; // (A
+g_charsets.US=int[int].NULL; // (B (USASCII)
+g_charsets.Dutch=int[int].NULL; // (4
+g_charsets.Finnish=int[int].NULL; // (C OR (5
+g_charsets.French=int[int].NULL; // (R
+g_charsets.FrenchCanadian=int[int].NULL; // (Q
+g_charsets.German=int[int].NULL; // (K
+g_charsets.Italian=int[int].NULL; // (Y
+g_charsets.NorwegianDanish=int[int].NULL; // (E OR (6
+g_charsets.Spanish=int[int].NULL; // (Z
+g_charsets.Swedish=int[int].NULL; // (H OR (7
+g_charsets.Swiss=int[int].NULL; // (=
+g_charsets.ISOLatin=int[int].NULL; // /A
 
 function isThirdLevelShift(term, ev, is_keypress) {
 	auto thirdLevelKey =
@@ -4478,18 +4443,11 @@ function isThirdLevelShift(term, ev, is_keypress) {
 function matchColor(r1, g1, b1) {
 	auto hash=(r1 << 16) | (g1 << 8) | b1;
 
-	if (matchColor._cache[hash] != null) {
-		return matchColor._cache[hash];
+	if (matchColor._cache[hash] >0) {
+		return matchColor._cache[hash]-1;
 	}
 
-	auto ldiff=Infinity
-	, li=-1
-	, i=0
-	, c
-	, r2
-	, g2
-	, b2
-	, diff;
+	auto ldiff=1e10f, li=-1, i=0, c, r2, g2, b2, diff;
 
 	for (; i < g_colors.n; i++) {
 		c=g_colors[i];
@@ -4510,147 +4468,117 @@ function matchColor(r1, g1, b1) {
 		}
 	}
 
-	return matchColor._cache[hash]=li;
+	matchColor._cache[hash]=li+1;
+	return li;
 }
 
 matchColor._cache={};
 
 // http://stackoverflow.com/questions/1633828
 matchColorDistance=function(r1, g1, b1, r2, g2, b2) {
-	return sqr(30 * (r1 - r2))
+	return (sqr(30 * (r1 - r2))
 		+ sqr(59 * (g1 - g2))
-		+ sqr(11 * (b1 - b2));
+		+ sqr(11 * (b1 - b2)));
 };
 
-function each(obj, iter, con) {
-	if (obj.forEach) return obj.forEach(iter, con);
-	for (auto i=0; i < obj.n; i++) {
-		iter.call(con, obj[i], i, obj);
-	}
-}
-
-function keys(obj) {
-	if (Object.keys) return Object.keys(obj);
-	auto key, keys=[];
-	for (key in obj) {
-		if (Object.prototype.hasOwnProperty.call(obj, key)) {
-			keys.push(key);
-		}
-	}
-	return keys;
-}
-
-auto wcwidth=(function(opts) {
-	// extracted from https://www.cl.cam.ac.uk/%7Emgk25/ucs/wcwidth.c
-	// combining characters
-	auto COMBINING=[
-		[0x0300, 0x036F], [0x0483, 0x0486], [0x0488, 0x0489],
-		[0x0591, 0x05BD], [0x05BF, 0x05BF], [0x05C1, 0x05C2],
-		[0x05C4, 0x05C5], [0x05C7, 0x05C7], [0x0600, 0x0603],
-		[0x0610, 0x0615], [0x064B, 0x065E], [0x0670, 0x0670],
-		[0x06D6, 0x06E4], [0x06E7, 0x06E8], [0x06EA, 0x06ED],
-		[0x070F, 0x070F], [0x0711, 0x0711], [0x0730, 0x074A],
-		[0x07A6, 0x07B0], [0x07EB, 0x07F3], [0x0901, 0x0902],
-		[0x093C, 0x093C], [0x0941, 0x0948], [0x094D, 0x094D],
-		[0x0951, 0x0954], [0x0962, 0x0963], [0x0981, 0x0981],
-		[0x09BC, 0x09BC], [0x09C1, 0x09C4], [0x09CD, 0x09CD],
-		[0x09E2, 0x09E3], [0x0A01, 0x0A02], [0x0A3C, 0x0A3C],
-		[0x0A41, 0x0A42], [0x0A47, 0x0A48], [0x0A4B, 0x0A4D],
-		[0x0A70, 0x0A71], [0x0A81, 0x0A82], [0x0ABC, 0x0ABC],
-		[0x0AC1, 0x0AC5], [0x0AC7, 0x0AC8], [0x0ACD, 0x0ACD],
-		[0x0AE2, 0x0AE3], [0x0B01, 0x0B01], [0x0B3C, 0x0B3C],
-		[0x0B3F, 0x0B3F], [0x0B41, 0x0B43], [0x0B4D, 0x0B4D],
-		[0x0B56, 0x0B56], [0x0B82, 0x0B82], [0x0BC0, 0x0BC0],
-		[0x0BCD, 0x0BCD], [0x0C3E, 0x0C40], [0x0C46, 0x0C48],
-		[0x0C4A, 0x0C4D], [0x0C55, 0x0C56], [0x0CBC, 0x0CBC],
-		[0x0CBF, 0x0CBF], [0x0CC6, 0x0CC6], [0x0CCC, 0x0CCD],
-		[0x0CE2, 0x0CE3], [0x0D41, 0x0D43], [0x0D4D, 0x0D4D],
-		[0x0DCA, 0x0DCA], [0x0DD2, 0x0DD4], [0x0DD6, 0x0DD6],
-		[0x0E31, 0x0E31], [0x0E34, 0x0E3A], [0x0E47, 0x0E4E],
-		[0x0EB1, 0x0EB1], [0x0EB4, 0x0EB9], [0x0EBB, 0x0EBC],
-		[0x0EC8, 0x0ECD], [0x0F18, 0x0F19], [0x0F35, 0x0F35],
-		[0x0F37, 0x0F37], [0x0F39, 0x0F39], [0x0F71, 0x0F7E],
-		[0x0F80, 0x0F84], [0x0F86, 0x0F87], [0x0F90, 0x0F97],
-		[0x0F99, 0x0FBC], [0x0FC6, 0x0FC6], [0x102D, 0x1030],
-		[0x1032, 0x1032], [0x1036, 0x1037], [0x1039, 0x1039],
-		[0x1058, 0x1059], [0x1160, 0x11FF], [0x135F, 0x135F],
-		[0x1712, 0x1714], [0x1732, 0x1734], [0x1752, 0x1753],
-		[0x1772, 0x1773], [0x17B4, 0x17B5], [0x17B7, 0x17BD],
-		[0x17C6, 0x17C6], [0x17C9, 0x17D3], [0x17DD, 0x17DD],
-		[0x180B, 0x180D], [0x18A9, 0x18A9], [0x1920, 0x1922],
-		[0x1927, 0x1928], [0x1932, 0x1932], [0x1939, 0x193B],
-		[0x1A17, 0x1A18], [0x1B00, 0x1B03], [0x1B34, 0x1B34],
-		[0x1B36, 0x1B3A], [0x1B3C, 0x1B3C], [0x1B42, 0x1B42],
-		[0x1B6B, 0x1B73], [0x1DC0, 0x1DCA], [0x1DFE, 0x1DFF],
-		[0x200B, 0x200F], [0x202A, 0x202E], [0x2060, 0x2063],
-		[0x206A, 0x206F], [0x20D0, 0x20EF], [0x302A, 0x302F],
-		[0x3099, 0x309A], [0xA806, 0xA806], [0xA80B, 0xA80B],
-		[0xA825, 0xA826], [0xFB1E, 0xFB1E], [0xFE00, 0xFE0F],
-		[0xFE20, 0xFE23], [0xFEFF, 0xFEFF], [0xFFF9, 0xFFFB],
-		[0x10A01, 0x10A03], [0x10A05, 0x10A06], [0x10A0C, 0x10A0F],
-		[0x10A38, 0x10A3A], [0x10A3F, 0x10A3F], [0x1D167, 0x1D169],
-		[0x1D173, 0x1D182], [0x1D185, 0x1D18B], [0x1D1AA, 0x1D1AD],
-		[0x1D242, 0x1D244], [0xE0001, 0xE0001], [0xE0020, 0xE007F],
-		[0xE0100, 0xE01EF]
-	];
-	// binary search
-	function bisearch(ucs) {
-		auto min=0;
-		auto max=COMBINING.n - 1;
-		auto mid;
-		if (ucs < COMBINING[0][0] || ucs > COMBINING[max][1])
-			return false;
-		while (max >= min) {
-			mid=Math.floor((min + max) / 2);
-			if (ucs > COMBINING[mid][1])
-				min=mid + 1;
-			else if (ucs < COMBINING[mid][0])
-				max=mid - 1;
-			else
-				return true;
-		}
+// extracted from https://www.cl.cam.ac.uk/%7Emgk25/ucs/wcwidth.c
+// combining characters
+auto COMBINING=[
+	[0x0300, 0x036F], [0x0483, 0x0486], [0x0488, 0x0489],
+	[0x0591, 0x05BD], [0x05BF, 0x05BF], [0x05C1, 0x05C2],
+	[0x05C4, 0x05C5], [0x05C7, 0x05C7], [0x0600, 0x0603],
+	[0x0610, 0x0615], [0x064B, 0x065E], [0x0670, 0x0670],
+	[0x06D6, 0x06E4], [0x06E7, 0x06E8], [0x06EA, 0x06ED],
+	[0x070F, 0x070F], [0x0711, 0x0711], [0x0730, 0x074A],
+	[0x07A6, 0x07B0], [0x07EB, 0x07F3], [0x0901, 0x0902],
+	[0x093C, 0x093C], [0x0941, 0x0948], [0x094D, 0x094D],
+	[0x0951, 0x0954], [0x0962, 0x0963], [0x0981, 0x0981],
+	[0x09BC, 0x09BC], [0x09C1, 0x09C4], [0x09CD, 0x09CD],
+	[0x09E2, 0x09E3], [0x0A01, 0x0A02], [0x0A3C, 0x0A3C],
+	[0x0A41, 0x0A42], [0x0A47, 0x0A48], [0x0A4B, 0x0A4D],
+	[0x0A70, 0x0A71], [0x0A81, 0x0A82], [0x0ABC, 0x0ABC],
+	[0x0AC1, 0x0AC5], [0x0AC7, 0x0AC8], [0x0ACD, 0x0ACD],
+	[0x0AE2, 0x0AE3], [0x0B01, 0x0B01], [0x0B3C, 0x0B3C],
+	[0x0B3F, 0x0B3F], [0x0B41, 0x0B43], [0x0B4D, 0x0B4D],
+	[0x0B56, 0x0B56], [0x0B82, 0x0B82], [0x0BC0, 0x0BC0],
+	[0x0BCD, 0x0BCD], [0x0C3E, 0x0C40], [0x0C46, 0x0C48],
+	[0x0C4A, 0x0C4D], [0x0C55, 0x0C56], [0x0CBC, 0x0CBC],
+	[0x0CBF, 0x0CBF], [0x0CC6, 0x0CC6], [0x0CCC, 0x0CCD],
+	[0x0CE2, 0x0CE3], [0x0D41, 0x0D43], [0x0D4D, 0x0D4D],
+	[0x0DCA, 0x0DCA], [0x0DD2, 0x0DD4], [0x0DD6, 0x0DD6],
+	[0x0E31, 0x0E31], [0x0E34, 0x0E3A], [0x0E47, 0x0E4E],
+	[0x0EB1, 0x0EB1], [0x0EB4, 0x0EB9], [0x0EBB, 0x0EBC],
+	[0x0EC8, 0x0ECD], [0x0F18, 0x0F19], [0x0F35, 0x0F35],
+	[0x0F37, 0x0F37], [0x0F39, 0x0F39], [0x0F71, 0x0F7E],
+	[0x0F80, 0x0F84], [0x0F86, 0x0F87], [0x0F90, 0x0F97],
+	[0x0F99, 0x0FBC], [0x0FC6, 0x0FC6], [0x102D, 0x1030],
+	[0x1032, 0x1032], [0x1036, 0x1037], [0x1039, 0x1039],
+	[0x1058, 0x1059], [0x1160, 0x11FF], [0x135F, 0x135F],
+	[0x1712, 0x1714], [0x1732, 0x1734], [0x1752, 0x1753],
+	[0x1772, 0x1773], [0x17B4, 0x17B5], [0x17B7, 0x17BD],
+	[0x17C6, 0x17C6], [0x17C9, 0x17D3], [0x17DD, 0x17DD],
+	[0x180B, 0x180D], [0x18A9, 0x18A9], [0x1920, 0x1922],
+	[0x1927, 0x1928], [0x1932, 0x1932], [0x1939, 0x193B],
+	[0x1A17, 0x1A18], [0x1B00, 0x1B03], [0x1B34, 0x1B34],
+	[0x1B36, 0x1B3A], [0x1B3C, 0x1B3C], [0x1B42, 0x1B42],
+	[0x1B6B, 0x1B73], [0x1DC0, 0x1DCA], [0x1DFE, 0x1DFF],
+	[0x200B, 0x200F], [0x202A, 0x202E], [0x2060, 0x2063],
+	[0x206A, 0x206F], [0x20D0, 0x20EF], [0x302A, 0x302F],
+	[0x3099, 0x309A], [0xA806, 0xA806], [0xA80B, 0xA80B],
+	[0xA825, 0xA826], [0xFB1E, 0xFB1E], [0xFE00, 0xFE0F],
+	[0xFE20, 0xFE23], [0xFEFF, 0xFEFF], [0xFFF9, 0xFFFB],
+	[0x10A01, 0x10A03], [0x10A05, 0x10A06], [0x10A0C, 0x10A0F],
+	[0x10A38, 0x10A3A], [0x10A3F, 0x10A3F], [0x1D167, 0x1D169],
+	[0x1D173, 0x1D182], [0x1D185, 0x1D18B], [0x1D1AA, 0x1D1AD],
+	[0x1D242, 0x1D244], [0xE0001, 0xE0001], [0xE0020, 0xE007F],
+	[0xE0100, 0xE01EF]
+];
+// binary search
+function bisearch(ucs) {
+	auto min=0;
+	auto max=COMBINING.n - 1;
+	auto mid;
+	if (ucs < COMBINING[0][0] || ucs > COMBINING[max][1])
 		return false;
+	while (max >= min) {
+		mid=Math.floor((min + max) / 2);
+		if (ucs > COMBINING[mid][1])
+			min=mid + 1;
+		else if (ucs < COMBINING[mid][0])
+			max=mid - 1;
+		else
+			return true;
 	}
-	function wcwidth(ucs) {
-		// test for 8-bit control characters
-		if (ucs == 0)
-			return opts.nul;
-		if (ucs < 32 || (ucs >= 0x7f && ucs < 0xa0))
-			return opts.control;
-		// binary search in table of non-spacing characters
-		if (bisearch(ucs))
-			return 0;
-		// if we arrive here, ucs is not a combining or C0/C1 control character
-		return 1 +
-			(
-			ucs >= 0x1100 &&
-			(
-				ucs <= 0x115f ||                // Hangul Jamo init. consonants
-				ucs == 0x2329 ||
-				ucs == 0x232a ||
-				(ucs >= 0x2e80 && ucs <= 0xa4cf && ucs != 0x303f) ||  // CJK..Yi
-				(ucs >= 0xac00 && ucs <= 0xd7a3) ||    // Hangul Syllables
-				(ucs >= 0xf900 && ucs <= 0xfaff) ||    // CJK Compat Ideographs
-				(ucs >= 0xfe10 && ucs <= 0xfe19) ||    // Vertical forms
-				(ucs >= 0xfe30 && ucs <= 0xfe6f) ||    // CJK Compat Forms
-				(ucs >= 0xff00 && ucs <= 0xff60) ||    // Fullwidth Forms
-				(ucs >= 0xffe0 && ucs <= 0xffe6) ||
-				(ucs >= 0x20000 && ucs <= 0x2fffd) ||
-				(ucs >= 0x30000 && ucs <= 0x3fffd)
-			)
-		);
-	}
-	return wcwidth;
-})({nul: 0, control: 0});  // configurable options
-
-/**
-* Adds an event listener to the g_
-*
-* @param {string} event The name of the event. TODO: Document all event types
-* @param {function} callback The function to call when the event is triggered.
-*/
-g_on=on;
-g_off=off;
-g_cancel=cancel;
+	return false;
+}
+function wcwidth(ucs) {
+	// test for 8-bit control characters
+	if (ucs == 0)
+		return 0;
+	if (ucs < 32 || (ucs >= 0x7f && ucs < 0xa0))
+		return 0;
+	// binary search in table of non-spacing characters
+	if (bisearch(ucs))
+		return 0;
+	// if we arrive here, ucs is not a combining or C0/C1 control character
+	return 1 +
+		(
+		ucs >= 0x1100 &&
+		(
+			ucs <= 0x115f ||                // Hangul Jamo init. consonants
+			ucs == 0x2329 ||
+			ucs == 0x232a ||
+			(ucs >= 0x2e80 && ucs <= 0xa4cf && ucs != 0x303f) ||  // CJK..Yi
+			(ucs >= 0xac00 && ucs <= 0xd7a3) ||    // Hangul Syllables
+			(ucs >= 0xf900 && ucs <= 0xfaff) ||    // CJK Compat Ideographs
+			(ucs >= 0xfe10 && ucs <= 0xfe19) ||    // Vertical forms
+			(ucs >= 0xfe30 && ucs <= 0xfe6f) ||    // CJK Compat Forms
+			(ucs >= 0xff00 && ucs <= 0xff60) ||    // Fullwidth Forms
+			(ucs >= 0xffe0 && ucs <= 0xffe6) ||
+			(ucs >= 0x20000 && ucs <= 0x2fffd) ||
+			(ucs >= 0x30000 && ucs <= 0x3fffd)
+		)
+	);
+};
 
 }
