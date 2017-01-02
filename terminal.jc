@@ -6,7 +6,11 @@ import System.Math.*
 import System.Console.*
 import Javascript.*
 
-// adapting to jc
+/*
+Qiming HOU 1/1/2017:
+	adapting the whole thing to jc
+	abandoned the mouse stuff in favor of quickedit-like operations
+*/
 module detail{
 /**
 * xterm.js: xterm, in the browser
@@ -35,6 +39,7 @@ module detail{
 * States
 */
 auto normal_state=0, escaped=1, csi=2, osc=3, charset_state=4, dcs=5, ignore=6;
+VISUAL_BELL_DURATION=0.5f
 
 /**
 * Terminal
@@ -48,7 +53,7 @@ class Terminal{
 	termName= 'xterm'
 	geometry= [80, 24]
 	cursorBlink= false
-	visualBell= false
+	//visualBell= false
 	popOnBell= false
 	scrollback= 1000
 	screenKeys= false
@@ -88,7 +93,7 @@ class Terminal{
 	cursorHidden=false
 	convertEol
 	state=0
-	queue=new string
+	//queue=new string
 	scrollTop=0
 	scrollBottom=0
 	//customKeydownHandler=null
@@ -148,6 +153,7 @@ class Terminal{
 
 	// Store if user went browsing history in scrollback
 	userScrolling=false
+	OnData=function(string s){}
 	/**
 	* Creates a new `Terminal` object.
 	*
@@ -295,6 +301,11 @@ CreateJSTerminal=function(JSContext JS,int cols,int rows){
 		w=JS.Param(2).as(float)
 		h=JS.Param(3).as(float)
 		//////////////
+		//clear it
+		colors=term.colors
+		bg=term.curAttr & 0x1ff;
+		g_renderer.DrawRectangle(x,y,w,h,colors[bg])
+		//////////////
 		//get the font
 		g_renderer=Gui2D.detail.g_renderer
 		embolden=JS.GetThis()["embolden"].or(300)
@@ -313,9 +324,15 @@ CreateJSTerminal=function(JSContext JS,int cols,int rows){
 		rows=min(max(int(floor(h/h_char)),1),term.scrollback)
 		term.resize(cols,rows)
 		//////////////
+		//the bell shake
+		tick_now=System.Time.tick64()
+		if (term.bell_tick-tick_now)>0LL:
+			//we're in the bell, shake the whole screen
+			y+=h_char*0.5f*(Random(f32)-0.5f)
+			JS["UI"].CallVoidMethod("AutoRefresh")
+		//////////////
 		//render the content
 		lines=term.lines
-		colors=term.colors
 		y_baseline=g_renderer.GetFontBaseline(fnt_scaled)
 		y_underline=y_baseline*1.05f
 		h_underline=y_baseline*0.05f
@@ -386,12 +403,45 @@ CreateJSTerminal=function(JSContext JS,int cols,int rows){
 					}
 		////////////////////
 		//render the cursor
+		x_cur=x+float(term.x)*w_char
+		y_cur=y+float(term.y)*h_char
 		if !term.cursorHidden&&term.has_focus:
-			x_cur=x+float(term.x)*w_char
-			y_cur=y+float(term.y)*h_char
 			this_obj=JS.GetThis().as(JSObject)
 			fg=(term.curAttr >> 9) & 0x1ff;
-			JS["UI"].CallMethod(int,"SetCaret",this_obj,x_cur,y_cur,w_char,h_char,colors[fg],500)
+			JS["UI"].CallVoidMethod("SetCaret",this_obj,x_cur,y_cur,w_char,h_char,colors[fg],500)
+		////////////////////
+		//render the IME composing text
+		if term.m_IME_overlay:
+			//bg=term.curAttr & 0x1ff;
+			fg=(term.curAttr >> 9) & 0x1ff;
+			s=term.m_IME_overlay
+			adv_tot=0.f
+			for ch in Utf8Chars(s)
+				dx=g_renderer.GetCharacterAdvance(fnt,ch)
+				g_renderer.DrawChar(fnt_scaled,x_cur+adv_tot,y_cur,ch,colors[fg]&0x7f000000)
+				adv_tot+=dx
+		return 0
+	}
+	js_term["OnKeyDown"]=function(JSContext JS){
+		ev=JS.Param(0).as(JSObject)
+		term.keyDown(ev)
+		return 0
+	}
+	js_term["OnTextEdit"]=function(JSContext JS){
+		ev=JS.Param(0).as(JSObject)
+		text=ev["text"].as(string)
+		if text&&text.n:
+			term.m_IME_overlay=text
+		else
+			term.m_IME_overlay=string.NULL
+		JS["UI"].CallVoidMethod("Refresh")
+		return 0
+	}
+	js_term["OnTextInput"]=function(JSContext JS){
+		text=ev["text"].as(string)
+		term.m_IME_overlay=string.NULL
+		if text&&text.n:
+			term.handler(text)
 		return 0
 	}
 	//todo: copy / paste / r-click
@@ -1367,7 +1417,7 @@ Terminal_prototype.write=function(string data0) {
 
 					default:
 						this.state=normal_state;
-						this.error('Unknown ESC control: %s.', code);
+						//this.error('Unknown ESC control: %s.', code);
 						break;
 				}
 				break;
@@ -1959,7 +2009,7 @@ Terminal_prototype.write=function(string data0) {
 						//   break;
 
 					default:
-						this.error('Unknown CSI code: %s.', code);
+						//this.error('Unknown CSI code: %s.', code);
 						break;
 				}
 
@@ -2003,7 +2053,7 @@ Terminal_prototype.write=function(string data0) {
 									break;
 
 								default:
-									this.error('Unknown DCS Pt: %s.', pt);
+									//this.error('Unknown DCS Pt: %s.', pt);
 									pt='';
 									break;
 							}
@@ -2026,7 +2076,7 @@ Terminal_prototype.write=function(string data0) {
 							break;
 
 						default:
-							this.error('Unknown DCS prefix: %s.', this.prefix);
+							//this.error('Unknown DCS prefix: %s.', this.prefix);
 							break;
 					}
 
@@ -2097,36 +2147,58 @@ Terminal_prototype.keyDown=function(ev) {
 	//	return false;
 	//}
 	
-	!? //todo: composition events
-
-	auto self=this;
 	auto result=this.evaluateKeyEscapeSequence(ev);
 
 	if (result.scrollDisp) {
 		this.scrollDisp(result.scrollDisp);
-		return this.cancel(ev, true);
+		return;
 	}
 
-	if (isThirdLevelShift(this, ev)) {
-		return true;
+	if (isThirdLevelShift(this, ev, 0)) {
+		return;
 	}
 
-	if (result.cancel) {
-		// The event is canceled at the end already, is this necessary?
-		this.cancel(ev, true);
-	}
+	//if (result.cancel) {
+	//	// The event is canceled at the end already, is this necessary?
+	//	this.cancel(ev, true);
+	//}
 
 	if (!result.key) {
-		return true;
+		return;
 	}
 
-	this.emit('keydown', ev);
-	this.emit('key', result.key, ev);
+	//this.emit('keydown', ev);
+	//this.emit('key', result.key, ev);
 	this.handler(result.key);
 
-	return this.cancel(ev, true);
+	//return this.cancel(ev, true);
 };
 
+KMOD_NONE = 0x0000
+KMOD_LSHIFT = 0x0001
+KMOD_RSHIFT = 0x0002
+KMOD_LCTRL = 0x0040
+KMOD_RCTRL = 0x0080
+KMOD_LALT = 0x0100
+KMOD_RALT = 0x0200
+KMOD_LGUI = 0x0400
+KMOD_RGUI = 0x0800
+KMOD_NUM = 0x1000
+KMOD_CAPS = 0x2000
+KMOD_MODE = 0x4000
+KMOD_RESERVED = 0x8000
+
+KMOD_CTRL=(KMOD_LCTRL|KMOD_RCTRL)
+KMOD_SHIFT=(KMOD_LSHIFT|KMOD_RSHIFT)
+KMOD_ALT=(KMOD_LALT|KMOD_RALT)
+KMOD_GUI=(KMOD_LGUI|KMOD_RGUI)
+KMOD_WIN=KMOD_GUI
+
+String_fromCharCode=inline(a){
+	auto ret=new string
+	ret.PushUnicode(a)
+	return ret
+}
 /**
 * Returns an object that determines how a KeyboardEvent should be handled. The key of the
 * returned value is the new key code to pass to the PTY.
@@ -2138,101 +2210,103 @@ Terminal_prototype.evaluateKeyEscapeSequence=function(ev) {
 	auto result={
 		// Whether to cancel event propogation (NOTE: this may not be needed since the event is
 		// canceled at the end of keyDown
-		cancel: false,
+		cancel: 0,
 		// The new key even to emit
-		key: undefined,
+		key: string.NULL,
 		// The number of characters to scroll, if this is defined it will cancel the event
-		scrollDisp: undefined
+		scrollDisp: 0
 	};
-	auto modifiers=ev.shiftKey << 0 | ev.altKey << 1 | ev.ctrlKey << 2 | ev.metaKey << 3;
+	keymod=ev["keymod"].or(0)
+	
+	auto modifiers=!!(keymod&UI.KMOD_SHIFT) << 0 | !!(keymod&UI.KMOD_ALT) << 1 | !!(keymod&UI.KMOD_CTRL) << 2 | !!(keymod&UI.KMOD_WIN) << 3;
 	switch (ev.keyCode) {
 		case 8:
 			// backspace
 			if (ev.shiftKey) {
-				result.key='\x08'; // ^H
+				result.key="\x08"; // ^H
 				break;
 			}
-			result.key='\x7f'; // ^?
+			result.key="\x7f"; // ^?
 			break;
 		case 9:
 			// tab
 			if (ev.shiftKey) {
-				result.key='\x1b[Z';
+				result.key="\x1b[Z";
 				break;
 			}
-			result.key='\t';
+			result.key="\t";
 			result.cancel=true;
 			break;
 		case 13:
 			// return/enter
-			result.key='\r';
+			result.key="\r";
 			result.cancel=true;
 			break;
 		case 27:
 			// escape
-			result.key='\x1b';
+			result.key="\x1b";
 			result.cancel=true;
 			break;
 		case 37:
 			// left-arrow
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'D';
+				result.key=FormatAsText("\x1b[1;",modifiers + 1, 'D');
 				// HACK: Make Alt + left-arrow behave like Ctrl + left-arrow: move one word backwards
 				// http://unix.stackexchange.com/a/108106
 				// macOS uses different escape sequences than linux
 				if (result.key == '\x1b[1;3D') {
-					result.key=(this.browser.isMac) ? '\x1bb' : '\x1b[1;5D';
+					result.key=(Platform.IS_APPLE) ? '\x1bb' : '\x1b[1;5D';
 				}
 			} else if (this.applicationCursor) {
-				result.key='\x1bOD';
+				result.key="\x1bOD";
 			} else {
-				result.key='\x1b[D';
+				result.key="\x1b[D";
 			}
 			break;
 		case 39:
 			// right-arrow
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'C';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'C');
 				// HACK: Make Alt + right-arrow behave like Ctrl + right-arrow: move one word forward
 				// http://unix.stackexchange.com/a/108106
 				// macOS uses different escape sequences than linux
-				if (result.key == '\x1b[1;3C') {
-					result.key=(this.browser.isMac) ? '\x1bf' : '\x1b[1;5C';
+				if (Platform.IS_APPLE&&result.key == '\x1b[1;3C') {
+					result.key=(Platform.IS_APPLE) ? '\x1bf' : '\x1b[1;5C';
 				}
 			} else if (this.applicationCursor) {
-				result.key='\x1bOC';
+				result.key="\x1bOC";
 			} else {
-				result.key='\x1b[C';
+				result.key="\x1b[C";
 			}
 			break;
 		case 38:
 			// up-arrow
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'A';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'A');
 				// HACK: Make Alt + up-arrow behave like Ctrl + up-arrow
 				// http://unix.stackexchange.com/a/108106
-				if (result.key == '\x1b[1;3A') {
-					result.key='\x1b[1;5A';
+				if (Platform.IS_APPLE&&result.key == '\x1b[1;3A') {
+					result.key="\x1b[1;5A";
 				}
 			} else if (this.applicationCursor) {
-				result.key='\x1bOA';
+				result.key="\x1bOA";
 			} else {
-				result.key='\x1b[A';
+				result.key="\x1b[A";
 			}
 			break;
 		case 40:
 			// down-arrow
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'B';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'B');
 				// HACK: Make Alt + down-arrow behave like Ctrl + down-arrow
 				// http://unix.stackexchange.com/a/108106
-				if (result.key == '\x1b[1;3B') {
-					result.key='\x1b[1;5B';
+				if (Platform.IS_APPLE&&result.key == '\x1b[1;3B') {
+					result.key="\x1b[1;5B";
 				}
 			} else if (this.applicationCursor) {
-				result.key='\x1bOB';
+				result.key="\x1bOB";
 			} else {
-				result.key='\x1b[B';
+				result.key="\x1b[B";
 			}
 			break;
 		case 45:
@@ -2240,41 +2314,41 @@ Terminal_prototype.evaluateKeyEscapeSequence=function(ev) {
 			if (!ev.shiftKey && !ev.ctrlKey) {
 				// <Ctrl> or <Shift> + <Insert> are used to
 				// copy-paste on some systems.
-				result.key='\x1b[2~';
+				result.key="\x1b[2~";
 			}
 			break;
 		case 46:
 			// delete
 			if (modifiers) {
-				result.key='\x1b[3;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[3;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[3~';
+				result.key="\x1b[3~";
 			}
 			break;
 		case 36:
 			// home
 			if (modifiers)
-				result.key='\x1b[1;' + (modifiers + 1) + 'H';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'H');
 			else if (this.applicationCursor)
-				result.key='\x1bOH';
+				result.key="\x1bOH";
 			else
-				result.key='\x1b[H';
+				result.key="\x1b[H";
 			break;
 		case 35:
 			// end
 			if (modifiers)
-				result.key='\x1b[1;' + (modifiers + 1) + 'F';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'F');
 			else if (this.applicationCursor)
-				result.key='\x1bOF';
+				result.key="\x1bOF";
 			else
-				result.key='\x1b[F';
+				result.key="\x1b[F";
 			break;
 		case 33:
 			// page up
 			if (ev.shiftKey) {
 				result.scrollDisp=-(this.rows - 1);
 			} else {
-				result.key='\x1b[5~';
+				result.key="\x1b[5~";
 			}
 			break;
 		case 34:
@@ -2282,126 +2356,126 @@ Terminal_prototype.evaluateKeyEscapeSequence=function(ev) {
 			if (ev.shiftKey) {
 				result.scrollDisp=this.rows - 1;
 			} else {
-				result.key='\x1b[6~';
+				result.key="\x1b[6~";
 			}
 			break;
 		case 112:
 			// F1-F12
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'P';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'P');
 			} else {
-				result.key='\x1bOP';
+				result.key="\x1bOP";
 			}
 			break;
 		case 113:
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'Q';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'Q');
 			} else {
-				result.key='\x1bOQ';
+				result.key="\x1bOQ";
 			}
 			break;
 		case 114:
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'R';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'R');
 			} else {
-				result.key='\x1bOR';
+				result.key="\x1bOR";
 			}
 			break;
 		case 115:
 			if (modifiers) {
-				result.key='\x1b[1;' + (modifiers + 1) + 'S';
+				result.key=FormatAsText("\x1b[1;", modifiers + 1, 'S');
 			} else {
-				result.key='\x1bOS';
+				result.key="\x1bOS";
 			}
 			break;
 		case 116:
 			if (modifiers) {
-				result.key='\x1b[15;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[15;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[15~';
+				result.key="\x1b[15~";
 			}
 			break;
 		case 117:
 			if (modifiers) {
-				result.key='\x1b[17;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[17;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[17~';
+				result.key="\x1b[17~";
 			}
 			break;
 		case 118:
 			if (modifiers) {
-				result.key='\x1b[18;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[18;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[18~';
+				result.key="\x1b[18~";
 			}
 			break;
 		case 119:
 			if (modifiers) {
-				result.key='\x1b[19;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[19;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[19~';
+				result.key="\x1b[19~";
 			}
 			break;
 		case 120:
 			if (modifiers) {
-				result.key='\x1b[20;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[20;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[20~';
+				result.key="\x1b[20~";
 			}
 			break;
 		case 121:
 			if (modifiers) {
-				result.key='\x1b[21;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[21;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[21~';
+				result.key="\x1b[21~";
 			}
 			break;
 		case 122:
 			if (modifiers) {
-				result.key='\x1b[23;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[23;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[23~';
+				result.key="\x1b[23~";
 			}
 			break;
 		case 123:
 			if (modifiers) {
-				result.key='\x1b[24;' + (modifiers + 1) + '~';
+				result.key=FormatAsText("\x1b[24;", modifiers + 1, '~');
 			} else {
-				result.key='\x1b[24~';
+				result.key="\x1b[24~";
 			}
 			break;
 		default:
 			// a-z and space
 			if (ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey) {
 				if (ev.keyCode >= 65 && ev.keyCode <= 90) {
-					result.key=String.fromCharCode(ev.keyCode - 64);
+					result.key=String_fromCharCode(ev.keyCode - 64);
 				} else if (ev.keyCode == 32) {
 					// NUL
-					result.key=String.fromCharCode(0);
+					result.key=String_fromCharCode(0);
 				} else if (ev.keyCode >= 51 && ev.keyCode <= 55) {
 					// escape, file sep, group sep, record sep, unit sep
-					result.key=String.fromCharCode(ev.keyCode - 51 + 27);
+					result.key=String_fromCharCode(ev.keyCode - 51 + 27);
 				} else if (ev.keyCode == 56) {
 					// delete
-					result.key=String.fromCharCode(127);
+					result.key=String_fromCharCode(127);
 				} else if (ev.keyCode == 219) {
 					// ^[ - Control Sequence Introducer (CSI)
-					result.key=String.fromCharCode(27);
+					result.key=String_fromCharCode(27);
 				} else if (ev.keyCode == 220) {
 					// ^\ - String Terminator (ST)
-					result.key=String.fromCharCode(28);
+					result.key=String_fromCharCode(28);
 				} else if (ev.keyCode == 221) {
 					// ^] - Operating System Command (OSC)
-					result.key=String.fromCharCode(29);
+					result.key=String_fromCharCode(29);
 				}
-			} else if (!this.browser.isMac && ev.altKey && !ev.ctrlKey && !ev.metaKey) {
+			} else if (!Platform.IS_APPLE && ev.altKey && !ev.ctrlKey && !ev.metaKey) {
 				// On Mac this is a third level shift. Use <Esc> instead.
 				if (ev.keyCode >= 65 && ev.keyCode <= 90) {
-					result.key='\x1b' + String.fromCharCode(ev.keyCode + 32);
+					result.key="\x1b" + String_fromCharCode(ev.keyCode + 32);
 				} else if (ev.keyCode == 192) {
-					result.key='\x1b`';
+					result.key="\x1b`";
 				} else if (ev.keyCode >= 48 && ev.keyCode <= 57) {
-					result.key='\x1b' + (ev.keyCode - 48);
+					result.key="\x1b" + (ev.keyCode - 48);
 				}
 			}
 			break;
@@ -2431,56 +2505,21 @@ Terminal_prototype.setgCharset=function(g, charset) {
 };
 
 /**
-* Handle a keypress event.
-* Key Resources:
-*   - https://developer.mozilla.org/en-US/docs/DOM/KeyboardEvent
-* @param {KeyboardEvent} ev The keypress event to be handled.
-*/
-Terminal_prototype.keyPress=function(ev) {
-	auto key;
-
-	this.cancel(ev);
-
-	if (ev.charCode) {
-		key=ev.charCode;
-	} else if (ev.which == null) {
-		key=ev.keyCode;
-	} else if (ev.which != 0 && ev.charCode != 0) {
-		key=ev.which;
-	} else {
-		return false;
-	}
-
-	if (!key || (
-		(ev.altKey || ev.ctrlKey || ev.metaKey) && !isThirdLevelShift(this, ev)
-	)) {
-		return false;
-	}
-
-	key=String.fromCharCode(key);
-
-	this.emit('keypress', key, ev);
-	this.emit('key', key, ev);
-	this.handler(key);
-
-	return false;
-};
-
-/**
 * Send data for handling to the terminal
 * @param {string} data
 */
-Terminal_prototype.send=function(data) {
-	auto self=this;
+Terminal_prototype.send=inline(data) {
+	//auto self=this;
 
-	if (!this.queue) {
-		setTimeout(function() {
-			self.handler(self.queue);
-			self.queue='';
-		}, 1);
-	}
+	//if (!this.queue) {
+	//	setTimeout(function() {
+	//		self.handler(self.queue);
+	//		self.queue='';
+	//	}, 1);
+	//}
 
-	this.queue += data;
+	//this.queue += data;
+	this.handler(data)
 };
 
 /**
@@ -2488,37 +2527,32 @@ Terminal_prototype.send=function(data) {
 * Note: We could do sweet things with webaudio here
 */
 Terminal_prototype.bell=function() {
-	if (!this.visualBell) return;
-	auto self=this;
-	this.element.style.borderColor='white';
-	setTimeout(function() {
-		self.element.style.borderColor='';
-	}, 10);
-	if (this.popOnBell) this.focus();
+	term.bell_tick=System.Time.tick64()+System.Time.SecondsToTicks(VISUAL_BELL_DURATION)
+	JS["UI"].CallVoidMethod("Refresh")
 };
 
 /**
 * Log the current state to the console.
 */
-Terminal_prototype.log=function() {
-	if (!this.debug) return;
-	if (!this.context.console || !this.context.console.log) return;
-	auto args=Array.prototype.slice.call(arguments);
-	this.context.console.log.apply(this.context.console, args);
-};
+//Terminal_prototype.log=function() {
+//	if (!this.debug) return;
+//	if (!this.context.console || !this.context.console.log) return;
+//	auto args=Array.prototype.slice.call(arguments);
+//	this.context.console.log.apply(this.context.console, args);
+//};
 
 /**
 * Log the current state as error to the console.
 */
-Terminal_prototype.error=function() {
-	if (!this.debug) return;
-	if (!this.context.console || !this.context.console.error) return;
-	auto args=Array.prototype.slice.call(arguments);
-	this.context.console.error.apply(this.context.console, args);
-};
+//Terminal_prototype.error=function() {
+//	if (!this.debug) return;
+//	if (!this.context.console || !this.context.console.error) return;
+//	auto args=Array.prototype.slice.call(arguments);
+//	this.context.console.error.apply(this.context.console, args);
+//};
 
 /**
-* Resizes the g_
+* Resizes the terminal
 *
 * @param {number} x The number of columns to resize to.
 * @param {number} y The number of rows to resize to.
@@ -2529,9 +2563,10 @@ Terminal_prototype.resize=function(x, y) {
 		return;
 	}
 
-	if (x < 1) x=1;
-	if (y < 1) y=1;
+	if (x < 2): x=2;
+	if (y < 1): y=1;
 
+	!?
 	// resize cols
 	j=this.cols;
 	if (j < x) {
@@ -2627,10 +2662,10 @@ Terminal_prototype.resize=function(x, y) {
 /**
 * Set the range of refreshing to the maximum value
 */
-Terminal_prototype.maxRange=function() {
-	this.refreshStart=0;
-	this.refreshEnd=this.rows - 1;
-};
+//Terminal_prototype.maxRange=function() {
+//	this.refreshStart=0;
+//	this.refreshEnd=this.rows - 1;
+//};
 
 
 
@@ -2690,7 +2725,7 @@ Terminal_prototype.eraseRight=function(x, y) {
 		line[x]=ch;
 	}
 
-	this.updateRange(y);
+	//this.updateRange(y);
 };
 
 
@@ -2707,7 +2742,7 @@ Terminal_prototype.eraseLeft=function(x, y) {
 	x++;
 	while (x--) line[x]=ch;
 
-	this.updateRange(y);
+	//this.updateRange(y);
 };
 
 /**
@@ -2791,7 +2826,7 @@ Terminal_prototype.handler=function(data) {
 	if (this.ybase != this.ydisp) {
 		this.scrollToBottom();
 	}
-	this.emit('data', data);
+	this.OnData(data);
 };
 
 
@@ -2840,8 +2875,8 @@ Terminal_prototype.reverseIndex=function() {
 		// blankLine(true) is xterm/linux behavior
 		this.lines.shiftElements(this.y + this.ybase, this.rows - 1, 1);
 		this.lines.set(this.y + this.ybase, this.blankLine(true));
-		this.updateRange(this.scrollTop);
-		this.updateRange(this.scrollBottom);
+		//this.updateRange(this.scrollTop);
+		//this.updateRange(this.scrollBottom);
 	} else {
 		this.y--;
 	}
@@ -3198,7 +3233,7 @@ Terminal_prototype.charAttributes=function(params) {
 			fg=(this.defAttr >> 9) & 0x1ff;
 			bg=this.defAttr & 0x1ff;
 		} else {
-			this.error('Unknown SGR attribute: %d.', p);
+			//this.error('Unknown SGR attribute: %d.', p);
 		}
 	}
 
@@ -3373,8 +3408,8 @@ Terminal_prototype.insertLines=function(params) {
 	}
 
 	// this.maxRange();
-	this.updateRange(this.y);
-	this.updateRange(this.scrollBottom);
+	//this.updateRange(this.y);
+	//this.updateRange(this.scrollBottom);
 };
 
 
@@ -3406,8 +3441,8 @@ Terminal_prototype.deleteLines=function(params) {
 	}
 
 	// this.maxRange();
-	this.updateRange(this.y);
-	this.updateRange(this.scrollBottom);
+	//this.updateRange(this.y);
+	//this.updateRange(this.scrollBottom);
 };
 
 
@@ -4042,8 +4077,8 @@ Terminal_prototype.scrollUp=function(params) {
 		this.lines.splice(this.ybase + this.scrollBottom, 0, this.blankLine());
 	}
 	// this.maxRange();
-	this.updateRange(this.scrollTop);
-	this.updateRange(this.scrollBottom);
+	//this.updateRange(this.scrollTop);
+	//this.updateRange(this.scrollBottom);
 };
 
 
@@ -4057,8 +4092,8 @@ Terminal_prototype.scrollDown=function(params) {
 		this.lines.splice(this.ybase + this.scrollTop, 0, this.blankLine());
 	}
 	// this.maxRange();
-	this.updateRange(this.scrollTop);
-	this.updateRange(this.scrollBottom);
+	//this.updateRange(this.scrollTop);
+	//this.updateRange(this.scrollBottom);
 };
 
 
@@ -4349,8 +4384,8 @@ Terminal_prototype.setAttrInRectangle=function(params) {
 	}
 
 	// this.maxRange();
-	this.updateRange(params[0]);
-	this.updateRange(params[2]);
+	//this.updateRange(params[0]);
+	//this.updateRange(params[2]);
 };
 
 
@@ -4374,13 +4409,13 @@ Terminal_prototype.fillRectangle=function(params) {
 	for (; t < b + 1; t++) {
 		line=this.lines.get(this.ybase + t);
 		for (i=l; i < r; i++) {
-			line[i]=[line[i][0], String.fromCharCode(ch)];
+			line[i]=[line[i][0], String_fromCharCode(ch)];
 		}
 	}
 
 	// this.maxRange();
-	this.updateRange(params[1]);
-	this.updateRange(params[3]);
+	//this.updateRange(params[1]);
+	//this.updateRange(params[3]);
 };
 
 
@@ -4431,8 +4466,8 @@ Terminal_prototype.eraseRectangle=function(params) {
 	}
 
 	// this.maxRange();
-	this.updateRange(params[0]);
-	this.updateRange(params[2]);
+	//this.updateRange(params[0]);
+	//this.updateRange(params[2]);
 };
 
 
@@ -4454,7 +4489,7 @@ Terminal_prototype.insertColumns=function() {
 		}
 	}
 
-	this.maxRange();
+	//this.maxRange();
 };
 
 
@@ -4476,7 +4511,7 @@ Terminal_prototype.deleteColumns=function() {
 		}
 	}
 
-	this.maxRange();
+	//this.maxRange();
 };
 
 /**
@@ -4597,12 +4632,12 @@ function indexOf(obj, el) {
 	return -1;
 }
 
-function isThirdLevelShift(term, ev) {
+function isThirdLevelShift(term, ev, is_keypress) {
 	auto thirdLevelKey =
 			(term.browser.isMac && ev.altKey && !ev.ctrlKey && !ev.metaKey) ||
 			(term.browser.isMSWindows && ev.altKey && ev.ctrlKey && !ev.metaKey);
 
-	if (ev.type == 'keypress') {
+	if (is_keypress) {
 		return thirdLevelKey;
 	}
 
