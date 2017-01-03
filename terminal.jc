@@ -55,7 +55,7 @@ class Terminal{
 	convertEol= true
 	termName= 'xterm'
 	//termName= 'linux'
-	geometry= [80, 24]
+	geometry= [80, 25]
 	cursorBlink= false
 	//visualBell= false
 	popOnBell= false
@@ -167,6 +167,11 @@ class Terminal{
 	// Store if user went browsing history in scrollback
 	userScrolling=false
 	OnData=function(string s){}
+	download_buf=string.NULL
+	download_written_size=0LL
+	download_size=-1LL
+	download_start=0LL
+	download_file=System.IO.CFile.NULL
 	/**
 	* Creates a new `Terminal` object.
 	*
@@ -2685,15 +2690,12 @@ class Terminal{
 	*   [1,1]) (HVP).
 	*/
 	HVPosition=function(params) {
-		if (params[0] < 1): params[0]=1;
-		if (params[1] < 1): params[1]=1;
-	
-		this.y=params[0] - 1;
+		this.y=max(params.n>=1?params[0]:1,1) - 1;
 		if (this.y >= this.rows) {
 			this.y=this.rows - 1;
 		}
 	
-		this.x=params[1] - 1;
+		this.x=max(params.n>=2?params[1]:1,1) - 1;
 		if (this.x >= this.cols) {
 			this.x=this.cols - 1;
 		}
@@ -3565,6 +3567,55 @@ class Terminal{
 	
 	//	//this.maxRange();
 	//};
+	download=function(string fn_local,string fn_remote){
+		if this.download_buf:return 0
+		fn_bash=fn_remote.Replace(["'","'\\''"])
+		this.download_buf=new string
+		this.download_size=-1LL
+		this.download_written_size=0LL
+		this.download_file=System.IO.CreateFile(fn_local)
+		this.send("ONLCR=`stty|grep onlcr`;stty -onlcr;wc -c '"+fn_bash+"'|cut -f 1 -d ' ';cat '"+fn_bash+"';stty $ONLCR;\r")
+		return 1
+	}
+	downloadWrite=function(string s){
+		this.download_buf.push(s)
+		if this.download_size<0LL:
+			//try to parse the header
+			pnewline=this.download_buf.IndexOf('\n')
+			if pnewline>=0:
+				sline_header=this.download_buf[pnewline+1:]
+				pnewline2=sline_header.IndexOf('\n')
+				if pnewline2>=0:
+					this.download_size=sline_header[:pnewline2-1].as(i64)
+					//Writeln('>>> ',sline_header[:pnewline2-1],' ',this.download_size)
+					if this.download_size<0LL:
+						this.download_size=0LL
+					//write the command itself
+					this.write(this.download_buf[:pnewline-1])
+					this.write("\r\n")
+					this.download_buf=new(this.download_buf[iptr(pnewline+1+pnewline2+1):])
+		if this.download_size<0LL:
+			//need a header
+			return 0
+		n_remaining=this.download_size-this.download_written_size
+		if i64(this.download_buf.n)>=n_remaining:
+			//write the remaining stuff
+			//Writeln(this.download_written_size,' ',this.download_size,' ',this.download_buf.n)
+			this.write("\rDownload completed\r\n")
+			this.write(this.download_buf[iptr(n_remaining):])
+			this.download_file.Write(this.download_buf[:n_remaining-1])
+			this.download_file.Close()
+			this.download_file=System.IO.CFile.NULL
+			this.download_buf=string.NULL
+			return 1
+		this.write(FormatAsText('\r',formatNumber(float(this.download_written_size+i64(this.download_buf.n))/float(this.download_size)*100.f,{frac:1}),'%'))
+		if this.download_buf.n>=1048576L:
+			//need to flush the result every so often, don't buffer too much
+			this.download_written_size+=i64(this.download_buf.n)
+			this.download_file.Write(this.download_buf)
+			this.download_buf.n=0
+		return 0
+	}
 	
 };
 //__enable_dynamic_members(Terminal);
@@ -3686,13 +3737,34 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			return 0
 		}
 		PIPE_READ_BATCH=65536
+		CheckProcessOutput=function(){
+			auto did=0
+			for iiter=0:15
+				if !proc.pipe_2nd.WouldBlock():
+					s=proc.pipe_2nd.Read(PIPE_READ_BATCH)
+					if s&&s.n>0:
+						//if Platform.BUILD=="debug":
+						//	Write(s.Replace(["\r","\\r","\x1b","<ESC>"]))
+						//	System.IO.stdout().Flush()
+						if term.download_buf:
+							term.downloadWrite(s)
+						else
+							term.write(s)
+						did=1
+				else
+					break
+			return did
+		}
+		js_term["Download"]=function(JSContext JS){
+			fn_local=JS.Param(0).as(string)
+			fn_remote=JS.Param(1).as(string)
+			term.download(fn_local,fn_remote)
+			return 0
+		}
 		js_term["Render"]=function(JSContext JS){
 			////////////////////
 			//poll the pipe on render
-			if !proc.pipe_2nd.WouldBlock():
-				s=proc.pipe_2nd.Read(PIPE_READ_BATCH)
-				if s&&s.n>0:
-					term.write(s)
+			CheckProcessOutput()
 			////////////////////
 			g_renderer=Gui2D.detail.g_renderer
 			term.need_update=0
@@ -3872,18 +3944,11 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				term.input_queue.n-=nwritten
 			if term.input_queue.n:
 				poll_delay=0
-			if !proc.pipe_2nd.WouldBlock():
-				s=proc.pipe_2nd.Read(PIPE_READ_BATCH)
-				if s&&s.n>0:
-					if Platform.BUILD=="debug":
-						Write(s.Replace(["\r","\\r","\x1b","<ESC>"]))
-						System.IO.stdout().Flush()
-					term.write(s)
-					poll_delay=0
-					JS_UI.CallMethod(int,"Refresh")
-			else
-				if !proc.isRunning():
-					poll_delay=-1
+			if CheckProcessOutput():
+				poll_delay=0
+				JS_UI.CallMethod(int,"Refresh")
+			else if !proc.isRunning():
+				poll_delay=-1
 			return JS.Return(poll_delay)
 		}
 		js_term["OnMouseWheel"]=function(JSContext JS){

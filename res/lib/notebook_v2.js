@@ -1716,6 +1716,11 @@ W.Terminal=function(id,attrs){
 			},
 		});
 	}
+	if(UI.HasFocus(obj)){
+		//W.Hotkey("",{key:"CTRL+D",action:function(){
+		//	obj.Download("c:/users/hqm/downloads/icon1k.png","icon1k.png");
+		//}});
+	}
 	UI.PopCliprect();
 	UI.End();
 	return obj;
