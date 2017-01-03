@@ -1680,32 +1680,37 @@ W.Terminal=function(id,attrs){
 	UI.Begin(obj)
 	if(!obj.m_term){
 		//var proc=IO.RunToolRedirected(args,spath,0);
-		UI.InitTerminal(obj,obj.cols,obj.rows,obj.proc.GetNativeProcess());
-		obj.idle_wait=100;
-		var fpoll=(function(){
-			var twait=this.Poll();
-			if(twait>0){
-				this.idle_wait=Math.min(this.idle_wait*2,1000);
-				UI.setTimeout(fpoll,this.idle_wait);
-			}else if(twait<0){
-				//terminated, do nothing
-			}else{
-				this.idle_wait=100;
-				UI.NextTick(fpoll)
+		if(!UI.InitTerminal(obj,obj.cols,obj.rows,obj.args,obj.spath)){
+			obj.m_term="bad";
+			obj.Render=function(){
+				//do nothing
 			}
-		}).bind(obj);
+		}else{
+			obj.idle_wait=25;
+			var fpoll=(function(){
+				var twait=this.Poll();
+				if(twait>0){
+					this.idle_wait=Math.min(this.idle_wait*2,100);
+					UI.setTimeout(fpoll,this.idle_wait);
+				}else if(twait<0){
+					//terminated, do nothing
+				}else{
+					this.idle_wait=25;
+					UI.NextTick(fpoll)
+				}
+			}).bind(obj);
+			UI.NextTick(fpoll);
+		}
 	}
 	W.PureRegion(id,obj);
+	UI.PushCliprect(obj.x,obj.y,obj.w,obj.h);
 	obj.Render(obj.x,obj.y,obj.w,obj.h);
+	UI.PopCliprect();
 	UI.End();
 	return obj;
 };
 
-UI.OpenTerminalTab=function(args,path){
-	var proc=IO.RunToolRedirected(args,spath,0);
-	if(!proc){
-		return undefined;
-	}
+UI.OpenTerminalTab=function(options){
 	UI.top.app.quit_on_zero_tab=0;
 	var ret=UI.NewTab({
 		file_name:'<terminal>',
@@ -1718,7 +1723,7 @@ UI.OpenTerminalTab=function(args,path){
 			if(this.main_widget){
 				title=(this.main_widget.GetTitle()||title);
 			}
-			return title;
+			this.title=title;
 		},
 		body:function(){
 			//frontmost doc
@@ -1728,8 +1733,15 @@ UI.OpenTerminalTab=function(args,path){
 				'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 				'file_name':'<terminal>',
 				'x':0,'y':0,
-				'proc':proc,
+				'args':options.args,
+				'spath':options.spath,
+				'cols':options.cols,
+				'rows':options.rows,
+				'default_focus':1,
 			});
+			if(!had_body){
+				UI.SetFocus(body);
+			}
 			this.main_widget=body;
 			return body;
 		},

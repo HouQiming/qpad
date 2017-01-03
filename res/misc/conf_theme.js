@@ -769,10 +769,10 @@ UI.CustomTheme=function(){
 			},
 		},
 		terminal:{
-			font:UI.Font("res/fonts/inconsolata.ttf",26),
+			font:UI.Font("res/fonts/inconsolata.ttf",20,-50),
 			embolden:200,
 			cols:80,
-			rows:40,
+			rows:25,
 		},
 		tip_window:{
 			w_text:512,

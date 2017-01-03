@@ -794,7 +794,14 @@ UI.Application=function(id,attrs){
 	if(UI.Platform.BUILD=="debug"){
 		//todo: test terminal
 		W.Hotkey("",{key:"SHIFT+CTRL+X",action:function(){
-			UI.OpenTerminalTab(["bash","-i"],".");
+			//UI.OpenTerminalTab(["bash","-i"],".");
+			UI.OpenTerminalTab({
+				args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty line 30;bash -i","/dev/null"],
+				//args:["powershell"],
+				spath:".",
+				cols:"132",
+				rows:"30",
+			});
 		}});
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
