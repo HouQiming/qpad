@@ -52,7 +52,7 @@ class Terminal{
 	//self.cancel=Terminal.cancel;
 	colors= g_colors
 	theme= 'default'
-	convertEol= false
+	convertEol= true
 	termName= 'xterm'
 	//termName= 'linux'
 	geometry= [80, 24]
@@ -193,6 +193,8 @@ class Terminal{
 		//Writeln('this.scrollback*this.cols*3=',this.scrollback*this.cols*3,' ',this.scrollback,' ',this.cols,' ',param_cols)
 		this.lines=new int[this.scrollback*this.cols*3]
 		this.n_valid_lines=0
+		this.ybase=0
+		this.ydisp=0
 		this.setupStops(0);
 	}
 	/**
@@ -3884,9 +3886,43 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					poll_delay=-1
 			return JS.Return(poll_delay)
 		}
+		js_term["OnMouseWheel"]=function(JSContext JS){
+			ev=JS.Param(0).as(JSObject)
+			dy=ev["y"].as(int)
+			term.scrollDisp(-3*dy)
+			term.need_update=1
+			JS_UI.CallMethod(int,"Refresh")
+			return 0
+		}
+		js_term["GetRows"]=function(JSContext JS){
+			return JS.Return(term.rows)
+		}
+		js_term["GetNValidLines"]=function(JSContext JS){
+			return JS.Return(term.n_valid_lines)
+		}
+		js_term["GetScrollValue"]=function(JSContext JS){
+			scroll_tot=term.n_valid_lines-term.rows
+			scroll_cur=term.ydisp
+			if scroll_cur>term.ybase:
+				scroll_cur-=term.scrollback
+			scroll_cur-=(term.ybase-scroll_tot)
+			if !(scroll_tot>0):
+				return 0
+			else
+				return JS.Return(double(scroll_cur)/double(scroll_tot))
+		}
+		js_term["SetScrollValue"]=function(JSContext JS){
+			value=JS.Param(0).as(double)
+			scroll_tot=term.n_valid_lines-term.rows
+			if scroll_tot>0:
+				scroll_cur=min(max(int(value*double(scroll_tot)),0),scroll_tot)
+				term.ydisp=term.ybase-scroll_tot+scroll_cur+term.scrollback
+				term.userScrolling=(term.ydisp!=term.ybase)
+				term.need_update=1
+				JS_UI.CallMethod(int,"Refresh")
+			return 0
+		}
 		//todo: copy / paste / r-click
-		//todo: wheel - just a viewport scroll
-		//todo: term.title
 		return JS.Return(js_term)
 	}
 })

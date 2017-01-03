@@ -1705,6 +1705,17 @@ W.Terminal=function(id,attrs){
 	W.PureRegion(id,obj);
 	UI.PushCliprect(obj.x,obj.y,obj.w,obj.h);
 	obj.Render(obj.x,obj.y,obj.w,obj.h);
+	var value=obj.GetScrollValue();
+	if(value>=0){
+		W.ScrollBar("sbar",{
+			x:obj.x+obj.w-obj.w_scroll_bar, y:obj.y, w:obj.w_scroll_bar, h:obj.h, dimension:'y',
+			page_size:obj.GetRows(), total_size:obj.GetNValidLines()-obj.GetRows(), value:value,
+			OnChange:function(value){
+				obj.SetScrollValue(value)
+				UI.Refresh()
+			},
+		});
+	}
 	UI.PopCliprect();
 	UI.End();
 	return obj;

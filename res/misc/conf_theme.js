@@ -773,6 +773,7 @@ UI.CustomTheme=function(){
 			embolden:200,
 			cols:80,
 			rows:25,
+			w_scroll_bar:20,
 		},
 		tip_window:{
 			w_text:512,

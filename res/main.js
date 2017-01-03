@@ -796,11 +796,12 @@ UI.Application=function(id,attrs){
 		W.Hotkey("",{key:"SHIFT+CTRL+X",action:function(){
 			//UI.OpenTerminalTab(["bash","-i"],".");
 			UI.OpenTerminalTab({
-				args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty line 30;bash -i","/dev/null"],
+				//args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty line 30;bash -i","/dev/null"],
+				args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;bash -i","/dev/null"],
 				//args:["powershell"],
 				spath:".",
-				cols:"132",
-				rows:"30",
+				//cols:"132",
+				//rows:"30",
 			});
 		}});
 		//detect memory leaks
