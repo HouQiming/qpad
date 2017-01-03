@@ -798,10 +798,12 @@ UI.Application=function(id,attrs){
 			UI.OpenTerminalTab({
 				//args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty line 30;bash -i","/dev/null"],
 				args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;bash -i","/dev/null"],
+				//args:["bad_command"],
 				//args:["powershell"],
 				spath:".",
 				//cols:"132",
 				//rows:"30",
+				auto_close:1,
 			});
 		}});
 		//detect memory leaks

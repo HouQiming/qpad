@@ -990,11 +990,8 @@ var RenderLayout=function(layout,obj,y_base){
 										rgn[s_method_name]=function(tab,rgn,fn,event){
 											//force-update the tab
 											tab.backup_x=undefined;
-											if(fn.call){
-												fn.call(rgn,event);
-											}else{
-												fn(event);
-											}
+											rgn['__temp_fn']=fn;
+											rgn['__temp_fn'](event);
 										}.bind(undefined,tab,rgn,rgn[s_method_name])
 										//avoid repeated application
 										rgn[s_method_name].is_rerender_hacked=1;

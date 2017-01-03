@@ -1,6 +1,6 @@
-//todo: smart space alloc
 import "system.jc"
 import "gui2d.jc"
+import "s-d-l.jc"
 import "javascript.jc"
 import System.Algorithm.*
 import System.Math.*
@@ -154,10 +154,12 @@ class Terminal{
 	cols=0
 	rows=0
 	lines=int[].NULL
+	line_end_states=int[].NULL //default: \n, 1: wrapped
 	n_valid_lines=0
 	need_update=0
 	gcharset=0
-	input_queue=string.NULL
+	input_during_download=string.NULL
+	input_pipe_queue=string.NULL
 	normal=__uninit()
 	sendFocus=false
 	bell_tick=System.Time.tick64()
@@ -196,7 +198,8 @@ class Terminal{
 		* and [2] is the character width
 		*/
 		//Writeln('this.scrollback*this.cols*3=',this.scrollback*this.cols*3,' ',this.scrollback,' ',this.cols,' ',param_cols)
-		this.lines=new int[this.scrollback*this.cols*3]
+		this.lines=new int[]
+		this.line_end_states=new int[]
 		this.n_valid_lines=0
 		this.ybase=0
 		this.ydisp=0
@@ -220,15 +223,30 @@ class Terminal{
 		szrow=this.cols*(3*sizeof(int))
 		if tar<src:
 			for i=0:n-1
+				this.line_end_states[(tar+i)%this.scrollback]=this.line_end_states[(src+i)%this.scrollback]
 				__basic_api.memcpy(
 					__pointer(this.lines.d+(tar+i)%this.scrollback*szrow),__pointer(this.lines.d+(src+i)%this.scrollback*szrow),szrow)
 		else
 			for i=n-1:-1:0
+				this.line_end_states[(tar+i)%this.scrollback]=this.line_end_states[(src+i)%this.scrollback]
 				__basic_api.memcpy(
 					__pointer(this.lines.d+(tar+i)%this.scrollback*szrow),__pointer(this.lines.d+(src+i)%this.scrollback*szrow),szrow)
 	
+	requestLines=function(int nlines){
+		if nlines>this.n_valid_lines:
+			this.n_valid_lines=min(nlines,this.scrollback)
+			this.lines.resize(this.n_valid_lines*this.cols*3)
+			this.line_end_states.resize(this.n_valid_lines)
+	}
+	
 	clearWithAttr=function(pchar,attr,nchar){
 		if !(nchar>0):return
+		requestLines((pchar+nchar+this.cols-1)/this.cols)
+		//clear line_end_states
+		for row=pchar/this.cols:(pchar+nchar+this.cols-1)/this.cols-1
+			row_real=row%this.scrollback
+			if row_real<this.line_end_states.n:
+				this.line_end_states[row_real]=0
 		if pchar+nchar>this.lines.n:
 			for i=pchar:this.lines.n-1
 				this.lines[(i)*3+0]=attr
@@ -285,8 +303,6 @@ class Terminal{
 			}
 			// blank out the recycled line after going over it
 			this.clearWithAttr(row*this.cols,this.defAttr,this.cols)
-			if this.n_valid_lines<this.scrollback:
-				this.n_valid_lines++;
 	
 		/**
 		* This event is emitted whenever the terminal is scrolled.
@@ -310,8 +326,8 @@ class Terminal{
 		if available_lines<0:
 			available_lines+=this.scrollback
 		if (disp < 0) {
-			auto y_top=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
-			auto available_lines_neg=(this.ydisp-y_top+this.scrollback)%this.scrollback
+			auto ytop=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
+			auto available_lines_neg=(this.ydisp-ytop+this.scrollback)%this.scrollback
 			if disp<-available_lines_neg:
 				disp=-available_lines_neg
 			this.userScrolling=true;
@@ -358,6 +374,12 @@ class Terminal{
 	*/
 	write=function(string data0) {
 		if(!this.writable){return;}
+		if this.selecting>0:
+			//freeze the terminal temporarily when selecting stuff
+			if !this.s_lingering:
+				this.s_lingering=new string
+			this.s_lingering.push(data0)
+			return
 		this.need_update=1
 		auto data=data0;
 		auto l=data.n, i=0, j, cs, ch, code, low, ch_width, row;
@@ -429,7 +451,19 @@ class Terminal{
 	
 						// '\t'
 						case '\t':
+							//note: \t beyond cols would have been dropped...
+							auto x0=this.x
 							this.x=this.nextStop(this.x);
+							if x0<this.cols&&this.x>x0:
+								//put up a tab char for selection
+								row=this.y + this.ybase;
+								if row>=this.scrollback:
+									row-=this.scrollback
+								this.requestLines(row+1)
+								auto pcurchar=(row*this.cols+x0)*3;
+								this.lines[pcurchar+0]=this.curAttr
+								this.lines[pcurchar+1]=9
+								this.lines[pcurchar+2]=this.x-x0
 							break;
 	
 						// shift out
@@ -467,7 +501,7 @@ class Terminal{
 	
 								// insert combining char in last cell
 								// FIXME: needs handling after cursor jumps
-								//todo: combining chars - don't want strings in cells
+								//coulddo: combining chars - we don't want strings in cells...
 								//if (!ch_width && this.x) {
 								//	// dont overflow left
 								//	if (this.lines.get(row)[this.x-1]) {
@@ -489,6 +523,8 @@ class Terminal{
 								if (this.x+ch_width-1 >= this.cols) {
 									// autowrap - DECAWM
 									if (this.wraparoundMode) {
+										//this line has wrapped, update the ending state
+										this.line_end_states[row]=1
 										this.x=0;
 										this.y++;
 										if (this.y > this.scrollBottom) {
@@ -504,8 +540,7 @@ class Terminal{
 								row=this.y + this.ybase;
 								if row>=this.scrollback:
 									row-=this.scrollback
-								if row+1>this.n_valid_lines:
-									this.n_valid_lines=row+1
+								this.requestLines(row+1)
 	
 								// insert mode: move characters to right
 								if (this.insertMode) {
@@ -1363,6 +1398,13 @@ class Terminal{
 		//this.refresh(this.refreshStart, this.refreshEnd);
 	};
 	
+	flushQueuedWrites=inline(){
+		if this.s_lingering:
+			auto data=this.s_lingering
+			this.s_lingering=string.NULL
+			this.write(data)
+	}
+	
 	/**
 	* Writes text to the terminal, followed by a break line character (\n).
 	* @param {string} text The text to write to the g_
@@ -1383,37 +1425,82 @@ class Terminal{
 	//	this.customKeydownHandler=customKeydownHandler;
 	//}
 	
+	confirmCopy=function(JS){
+		if !this.selecting:return
+		auto sel_x0=this.sel_x0
+		auto sel_y0=this.sel_y0
+		auto sel_x1=this.sel_x1
+		auto sel_y1=this.sel_y1
+		auto ytop=(this.n_valid_lines<this.scrollback?0:this.ybase+this.rows%this.scrollback)
+		sel_y0=(sel_y0+this.scrollback-ytop)%this.scrollback
+		sel_y1=(sel_y1+this.scrollback-ytop)%this.scrollback
+		if sel_y0>sel_y1||sel_y0==sel_y1&&sel_x0>sel_x1:
+			tmp=sel_x0;sel_x0=sel_x1;sel_x1=tmp
+			tmp=sel_y0;sel_y0=sel_y1;sel_y1=tmp
+		auto stext=new string
+		for j=sel_y0:sel_y1
+			row=(ytop+j)%this.scrollback
+			sel_x0_j=this.cols
+			sel_x1_j=0
+			if j==sel_y0:
+				sel_x0_j=sel_x0
+			else if j>sel_y0:
+				sel_x0_j=0
+			if j==sel_y1:
+				sel_x1_j=sel_x1
+			else if j<sel_y1:
+				sel_x1_j=this.cols
+			for i=sel_x0_j:sel_x1_j-1
+				auto addr=(row*this.cols+i)*3
+				if addr+2<this.lines.n&&this.lines[addr+2]:
+					stext.PushUnicode(this.lines[addr+1])
+			if row<this.line_end_states.n&&this.line_end_states[row]==0:
+				has_newline=1
+				for i=sel_x1_j:this.cols-1
+					auto addr=(row*this.cols+i)*3
+					if addr+2<this.lines.n&&this.lines[addr+2]:
+						has_newline=0
+						break
+				if has_newline:
+					stext.push('\n')
+		stext.push(char(0))
+		SDL.detail.SDL_SetClipboardText(stext)
+		stext.discard()
+		if this.selecting==1:
+			js_this=JS.GetThis()
+			JS["UI"].CallMethod(int,"ReleaseMouse",js_this)
+		this.selecting=0
+	}
+	
 	/**
 	* Handle a keydown event
 	* Key Resources:
 	*   - https://developer.mozilla.org/en-US/docs/DOM/KeyboardEvent
 	* @param {KeyboardEvent} ev The keydown event to be handled.
 	*/
-	keyDown=function(ev) {
-		//if (this.customKeydownHandler && this.customKeydownHandler(ev) == false) {
-		//	return false;
-		//}
-	
-		//if (!this.compositionHelper.keydown.bind(this.compositionHelper)(ev)) {
-		//	if (this.ybase != this.ydisp) {
-		//		this.scrollToBottom();
-		//	}
-		//	return false;
-		//}
-		
+	keyDown=function(JS,ev) {
 		auto result=this.evaluateKeyEscapeSequence(ev);
 		
 		if (result.scrollDisp) {
 			this.scrollDisp(result.scrollDisp);
 			return 1;
 		}
-	
+
 		auto keymod=ev["keymod"].or(0)
 		auto shiftKey=!!(keymod&KMOD_SHIFT)
 		auto altKey=!!(keymod&KMOD_ALT)
 		auto ctrlKey=!!(keymod&KMOD_CTRL)
 		auto metaKey=!!(keymod&KMOD_WIN)
 		auto keyCode=ev["keysym"].as(int)
+		if this.selecting>0:
+			if !keymod&&(keyCode==13||keyCode==1073741982)||keymod==KMOD_CTRL&&keyCode==99:
+				//return / ctrl+c - copy text and cancel sel
+				//SDL.detail.SDL_SetClipboardText()
+				this.confirmCopy(JS)
+				return 1
+			//todo: download hotkey
+			return 0
+	
 		auto thirdLevelKey = (
 				(Platform.IS_APPLE && altKey && !ctrlKey && !metaKey) ||
 				(Platform.IS_WINDOWS && altKey && ctrlKey && !metaKey));
@@ -1431,6 +1518,16 @@ class Terminal{
 			return 0;
 		}
 	
+		if this.download_buf:
+			if result.key=="\x03":
+				//CTRL+C
+				this.input_during_download=string.NULL
+				this.cancelDownload()
+				return 1
+			if !this.input_during_download:
+				this.input_during_download=new string
+			this.input_during_download.push(result.key)
+			return 1
 		//this.emit('keydown', ev);
 		//this.emit('key', result.key, ev);
 		this.handler(result.key);
@@ -1767,6 +1864,18 @@ class Terminal{
 		this.handler(data)
 	};
 	
+	onTextInput=function(text){
+		//selection won't matter here - it can't possibly be a hotkey, just send it
+		//if this.selecting>0:
+		//when downloading, though, we have to buffer it
+		if this.download_buf:
+			if !this.input_during_download:
+				this.input_during_download=new string
+			this.input_during_download.push(text)
+		else
+			this.handler(text)
+	}
+	
 	/**
 	* Ring the bell.
 	* Note: We could do sweet things with webaudio here
@@ -1792,7 +1901,7 @@ class Terminal{
 		if (x < 2) x=2;
 		if (y < 1) y=1;
 	
-		new_lines=new int[this.scrollback*x*3]
+		new_lines=new int[this.n_valid_lines*x*3]
 		ncpy=min(this.cols,x)*(3*sizeof(int))
 		for i=0:this.n_valid_lines-1
 			__basic_api.memcpy(
@@ -2885,6 +2994,7 @@ class Terminal{
 						if (!this.has_normal) {
 							auto normal={
 								lines: this.lines,
+								line_end_states: this.line_end_states,
 								ybase: this.ybase,
 								ydisp: this.ydisp,
 								n_valid_lines: this.n_valid_lines,
@@ -3063,6 +3173,7 @@ class Terminal{
 					case 47,1047,1049: // normal screen buffer - clearing it first
 						if (this.has_normal) {
 							this.lines=this.normal.lines;
+							this.line_end_states=this.normal.line_end_states;
 							this.ybase=this.normal.ybase;
 							this.ydisp=this.normal.ydisp;
 							this.n_valid_lines=this.normal.n_valid_lines
@@ -3207,6 +3318,7 @@ class Terminal{
 		auto param=params.n>=1?params[0]:1
 		
 		row=(this.y + this.ybase)%this.scrollback;
+		this.requestLines(row+1)
 		j=this.x;
 		param=min(max(param,1),this.cols-j)
 		pchar=row*this.cols+j
@@ -3607,6 +3719,10 @@ class Terminal{
 			this.download_file.Close()
 			this.download_file=System.IO.CFile.NULL
 			this.download_buf=string.NULL
+			if this.input_during_download:
+				s_input=this.input_during_download
+				this.input_during_download=string.NULL
+				this.send(s_input)
 			return 1
 		this.write(FormatAsText('\r',formatNumber(float(this.download_written_size+i64(this.download_buf.n))/float(this.download_size)*100.f,{frac:1}),'%'))
 		if this.download_buf.n>=1048576L:
@@ -3616,7 +3732,32 @@ class Terminal{
 			this.download_buf.n=0
 		return 0
 	}
+	cancelDownload=function(){
+		n_remaining=iptr(min(this.download_size-this.download_written_size,i64(this.download_buf.n)))
+		this.write("\rDownload canceled\r\n")
+		this.download_file.Write(this.download_buf[:n_remaining-1])
+		this.download_file.Close()
+		this.download_file=System.IO.CFile.NULL
+		this.download_buf=string.NULL
+		//we need to actually send the CTRL+C
+		this.send("\x03")
+	}
+	__JS_prototype=function(JSObject proto){
+		proto.ExportProperty(this,"cols")
+		proto.ExportProperty(this,"rows")
+		proto.ExportProperty(this,"n_valid_lines")
+	}
 	
+	/////////////
+	x_rendered=0.f
+	y_rendered=0.f
+	selecting=0
+	sel_x0=0
+	sel_y0=0
+	sel_x1=0
+	sel_y1=0
+	//w_rendered=0.f
+	//h_rendered=0.f
 };
 //__enable_dynamic_members(Terminal);
 
@@ -3713,17 +3854,18 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		if !proc:
 			//job object creation may fail
 			proc=System.Processes.RunPiped(args,spath,0,"input,output,error")
-		if !proc:
-			return 0
+		//if !proc:
+		//	return 0
 		//Writeln(cols,' ',rows)
 		term=new Terminal(cols,rows)
-		term.input_queue=new string
+		term.input_pipe_queue=new string
 		term.OnData=function(string s0){
-			term.input_queue.push(s0)
-			nwritten=proc.pipe.Write(term.input_queue)
-			if nwritten>0&&nwritten<term.input_queue.n:
-				copy(term.input_queue[0:],term.input_queue[nwritten:])
-			term.input_queue.n-=nwritten
+			if !proc||!proc.pipe:return
+			term.input_pipe_queue.push(s0)
+			nwritten=proc.pipe.Write(term.input_pipe_queue)
+			if nwritten>0&&nwritten<term.input_pipe_queue.n:
+				copy(term.input_pipe_queue[0:],term.input_pipe_queue[nwritten:])
+			term.input_pipe_queue.n-=nwritten
 		}
 		js_term["m_term"]=term
 		js_term["OnFocus"]=function(JSContext JS){
@@ -3740,7 +3882,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		CheckProcessOutput=function(){
 			auto did=0
 			for iiter=0:15
-				if !proc.pipe_2nd.WouldBlock():
+				if proc&&proc.pipe_2nd&&!proc.pipe_2nd.WouldBlock():
 					s=proc.pipe_2nd.Read(PIPE_READ_BATCH)
 					if s&&s.n>0:
 						//if Platform.BUILD=="debug":
@@ -3768,10 +3910,16 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			////////////////////
 			g_renderer=Gui2D.detail.g_renderer
 			term.need_update=0
-			x=JS.Param(0).as(float)*g_renderer.m_pixels_per_unit
-			y=JS.Param(1).as(float)*g_renderer.m_pixels_per_unit
-			w=JS.Param(2).as(float)*g_renderer.m_pixels_per_unit
-			h=JS.Param(3).as(float)*g_renderer.m_pixels_per_unit
+			x=JS.Param(0).as(float)
+			y=JS.Param(1).as(float)
+			w=JS.Param(2).as(float)
+			h=JS.Param(3).as(float)
+			term.x_rendered=x
+			term.y_rendered=y
+			x*=g_renderer.m_pixels_per_unit
+			y*=g_renderer.m_pixels_per_unit
+			w*=g_renderer.m_pixels_per_unit
+			h*=g_renderer.m_pixels_per_unit
 			//////////////
 			//clear it
 			colors=term.colors
@@ -3809,11 +3957,33 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			ybaseline=g_renderer.GetFontBaseline(fnt_scaled)
 			y_underline=ybaseline*1.05f
 			h_underline=ybaseline*0.05f
+			sel_x0=term.sel_x0
+			sel_y0=term.sel_y0
+			sel_x1=term.sel_x1
+			sel_y1=term.sel_y1
+			ytop=(term.n_valid_lines<term.scrollback?0:term.ybase+term.rows%term.scrollback)
+			sel_y0=(sel_y0+term.scrollback-ytop)%term.scrollback
+			sel_y1=(sel_y1+term.scrollback-ytop)%term.scrollback
+			if sel_y0>sel_y1||sel_y0==sel_y1&&sel_x0>sel_x1:
+				tmp=sel_x0;sel_x0=sel_x1;sel_x1=tmp
+				tmp=sel_y0;sel_y0=sel_y1;sel_y1=tmp
 			for j=0:term.rows-1
 				row=(term.ydisp+j)%term.scrollback
 				row_base=row*(3*term.cols)
 				if row==term.n_valid_lines:
 					break
+				sel_x0_j=term.cols
+				sel_x1_j=0
+				if term.selecting:
+					row_topbased=(row+term.scrollback-ytop)%term.scrollback
+					if row_topbased==sel_y0:
+						sel_x0_j=sel_x0
+					else if row_topbased>sel_y0:
+						sel_x0_j=0
+					if row_topbased==sel_y1:
+						sel_x1_j=sel_x1
+					else if row_topbased<sel_y1:
+						sel_x1_j=term.cols
 				for i=0:term.cols-1
 					data=lines[row_base+i*3+0]
 					ch=lines[row_base+i*3+1]
@@ -3822,6 +3992,8 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					bg=data & 0x1ff;
 					fg=(data >> 9) & 0x1ff;
 					flags=data >> 18;
+					if i>=sel_x0_j&&i<sel_x1_j:
+						flags^=g_flags.INVERSE
 					
 					if (flags & g_flags.BLINK) {
 						//QM: blink would be CPU-consuming in GL
@@ -3865,7 +4037,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					x_ch=x+float(i)*w_char
 					y_ch=y+float(j)*h_char
 					g_renderer.DrawRectangle(x_ch,y_ch,w_char*float(ch_width),h_char,colors[bg])
-					if !(flags & g_flags.INVISIBLE):
+					if !(flags & g_flags.INVISIBLE)&&ch!=32&&ch!=9&&ch!=0:
 						if (flags & g_flags.BOLD) {
 							g_renderer.DrawChar(fnt_bold_scaled,x_ch,y_ch,colors[fg],ch)
 						}else{
@@ -3902,7 +4074,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		}
 		js_term["OnKeyDown"]=function(JSContext JS){
 			ev=JS.Param(0).as(JSObject)
-			if term.keyDown(ev):
+			if term.keyDown(JS,ev):
 				term.need_update=1
 				JS_UI.CallMethod(int,"Refresh")
 			return 0
@@ -3922,7 +4094,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			text=ev["text"].as(string)
 			term.m_IME_overlay=string.NULL
 			if text&&text.n:
-				term.handler(text)
+				term.onTextInput(text)
 			return 0
 		}
 		js_term["NeedUpdate"]=function(JSContext JS){
@@ -3937,17 +4109,17 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		js_term["Poll"]=function(JSContext JS){
 			//idle-aware polling - return the setTimeOut delay
 			poll_delay=100
-			if term.input_queue.n:
-				nwritten=proc.pipe.Write(term.input_queue)
-				if nwritten>0&&nwritten<term.input_queue.n:
-					copy(term.input_queue[0:],term.input_queue[nwritten:])
-				term.input_queue.n-=nwritten
-			if term.input_queue.n:
+			if proc&&proc.pipe&&term.input_pipe_queue.n:
+				nwritten=proc.pipe.Write(term.input_pipe_queue)
+				if nwritten>0&&nwritten<term.input_pipe_queue.n:
+					copy(term.input_pipe_queue[0:],term.input_pipe_queue[nwritten:])
+				term.input_pipe_queue.n-=nwritten
+			if term.input_pipe_queue.n:
 				poll_delay=0
 			if CheckProcessOutput():
 				poll_delay=0
 				JS_UI.CallMethod(int,"Refresh")
-			else if !proc.isRunning():
+			else if !proc||!proc.isRunning():
 				poll_delay=-1
 			return JS.Return(poll_delay)
 		}
@@ -3958,12 +4130,6 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			term.need_update=1
 			JS_UI.CallMethod(int,"Refresh")
 			return 0
-		}
-		js_term["GetRows"]=function(JSContext JS){
-			return JS.Return(term.rows)
-		}
-		js_term["GetNValidLines"]=function(JSContext JS){
-			return JS.Return(term.n_valid_lines)
 		}
 		js_term["GetScrollValue"]=function(JSContext JS){
 			scroll_tot=term.n_valid_lines-term.rows
@@ -3987,7 +4153,133 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				JS_UI.CallMethod(int,"Refresh")
 			return 0
 		}
-		//todo: copy / paste / r-click
+		MouseToTermPos=inline(JSContext JS){
+			js_this=JS.GetThis()
+			JS_UI.CallMethod(int,"SetFocus",js_this)
+			ev=JS.Param(0).as(JSObject)
+			x=ev["x"].as(float)
+			y=ev["y"].as(float)
+			x-=term.x_rendered
+			y-=term.y_rendered
+			fnt=JS.GetThis()["font"].as(Gui2D.detail.TFont)
+			w_char=Gui2D.detail.g_renderer.GetCharacterAdvance(fnt,int(' '))
+			h_char=Gui2D.detail.g_renderer.GetCharacterHeight(fnt)
+			ytop=(term.n_valid_lines<term.scrollback?0:term.ybase+term.rows%term.scrollback)
+			available_lines_neg=(term.ydisp-ytop+term.scrollback)%term.scrollback
+			available_lines=(term.ybase-term.ydisp)
+			if available_lines<0:
+				available_lines+=term.scrollback
+			xi=min(max(int(floor(x/w_char)),0),term.cols)
+			yi=min(max(min(max(int(floor(y/h_char)),-term.rows),term.rows*2),-available_lines_neg),available_lines+term.rows-1)
+			yi_global=(yi+term.ydisp)%term.scrollback
+			if yi_global<0:
+				yi_global+=term.scrollback
+			yi_global=min(max(yi_global,0),term.n_valid_lines-1)
+			if yi<0:
+				term.scrollDisp(yi)
+			else if yi>=term.rows:
+				term.scrollDisp(yi-(term.rows-1))
+			return (xi,yi_global)
+		}
+		js_term["OnMouseDown"]=function(JSContext JS){
+			ev=JS.Param(0).as(JSObject)
+			button=ev["button"].as(int)
+			clicks=ev["clicks"].as(int)
+			(xi,yi_global)=MouseToTermPos(JS)
+			if button==1:
+				//left click - selection or dblclick
+				if clicks>=3:
+					//paragraph
+					//todo: going along continuing line ends
+					term.selecting=2
+					term.sel_x0=0
+					term.sel_y0=yi_global
+					term.sel_x1=term.cols
+					term.sel_y1=yi_global
+				else if clicks==2:
+					//word
+					term.selecting=2
+					term.sel_x0=xi
+					term.sel_y0=yi_global
+					term.sel_x1=xi
+					term.sel_y1=yi_global
+					pchar_line=yi_global*term.cols
+					while term.sel_x0>0:
+						addr=(pchar_line+term.sel_x0-1)*3
+						if term.lines[addr+2]&&term.lines[addr+1]==' ':
+							break
+						term.sel_x0--
+					if term.sel_x1<term.cols:
+						for(;;)
+							term.sel_x1++
+							if term.sel_x1>=term.cols:break
+							addr=(pchar_line+term.sel_x1)*3+1
+							if !term.lines[addr+2]||term.lines[addr+1]==' ':
+								break
+				else
+					//drag
+					term.selecting=1
+					term.sel_x0=xi
+					term.sel_y0=yi_global
+					term.sel_x1=xi
+					term.sel_y1=yi_global
+					js_this=JS.GetThis()
+					JS_UI.CallMethod(int,"CaptureMouse",js_this)
+			else if button==3:
+				//right click - paste or copy confirmation
+				if term.selecting:
+					term.confirmCopy(JS)
+				else
+					s=SDL.detail.SDL_GetClipboardText()
+					if s:
+						lg=System.OS_API.strlen(s)
+						text=new string
+						text.BindToPointer(s,lg)
+						term.onTextInput(text)
+						text.discard()
+						SDL.detail.SDL_free(s)
+			JS_UI.CallMethod(int,"Refresh")
+			return 0
+		}
+		js_term["OnMouseMove"]=function(JSContext JS){
+			if term.selecting==1:
+				(xi,yi_global)=MouseToTermPos(JS)
+				term.sel_x1=xi
+				term.sel_y1=yi_global
+				JS_UI.CallMethod(int,"Refresh")
+			return 0
+		}
+		js_term["OnMouseUp"]=function(JSContext JS){
+			if term.selecting==1:
+				(xi,yi_global)=MouseToTermPos(JS)
+				term.sel_x1=xi
+				term.sel_y1=yi_global
+				term.selecting=2
+				if term.sel_x0==term.sel_x1&&term.sel_y0==term.sel_y1:
+					term.selecting=0
+				js_this=JS.GetThis()
+				JS_UI.CallMethod(int,"ReleaseMouse",js_this)
+				JS_UI.CallMethod(int,"Refresh")
+			return 0
+		}
+		js_term["WriteTerminal"]=function(JSContext JS){
+			s=JS.Param(0).as(string)
+			if s:
+				term.write(s)
+			return 0
+		}
+		js_term["Terminate"]=function(JSContext JS){
+			if proc:
+				if proc.pipe:
+					proc.pipe.Close()
+					proc.pipe=typeof(proc.pipe).NULL
+				if proc.pipe_2nd:
+					proc.pipe_2nd.Close()
+					proc.pipe_2nd=typeof(proc.pipe_2nd).NULL
+				proc.Terminate()
+				proc=System.Processes.CProcess.NULL
+			return 0
+		}
 		return JS.Return(js_term)
 	}
 })

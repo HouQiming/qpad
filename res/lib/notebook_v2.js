@@ -1673,7 +1673,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 ///////////////////////////////////
 //terminal
 W.terminal_prototype={
-	//todo
+	//nothing for now
 };
 W.Terminal=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"terminal",W.terminal_prototype);
@@ -1694,6 +1694,8 @@ W.Terminal=function(id,attrs){
 					UI.setTimeout(fpoll,this.idle_wait);
 				}else if(twait<0){
 					//terminated, do nothing
+					this.terminated=1;
+					UI.Refresh()
 				}else{
 					this.idle_wait=25;
 					UI.NextTick(fpoll)
@@ -1704,23 +1706,48 @@ W.Terminal=function(id,attrs){
 	}
 	W.PureRegion(id,obj);
 	UI.PushCliprect(obj.x,obj.y,obj.w,obj.h);
-	obj.Render(obj.x,obj.y,obj.w,obj.h);
+	UI.RoundRect({
+		x:obj.x,y:obj.y,w:obj.w,h:obj.h,
+		color:obj.panel_style.bgcolor,
+	})
 	var value=obj.GetScrollValue();
+	var dims=UI.MeasureText(obj.font,' ');
+	var w_term=obj.m_term.cols*dims.w;
+	var h_term=obj.m_term.rows*dims.h;
+	var w_area=w_term+(value>=0?obj.w_scroll_bar:0);
+	var x_term=obj.x+(obj.w-w_area)*0.5;
+	var y_term=obj.y+(obj.h-h_term)*0.5;
+	UI.RoundRect({
+		x:x_term-obj.panel_style.shadow_size,y:y_term-obj.panel_style.shadow_size,
+		w:w_area+obj.panel_style.shadow_size*2,h:h_term+obj.panel_style.shadow_size*2,
+		color:obj.panel_style.shadow_color,
+		border_width:-obj.panel_style.shadow_size,
+		round:obj.panel_style.shadow_size,
+	});
+	UI.RoundRect({
+		x:x_term-obj.panel_style.border_width,y:y_term-obj.panel_style.border_width,
+		w:w_area+obj.panel_style.border_width*2,h:h_term+obj.panel_style.border_width*2,
+		color:obj.panel_style.border_color,
+		round:obj.panel_style.border_width,
+	});
+	UI.PushCliprect(x_term,y_term,w_area,h_term);
+	obj.Render(x_term,y_term,w_term,h_term);
 	if(value>=0){
 		W.ScrollBar("sbar",{
-			x:obj.x+obj.w-obj.w_scroll_bar, y:obj.y, w:obj.w_scroll_bar, h:obj.h, dimension:'y',
-			page_size:obj.GetRows(), total_size:obj.GetNValidLines()-obj.GetRows(), value:value,
+			x:x_term+w_term, y:y_term, w:obj.w_scroll_bar, h:h_term, dimension:'y',
+			page_size:obj.m_term.rows, total_size:obj.m_term.n_valid_lines-obj.m_term.rows, value:value,
 			OnChange:function(value){
 				obj.SetScrollValue(value)
 				UI.Refresh()
 			},
 		});
 	}
-	if(UI.HasFocus(obj)){
-		//W.Hotkey("",{key:"CTRL+D",action:function(){
-		//	obj.Download("c:/users/hqm/downloads/icon1k.png","icon1k.png");
-		//}});
-	}
+	UI.PopCliprect();
+	//if(UI.HasFocus(obj)){
+	//	W.Hotkey("",{key:"CTRL+D",action:function(){
+	//		obj.Download("c:/users/hqm/downloads/icon1k.png","icon1k.png");
+	//	}});
+	//}
 	UI.PopCliprect();
 	UI.End();
 	return obj;
@@ -1738,6 +1765,9 @@ UI.OpenTerminalTab=function(options){
 			var title=UI._("Terminal");
 			if(this.main_widget){
 				title=(this.main_widget.GetTitle()||title);
+				if(this.main_widget.terminated){
+					title=UI.Format("@1 [stopped]",title);
+				}
 			}
 			this.title=title;
 		},
@@ -1758,10 +1788,37 @@ UI.OpenTerminalTab=function(options){
 			if(!had_body){
 				UI.SetFocus(body);
 			}
+			if(body.terminated&&options.auto_close){
+				UI.m_invalid_util_tabs.push(this.__global_tab_id);
+			}
 			this.main_widget=body;
 			return body;
 		},
-		//todo: OnTabClose
+		OnTabClose:function(){
+			if(this.main_widget){
+				var body=this.main_widget;
+				if(!body.terminated){
+					this.in_save_dialog=1;
+					this.save_dialog_desc={
+						text:UI._("It's still running..."),
+						buttons:[{
+							text:UI._("Stop it"),is_good:1,
+							hotkeys:["K","Y","RETURN","SPACE"],
+							std_action:"close",
+							OnClick:function(){
+								//console.log('body.Terminate();');
+								body.Terminate();
+							},
+						},{
+							text:UI._("Cancel"),
+							hotkeys:["N","C","ESC"],
+							std_action:"cancel",
+						}]};
+					return 0;
+				}
+			}
+			return 1;
+		},
 		NeedRendering:function(){
 			if(this.main_widget){
 				return this.main_widget.NeedUpdate();

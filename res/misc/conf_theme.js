@@ -774,6 +774,13 @@ UI.CustomTheme=function(){
 			cols:80,
 			rows:25,
 			w_scroll_bar:20,
+			panel_style:{
+				bgcolor:L?0xffd0d0d0:0xff333333,
+				border_color:0xff36342e,
+				border_width:4,
+				shadow_size:12,
+				shadow_color:C_shadow,
+			},
 		},
 		tip_window:{
 			w_text:512,
