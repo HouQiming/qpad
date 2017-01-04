@@ -2368,7 +2368,7 @@ var find_context_prototype={
 				if(this.m_repo_files&&UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
 					if(!this.m_search_doc&&this.m_p_repo_files<this.m_repo_files.length){
 						//try to search beyond the current file, keep doc in m_temp_documents
-						var doc_next=UI.OpenCodeEditorDocument(this.m_repo_files[this.m_p_repo_files]);
+						var doc_next=UI.OpenCodeEditorDocument(this.m_repo_files[this.m_p_repo_files],-1);
 						this.m_p_repo_files++;
 						this.m_search_doc=doc_next;
 						if(!doc_next.ed){doc_next.Init();}
@@ -2762,7 +2762,16 @@ var find_context_prototype={
 		renderer.ShowRange(doc.ed,sel[0],sel[1]);
 		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
 			UI.OpenEditorWindow(doc.m_file_name);
+			//var obj_tab=UI.OpenEditorWindow(doc.m_file_name);
+			//if(obj_tab&&obj_tab.main_widget&&obj_tab.main_widget.doc){
+			//	var sel=doc.GetSelection();
+			//	doc=obj_tab.main_widget.doc;
+			//	doc.SetSelection(sel[0],sel[1]);
+			//}
 		}
+		//if(this.m_sel_backups){
+		//	this.m_sel_backups[doc.m_file_name]=undefined;
+		//}
 		this.m_confirmed=1;
 		UI.SetFocus(doc);
 	},
@@ -8386,6 +8395,18 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 			for(var i=0;i<arr_ori.length;i++){
 				var doc=arr_ori[i];
 				if(doc&&!doc.owner){
+					doc.m_ed_refcnt++;
+					return doc;
+				}
+			}
+		}
+	}else if(is_preview==-1){
+		//find mode
+		var arr_ori=UI.g_editor_from_file[fn];
+		if(arr_ori){
+			for(var i=0;i<arr_ori.length;i++){
+				var doc=arr_ori[i];
+				if(doc){
 					doc.m_ed_refcnt++;
 					return doc;
 				}
