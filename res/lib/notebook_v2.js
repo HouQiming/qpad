@@ -772,7 +772,8 @@ W.notebook_prototype={
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
 			var doc_in=cell_i.m_text_in;
-			if(doc_in.ed.GetTextSize()>=lg&&doc_in.ed.GetText(0,lg)==s_mark){
+			var s_check=doc_in.ed.GetText(0,Math.min(doc_in.ed.GetTextSize(),4096));
+			if(s_check.indexOf(s_mark)>=0){
 				return i;
 			}
 		}

@@ -1060,13 +1060,14 @@ UI.RegisterEditorPlugin(function(){
 				s_mark="#!/bin/sh\n#build script for "+s_name_in_script+"\n";
 				s_language='Unix Shell Script';
 			}
-			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,1,'input');
+			var s_mark_search="build script for "+s_name_in_script+"\n";
+			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark_search,s_language,1,'input');
 			if(result_cell){
 				var obj_notebook=result_cell.obj_notebook;
 				var cell_i=obj_notebook.m_cells[result_cell.cell_id];
 				var doc_in=cell_i.m_text_in;
 				var size=doc_in.ed.GetTextSize();
-				if(size==Duktape.__byte_length(s_mark)){
+				if(size==Duktape.__byte_length(s_mark_search)){
 					doc_in.ed.Edit([0,size,s_mark+s_script]);
 					doc_in.m_cell_id=cell_i.m_cell_id;
 					doc_in.CallOnChange();
@@ -1095,8 +1096,9 @@ UI.RegisterEditorPlugin(function(){
 				s_language='Unix Shell Script';
 			}
 			//"non_quiet"
+			var s_mark_search="build script for "+s_name_in_script+"\n";
 			var bk_active_tab=UI.top.app.document_area.active_tab;
-			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,'output');
+			var result_cell=UI.OpenNotebookCellFromEditor(this,s_mark_search,s_language,0,'output');
 			if(result_cell){
 				var obj_notebook=result_cell.obj_notebook;
 				//var cell_i=obj_notebook.m_cells[result_cell.cell_id];
@@ -1109,7 +1111,7 @@ UI.RegisterEditorPlugin(function(){
 			}else{
 				//create cell and focus it
 				fgencell.call(this,is_project)
-				result_cell=UI.OpenNotebookCellFromEditor(this,s_mark,s_language,0,'output');
+				result_cell=UI.OpenNotebookCellFromEditor(this,s_mark_search,s_language,0,'output');
 				if(result_cell){
 					var obj_notebook=result_cell.obj_notebook;
 					//var cell_i=obj_notebook.m_cells[result_cell.cell_id];

@@ -34,9 +34,6 @@ static DWORD WINAPI win_thread(void* unused_param){
 	for(;;){
 		DWORD ret=WaitForMultipleObjects(g_all_handles.n,g_all_handles.p,0,INFINITE);
 		SDL_Event a;
-		//todo
-		printf("g_all_handles.n=%d\n",g_all_handles.n);fflush(stdout);
-		//todo
 		//////////////
 		//send the SDL event
 		memset(&a,0,sizeof(a));
