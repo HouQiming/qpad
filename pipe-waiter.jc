@@ -1,0 +1,34 @@
+import "system.jc"
+import System.Algorithm.*
+import System.Math.*
+import System.Console.*
+
+//__generate_json("c_files","pipe_waiter.c")
+//__generate_json("h_files","pipe_waiter.h")
+AddPipeHandle=__c_function(int,"AddPipeHandle","pipe_waiter.h","c_files","pipe_waiter.c")
+RemoveAndClosePipeHandle=__c_function(int,"RemoveAndClosePipeHandle","pipe_waiter.h","c_files","pipe_waiter.c")
+StartWaitingForPipes=__c_function(int,"StartWaitingForPipes","pipe_waiter.h","c_files","pipe_waiter.c")
+InitPipeWaiter=__c_function(int,"InitPipeWaiter","pipe_waiter.h","c_files","pipe_waiter.c")
+StopPipeWaiter=__c_function(int,"StopPipeWaiter","pipe_waiter.h","c_files","pipe_waiter.c")
+
+AddPipe=function(pipe)
+	if Platform.IS_WINDOWS:
+		handle=pipe.hf
+		if !handle:return
+	else
+		handle=__pointer(iptr(pipe.hf))
+		handle=pipe.hf
+		if handle<0:return
+	AddPipeHandle(handle)
+	__explicit_rc(pipe,1)
+
+RemovePipe=function(pipe)
+	if Platform.IS_WINDOWS:
+		handle=pipe.hf
+		pipe.hf=NULL
+	else
+		handle=__pointer(iptr(pipe.hf))
+		if handle<0:return
+		pipe.hf=-1
+	RemoveAndClosePipeHandle(handle)
+	__explicit_rc(pipe,-1)

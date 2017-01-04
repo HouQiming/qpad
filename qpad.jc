@@ -6,6 +6,7 @@ import "code-parser.jc"
 import "encoding.jc"
 import "g-l.jc"
 import "terminal.jc"
+import "pipe-waiter.jc"
 //import "txtx-editor.jc"
 //import "zip-doc.jc"
 //import "ooc-mipmap.jc"
@@ -642,6 +643,11 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			proto.ExportMethod(this,"Terminate",JS_Terminate)
 			proto.ExportMethod(this,"GetNativeProcess",JS_GetNativeProcess)
 		}
+		auto __done__()
+			if proc.pipe:
+				PipeWaiter.RemovePipe(proc.pipe)
+			if proc.pipe_2nd:
+				PipeWaiter.RemovePipe(proc.pipe_2nd)
 	jsio["RunProcess"]=function(JSContext JS){
 		auto shell_args=JS.Param(0).as(JSObject)
 		auto spath=JS.Param(1).or(".")
@@ -671,7 +677,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			pproc=System.Processes.RunPiped(args,spath,show,"output,error")
 		if !pproc:
 			return 0
+		if pproc.pipe:
+			PipeWaiter.AddPipe(pproc.pipe)
+		if pproc.pipe_2nd:
+			PipeWaiter.AddPipe(pproc.pipe_2nd)
 		return JS.Return(new CProcessWrapper(){proc:pproc})
+	}
+	jsio["StartWaitingForPipes"]=function(JSContext JS){
+		PipeWaiter.StartWaitingForPipes()
+		return 0
 	}
 	/////////////
 	Duktape=JS.GetGlobal()["Duktape"].as(JSObject)
@@ -729,7 +743,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	//	Writeln(fn)
 	//Writeln('main: ',sbox.UIReadAll("res/main.js"))
 	//Writeln(formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-g_startup_tick)*1000.0,{frac:2}),'ms since startup - sbox.UIRunJS');
+	PipeWaiter.InitPipeWaiter()
 	sbox.UIRunJS(JS,"res/main.js")
+	PipeWaiter.StopPipeWaiter()
 	//if Platform.IS_WINDOWS&&System.IO.FileExists(System.Env.GetExecutablePath()+"/opengl32.dll"):
 	//	//LLVMPipe tends to crash
 	//	ExitProcess(1)

@@ -202,6 +202,24 @@ UI.BumpHistory=function(file_name){
 }
 
 ////////////////////////////////////
+var g_pipe_callbacks=[];
+UI.WaitOnPipe=function(f){
+	g_pipe_callbacks.push(f);
+};
+
+UI.OnCustomEvent=function(event){
+	if(event.code==4){
+		//gotta run the pipe pollers
+		var cbs=g_pipe_callbacks;
+		g_pipe_callbacks=[];
+		for(var i=0;i<cbs.length;i++){
+			var f=cbs[i];
+			f();
+		}
+	}
+};
+
+////////////////////////////////////
 var g_utility_procs=[];
 var freadOnTimer=function(){
 	var new_procs=[]
@@ -236,7 +254,8 @@ var freadOnTimer=function(){
 	g_utility_procs=new_procs;
 	if(g_utility_procs.length>0){
 		//UI.setTimeout(freadOnTimer,50)
-		UI.NextTick(freadOnTimer)
+		//UI.NextTick(freadOnTimer)
+		UI.WaitOnPipe(freadOnTimer)
 	}
 };
 IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){

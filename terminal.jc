@@ -169,7 +169,6 @@ class Terminal{
 
 	// Store if user went browsing history in scrollback
 	userScrolling=false
-	OnData=function(string s){}
 	download_buf=string.NULL
 	download_written_size=0LL
 	download_size=-1LL
@@ -216,6 +215,13 @@ class Terminal{
 	destroy=function() {
 		this.readable=false;
 		this.writable=false;
+		this.lines=int[].NULL;
+		if this.proc:
+			if this.proc.pipe:
+				PipeWaiter.RemovePipe(proc.pipe)
+			if this.proc.pipe_2nd:
+				PipeWaiter.RemovePipe(proc.pipe_2nd)
+			this.proc=System.Processes.CProcess.NULL
 		//this._events={};
 		//this.handler=function() {};
 	};
@@ -2149,6 +2155,14 @@ class Terminal{
 		}
 		this.OnData(data);
 	};
+	OnData=function(string s0){
+		if !proc||!proc.pipe:return
+		this.input_pipe_queue.push(s0)
+		auto nwritten=proc.pipe.Write(this.input_pipe_queue)
+		if nwritten>0&&nwritten<this.input_pipe_queue.n:
+			copy(this.input_pipe_queue[0:],this.input_pipe_queue[nwritten:])
+		this.input_pipe_queue.n-=nwritten
+	}
 	
 	/**
 	* ESC
@@ -3829,12 +3843,17 @@ class Terminal{
 		//we need to actually send the CTRL+C
 		this.send("\x03")
 	}
+	JS_destroy=function(JSContext JS){
+		this.destroy()
+		return 0;
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"cols")
 		proto.ExportProperty(this,"rows")
 		proto.ExportProperty(this,"n_valid_lines")
 		proto.ExportProperty(this,"progress_value")
 		proto.ExportProperty(this,"got_enter_from_input")
+		proto.ExportMethod(this,"destroy",JS_destroy)
 	}
 	
 	/////////////
@@ -3846,6 +3865,9 @@ class Terminal{
 	sel_x1=0
 	sel_y1=0
 	got_enter_from_input=0
+	proc=System.Processes.CProcess.NULL
+	auto __done__()
+		this.destroy();
 	//w_rendered=0.f
 	//h_rendered=0.f
 };
@@ -3944,20 +3966,25 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		if !proc:
 			//job object creation may fail
 			proc=System.Processes.RunPiped(args,spath,0,"input,output,error")
+		if proc.pipe:
+			PipeWaiter.AddPipe(proc.pipe)
+		if proc.pipe_2nd:
+			PipeWaiter.AddPipe(proc.pipe_2nd)
 		//if !proc:
 		//	return 0
 		//Writeln(cols,' ',rows)
 		term=new Terminal(cols,rows)
 		term.JS=JS
 		term.input_pipe_queue=new string
-		term.OnData=function(string s0){
-			if !proc||!proc.pipe:return
-			term.input_pipe_queue.push(s0)
-			nwritten=proc.pipe.Write(term.input_pipe_queue)
-			if nwritten>0&&nwritten<term.input_pipe_queue.n:
-				copy(term.input_pipe_queue[0:],term.input_pipe_queue[nwritten:])
-			term.input_pipe_queue.n-=nwritten
-		}
+		term.proc=proc
+		//term.OnData=function(string s0){
+		//	if !proc||!proc.pipe:return
+		//	term.input_pipe_queue.push(s0)
+		//	nwritten=proc.pipe.Write(term.input_pipe_queue)
+		//	if nwritten>0&&nwritten<term.input_pipe_queue.n:
+		//		copy(term.input_pipe_queue[0:],term.input_pipe_queue[nwritten:])
+		//	term.input_pipe_queue.n-=nwritten
+		//}
 		js_term["m_term"]=term
 		js_term["OnFocus"]=function(JSContext JS){
 			if term.sendFocus: term.send('\x1b[I');

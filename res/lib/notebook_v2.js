@@ -1691,14 +1691,16 @@ W.Terminal=function(id,attrs){
 				var twait=this.Poll();
 				if(twait>0){
 					this.idle_wait=Math.min(this.idle_wait*2,100);
-					UI.setTimeout(fpoll,this.idle_wait);
+					//UI.setTimeout(fpoll,this.idle_wait);
+					UI.WaitOnPipe(fpoll);
 				}else if(twait<0){
 					//terminated, do nothing
 					this.terminated=1;
 					UI.Refresh()
 				}else{
 					this.idle_wait=25;
-					UI.NextTick(fpoll)
+					//UI.NextTick(fpoll)
+					UI.WaitOnPipe(fpoll);
 				}
 			}).bind(obj);
 			UI.NextTick(fpoll);
@@ -1841,6 +1843,9 @@ UI.OpenTerminalTab=function(options){
 				}
 				UI.RefreshAllTabs();
 			}
+			this.main_widget.m_term.destroy();
+			this.main_widget.m_term=undefined;
+			this.main_widget=undefined;
 		},
 	})
 	return ret;
