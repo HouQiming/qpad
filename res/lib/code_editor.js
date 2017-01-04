@@ -2343,7 +2343,13 @@ var find_context_prototype={
 							if(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE){
 								return UI.ED_GetFileLanguage(fn).parser=="C";
 							}else{
-								return !UI.ED_GetFileLanguage(fn).is_binary;
+								if(UI.ED_GetFileLanguage(fn).is_binary){
+									return 0;
+								}
+								if(!UI.m_ui_metadata[fn]&&UI.ED_DetectBinaryFile(fn)){
+									return 0;
+								}
+								return 1;
 							}
 						}.bind(this));
 						this.m_p_repo_files=0;
@@ -7682,7 +7688,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			bk_current_tab_id=UI.top.app.document_area.current_tab_id;
 		}
 		var lang=UI.ED_GetFileLanguage(fname);
-		if(lang.is_binary){
+		if(lang.is_binary||!UI.m_ui_metadata[fname]&&UI.ED_DetectBinaryFile(fname)){
 			obj_tab=UI.NewBinaryEditorTab(fname)
 		}else{
 			obj_tab=UI.NewCodeEditorTab(fname)

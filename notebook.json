@@ -2,7 +2,7 @@
  "cells": [
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\nterminal emulator\n\tintegrate into the notebook\n\t\tsideways terminal\n\t\tdon't need the cursor\n\tretarded charset test, bash prompt detection\n\tctrl+c vs queued output\n\tdownload\n\t\tUI\n\t\t(test) failure\n\t\t(test) ctrl+c\n\t\t(test) buffer but suppress input\n\t\t\texcept ctrl+c\n\tctrl+o\n\t\tadjust priorities\nctrl+shift+f in current file\npossible memory leak\nctrl+o when focusing weird documents (e.g. terminal)\nexplicit diff visualization\n\tautoedit stuff + diffupdate\ngraph:\n\tjc nodes\n\t\t__c_function\n\t\t__generate_json\n\t\t\tthe few purposes\n\tauto-select and auto-scroll to the current cursor location\n\tonly show new nodes that can be connected to the current selection and has non-zero relevance\n\t\tif the selection is empty, show top-level stuff\n\tleave a hole for the text editor\n\t\tor a dedicated util tab showing the current graph(s)\n\t---\n\tcolor / type text in nodes\n\tfix up some existing code\n\t\tprogramming techniques - micro patterns\n\t\t\tstatic irregular array\n\t\t\tobfuscated zip ...\n\t\t\t--\n\t\tcould use (deduced) node groups\n\tED_GetAllComboNames - per-file package activation\n\t\ttracking owning packages\n\t\tand a package listing from standard locations\n\t\tadd @include\n\t\tsort by port relevance\nnotebook saving:\n\tseparate input / outpu?\nlife cycles\n\tcould label them on graph nodes\n\toverlay ray linking the nodes together\nfile view class list\n\tsearchable classes\nstyle enforcement\n\tpotentially per-project\n\t\tor per-file with a default\n\tspace rules enforcement\n\t\tlet the parser decide\n\t\tmaybe also enforce it in the find bar\nweird bookmark display in tophint for certain folding setups\n(reproduce?) project-in-unopenable-location crash\niOS bluetooth keyboard support\n\t- keyCommands\nstop / clear buttons in notebook v2\nF5/CTRL+F5 indicators\ntouch: scrolling, touch detection, ac modes, mouse over, typos\n\ttouch-awareness\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\n\tthe smart rerendering FBO... one FBO for each window? only one FBO for the frontmost?\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\ncode beautifier\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw up the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\t[ new window ] and [ button: ... ] in help\npeek definition:\n\tCEO and hide cannot overlap\n",
+   "m_text_in": "# TODO LIST\nheuristic binary file detection during global search?\nbug: ctrl+shift+f then enter in current file\nterminal emulator\n\tintegrate into the notebook\n\t\tsideways terminal\n\t\tdon't need the cursor\n\twe could have tiny terminals now\n\t\tremote editing rsync / ...\n\tretarded charset warning, bash prompt detection\n\tctrl+c vs queued output\n\tdownload\n\t\tUI\n\t\t(test) failure\n\t\t(test) ctrl+c\n\t\t(test) buffer but suppress input\n\t\t\texcept ctrl+c\n\tctrl+o\n\t\tadjust priorities\nremote editing\n\tremember rsync pairs\n\t\tor use git merge?\n\tGUI for ssh\npossible memory leak\nctrl+o when focusing weird documents (e.g. terminal)\nexplicit diff visualization\n\tautoedit stuff + diffupdate\ngraph:\n\tjc nodes\n\t\t__c_function\n\t\t__generate_json\n\t\t\tthe few purposes\n\tauto-select and auto-scroll to the current cursor location\n\tonly show new nodes that can be connected to the current selection and has non-zero relevance\n\t\tif the selection is empty, show top-level stuff\n\tleave a hole for the text editor\n\t\tor a dedicated util tab showing the current graph(s)\n\t---\n\tcolor / type text in nodes\n\tfix up some existing code\n\t\tprogramming techniques - micro patterns\n\t\t\tstatic irregular array\n\t\t\tobfuscated zip ...\n\t\t\t--\n\t\tcould use (deduced) node groups\n\tED_GetAllComboNames - per-file package activation\n\t\ttracking owning packages\n\t\tand a package listing from standard locations\n\t\tadd @include\n\t\tsort by port relevance\nnotebook saving:\n\tseparate input / outpu?\nlife cycles\n\tcould label them on graph nodes\n\toverlay ray linking the nodes together\nfile view class list\n\tsearchable classes\nstyle enforcement\n\tpotentially per-project\n\t\tor per-file with a default\n\tspace rules enforcement\n\t\tlet the parser decide\n\t\tmaybe also enforce it in the find bar\nweird bookmark display in tophint for certain folding setups\n(reproduce?) project-in-unopenable-location crash\niOS bluetooth keyboard support\n\t- keyCommands\nstop / clear buttons in notebook v2\nF5/CTRL+F5 indicators\ntouch: scrolling, touch detection, ac modes, mouse over, typos\n\ttouch-awareness\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\ndrag-out support\n\tsecondary windows\n\t\trendering works as is\n\t\tregion is mixed up\n\tthe smart rerendering FBO... one FBO for each window? only one FBO for the frontmost?\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\ncode beautifier\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw up the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\t[ new window ] and [ button: ... ] in help\npeek definition:\n\tCEO and hide cannot overlap\n",
    "m_text_out": "",
    "m_cell_id": 0,
    "m_has_any_error": 0,
@@ -24,22 +24,22 @@
   {
    "m_language": "Windows BAT",
    "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code -awin64 qpad.jc --run\n",
-   "m_text_out": "creating FBO: 1920 1017\r\nc:/tp/qpad/notebook.json:1:1: fatal error: the script has returned an error 1\n",
+   "m_text_out": "creating FBO: 1920 1017\r\n",
    "m_cell_id": 1,
    "m_completion_time": [
     2017,
     0,
     3,
-    21,
-    21,
-    9,
+    22,
+    49,
+    16,
     3
    ],
-   "m_has_any_error": 1,
+   "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_button_name": "Debug",
-   "m_unknown_progress": 1.0887235930781562,
-   "m_t_unknown_progress": 84292866467,
+   "m_unknown_progress": 0.2857745668175787,
+   "m_t_unknown_progress": 2592217715,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -97,7 +97,7 @@
   {
    "m_language": "Markdown",
    "m_text_in": "Search result",
-   "m_text_out": "c:/tp/qpad/res/lib/code_editor.js:94510..94536: OpenNotebookCellFromEditor\nc:/tp/qpad/res/lib/code_editor.js:96870..96896: OpenNotebookCellFromEditor\nc:/tp/qpad/res/main.js:21145..21171: OpenNotebookCellFromEditor\nc:/tp/qpad/res/plugin/edbase.js:69297..69323: OpenNotebookCellFromEditor\nc:/tp/qpad/res/plugin/edbase.js:70627..70653: OpenNotebookCellFromEditor\nc:/tp/qpad/res/plugin/edbase.js:71111..71137: OpenNotebookCellFromEditor\n",
+   "m_text_out": "c:/tp/qpad/qpad.jc:433..441: js_units\nc:/tp/qpad/qpad.jc:475..483: js_units\nc:/tp/qpad/qpad.jc:517..525: js_units\nc:/tp/qpad/qpad.jc:564..572: js_units\nc:/tp/qpad/zmain.jc:362..370: js_units\nc:/tp/qpad/zmain.jc:404..412: js_units\nc:/tp/qpad/zmain.jc:446..454: js_units\nc:/tp/qpad/zmain.jc:493..501: js_units\n",
    "m_has_any_error": 1,
    "m_cell_id": 4,
    "m_button_name": "• Search result",
@@ -107,5 +107,5 @@
    "out_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 0
 }

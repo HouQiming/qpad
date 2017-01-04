@@ -348,6 +348,7 @@ W.BinaryEditor_prototype={
 		new_metadata.bookmarks=this.m_bookmarks;
 		new_metadata.w_bytes=this.m_w_bytes;
 		new_metadata.m_scroll=this.m_scroll;
+		new_metadata.m_language_id='Binary';
 		UI.m_ui_metadata[this.file_name]=new_metadata
 	},
 	PushUndo:function(addr,sz){

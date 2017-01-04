@@ -4956,6 +4956,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		else
 			return 0
 	}
+	JS_UI["ED_DetectBinaryFile"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		if !fn:return 0
+		f=System.IO.OpenFile(fn)
+		if !f:return 0
+		s=f.Read(65536)
+		f.Close()
+		if !s||!s.n:return 0
+		ret=0
+		for ch in s
+			chi=i32(u32(u8(ch)))
+			if chi<32&&chi!=9&&chi!=10&&chi!=13:
+				ret=1
+				break
+		return JS.Return(ret)
+	}
 	/////////////////////////////
 	g_model_cn=new CEncodingModel(sbox.UIReadAll("assets/bayesian_cn.bin").ConvertToAsBinary(u32))
 	g_model_jp=new CEncodingModel(sbox.UIReadAll("assets/bayesian_jp.bin").ConvertToAsBinary(u32))

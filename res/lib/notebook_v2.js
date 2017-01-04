@@ -767,7 +767,6 @@ W.notebook_prototype={
 		UI.Refresh()
 	},
 	GetSpecificCell:function(s_mark,s_language,create_if_not_found){
-		//cell name? no need, could put "@echo off" in the mark if needed
 		var lg=Duktape.__byte_length(s_mark);
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
