@@ -800,6 +800,8 @@ UI.Application=function(id,attrs){
 				args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;bash -i","/dev/null"],
 				//args:["bad_command"],
 				//args:["powershell"],
+				//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;winpty cmd","/dev/null"],
+				//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;ssh a@192.168.111.51","/dev/null"],
 				spath:".",
 				//cols:"132",
 				//rows:"30",

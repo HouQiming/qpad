@@ -76,23 +76,61 @@ UI.RegisterEditorPlugin(function(){
 	})
 });//.prototype.desc={category:"Tools",name:"Error overlays",stable_name:"error_overlay"};
 
-var AddErrorToEditor=function(doc,err){
-	if(err.is_in_active_doc){return;}
-	if(err.is_quiet){return;}
-	var hl_items=doc.CreateTransientHighlight({
-		'depth':1,
-		'color':err.color||doc.color_tilde_compiler_error,
-		'display_mode':UI.HL_DISPLAY_MODE_TILDE,
-		'invertible':0,
-	});
-	hl_items[0].ccnt=err.ccnt0;err.sel_ccnt0=hl_items[0];hl_items[0].undo_tracked=1
-	hl_items[1].ccnt=err.ccnt1;err.sel_ccnt1=hl_items[1];hl_items[1].undo_tracked=1
-	err.highlight=hl_items[2];
-	err.id=doc.m_error_overlays.length
-	err.is_in_active_doc=1
-	////////////
-	doc.m_error_overlays.push(err)
-}
+var AddErrorToEditor=function(err,quiet){
+	if(!err.is_in_active_doc){
+		UI.OpenEditorWindow(err.file_name,function(){
+			var go_prev_line=0
+			//if(err.is_in_active_doc==undefined){return;}
+			if(err.ccnt0==undefined||err.ccnt1==undefined){
+				if(err.line1==undefined){
+					err.line1=err.line0
+				}
+				if(err.col0==undefined){
+					err.col0=0;
+					err.col1=0;
+					if(err.line0==err.line1){
+						err.line1++
+						go_prev_line=1
+					}
+				}else if(err.col1==undefined){
+					err.col1=1e9;
+				}
+				err.ccnt0=this.SeekLC(err.line0,err.col0)
+				err.ccnt1=this.SeekLC(err.line1,err.col1)
+			}
+			if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
+			if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
+			/////////////////
+			if(!err.is_quiet){
+				var hl_items=this.CreateTransientHighlight({
+					'depth':1,
+					'color':err.color||this.color_tilde_compiler_error,
+					'display_mode':UI.HL_DISPLAY_MODE_TILDE,
+					'invertible':0,
+				});
+				hl_items[0].ccnt=err.ccnt0;err.sel_ccnt0=hl_items[0];hl_items[0].undo_tracked=1
+				hl_items[1].ccnt=err.ccnt1;err.sel_ccnt1=hl_items[1];hl_items[1].undo_tracked=1
+				err.highlight=hl_items[2];
+				err.id=this.m_error_overlays.length
+				err.is_in_active_doc=1
+				////////////
+				this.m_error_overlays.push(err)
+			}
+			if(!quiet){
+				this.SetSelection(err.ccnt0,err.ccnt1);
+				UI.SetFocus(this)
+			}
+		},quiet?"quite":undefined);
+	}else{
+		UI.OpenEditorWindow(err.file_name,function(){
+			if(!quiet){
+				this.SetSelection(err.sel_ccnt0.ccnt,err.sel_ccnt0.ccnt)
+				this.CallOnSelectionChange();
+				UI.SetFocus(this)
+			}
+		},quiet?"quite":undefined)
+	}
+};
 
 var JsifyBuffer=function(a){
 	var ret=[];
@@ -111,7 +149,7 @@ UI.RegisterOutputParser=function(s_regex_string,n_brackets,fmatch_to_err){
 };
 
 var MAX_PARSABLE_LINE=1024;
-var ParseOutput=function(sline){
+UI.ParseCompilerOutput=function(sline){
 	if(Duktape.__byte_length(sline)>MAX_PARSABLE_LINE){return undefined;}
 	if(!g_processed_output_parser){
 		//create the grand regexp
@@ -403,6 +441,13 @@ W.CellCaption=function(id,attrs){
 	return obj
 };
 
+var ClearCompilerError=function(err){
+	if(err.sel_ccnt0){err.sel_ccnt0.discard();err.sel_ccnt0=undefined;}
+	if(err.sel_ccnt1){err.sel_ccnt1.discard();err.sel_ccnt1=undefined;}
+	if(err.highlight){err.highlight.discard();err.highlight=undefined;}
+	err.is_in_active_doc=undefined;
+}
+
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 W.notebook_prototype={
 	Save:function(){
@@ -489,10 +534,7 @@ W.notebook_prototype={
 					crange.loc1.discard()
 					crange.hlobj.discard()
 					var err=crange.err;
-					if(err.sel_ccnt0){err.sel_ccnt0.discard();err.sel_ccnt0=undefined;}
-					if(err.sel_ccnt1){err.sel_ccnt1.discard();err.sel_ccnt1=undefined;}
-					if(err.highlight){err.highlight.discard();err.highlight=undefined;}
-					err.is_in_active_doc=undefined;
+					ClearCompilerError(err);
 				}
 				this.m_clickable_ranges=[]
 			}
@@ -810,51 +852,9 @@ W.notebook_prototype={
 			err.file_name=(fn_search_found||cell_i.m_current_path+'/'+err.file_name);
 		}
 		err.file_name=IO.NormalizeFileName(err.file_name);
-		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1,adding_to_existing){
-			if(!err.is_in_active_doc){
-				UI.OpenEditorWindow(err.file_name,function(){
-					var go_prev_line=0
-					//if(err.is_in_active_doc==undefined){return;}
-					if(err.ccnt0==undefined||err.ccnt1==undefined){
-						if(err.line1==undefined){
-							err.line1=err.line0
-						}
-						if(err.col0==undefined){
-							err.col0=0;
-							err.col1=0;
-							if(err.line0==err.line1){
-								err.line1++
-								go_prev_line=1
-							}
-						}else if(err.col1==undefined){
-							err.col1=1e9;
-						}
-						err.ccnt0=this.SeekLC(err.line0,err.col0)
-						err.ccnt1=this.SeekLC(err.line1,err.col1)
-					}
-					if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
-					if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
-					/////////////////
-					AddErrorToEditor(this,err)
-					if(!adding_to_existing){
-						this.SetSelection(err.ccnt0,err.ccnt1);
-						if(do_onfocus){
-							UI.SetFocus(this)
-						}
-					}
-				},adding_to_existing?"quite":undefined);
-			}else{
-				UI.OpenEditorWindow(err.file_name,function(){
-					if(!adding_to_existing){
-						this.SetSelection(err.sel_ccnt0.ccnt,err.sel_ccnt0.ccnt)
-						this.CallOnSelectionChange();
-						if(do_onfocus){
-							UI.SetFocus(this)
-						}
-					}
-				},adding_to_existing?"quite":undefined)
-			}
-			if(!adding_to_existing){
+		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1,quiet){
+			AddErrorToEditor(err,quiet);
+			if(!quiet){
 				this.SetSelection(ccnt_lh,ccnt_next)
 			}
 		}
@@ -950,7 +950,7 @@ W.notebook_prototype={
 				if(need_break){
 					break;
 				}
-				var err=ParseOutput(sline)
+				var err=UI.ParseCompilerOutput(sline)
 				if(err){this.CreateCompilerError(id,err,ccnt_lh,ccnt_next);}
 			}
 			if(need_break){
@@ -1767,6 +1767,11 @@ UI.OpenTerminalTab=function(options){
 				title=(this.main_widget.GetTitle()||title);
 				if(this.main_widget.terminated){
 					title=UI.Format("@1 [stopped]",title);
+				}else{
+					var progress=this.main_widget.m_term.progress_value;
+					if(progress>=0&&progress<=1){
+						title=UI.Format("@1 [@2%]",title,(progress*100.0).toFixed(1));
+					}
 				}
 			}
 			this.title=title;
@@ -1828,7 +1833,48 @@ UI.OpenTerminalTab=function(options){
 		},
 		Save:function(){},
 		SaveMetaData:function(){},
-		OnDestroy:function(){},
+		OnDestroy:function(){
+			var obj=this.main_widget;
+			if(obj&&obj.compiler_errors){
+				for(var i=0;i<obj.compiler_errors.length;i++){
+					ClearCompilerError(obj.compiler_errors[i]);
+				}
+				UI.RefreshAllTabs();
+			}
+		},
 	})
 	return ret;
+};
+
+UI.ParseTerminalOutput=function(obj,sline,is_clicked){
+	if(obj.m_term.got_enter_from_input){
+		if(obj.compiler_errors){
+			for(var i=0;i<obj.compiler_errors.length;i++){
+				ClearCompilerError(obj.compiler_errors[i]);
+			}
+			obj.compiler_errors=undefined;
+			UI.RefreshAllTabs();
+		}
+		obj.m_term.got_enter_from_input=0
+	}
+	var err=UI.ParseCompilerOutput(sline);
+	if(err){
+		var fn_raw=err.file_name;
+		if(!(fn_raw.search(g_regexp_abspath)>=0)&&!IO.FileExists(fn_raw)){
+			var fn_search_found=UI.SearchIncludeFile('./'+fn_raw,fn_raw);
+			err.file_name=(fn_search_found||err.file_name);
+		}
+		if(is_clicked){
+			//do not create a new highlight for the error, but noisily focus it
+			err.is_quiet=1;
+			AddErrorToEditor(err,0);
+		}else{
+			AddErrorToEditor(err,1);
+		}
+		if(!obj.compiler_errors){
+			obj.compiler_errors=[];
+		}
+		obj.compiler_errors.push(err);
+		UI.RefreshAllTabs();
+	}
 };
