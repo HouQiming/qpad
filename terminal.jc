@@ -3997,9 +3997,9 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			return 0
 		}
 		PIPE_READ_BATCH=65536
-		CheckProcessOutput=function(){
+		CheckProcessOutput=function(n_iters){
 			auto did=0
-			for iiter=0:(term.download_buf?16:1)-1
+			for iiter=0:n_iters-1
 				if proc&&proc.pipe_2nd&&!proc.pipe_2nd.WouldBlock():
 					s=proc.pipe_2nd.Read(PIPE_READ_BATCH)
 					if s&&s.n>0:
@@ -4024,7 +4024,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		js_term["Render"]=function(JSContext JS){
 			////////////////////
 			//poll the pipe on render
-			CheckProcessOutput()
+			CheckProcessOutput(term.download_buf?16:1)
 			////////////////////
 			g_renderer=Gui2D.detail.g_renderer
 			term.need_update=0
@@ -4194,6 +4194,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			ev=JS.Param(0).as(JSObject)
 			if term.keyDown(JS,ev):
 				term.need_update=1
+				CheckProcessOutput(16)
 				JS_UI.CallMethod(int,"Refresh")
 			return 0
 		}
@@ -4212,6 +4213,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			text=ev["text"].as(string)
 			term.m_IME_overlay=string.NULL
 			if text&&text.n:
+				CheckProcessOutput(16)
 				term.onTextInput(text)
 			return 0
 		}
@@ -4234,7 +4236,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				term.input_pipe_queue.n-=nwritten
 			if term.input_pipe_queue.n:
 				poll_delay=0
-			if CheckProcessOutput():
+			if CheckProcessOutput(term.download_buf?16:1):
 				poll_delay=0
 				JS_UI.CallMethod(int,"Refresh")
 			else if !proc||!proc.isRunning():

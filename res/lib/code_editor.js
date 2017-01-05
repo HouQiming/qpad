@@ -1165,7 +1165,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		this.m_unkeyed_bookmarks=bm_filtered;
 		if(bm_ccnts.length){
-			bm_ccnts.sort(function(a,b){return (a[1]*10+a[0])-(b[1]*10+b[0]);});
+			//bm_ccnts.sort(function(a,b){return (a[1]*10+a[0])-(b[1]*10+b[0]);});
+			bm_ccnts.sort(function(a,b){return (a[1]-b[1])||(a[0]-b[0]);});
 			bm_xys=this.ed.GetXYEnMasse(bm_ccnts.map(function(a){return a[1]}))
 		}
 		this.m_rendering_bm_ccnts=bm_ccnts;
@@ -1294,7 +1295,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			UI.PushCliprect(area_x,area_y,area_w,area_h)
 			for(var i=0;i<bm_ccnts.length;i++){
 				var y=bm_xys[i*2+1]-scroll_y+area_y
-				var id=bm_ccnts[i][0]
+				var id=bm_ccnts[i][0];
+				if(bm_xys[i*2+1]<scroll_y||bm_xys[i*2+1]>=scroll_y+area_h){
+					continue;
+				}
 				UI.RoundRect({x:area_x+2,y:y+4,w:w_line_numbers-4,h:hc-8,
 					color:edstyle.bookmark_color,
 					border_color:edstyle.bookmark_border_color,
@@ -5483,8 +5487,10 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 	var fn=(spath+"/"+fn_include);
 	if(IO.FileExists(fn)){return fn;}
 	//git
-	DetectRepository(fn_base)
-	var spath_repo=g_repo_from_file[fn_base]
+	//DetectRepository(fn_base)
+	//var spath_repo=g_repo_from_file[fn_base]
+	var spath_repo=DetectRepository(fn_base);
+	//console.log(fn_base,DetectRepository(fn_base),spath_repo,fn_include);
 	if(spath_repo){
 		var repo=g_repo_list[spath_repo];
 		if(repo&&repo.is_parsing){
@@ -6100,7 +6106,7 @@ W.CodeEditor=function(id,attrs){
 		}
 		//parsing progress
 		var parsing_jobs=UI.ED_GetRemainingParsingJobs();
-		if(doc&&!doc.notebook_owner&&parsing_jobs){
+		if(doc&&!doc.notebook_owner&&parsing_jobs&&g_is_parse_more_running){
 			var fn_next=UI.GetSmartTabName(parsing_jobs.fn_next);
 			obj.CreateNotification({
 				id:'parsing_progress',
@@ -6524,6 +6530,7 @@ W.CodeEditor=function(id,attrs){
 						var hh=Math.min(y1-y0,h_top_hint-y_top_hint)
 						if(hh>=0){
 							//print('draw',y0,(obj.y+y_top_hint)*UI.pixels_per_unit,doc.ed.SeekXY(0,y0))
+							//console.log('tophint',bbi,y0);
 							var renderer=doc.GetRenderer();
 							renderer.m_temporarily_disable_spell_check=1
 							doc.RenderWithLineNumbers(0,y0,obj.x,obj.y+y_top_hint,w_top_hint,hh,0,1)
@@ -7301,7 +7308,7 @@ W.CodeEditor=function(id,attrs){
 					var bm_xys=doc.m_rendering_bm_xys;
 					for(var i=0;i<bm_ccnts.length;i++){
 						var y=Math.max(Math.min(bm_xys[i*2+1]/ytot,1),0)*sbar.h+sbar.y
-						var id=bm_ccnts[i][0]
+						var id=bm_ccnts[i][0];
 						UI.RoundRect({
 							x:sbar.x, w:sbar.w,
 							y:y-obj.bookmark_scroll_bar_marker_size*0.5,h:obj.bookmark_scroll_bar_marker_size,
