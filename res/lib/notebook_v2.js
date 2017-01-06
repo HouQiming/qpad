@@ -999,6 +999,7 @@ W.notebook_prototype={
 		}
 		cell_i.m_proc=proc;
 		cell_i.m_output_terminal=proc;
+		proc.interactive_ified=interactive_ified;
 		proc.m_unknown_progress=0;
 		proc.m_t_unknown_progress=UI.m_frame_tick;
 		proc.m_current_path=spath;
@@ -1010,17 +1011,22 @@ W.notebook_prototype={
 		if(cell_i.m_proc&&!cell_i.m_proc.is_terminated){
 			this.WriteCellOutput(cell_i.m_cell_id,"Stopped...\n")
 			cell_i.m_proc.is_terminated=1;
-			cell_i.m_proc.proc.Terminate()
+			if(cell_i.m_proc.interactive_ified){
+				//hack: interactive processes... could use a ctrl+c
+				cell_i.m_proc.m_term.send('\x03');
+			}else{
+				cell_i.m_proc.Terminate()
+			}
 			UI.Refresh()
 		}
 	},
 	OnDestroy:function(){
 		for(var i=0;i<this.m_cells.length;i++){
-			this.ClearCellOutput(i)
 			var proc_desc=this.m_cells[i].m_proc;
 			if(proc_desc){
-				proc_desc.proc.Terminate()
+				proc_desc.Terminate()
 			}
+			this.ClearCellOutput(i)
 		}
 	},
 	UpdateLanguage:function(id,name){
@@ -1086,16 +1092,17 @@ W.NotebookView=function(id,attrs){
 			var progress=undefined;
 			var progress_mode=undefined;
 			if(cell_i.m_proc){
-				progress=(cell_i&&(parseFloat(cell_i.m_progress)/100));
+				progress=cell_i.m_proc.m_term.progress_value;
+				if(!(progress>=0)){progress=undefined;}
 				progress_mode='normal';
-				if((cell_i&&cell_i.m_progress)==undefined){
-					progress=cell_i.m_unknown_progress;
-					var dt=Duktape.__ui_seconds_between_ticks(cell_i.m_t_unknown_progress,UI.m_frame_tick);
-					cell_i.m_t_unknown_progress=UI.m_frame_tick;
+				if(progress==undefined){
+					progress=cell_i.m_proc.m_unknown_progress;
+					var dt=Duktape.__ui_seconds_between_ticks(cell_i.m_proc.m_t_unknown_progress,UI.m_frame_tick);
+					cell_i.m_proc.m_t_unknown_progress=UI.m_frame_tick;
 					progress_mode='unknown';
-					cell_i.m_unknown_progress+=dt/obj.panel_style.unknown_progress_period;
-					if(cell_i.m_unknown_progress>1+obj.panel_style.unknown_progress_bar_length){
-						cell_i.m_unknown_progress=obj.panel_style.unknown_progress_bar_length;
+					cell_i.m_proc.m_unknown_progress+=dt/obj.panel_style.unknown_progress_period;
+					if(cell_i.m_proc.m_unknown_progress>1+obj.panel_style.unknown_progress_bar_length){
+						cell_i.m_proc.m_unknown_progress=obj.panel_style.unknown_progress_bar_length;
 					}
 					//if(UI.MyWindowHasFocus()){
 					//	UI.RefreshIn(100);
@@ -1441,7 +1448,10 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 					if(body.m_cells[i].m_proc){
 						is_running=1;
 						if(s_progress==undefined){
-							s_progress=body.m_cells[i].m_progress;
+							var progress=body.m_cells[i].m_proc.m_term.progress_value;
+							if(progress>=0){
+								s_progress=(progress*100.0).toFixed(1);
+							}
 						}
 					}
 				}
@@ -1671,11 +1681,11 @@ UI.OpenTerminalTab=function(options){
 			if(this.main_widget){
 				title=(this.main_widget.GetTitle()||title);
 				if(this.main_widget.terminated){
-					title=UI.Format("@1 [stopped]",title);
+					title=UI.Format("@1 (stopped)",title);
 				}else{
 					var progress=this.main_widget.m_term.progress_value;
 					if(progress>=0&&progress<=1){
-						title=UI.Format("@1 [@2%]",title,(progress*100.0).toFixed(1));
+						title=UI.Format("@1 (@2%)",title,(progress*100.0).toFixed(1));
 					}
 				}
 			}

@@ -3865,6 +3865,12 @@ class Terminal{
 			this.write(s)
 		return 0;
 	}
+	JS_send=function(JSContext JS){
+		auto s=JS.Param(0).as(string)
+		if s:
+			this.send(s)
+		return 0;
+	}
 	JS_getBgcolor=function(JSContext JS){
 		auto colors=this.colors
 		auto bg=this.curAttr & 0x1ff;
@@ -3878,6 +3884,7 @@ class Terminal{
 		proto.ExportProperty(this,"got_enter_from_input")
 		proto.ExportMethod(this,"destroy",JS_destroy)
 		proto.ExportMethod(this,"write",JS_write)
+		proto.ExportMethod(this,"send",JS_send)
 		proto.ExportMethod(this,"getBgcolor",JS_getBgcolor)
 	}
 	
@@ -4270,6 +4277,12 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				JS_UI.CallMethod(int,"Refresh")
 			else if !proc||!proc.isRunning():
 				poll_delay=-1
+				if proc.pipe:
+					proc.pipe.Close()
+					proc.pipe=typeof(proc.pipe).NULL
+				if proc.pipe_2nd:
+					proc.pipe_2nd.Close()
+					proc.pipe_2nd=typeof(proc.pipe_2nd).NULL
 			return JS.Return(poll_delay)
 		}
 		js_term["OnMouseWheel"]=function(JSContext JS){
@@ -4454,14 +4467,10 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		}
 		js_term["Terminate"]=function(JSContext JS){
 			if proc:
-				if proc.pipe:
-					proc.pipe.Close()
-					proc.pipe=typeof(proc.pipe).NULL
-				if proc.pipe_2nd:
-					proc.pipe_2nd.Close()
-					proc.pipe_2nd=typeof(proc.pipe_2nd).NULL
+				//send CTRL+C
+				//term.send("\x03")
 				proc.Terminate()
-				proc=System.Processes.CProcess.NULL
+				//proc=System.Processes.CProcess.NULL
 			return 0
 		}
 		js_term["toJSON"]=function(JSContext JS){
@@ -4472,7 +4481,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				ret=proc.exit_code()
 				return JS.Return(ret)
 			else
-				return 0
+				return JS.Return(-1)
 		}
 		return JS.Return(!!proc)
 	}
