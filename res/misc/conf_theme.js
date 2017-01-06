@@ -779,6 +779,7 @@ UI.CustomTheme=function(){
 				border_color:0xff36342e,
 				border_width:4,
 				shadow_size:12,
+				shadow_size_embedded:6,
 				shadow_color:C_shadow,
 			},
 		},

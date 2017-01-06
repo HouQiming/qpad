@@ -452,7 +452,6 @@ var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 W.notebook_prototype={
 	Save:function(){
 		var docs=[];
-		var procs=[];
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
 			var doc_in=cell_i.m_text_in;
@@ -460,16 +459,15 @@ W.notebook_prototype={
 			docs[i*2+0]=doc_in;
 			doc_in.saved_point=doc_in.ed.GetUndoQueueLength();
 			doc_in.ResetSaveDiff();
-			var doc_out=cell_i.m_text_out;
-			cell_i.m_text_out=doc_out.ed.GetText();
-			docs[i*2+1]=doc_out;
+			//var doc_out=cell_i.m_text_out;
+			//cell_i.m_text_out=doc_out.ed.GetText();
+			//docs[i*2+1]=doc_out;
 			cell_i.in_m_current_wrap_width=doc_in.m_current_wrap_width;
 			cell_i.in_m_enable_wrapping=doc_in.m_enable_wrapping;
-			cell_i.out_m_current_wrap_width=doc_out.m_current_wrap_width;
-			cell_i.out_m_enable_wrapping=doc_out.m_enable_wrapping;
+			//cell_i.out_m_current_wrap_width=doc_out.m_current_wrap_width;
+			//cell_i.out_m_enable_wrapping=doc_out.m_enable_wrapping;
 			//doc_out.saved_point=doc_out.ed.GetUndoQueueLength();
 			//doc_out.ResetSaveDiff();
-			procs[i]=cell_i.m_proc;cell_i.m_proc=undefined;
 		}
 		var s=JSON.stringify({cells:this.m_cells,m_last_focus_cell_id:this.m_last_focus_cell_id},null,1)
 		var save_ret=UI.SafeSave(this.file_name,s);
@@ -479,8 +477,7 @@ W.notebook_prototype={
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
 			cell_i.m_text_in=docs[i*2+0];
-			cell_i.m_text_out=docs[i*2+1];
-			cell_i.m_proc=procs[i];
+			//cell_i.m_text_out=docs[i*2+1];
 		}
 		//if(!(sz_written>=sz_std)){
 		//	return 0;
@@ -649,17 +646,17 @@ W.notebook_prototype={
 		doc_in.saved_point=doc_in.ed.GetUndoQueueLength();
 		cell_i.m_text_in=doc_in;
 		//////
-		var doc_out=UI.CreateEmptyCodeEditor();
-		doc_out.plugins=this.m_cell_plugins;
-		doc_out.m_enable_wrapping=cell_i.out_m_enable_wrapping||0;
-		doc_out.m_current_wrap_width=cell_i.out_m_current_wrap_width||512;
-		doc_out.wrap_width=(doc_out.m_enable_wrapping?doc_out.m_current_wrap_width:0);
-		doc_out.notebook_owner=this;
-		doc_out.read_only=1;
-		doc_out.Init();
-		doc_out.scroll_x=0;doc_out.scroll_y=0;
-		if(cell_i.m_text_out){doc_out.ed.Edit([0,0,cell_i.m_text_out],1);}
-		cell_i.m_text_out=doc_out;
+		//var doc_out=UI.CreateEmptyCodeEditor();
+		//doc_out.plugins=this.m_cell_plugins;
+		//doc_out.m_enable_wrapping=cell_i.out_m_enable_wrapping||0;
+		//doc_out.m_current_wrap_width=cell_i.out_m_current_wrap_width||512;
+		//doc_out.wrap_width=(doc_out.m_enable_wrapping?doc_out.m_current_wrap_width:0);
+		//doc_out.notebook_owner=this;
+		//doc_out.read_only=1;
+		//doc_out.Init();
+		//doc_out.scroll_x=0;doc_out.scroll_y=0;
+		//if(cell_i.m_text_out){doc_out.ed.Edit([0,0,cell_i.m_text_out],1);}
+		//cell_i.m_text_out=doc_out;
 	},
 	Load:function(){
 		if(UI.enable_timing){
@@ -699,11 +696,11 @@ W.notebook_prototype={
 		for(var i=0;i<this.m_cells.length;i++){
 			this.ClearCellOutput(i)
 			var doc_in=this.m_cells[i].m_text_in;
-			var doc_out=this.m_cells[i].m_text_out;
+			//var doc_out=this.m_cells[i].m_text_out;
 			doc_in.OnDestroy();
-			doc_out.OnDestroy();
+			//doc_out.OnDestroy();
 			this["doc_in_"+i.toString()]=undefined;
-			this["doc_out_"+i.toString()]=undefined;
+			//this["doc_out_"+i.toString()]=undefined;
 		}
 		this.m_cells=undefined;
 		this.Load()
@@ -808,16 +805,18 @@ W.notebook_prototype={
 	GetSubCell:function(sub_cell_id){
 		var cur_cell=this.m_cells[sub_cell_id>>1];
 		if(cur_cell){
-			return ((sub_cell_id&1)?cur_cell.m_text_out:cur_cell.m_text_in);
+			//cur_cell.m_text_out
+			return ((sub_cell_id&1)?null:cur_cell.m_text_in);
 		}
 		return undefined;
 	},
 	GotoSubCell:function(sub_cell_id,sel_side){
-		var doc=this.GetSubCell(sub_cell_id);
-		if(!doc){
+		if(sub_cell_id&1){
+			//we no longer have output cells
 			return 0;
 		}
-		if((sub_cell_id&1)&&!(doc.ed.GetTextSize()>0)){
+		var doc=this.GetSubCell(sub_cell_id);
+		if(!doc){
 			return 0;
 		}
 		this.m_last_focus_cell_id=sub_cell_id;
@@ -838,150 +837,29 @@ W.notebook_prototype={
 		UI.Refresh()
 		return 1;
 	},
-	CreateCompilerError:function(id,err,ccnt_lh,ccnt_next){
-		//we could afford to discard dangling highlights - give discard responsibility to the cell
-		var cell_i=this.m_cells[id];
-		var edstyle=UI.default_styles.code_editor.editor_style;
-		err.is_in_active_doc=0;//the callback may end up getting called later than error clearing
-		err.color=((err.category||'error')=='error'?edstyle.color_tilde_compiler_error:edstyle.color_tilde_compiler_warning);
-		err.cell_id=id;
-		var fn_raw=err.file_name;
-		if(cell_i.m_current_path&&!(err.file_name.search(g_regexp_abspath)>=0)&&!IO.FileExists(err.file_name)){
-			//var fn_search_found=
-			var fn_search_found=UI.SearchIncludeFile(cell_i.m_current_path+'/'+err.file_name,err.file_name);
-			err.file_name=(fn_search_found||cell_i.m_current_path+'/'+err.file_name);
-		}
-		err.file_name=IO.NormalizeFileName(err.file_name);
-		var fclick_callback=function(do_onfocus,raw_edit_ccnt0,raw_edit_ccnt1,quiet){
-			AddErrorToEditor(err,quiet);
-			if(!quiet){
-				this.SetSelection(ccnt_lh,ccnt_next)
-			}
-		}
-		var doc=cell_i.m_text_out;
-		cell_i.m_has_any_error=1;
-		var loc0=doc.ed.CreateLocator(ccnt_lh,1)
-		var loc1=doc.ed.CreateLocator(ccnt_next,-1)
-		var hlobj=doc.ed.CreateHighlight(loc0,loc1,-1)
-		hlobj.color=doc.color;
-		hlobj.display_mode=UI.HL_DISPLAY_MODE_EMBOLDEN
-		hlobj.invertible=0;
-		doc.m_clickable_ranges.push({
-			loc0:loc0,
-			loc1:loc1,
-			hlobj:hlobj,
-			err:err,
-			f:fclick_callback})
-		//search for already-open windows
-		if(UI.SearchForEditorTab(err.file_name)){
-			//if found, add it to the existing tab
-			fclick_callback(0,0,0,1);
-		}
-		////////
-		doc=undefined;
-		UI.RefreshAllTabs()
-	},
 	WriteCellOutput:function(id,s){
 		var cell_i=this.m_cells[id];
-		var doc=cell_i.m_text_out;
-		var ed=doc.ed;
-		var ccnt=ed.GetTextSize();
-		var sel=doc.GetSelection();
-		ed.Edit([ccnt,0,s],1);
-		//try to advance the selection
-		var is_end=0;
-		if(sel[0]==sel[1]&&sel[1]==ccnt){
-			var ccnt_end=doc.ed.GetTextSize()
-			sel[0]=ccnt_end;
-			sel[1]=ccnt_end;
-			doc.SetSelection(ccnt_end,ccnt_end)
-			is_end=1;
+		if(!cell_i.m_output_terminal){
+			cell_i.m_output_terminal=Object.create(UI.default_styles.terminal);
+			UI.InitTerminal(proc,proc.cols,proc.rows);
 		}
-		//if(UI.g_output_parsers){
-		var line=doc.GetLC(ccnt)[0]
-		var ccnt_lh=doc.SeekLC(line,0)
-		var ccnt_tot=doc.ed.GetTextSize()
-		cell_i.m_progress=undefined;
-		for(;;){
-			var ccnt_next=doc.SeekLineBelowKnownPosition(ccnt_lh,line,line+1)
-			var need_break=0;
-			if(!(ccnt_next<ccnt_tot)){
-				if(!(doc.GetLC(ccnt_next)[0]>line)){
-					if(ccnt_next-ccnt_lh>=MAX_PARSABLE_LINE){
-						break;
-					}
-					need_break=1;
-				}
-			}
-			var sline=doc.ed.GetText(ccnt_lh,ccnt_next-ccnt_lh);
-			var lg=Duktape.__byte_length(sline);
-			if(lg<MAX_PARSABLE_LINE){
-				//chop line feeds
-				var lf_groups=sline.split('\r');
-				if(lf_groups.length>1&&!(lf_groups.length==2&&lf_groups[lf_groups.length-1]=='\n')){
-					var need_newline=0;
-					if(lf_groups[lf_groups.length-1]=='\n'){
-						lf_groups.pop();
-						need_newline=1;
-					}
-					while(lf_groups.length>0&&!lf_groups[lf_groups.length-1]){
-						lf_groups.pop();
-					}
-					if(lf_groups.length>0){
-						s_new=lf_groups.pop();
-					}else{
-						s_new='';
-					}
-					if(need_newline){
-						s_new=s_new+'\n';
-					}
-					if(need_break){
-						var match_progress=s_new.match(/([0-9]+(.[0-9]*)?)[%]/);
-						if(match_progress){
-							cell_i.m_progress=match_progress[1];
-						}
-					}
-					ed.Edit([ccnt_lh,lg,s_new],0);
-					ccnt_tot=doc.ed.GetTextSize();
-					ccnt_next=ccnt_lh+Duktape.__byte_length(s_new);
-					sline=s_new;
-				}
-				///////////////
-				if(need_break){
-					break;
-				}
-				var err=UI.ParseCompilerOutput(sline)
-				if(err){this.CreateCompilerError(id,err,ccnt_lh,ccnt_next);}
-			}
-			if(need_break){
-				break;
-			}
-			ccnt_lh=ccnt_next;
-			line++;
-		}
-		//}
-		if(is_end){
-			var ccnt_end=ed.GetTextSize()
-			doc.SetSelection(ccnt_end,ccnt_end)
-		}
+		cell_i.m_output_terminal.m_term.write(s);
 		UI.Refresh()
 	},
 	ClearCellOutput:function(id){
 		var cell_i=this.m_cells[id];
-		var doc=cell_i.m_text_out;
-		var ed_out=cell_i.m_text_out.ed;
-		if(ed_out.GetTextSize()){
-			doc.scroll_x=0;
-			doc.scroll_y=0;
-			doc.sel0.ccnt=0;
-			doc.sel1.ccnt=0;
-			ed_out.Edit([0,ed_out.GetTextSize(),undefined]);
-			doc.ResetSaveDiff()
+		if(cell_i.m_output_terminal){
+			if(cell_i.m_output_terminal.compiler_errors){
+				for(var i=0;i<cell_i.m_output_terminal.compiler_errors.length;i++){
+					ClearCompilerError(cell_i.m_output_terminal.compiler_errors[i]);
+				}
+				UI.RefreshAllTabs();
+			}
+			cell_i.m_output_terminal.m_term.destroy();
+			cell_i.m_output_terminal.m_term=undefined;
+			cell_i.m_output_terminal=undefined;
 		}
-		cell_i.m_has_any_error=0;;
-		cell_i.m_progress=undefined;
-		doc.ClearClickableRanges();
-		this.need_save|=65536;
+		cell_i.m_proc=undefined;
 	},
 	RunCell:function(id){
 		var cell_i=this.m_cells[id];
@@ -1050,18 +928,11 @@ W.notebook_prototype={
 			UI.Refresh();
 			return;
 		}
-		var interactive_ified=0;
-		if(s_code.indexOf('[interactive]')>=0){
-			//terminal
-			if(UI.DetectUnixTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols 80;stty line 25;"+IO.ShellCmd(args),"/dev/null"];
-				interactive_ified=1;
-			}
-		}
 		if(s_code.indexOf('[new term]')>=0){
 			//new terminal
-			if(!interactive_ified&&UI.DetectUnixTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols 80;stty line 25;"+IO.ShellCmd(args),"/dev/null"];
+			//ignore cols / rows
+			if(UI.DetectMSYSTools()){
+				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols 80;stty rows 25;"+IO.ShellCmd(args),"/dev/null"];
 			}
 			UI.OpenTerminalTab({
 				args:args,
@@ -1071,59 +942,67 @@ W.notebook_prototype={
 			UI.Refresh();
 			return;
 		}
-		var proc=IO.RunToolRedirected(args,spath,0)
-		var idle_wait=100;
 		for(var i=0;i<this.m_cells.length;i++){
 			this.m_cells[i].m_cell_id=i;
 		}
-		var proc_desc={proc:proc,fn_script:fn_script};
-		if(proc){
-			var fpoll=(function(cell_i,proc_desc){
-				this.need_save|=65536;
-				var s=proc.Read(65536)
-				//print('fpoll',s,JSON.stringify(args),proc.IsRunning())
-				if(s){
-					if(proc_desc.is_terminated!="forced"){
-						this.WriteCellOutput(cell_i.m_cell_id,s)
+		////////////////////////////////
+		//create the embedded terminal
+		var cols=80;
+		var rows=25;
+		var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
+		if(this.w>this.h){
+			cols=Math.max(Math.floor(this.w/this.panel_style.scale/dims.w*0.5/8)*8,8);
+			rows=Math.max(Math.ceil(this.h/this.panel_style.scale/dims.h),2);
+		}else{
+			cols=Math.max(Math.ceil(this.w/this.panel_style.scale/dims.w/8)*8,8);
+			rows=Math.max(Math.floor(this.h/this.panel_style.scale/dims.h*0.5),2);
+		}
+		var interactive_ified=0;
+		if(s_code.indexOf('[interactive]')>=0){
+			//terminal
+			if(UI.DetectMSYSTools()){
+				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
+				interactive_ified=1;
+			}
+		}
+		var proc=Object.create(UI.default_styles.terminal);
+		proc.cols=cols;
+		proc.rows=rows;
+		if(UI.InitTerminal(proc,proc.cols,proc.rows,args,spath)){
+			var fpoll=(function(){
+				var twait=this.Poll();
+				if(twait>0){
+					UI.WaitOnPipe(fpoll);
+				}else if(twait<0){
+					//process terminated
+					var code=this.GetExitCode()
+					if(code!=0&&!cell_i.m_has_any_error){
+						this.m_term.write("=== fatal error: the script has returned an error "+code+"\n")
 					}
-					idle_wait=100;
-					UI.NextTick(fpoll)
-				}else if(proc.IsRunning()){
-					idle_wait=Math.min(idle_wait*2,1000);
-					UI.setTimeout(fpoll,idle_wait);
-					if(cell_i.m_progress==undefined&&UI.MyWindowHasFocus()){
-						UI.Refresh();
-					}
-				}else{
-					if(cell_i.m_proc==proc_desc&&proc_desc.is_terminated!="forced"){
-						var code=proc.GetExitCode()
-						if(code!=0&&!cell_i.m_has_any_error){
-							this.WriteCellOutput(cell_i.m_cell_id,this.file_name+":1:1: fatal error: the script has returned an error "+code+"\n")
-						}
-						cell_i.m_proc=undefined;
-						cell_i.m_progress=undefined;
-						cell_i.m_completion_time=JsifyBuffer(IO.WallClockTime());
-					}
-					IO.DeleteFile(fn_script)
+					IO.DeleteFile(fn_script);
+					cell_i.m_proc=undefined;
+					this.m_term.progress_value=-1;
 					UI.OnApplicationSwitch()
 					UI.Refresh();
 					//completion notification
 					if(UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
 						UI.ShowCompletionNotification();
 					}
+				}else{
+					UI.WaitOnPipe(fpoll);
 				}
-			}).bind(this,cell_i,proc_desc)
-			UI.NextTick(fpoll)
+			}).bind(proc);
+			UI.NextTick(fpoll);
 		}else{
-			this.WriteCellOutput(id,this.file_name+":1:1: fatal error: failed to execute the script\n")
+			this.WriteCellOutput(id,"=== fatal error: failed to execute the script\n")
 			IO.DeleteFile(fn_script)
 		}
-		this.need_save|=65536;
-		cell_i.m_proc=proc_desc;
-		cell_i.m_unknown_progress=0;
-		cell_i.m_t_unknown_progress=UI.m_frame_tick;
-		cell_i.m_current_path=spath;
-		this.m_last_focus_cell_id=id*2+1;
+		cell_i.m_proc=proc;
+		cell_i.m_output_terminal=proc;
+		proc.m_unknown_progress=0;
+		proc.m_t_unknown_progress=UI.m_frame_tick;
+		proc.m_current_path=spath;
+		this.m_last_focus_cell_id=id*2+0;
 		UI.Refresh()
 	},
 	KillCell:function(id){
@@ -1279,110 +1158,63 @@ W.NotebookView=function(id,attrs){
 			focus_cell_id&=-2;
 			obj.m_last_focus_cell_id=focus_cell_id;
 		}
-		if(UI.nd_focus==cur_cell.m_text_out){
+		if(UI.nd_focus==cur_cell.m_output_terminal){
 			focus_cell_id=(focus_cell_id&-2)+1;
-			obj.m_last_focus_cell_id=focus_cell_id;
+			obj.m_last_focus_cell_id=(focus_cell_id&-2);
 		}
 		//////
-		var h_in=0,h_out=0;
+		//var h_in=0,h_out=0;
 		if(cur_cell.m_text_in){
 			cur_cell.m_text_in.sub_cell_id=(focus_cell_id&-2)+0;
 			cur_cell.m_text_in.m_cell_id=(focus_cell_id>>1);
-			h_in=MeasureEditorSize(cur_cell.m_text_in,obj.w);
+			//h_in=MeasureEditorSize(cur_cell.m_text_in,obj.w);
 		}
-		if(cur_cell.m_text_out){
-			cur_cell.m_text_out.sub_cell_id=(focus_cell_id&-2)+1;
-			cur_cell.m_text_out.m_cell_id=(focus_cell_id>>1);
-			h_out=MeasureEditorSize(cur_cell.m_text_out,obj.w);
+		//if(cur_cell.m_text_out){
+		//	cur_cell.m_text_out.sub_cell_id=(focus_cell_id&-2)+1;
+		//	cur_cell.m_text_out.m_cell_id=(focus_cell_id>>1);
+		//	h_out=MeasureEditorSize(cur_cell.m_text_out,obj.w);
+		//}
+		//terminal
+		var w_editor=obj.w;
+		var h_editor=obj.h;
+		var term_side="x";
+		if(cur_cell.m_output_terminal){
+			var term=cur_cell.m_output_terminal;
+			var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
+			var w_term=term.m_term.cols*dims.w;
+			var h_term=term.m_term.rows*dims.h;
+			var value=term.GetScrollValue();
+			var w_term_area=w_term+(value>=0?term.w_scroll_bar:0);
+			var scale=Math.min(Math.min(obj.w/w_term_area,obj.h/h_term),1);
+			term.font=UI.ScaleFont(UI.default_styles.terminal.font,scale);
+			w_term_area*=scale;
+			h_term*=scale;
+			var x_term=obj.x+obj.w-w_term_area;
+			var y_term=obj.y+obj.h-h_term;
+			term.x=x_term;
+			term.y=y_term;
+			term.w=w_term_area;
+			term.h=h_term;
+			if(obj.w-w_term_area>obj.h-h_term){
+				w_editor=obj.w-w_term_area-term.panel_style.border_width;
+				//UI.RoundRect({x:x_term,y:obj.y,w:w_term_area,h:obj.h,color:C_bg,border_width:0});
+				y_term=obj.y+(obj.h-h_term)*0.5;
+				term_side="x";
+			}else{
+				h_editor=obj.h-h_term-term.panel_style.border_width;
+				//UI.RoundRect({x:obj.x,y:y_term,w:obj.w,h:h_term,color:C_bg,border_width:0});
+				x_term=obj.x+(obj.w-w_term_area)*0.5;
+				term_side="y";
+			}
 		}
-		var doc=((focus_cell_id&1)?cur_cell.m_text_out:cur_cell.m_text_in);
-		var has_both=(cur_cell.m_text_in&&cur_cell.m_text_out&&(cur_cell.m_text_out.ed.GetTextSize()>0||(focus_cell_id&1)))
-		if(has_both){
-			//allocate a larger budget on the focused side
-			var h_in_budget=0,h_out_budget=0;
-			var h_available=obj.h;
-			var in_budget_ratio=cur_cell.m_in_budget_ratio;
-			if(in_budget_ratio==undefined){
-				in_budget_ratio=0.5;
-			}
-			in_budget_ratio=Math.min(Math.max(0.125,in_budget_ratio),0.875);
-			//var met_budget_flags=0;
-			h_in_budget=h_available*in_budget_ratio;
-			h_out_budget=h_available-h_in_budget;
-			if(h_out<h_out_budget){
-				h_out_budget=h_out;
-				h_in_budget=h_available-h_out_budget;
-			}else{
-				//met_budget_flags|=1;
-			}
-			if(h_in<h_in_budget){
-				h_in_budget=h_in;
-				h_out_budget=h_available-h_in_budget;
-			}else{
-				//met_budget_flags|=2;
-			}
-			cur_cell.m_text_in.default_focus=((focus_cell_id&1)?1:2);
-			cur_cell.m_text_out.default_focus=((focus_cell_id&1)?2:1);
-			var obj_widget_in=W.CodeEditor("cell_"+(focus_cell_id&-2).toString(),{
-				disable_minimap:1,
-				doc:cur_cell.m_text_in,
-				read_only:cur_cell.m_text_in.read_only,
-				x:obj.x,y:obj.y,w:obj.w,h:h_in_budget,
-			});
-			var obj_widget_out=W.CodeEditor("cell_"+((focus_cell_id&-2)+1).toString(),{
-				disable_minimap:1,
-				doc:cur_cell.m_text_out,
-				read_only:cur_cell.m_text_out.read_only,
-				x:obj.x,y:obj.y+h_in_budget,w:obj.w,h:h_out_budget,
-			});
-			//var w_line_numbers=Math.min(obj_widget_in.doc.m_rendering_w_line_numbers,obj_widget_out.doc.m_rendering_w_line_numbers);
-			//w_line_numbers=(w_line_numbers||0);
-			////shadow the other end
-			//if(focus_cell_id&1){
-			//	UI.PushCliprect(obj.x+w_line_numbers,obj.y+h_in_budget-obj.panel_style.shadow_size,obj.w-w_line_numbers,obj.panel_style.shadow_size);
-			//}else{
-			//	UI.PushCliprect(obj.x+w_line_numbers,obj.y+h_in_budget,obj.w-w_line_numbers,obj.panel_style.shadow_size);
-			//}
-			//UI.RoundRect({
-			//	x:obj.x+w_line_numbers-obj.panel_style.shadow_size,y:obj.y+h_in_budget-obj.panel_style.shadow_size,
-			//	w:obj.w-w_line_numbers+obj.panel_style.shadow_size*2,h:obj.panel_style.shadow_size*2,
-			//	round:obj.panel_style.shadow_size,border_width:-obj.panel_style.shadow_size,
-			//	color:obj.panel_style.shadow_color
-			//})
-			//UI.PopCliprect();
-			//draggable for in_budget_ratio
-			W.Region("budget_adjuster_"+(focus_cell_id&-2).toString(),{
-				x:obj.x,y:obj.y+h_in_budget-obj.panel_style.separator_bar_region_size*0.5,w:obj.w,h:obj.panel_style.separator_bar_region_size,
-				cell:cur_cell,
-				obj_h:obj.h,
-				mouse_cursor:'sizens',
-				OnMouseDown:function(event){
-					this.m_drag_ctx={
-						dy:h_in_budget-event.y,
-						h:this.obj_h,
-					};
-					UI.CaptureMouse(this);
-				},
-				OnMouseMove:function(event){
-					var ctx=this.m_drag_ctx;
-					if(!ctx){return;}
-					this.cell.m_in_budget_ratio=Math.min(Math.max(0.125,(ctx.dy+event.y)/ctx.h),0.875);
-					obj.need_save|=65536;
-					UI.Refresh();
-				},
-				OnMouseUp:function(event){
-					this.OnMouseMove(event);
-					UI.ReleaseMouse(this);
-					this.m_drag_ctx=undefined;
-				},
-			})
-		}else if(doc){
-			var h_doc=Math.min(MeasureEditorSize(doc,obj.w),obj.h);
+		var doc=cur_cell.m_text_in;
+		if(doc){
+			//var h_doc=Math.min(MeasureEditorSize(doc,obj.w),obj.h);
 			W.CodeEditor("cell_"+focus_cell_id.toString(),{
 				disable_minimap:1,
 				doc:doc,
 				read_only:doc.read_only,
-				x:obj.x,y:obj.y,w:obj.w,h:obj.h,
+				x:obj.x,y:obj.y,w:w_editor,h:h_editor,
 			});
 			//UI.PushCliprect(obj.x,obj.y+h_doc,obj.w,obj.panel_style.shadow_size);
 			//UI.RoundRect({
@@ -1400,6 +1232,60 @@ W.NotebookView=function(id,attrs){
 				obj_widget.DismissNotificationsByRegexp(g_re_cancel_note);
 			}
 		}
+		//actually render the terminal
+		if(cur_cell.m_output_terminal){
+			W.PureRegion("cell_term_"+(focus_cell_id&-2).toString(),term);
+			//var sz_expand=term.panel_style.border_width+term.panel_style.shadow_size_embedded;
+			//UI.RoundRect({
+			//	x:x_term-sz_expand,y:y_term-sz_expand,
+			//	w:w_term_area+sz_expand*2,h:h_term+sz_expand*2,
+			//	color:term.panel_style.shadow_color,
+			//	border_width:-term.panel_style.shadow_size_embedded,
+			//	round:term.panel_style.shadow_size_embedded,
+			//});
+			//var C_bg=term.m_term.getBgcolor();
+			var C_bg=obj.panel_style.cell_list_bgcolor;
+			var sz_expand=term.panel_style.shadow_size_embedded;
+			if(term_side=="x"){
+				UI.RoundRect({
+					x:obj.x+w_editor-sz_expand,y:obj.y-sz_expand,
+					w:sz_expand*2,h:obj.h+sz_expand*2,
+					color:term.panel_style.shadow_color,
+					border_width:-term.panel_style.shadow_size_embedded,
+					round:term.panel_style.shadow_size_embedded,
+				});
+				UI.RoundRect({x:obj.x+w_editor,y:obj.y,w:w_term_area,h:obj.h,color:C_bg,border_width:0});
+			}else{
+				UI.RoundRect({
+					x:obj.x-sz_expand,y:obj.y+h_editor-sz_expand,
+					w:obj.w+sz_expand*2,h:sz_expand*2,
+					color:term.panel_style.shadow_color,
+					border_width:-term.panel_style.shadow_size_embedded,
+					round:term.panel_style.shadow_size_embedded,
+				});
+				UI.RoundRect({x:obj.x,y:obj.y+h_editor,w:obj.w,h:h_term,color:C_bg,border_width:0});
+			}
+			UI.RoundRect({
+				x:x_term-term.panel_style.border_width,y:y_term-term.panel_style.border_width,
+				w:w_term_area+term.panel_style.border_width*2,h:h_term+term.panel_style.border_width*2,
+				color:term.panel_style.border_color,
+				//round:term.panel_style.border_width,
+			});
+			UI.PushCliprect(x_term,y_term,w_term_area,h_term);
+			term.Render(x_term,y_term,w_term,h_term);
+			UI.PopCliprect();
+			if(value>=0){
+				W.ScrollBar("cell_term_sbar_"+(focus_cell_id&-2).toString(),{
+					x:x_term+w_term, y:y_term, w:term.w_scroll_bar, h:h_term, dimension:'y',
+					page_size:term.m_term.rows, total_size:term.m_term.n_valid_lines-term.m_term.rows, value:value,
+					OnChange:function(value){
+						term.SetScrollValue(value)
+						UI.Refresh()
+					},
+				});
+			}
+		}
+		//todo: buttons
 	}
 	if(obj.activated){
 		var menu_notebook=undefined;
@@ -1423,7 +1309,7 @@ W.NotebookView=function(id,attrs){
 			menu_notebook.AddNormalItem({
 				text:"&Clone cell",
 				action:obj.DupCell.bind(obj)});
-			if(cur_cell.m_text_out&&cur_cell.m_text_out.ed.GetTextSize()){
+			if(cur_cell.m_output_terminal){
 				menu_notebook.AddNormalItem({
 					text:"Clear &output",
 					enable_hotkey:1,key:"SHIFT+CTRL+C",
@@ -1702,25 +1588,21 @@ W.Terminal=function(id,attrs){
 	if(!obj.m_term){
 		//var proc=IO.RunToolRedirected(args,spath,0);
 		if(!UI.InitTerminal(obj,obj.cols,obj.rows,obj.args,obj.spath)){
-			obj.m_term="bad";
-			obj.Render=function(){
-				//do nothing
-			}
+			//no need to poll anything
+			//obj.m_term="bad";
+			//obj.Render=function(){
+			//	//do nothing
+			//}
 		}else{
-			obj.idle_wait=25;
 			var fpoll=(function(){
 				var twait=this.Poll();
 				if(twait>0){
-					this.idle_wait=Math.min(this.idle_wait*2,100);
-					//UI.setTimeout(fpoll,this.idle_wait);
 					UI.WaitOnPipe(fpoll);
 				}else if(twait<0){
 					//terminated, do nothing
 					this.terminated=1;
 					UI.Refresh()
 				}else{
-					this.idle_wait=25;
-					//UI.NextTick(fpoll)
 					UI.WaitOnPipe(fpoll);
 				}
 			}).bind(obj);
@@ -1887,8 +1769,8 @@ UI.ParseTerminalOutput=function(obj,sline,is_clicked){
 	if(err){
 		var fn_raw=err.file_name;
 		if(!(fn_raw.search(g_regexp_abspath)>=0)&&!IO.FileExists(fn_raw)){
-			var fn_search_found=UI.SearchIncludeFile('./'+fn_raw,fn_raw);
-			err.file_name=(fn_search_found||err.file_name);
+			var fn_search_found=UI.SearchIncludeFile((obj.m_current_path||'.')+'/'+fn_raw,fn_raw);
+			err.file_name=(fn_search_found||((obj.m_current_path||'.')+'/'+err.file_name));
 		}
 		if(is_clicked){
 			//do not create a new highlight for the error, but noisily focus it
@@ -1902,10 +1784,13 @@ UI.ParseTerminalOutput=function(obj,sline,is_clicked){
 		}
 		obj.compiler_errors.push(err);
 		UI.RefreshAllTabs();
+		return 1;
+	}else{
+		return 0;
 	}
 };
 
-var ReallyDetectUnixTools=function(){
+var ReallyDetectMSYSTools=function(){
 	if(UI.IS_MOBILE){return 0;}
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		var paths=IO.ProcessUnixFileName("%PATH%").split(/[; \t]/);
@@ -1926,9 +1811,9 @@ var ReallyDetectUnixTools=function(){
 	}
 };
 
-UI.DetectUnixTools=function(){
+UI.DetectMSYSTools=function(){
 	if(UI.m_has_unix_tools==undefined){
-		UI.m_has_unix_tools=ReallyDetectUnixTools();
+		UI.m_has_unix_tools=ReallyDetectMSYSTools();
 	}
 	return UI.m_has_unix_tools;
 };

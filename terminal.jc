@@ -402,6 +402,7 @@ class Terminal{
 			if counter>=MAX_PARSABLE_LINE:break
 		if counter>=MAX_PARSABLE_LINE:return
 		this.s_parse_buffer.n=0
+		row_initial=row
 		for(;;)
 			for i=0:this.cols-1
 				auto addr=(row*this.cols+i)*3
@@ -415,7 +416,18 @@ class Terminal{
 			//this... should always be the terminal object
 			this.s_parse_buffer.push('\n')
 			js_this=JS.GetThis()
-			JS["UI"].CallMethod(int,"ParseTerminalOutput",js_this,this.s_parse_buffer,0)
+			is_compiler_error=JS["UI"].CallMethod(int,"ParseTerminalOutput",js_this,this.s_parse_buffer,0)
+			if is_compiler_error:
+				row=row_initial
+				for(;;)
+					for i=0:this.cols-1
+						auto addr=(row*this.cols+i)*3
+						if addr+2<this.lines.n&&this.lines[addr+2]:
+							this.lines[addr+0]|=g_flags.UNDERLINE<<18
+					if row==row0:break
+					row++
+					if row>=this.scrollback:
+						row-=this.scrollback
 	}
 	
 	/**
@@ -3847,6 +3859,17 @@ class Terminal{
 		this.destroy()
 		return 0;
 	}
+	JS_write=function(JSContext JS){
+		auto s=JS.Param(0).as(string)
+		if s:
+			this.write(s)
+		return 0;
+	}
+	JS_getBgcolor=function(JSContext JS){
+		auto colors=this.colors
+		auto bg=this.curAttr & 0x1ff;
+		return JS.Return(colors[bg])
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"cols")
 		proto.ExportProperty(this,"rows")
@@ -3854,6 +3877,8 @@ class Terminal{
 		proto.ExportProperty(this,"progress_value")
 		proto.ExportProperty(this,"got_enter_from_input")
 		proto.ExportMethod(this,"destroy",JS_destroy)
+		proto.ExportMethod(this,"write",JS_write)
+		proto.ExportMethod(this,"getBgcolor",JS_getBgcolor)
 	}
 	
 	/////////////
@@ -3957,18 +3982,21 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		rows=JS.Param(2).as(int)
 		auto shell_args=JS.Param(3).as(JSObject)
 		auto spath=JS.Param(4).or(".")
-		auto n=shell_args.length()
-		auto args=[shell_args[i].as(string) for i=0:n-1]
-		foreach s,I in args
-			if !s:
-				return JS.ReturnError("bad args")
-		proc=System.Processes.RunPiped(args,spath,0,"new_job,input,output,error")
-		if !proc:
-			//job object creation may fail
-			proc=System.Processes.RunPiped(args,spath,0,"input,output,error")
-		if proc.pipe:
+		if shell_args:
+			auto n=shell_args.length()
+			auto args=[shell_args[i].as(string) for i=0:n-1]
+			foreach s,I in args
+				if !s:
+					return JS.ReturnError("bad args")
+			proc=System.Processes.RunPiped(args,spath,0,"new_job,input,output,error")
+			if !proc:
+				//job object creation may fail
+				proc=System.Processes.RunPiped(args,spath,0,"input,output,error")
+		else
+			proc=typeof(proc).NULL
+		if proc&&proc.pipe:
 			PipeWaiter.AddPipe(proc.pipe)
-		if proc.pipe_2nd:
+		if proc&&proc.pipe_2nd:
 			PipeWaiter.AddPipe(proc.pipe_2nd)
 		//if !proc:
 		//	return 0
@@ -4074,7 +4102,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			lines=term.lines
 			ybaseline=g_renderer.GetFontBaseline(fnt_scaled)
 			y_underline=ybaseline*1.05f
-			h_underline=ybaseline*0.05f
+			h_underline=ybaseline*0.2f
 			sel_x0=term.sel_x0
 			sel_y0=term.sel_y0
 			sel_x1=term.sel_x1
@@ -4155,12 +4183,13 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					x_ch=x+float(i)*w_char
 					y_ch=y+float(j)*h_char
 					g_renderer.DrawRectangle(x_ch,y_ch,w_char*float(ch_width),h_char,colors[bg])
-					if !(flags & g_flags.INVISIBLE)&&ch!=32&&ch!=9&&ch!=0:
-						if (flags & g_flags.BOLD) {
-							g_renderer.DrawChar(fnt_bold_scaled,x_ch,y_ch,colors[fg],ch)
-						}else{
-							g_renderer.DrawChar(fnt_scaled,x_ch,y_ch,colors[fg],ch)
-						}
+					if !(flags & g_flags.INVISIBLE):
+						if ch!=32&&ch!=9&&ch!=0:
+							if (flags & g_flags.BOLD) {
+								g_renderer.DrawChar(fnt_bold_scaled,x_ch,y_ch,colors[fg],ch)
+							}else{
+								g_renderer.DrawChar(fnt_scaled,x_ch,y_ch,colors[fg],ch)
+							}
 						if (flags & g_flags.UNDERLINE) {
 							g_renderer.DrawRectangle(x_ch,y_ch+y_underline,w_char*float(ch_width),h_underline, colors[fg])
 						}
@@ -4316,8 +4345,8 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					term.sel_y0=ytop
 					term.sel_x1=term.cols
 					term.sel_y1=(term.ybase+term.rows-1)%term.scrollback
-				else if clicks==3:
-					//paragraph
+				else if clicks>=2:
+					//select paragraph first
 					auto ytop=(term.n_valid_lines<term.scrollback?0:(term.ybase+term.rows)%term.scrollback)
 					term.selecting=2
 					term.sel_x0=0
@@ -4349,27 +4378,28 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					if term.s_parse_buffer.n:
 						term.s_parse_buffer.push('\n')
 						js_this=JS.GetThis()
-						JS["UI"].CallMethod(int,"ParseTerminalOutput",js_this,term.s_parse_buffer,1)
-				else if clicks==2:
-					//word
-					term.selecting=2
-					term.sel_x0=xi
-					term.sel_y0=yi_global
-					term.sel_x1=xi
-					term.sel_y1=yi_global
-					pchar_line=yi_global*term.cols
-					while term.sel_x0>0:
-						addr=(pchar_line+term.sel_x0-1)*3
-						if uptr(addr)>=uptr(term.lines.n)||term.lines[addr+2]&&(term.lines[addr+1]==' '||term.lines[addr+1]=='\t'):
-							break
-						term.sel_x0--
-					if term.sel_x1<term.cols:
-						for(;;)
-							term.sel_x1++
-							if term.sel_x1>=term.cols:break
-							addr=(pchar_line+term.sel_x1)*3
+						if JS["UI"].CallMethod(int,"ParseTerminalOutput",js_this,term.s_parse_buffer,1):
+							clicks=3
+					//re-select word if ParseTerminalOutput failed
+					if clicks==2:
+						term.selecting=2
+						term.sel_x0=xi
+						term.sel_y0=yi_global
+						term.sel_x1=xi
+						term.sel_y1=yi_global
+						pchar_line=yi_global*term.cols
+						while term.sel_x0>0:
+							addr=(pchar_line+term.sel_x0-1)*3
 							if uptr(addr)>=uptr(term.lines.n)||term.lines[addr+2]&&(term.lines[addr+1]==' '||term.lines[addr+1]=='\t'):
 								break
+							term.sel_x0--
+						if term.sel_x1<term.cols:
+							for(;;)
+								term.sel_x1++
+								if term.sel_x1>=term.cols:break
+								addr=(pchar_line+term.sel_x1)*3
+								if uptr(addr)>=uptr(term.lines.n)||term.lines[addr+2]&&(term.lines[addr+1]==' '||term.lines[addr+1]=='\t'):
+									break
 				else
 					//drag
 					term.selecting=1
@@ -4434,7 +4464,23 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				proc=System.Processes.CProcess.NULL
 			return 0
 		}
-		return JS.Return(js_term)
+		js_term["toJSON"]=function(JSContext JS){
+			return 0
+		}
+		js_term["GetExitCode"]=function(JSContext JS){
+			if proc:
+				ret=proc.exit_code()
+				return JS.Return(ret)
+			else
+				return 0
+		}
+		return JS.Return(!!proc)
+	}
+	JS_UI["ScaleFont"]=function(JSContext JS){
+		fnt=JS.Param(0).as(Gui2D.detail.TFont)
+		scale=JS.Param(1).as(float)
+		fnt.h*=scale
+		return JS.Return(fnt)
 	}
 })
 
