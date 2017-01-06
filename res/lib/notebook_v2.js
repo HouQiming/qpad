@@ -449,13 +449,17 @@ var ClearCompilerError=function(err){
 }
 
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
+var g_v2_separator='\n=====\uDBFF\uDFFF=====\n',g_v2_separator_re=new RegExp(g_v2_separator,'g');
 W.notebook_prototype={
 	Save:function(){
 		var docs=[];
+		var parts=[null];
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
 			var doc_in=cell_i.m_text_in;
-			cell_i.m_text_in=doc_in.ed.GetText();
+			//cell_i.m_text_in=doc_in.ed.GetText();
+			parts.push(doc_in.ed.GetText().replace(g_v2_separator_re,'\n\n'));
+			cell_i.m_text_in=undefined;
 			docs[i*2+0]=doc_in;
 			doc_in.saved_point=doc_in.ed.GetUndoQueueLength();
 			doc_in.ResetSaveDiff();
@@ -470,6 +474,8 @@ W.notebook_prototype={
 			//doc_out.ResetSaveDiff();
 		}
 		var s=JSON.stringify({cells:this.m_cells,m_last_focus_cell_id:this.m_last_focus_cell_id},null,1)
+		parts[0]='v2\n'+s;
+		s=parts.join(g_v2_separator);
 		var save_ret=UI.SafeSave(this.file_name,s);
 		//var sz_std=Duktape.__byte_length(s);
 		//var sz_written=IO.CreateFile(this.file_name,s);
@@ -667,9 +673,21 @@ W.notebook_prototype={
 		if(fn_notes){
 			this.m_loaded_time=IO.GetFileTimestamp(fn_notes);
 			try{
-				var json_obj=JSON.parse(IO.ReadAll(fn_notes));
-				this.m_cells=json_obj.cells;
-				this.m_last_focus_cell_id=(json_obj.m_last_focus_cell_id||0);
+				var s_file_data=IO.ReadAll(fn_notes);
+				if(s_file_data.length>3&&s_file_data.substr(0,3)=='v2\n'){
+					//format v2 - g_v2_separator
+					var parts=s_file_data.substr(3).split(g_v2_separator);
+					var json_obj=JSON.parse(parts[0]);
+					this.m_cells=json_obj.cells;
+					this.m_last_focus_cell_id=(json_obj.m_last_focus_cell_id||0);
+					for(var i=0;i<this.m_cells.length;i++){
+						this.m_cells[i].m_text_in=(parts[i+1]||'');
+					}
+				}else{
+					var json_obj=JSON.parse(s_file_data);
+					this.m_cells=json_obj.cells;
+					this.m_last_focus_cell_id=(json_obj.m_last_focus_cell_id||0);
+				}
 			}catch(err){
 				this.m_cells=[];
 				this.m_last_focus_cell_id=0;
@@ -840,7 +858,20 @@ W.notebook_prototype={
 	WriteCellOutput:function(id,s){
 		var cell_i=this.m_cells[id];
 		if(!cell_i.m_output_terminal){
+			var cols=80;
+			var rows=25;
+			var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
+			if(this.w>this.h){
+				cols=Math.max(Math.floor(this.w/this.panel_style.scale/dims.w*0.5/8)*8,8);
+				rows=Math.max(Math.ceil(this.h/this.panel_style.scale/dims.h),2);
+			}else{
+				cols=Math.max(Math.ceil(this.w/this.panel_style.scale/dims.w/8)*8,8);
+				rows=Math.max(Math.floor(this.h/this.panel_style.scale/dims.h*0.5),2);
+			}
 			cell_i.m_output_terminal=Object.create(UI.default_styles.terminal);
+			var proc=cell_i.m_output_terminal;
+			proc.cols=cols;
+			proc.rows=rows;
 			UI.InitTerminal(proc,proc.cols,proc.rows);
 		}
 		cell_i.m_output_terminal.m_term.write(s);
@@ -885,7 +916,6 @@ W.notebook_prototype={
 				return;
 			}
 		}
-		var ed_out=cell_i.m_text_out.ed;
 		this.ClearCellOutput(id)
 		var desc=Language.GetDescObjectByName(cell_i.m_language);
 		if(!desc.m_buildenv_by_name){return;}
@@ -997,8 +1027,8 @@ W.notebook_prototype={
 			this.WriteCellOutput(id,"=== fatal error: failed to execute the script\n")
 			IO.DeleteFile(fn_script)
 		}
-		cell_i.m_proc=proc;
 		cell_i.m_output_terminal=proc;
+		cell_i.m_proc=proc;
 		proc.interactive_ified=interactive_ified;
 		proc.m_unknown_progress=0;
 		proc.m_t_unknown_progress=UI.m_frame_tick;
@@ -1013,7 +1043,7 @@ W.notebook_prototype={
 			cell_i.m_proc.is_terminated=1;
 			if(cell_i.m_proc.interactive_ified){
 				//hack: interactive processes... could use a ctrl+c
-				cell_i.m_proc.m_term.send('\x03');
+				cell_i.m_proc.m_term.send('\x03\x04');
 			}else{
 				cell_i.m_proc.Terminate()
 			}

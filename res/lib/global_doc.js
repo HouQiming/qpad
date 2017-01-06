@@ -216,6 +216,7 @@ UI.OnCustomEvent=function(event){
 			var f=cbs[i];
 			f();
 		}
+		IO.StartWaitingForPipes();
 	}
 };
 

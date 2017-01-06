@@ -1167,6 +1167,24 @@ UI.RegisterEditorPlugin(function(){
 			}.bind(this)})
 		}
 		menu_run.AddNormalItem({text:"&Stop all cells",icon:"停",enable_hotkey:0,action:function(){
+			var obj_active_tab=UI.GetFrontMostEditorTab();
+			var doc=obj_active_tab.main_widget&&obj_active_tab.main_widget.doc;
+			if(!doc||!doc.m_file_name){return;}
+			var spath_repo=UI.GetNotebookProject(doc.m_file_name);
+			var file_name=IO.NormalizeFileName(spath_repo+"/notebook.json");
+			var obj_tab_i=UI.BringUpNotebookTab(file_name,"none");
+			if(!obj_tab_i){return;}
+			if(obj_tab_i.document_type=="notebook"){
+				if(obj_tab_i.main_widget){
+					var obj_notebook=obj_tab_i.main_widget;
+					if(obj_notebook.m_cells){
+						for(var j=0;j<obj_notebook.m_cells.length;j++){
+							obj_notebook.KillCell(j);
+						}
+					}
+				}
+			}
+			/*
 			for(var i=0;i<UI.g_all_document_windows.length;i++){
 				var obj_tab_i=UI.g_all_document_windows[i];
 				if(obj_tab_i.document_type=="notebook"){
@@ -1180,6 +1198,7 @@ UI.RegisterEditorPlugin(function(){
 					}
 				}
 			}
+			*/
 		}})
 		if(desc.m_buildenvs&&desc.m_buildenvs.length>1){
 			menu_run.AddSeparator()

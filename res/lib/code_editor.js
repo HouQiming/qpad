@@ -2823,13 +2823,13 @@ UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found
 	var cell_id=obj_notebook.GetSpecificCell(s_mark,s_language,create_if_not_found)
 	if(cell_id<0){return undefined;}
 	if(is_non_quiet){
-		//todo: output / input focus
+		//output / input focus
 		//UI.SetFocus(obj_notebook.m_cells[cell_id].m_text_in);
-		obj_notebook.GotoSubCell(cell_id*2+(is_non_quiet=="output"?1:0));
+		obj_notebook.GotoSubCell(cell_id*2);
 		//obj_notebook.need_auto_scroll=1;
 		var cell_i=(obj_notebook.m_cells&&obj_notebook.m_cells[cell_id]);
 		if(cell_i&&is_non_quiet!="output"){
-			UI.SetFocus(is_non_quiet=="output"?cell_i.m_text_out:cell_i.m_text_in)
+			UI.SetFocus(is_non_quiet=="output"&&cell_i.m_output_terminal?cell_i.m_output_terminal:cell_i.m_text_in)
 		}
 		UI.RefreshAllTabs();
 	}
