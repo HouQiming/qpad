@@ -594,7 +594,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if Platform.IS_WINDOWS:
 				if !i:s_args_i=s_args_i.Replace(["/","\\"])
 			if s_args_i.IndexOf(' ')>=0||s_args_i.IndexOf('&')>=0:
-				s_args_i="\""+genString(s_args_i)+"\""
+				if Platform.IS_WINDOWS:
+					s_args_i="\""+genString(s_args_i)+"\""
+				else
+					s_args_i="'"+genString(s_args_i)+"'"
 			if i:scmd.push(' ')
 			scmd.push(s_args_i)
 		if do_system:
@@ -743,6 +746,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	//	Writeln(fn)
 	//Writeln('main: ',sbox.UIReadAll("res/main.js"))
 	//Writeln(formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-g_startup_tick)*1000.0,{frac:2}),'ms since startup - sbox.UIRunJS');
+	System.Env.SetEnvironmentString("TERM","xterm")
 	PipeWaiter.InitPipeWaiter()
 	sbox.UIRunJS(JS,"res/main.js")
 	PipeWaiter.StopPipeWaiter()

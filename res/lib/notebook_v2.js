@@ -1050,6 +1050,27 @@ W.notebook_prototype={
 			UI.Refresh();
 			return;
 		}
+		var interactive_ified=0;
+		if(s_code.indexOf('[interactive]')>=0){
+			//terminal
+			if(UI.DetectUnixTools()){
+				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols 80;stty line 25;"+IO.ShellCmd(args),"/dev/null"];
+				interactive_ified=1;
+			}
+		}
+		if(s_code.indexOf('[new term]')>=0){
+			//new terminal
+			if(!interactive_ified&&UI.DetectUnixTools()){
+				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols 80;stty line 25;"+IO.ShellCmd(args),"/dev/null"];
+			}
+			UI.OpenTerminalTab({
+				args:args,
+				spath:spath,
+				auto_close:1,
+			});
+			UI.Refresh();
+			return;
+		}
 		var proc=IO.RunToolRedirected(args,spath,0)
 		var idle_wait=100;
 		for(var i=0;i<this.m_cells.length;i++){
@@ -1882,4 +1903,32 @@ UI.ParseTerminalOutput=function(obj,sline,is_clicked){
 		obj.compiler_errors.push(err);
 		UI.RefreshAllTabs();
 	}
+};
+
+var ReallyDetectUnixTools=function(){
+	if(UI.IS_MOBILE){return 0;}
+	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		var paths=IO.ProcessUnixFileName("%PATH%").split(/[; \t]/);
+		var got_script=0;
+		var got_stty=0;
+		for(var i=0;i<paths.length;i++){
+			var path_i=paths[i];
+			if(!got_script&&IO.FileExists(path_i+"\\script.exe")){
+				got_script=1;
+			}
+			if(!got_stty&&IO.FileExists(path_i+"\\stty.exe")){
+				got_stty=1;
+			}
+		}
+		return (got_script&&got_stty);
+	}else{
+		return 1;
+	}
+};
+
+UI.DetectUnixTools=function(){
+	if(UI.m_has_unix_tools==undefined){
+		UI.m_has_unix_tools=ReallyDetectUnixTools();
+	}
+	return UI.m_has_unix_tools;
 };

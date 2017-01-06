@@ -8281,6 +8281,7 @@ W.OptionsPage=function(id,attrs){
 				{license_line:"duktape: Copyright (c) 2013-2015 by Duktape authors"},
 				{license_line:"Hunspell: Copyright (c) N\u00e9meth L\u00e1szl\u00f3"},
 				{license_line:"Native File Dialog by Michael Labbe mike@frogtoss.com"},
+				{license_line:"xterm.js: Copyright (c) 2014-2016, SourceLair Private Company"},
 			];
 			plugin_items["Font Licenses"]=[
 				{license_line:"Open Sans: Digitized data copyright © 2010-2011, Google Corporation"},
