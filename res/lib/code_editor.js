@@ -3880,8 +3880,8 @@ var ParseGit=function(spath){
 				ReparseDanglingDeps();
 				ResumeProjectParsing(g_repo_parsing_context);
 				UI.Refresh()
-			}.bind(undefined,g_repo_parsing_context), 30)
-		}, 30)
+			}.bind(undefined,g_repo_parsing_context))
+		})
 	})
 	QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
 	return my_repo
@@ -8421,6 +8421,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 				}
 			}
 		}
+		is_preview=0;
 	}
 	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
 	var style=UI.default_styles.code_editor.editor_style;

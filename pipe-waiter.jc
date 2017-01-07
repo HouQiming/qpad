@@ -3,15 +3,15 @@ import System.Algorithm.*
 import System.Math.*
 import System.Console.*
 
-//__generate_json("c_files","pipe_waiter.c")
-//__generate_json("h_files","pipe_waiter.h")
-AddPipeHandle=__c_function(int,"AddPipeHandle","pipe_waiter.h","c_files","pipe_waiter.c")
-RemoveAndClosePipeHandle=__c_function(int,"RemoveAndClosePipeHandle","pipe_waiter.h","c_files","pipe_waiter.c")
-StartWaitingForPipes=__c_function(int,"StartWaitingForPipes","pipe_waiter.h","c_files","pipe_waiter.c")
-InitPipeWaiter=__c_function(int,"InitPipeWaiter","pipe_waiter.h","c_files","pipe_waiter.c")
-StopPipeWaiter=__c_function(int,"StopPipeWaiter","pipe_waiter.h","c_files","pipe_waiter.c")
-
-AddPipe=function(pipe)
+PIPE_READ_BATCH=65536
+class CCallbackHolder
+	function(__pointer) data_cb
+	function(__pointer) close_cb
+SetPipeDataCallback=function(pipe0,fcallback0,fcallback_close0){
+	CreatePipeWaiterThread=__c_function(int,"CreatePipeWaiterThread","pipe_waiter.h","c_files","pipe_waiter.c")
+	pipe=pipe0
+	fcallback=fcallback0
+	fcallback_close=fcallback_close0
 	if Platform.IS_WINDOWS:
 		handle=pipe.hf
 		if !handle:return
@@ -19,16 +19,26 @@ AddPipe=function(pipe)
 		handle=__pointer(iptr(pipe.hf))
 		handle=pipe.hf
 		if handle<0:return
-	AddPipeHandle(handle)
-	__explicit_rc(pipe,1)
-
-RemovePipe=function(pipe)
-	if Platform.IS_WINDOWS:
-		handle=pipe.hf
-		pipe.hf=NULL
-	else
-		handle=__pointer(iptr(pipe.hf))
-		if handle<0:return
-		pipe.hf=-1
-	RemoveAndClosePipeHandle(handle)
-	__explicit_rc(pipe,-1)
+	ref_holder=CCallbackHolder.NULL
+	data_cb=function(__pointer first_byte){
+		auto s=[char(iptr(first_byte))]
+		if !pipe.WouldBlock():
+			s.push(pipe.Read(PIPE_READ_BATCH))
+		fcallback(s);
+	}
+	close_cb=function(__pointer unused_param){
+		fcallback_close();
+		pipe.Close()
+		pipe=typeof(pipe).NULL
+		fcallback=__zero(typeof(fcallback))
+		fcallback_close=__zero(typeof(fcallback_close))
+		//this should break the reference loop...
+		__explicit_rc(ref_holder,-1)
+		ref_holder=CCallbackHolder.NULL
+	}
+	ref_holder=new CCallbackHolder(){data_cb:data_cb,close_cb:close_cb}
+	__explicit_rc(ref_holder,1)
+	CreatePipeWaiterThread(handle,
+		data_cb.ptr_fn,data_cb.ptr_this,
+		close_cb.ptr_fn,close_cb.ptr_this);
+}

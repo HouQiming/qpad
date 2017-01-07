@@ -202,83 +202,24 @@ UI.BumpHistory=function(file_name){
 }
 
 ////////////////////////////////////
-var g_pipe_callbacks=[];
-UI.WaitOnPipe=function(f){
-	g_pipe_callbacks.push(f);
-};
-
-UI.OnCustomEvent=function(event){
-	if(event.code==4){
-		//gotta run the pipe pollers
-		//console.log('pipe wakeup',Math.random());
-		var cbs=g_pipe_callbacks;
-		g_pipe_callbacks=[];
-		for(var i=0;i<cbs.length;i++){
-			var f=cbs[i];
-			f();
-		}
-		//IO.StartWaitingForPipes();
-	}
-};
-
-////////////////////////////////////
-var g_utility_procs=[];
-var freadOnTimer=function(){
-	var new_procs=[]
-	var tick_now=Duktape.__ui_get_tick();
-	for(var i=0;i<g_utility_procs.length;i++){
-		var proc_i=g_utility_procs[i]
-		if(Duktape.__ui_seconds_between_ticks(proc_i.tick0,tick_now)>proc_i.t_timeout){
-			//it timed out, kill and abandon
-			proc_i.Terminate()
-			proc_i.ffinalize()
-			continue
-		}
-		var s=proc_i.Read(65536)
-		if(s&&s.length>0){
-			var lines=(proc_i.buf+s).split("\n")
-			for(var j=0;j<lines.length-1;j++){
-				var match_j=lines[j].match(proc_i.sregex)
-				if(match_j){
-					proc_i.fparse(match_j);
-				}
-			}
-			proc_i.buf=lines[lines.length-1]
-			new_procs.push(proc_i)
-		}else{
-			if(proc_i.IsRunning()){
-				new_procs.push(proc_i)
-			}else{
-				proc_i.ffinalize()
-			}
-		}
-	}
-	g_utility_procs=new_procs;
-	if(g_utility_procs.length>0){
-		//UI.setTimeout(freadOnTimer,50)
-		//UI.NextTick(freadOnTimer)
-		UI.WaitOnPipe(freadOnTimer)
-	}
-};
-IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize, t_timeout){
+IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize){
 	//segment by line, then test regexp
-	var proc=IO.RunToolRedirected(args,work_dir,0)
-	if(!proc){
-		//print('runtool failed: ',JSON.stringify(args),work_dir)
+	var proc={};
+	proc.sregex=new RegExp(sregex,"");
+	proc.buf="";
+	if(!IO.RunToolRedirected(args,work_dir,0,function(s){
+		var lines=(proc.buf+s).split("\n");
+		for(var j=0;j<lines.length-1;j++){
+			var match_j=lines[j].match(proc.sregex);
+			if(match_j){
+				fparse(match_j);
+			}
+		}
+		proc.buf=lines[lines.length-1];
+	},ffinalize)){
 		//we should make sure ffinalize always gets called
 		ffinalize();
 		return 0;
-	}
-	proc.sregex=new RegExp(sregex,"");
-	proc.fparse=fparse;
-	proc.ffinalize=ffinalize;
-	proc.t_timeout=t_timeout;
-	proc.tick0=Duktape.__ui_get_tick();
-	proc.buf="";
-	g_utility_procs.push(proc)
-	if(g_utility_procs.length==1){
-		//UI.setTimeout(freadOnTimer,50)
-		UI.NextTick(freadOnTimer)
 	}
 	return 1;
 };

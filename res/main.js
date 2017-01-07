@@ -656,7 +656,6 @@ var CreateMenus=function(){
 };
 
 UI.Application=function(id,attrs){
-	IO.StartWaitingForPipes();
 	//UI.TimingEvent("UI.Application")
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
@@ -827,11 +826,6 @@ UI.Application=function(id,attrs){
 		UI.ReallySaveMetaData();
 		UI.m_need_metadata_save=0;
 	}
-};
-
-//send at most 1 pipe event per frame
-UI.OnIdle=function(){
-	IO.StartWaitingForPipes();
 };
 
 if(UI.Platform.ARCH=="mac"){

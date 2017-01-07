@@ -107,15 +107,6 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-crazy CPU-eat-up of a simple SSH terminal
-	WaitForMultipleObjects doesn't even work on pipes
-	have to use libuv pipe... which doesn't play along with SDL
-	create a dedicated thread for libuv, put in dummy libuv callbacks that merely posts events to SDL
-		and call the callback in SDL
-		socket...
-	----
-	for windows, just create a read-1-byte-and-post-sdl-event thread for each pipe
-		need a general "JC callback" event
 notebook terminal
 	target buttons
 		[new window]
@@ -169,7 +160,6 @@ terminal emulator
 	ctrl+o
 		adjust priorities
 possible memory leak
-ctrl+o when focusing weird documents (e.g. terminal)
 explicit diff visualization
 	autoedit stuff + diffupdate
 graph:

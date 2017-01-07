@@ -2,6 +2,7 @@ import "system.jc"
 import "gui2d.jc"
 import "s-d-l.jc"
 import "javascript.jc"
+import "pipe-waiter.jc"
 import System.Algorithm.*
 import System.Math.*
 import System.Console.*
@@ -219,8 +220,8 @@ class Terminal{
 		if this.proc:
 			//if this.proc.pipe:
 			//	PipeWaiter.RemovePipe(proc.pipe)
-			if this.proc.pipe_2nd:
-				PipeWaiter.RemovePipe(proc.pipe_2nd)
+			//if this.proc.pipe_2nd:
+			//	PipeWaiter.RemovePipe(proc.pipe_2nd)
 			this.proc=System.Processes.CProcess.NULL
 		//this._events={};
 		//this.handler=function() {};
@@ -2167,13 +2168,21 @@ class Terminal{
 		}
 		this.OnData(data);
 	};
-	OnData=function(string s0){
-		if !proc||!proc.pipe:return
-		this.input_pipe_queue.push(s0)
+	WriteInput=function(){
 		auto nwritten=proc.pipe.Write(this.input_pipe_queue)
 		if nwritten>0&&nwritten<this.input_pipe_queue.n:
 			copy(this.input_pipe_queue[0:],this.input_pipe_queue[nwritten:])
 		this.input_pipe_queue.n-=nwritten
+		if this.input_pipe_queue.n>0:
+			JS["UI"].CallMethod(int,"NextTick",function(JSContext JS){
+				WriteInput();
+				return 0;
+			})
+	}
+	OnData=function(string s0){
+		if !proc||!proc.pipe:return
+		this.input_pipe_queue.push(s0)
+		WriteInput()
 	}
 	
 	/**
@@ -3803,6 +3812,7 @@ class Terminal{
 		return 1
 	}
 	downloadWrite=function(string s){
+		if !this.writable:return
 		this.download_buf.push(s)
 		if this.download_size<0LL:
 			//try to parse the header
@@ -3989,6 +3999,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		rows=JS.Param(2).as(int)
 		auto shell_args=JS.Param(3).as(JSObject)
 		auto spath=JS.Param(4).or(".")
+		auto finalization_callback=JS.Param(5).as(JSObject)
 		if shell_args:
 			auto n=shell_args.length()
 			auto args=[shell_args[i].as(string) for i=0:n-1]
@@ -4001,17 +4012,21 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				proc=System.Processes.RunPiped(args,spath,0,"input,output,error")
 		else
 			proc=typeof(proc).NULL
-		//if proc&&proc.pipe:
-		//	PipeWaiter.AddPipe(proc.pipe)
-		if proc&&proc.pipe_2nd:
-			PipeWaiter.AddPipe(proc.pipe_2nd)
-		//if !proc:
-		//	return 0
-		//Writeln(cols,' ',rows)
 		term=new Terminal(cols,rows)
 		term.JS=JS
 		term.input_pipe_queue=new string
 		term.proc=proc
+		if proc&&proc.pipe_2nd:
+			PipeWaiter.SetPipeDataCallback(proc.pipe_2nd,function(string s){
+				if term.download_buf:
+					term.downloadWrite(s)
+				else
+					term.write(s)
+				JS_UI.CallMethod(int,"Refresh")
+			},function(){
+				if finalization_callback:
+					finalization_callback.Call(int)
+			})
 		//term.OnData=function(string s0){
 		//	if !proc||!proc.pipe:return
 		//	term.input_pipe_queue.push(s0)
@@ -4031,25 +4046,6 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			term.has_focus=0
 			return 0
 		}
-		PIPE_READ_BATCH=65536
-		CheckProcessOutput=function(n_iters){
-			auto did=0
-			for iiter=0:n_iters-1
-				if proc&&proc.pipe_2nd&&!proc.pipe_2nd.WouldBlock():
-					s=proc.pipe_2nd.Read(PIPE_READ_BATCH)
-					if s&&s.n>0:
-						//if Platform.BUILD=="debug":
-						//	Write(s.Replace(["\r","\\r","\x1b","<ESC>"]))
-						//	System.IO.stdout().Flush()
-						if term.download_buf:
-							term.downloadWrite(s)
-						else
-							term.write(s)
-						did=1
-				else
-					break
-			return did
-		}
 		js_term["Download"]=function(JSContext JS){
 			fn_local=JS.Param(0).as(string)
 			fn_remote=JS.Param(1).as(string)
@@ -4057,9 +4053,6 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			return 0
 		}
 		js_term["Render"]=function(JSContext JS){
-			////////////////////
-			//poll the pipe on render
-			CheckProcessOutput(term.download_buf?16:1)
 			////////////////////
 			g_renderer=Gui2D.detail.g_renderer
 			term.need_update=0
@@ -4230,7 +4223,6 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			ev=JS.Param(0).as(JSObject)
 			if term.keyDown(JS,ev):
 				term.need_update=1
-				CheckProcessOutput(16)
 				JS_UI.CallMethod(int,"Refresh")
 			return 0
 		}
@@ -4249,7 +4241,6 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			text=ev["text"].as(string)
 			term.m_IME_overlay=string.NULL
 			if text&&text.n:
-				CheckProcessOutput(16)
 				term.onTextInput(text)
 			return 0
 		}
@@ -4261,31 +4252,6 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				return JS.Return(term.title)
 			else
 				return 0
-		}
-		js_term["Poll"]=function(JSContext JS){
-			//idle-aware polling - return the setTimeOut delay
-			poll_delay=100
-			if proc&&proc.pipe&&term.input_pipe_queue.n:
-				nwritten=proc.pipe.Write(term.input_pipe_queue)
-				if nwritten>0&&nwritten<term.input_pipe_queue.n:
-					copy(term.input_pipe_queue[0:],term.input_pipe_queue[nwritten:])
-				term.input_pipe_queue.n-=nwritten
-			if term.input_pipe_queue.n:
-				poll_delay=0
-			if CheckProcessOutput(term.download_buf?16:1):
-				poll_delay=0
-				JS_UI.CallMethod(int,"Refresh")
-			else if !proc||!proc.isRunning():
-				poll_delay=-1
-				//if proc.pipe:
-				//	PipeWaiter.RemovePipe(proc.pipe)
-				//	//proc.pipe.Close()
-				//	proc.pipe=typeof(proc.pipe).NULL
-				if proc.pipe_2nd:
-					PipeWaiter.RemovePipe(proc.pipe_2nd)
-					//proc.pipe_2nd.Close()
-					proc.pipe_2nd=typeof(proc.pipe_2nd).NULL
-			return JS.Return(poll_delay)
 		}
 		js_term["OnMouseWheel"]=function(JSContext JS){
 			ev=JS.Param(0).as(JSObject)

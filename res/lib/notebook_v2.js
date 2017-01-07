@@ -998,31 +998,28 @@ W.notebook_prototype={
 		var proc=Object.create(UI.default_styles.terminal);
 		proc.cols=cols;
 		proc.rows=rows;
-		if(UI.InitTerminal(proc,proc.cols,proc.rows,args,spath)){
-			var fpoll=(function(){
-				var twait=this.Poll();
-				if(twait>0){
-					UI.WaitOnPipe(fpoll);
-				}else if(twait<0){
-					//process terminated
-					var code=this.GetExitCode()
-					if(code!=0&&!cell_i.m_has_any_error){
-						this.m_term.write("=== fatal error: the script has returned an error "+code+"\n")
-					}
-					IO.DeleteFile(fn_script);
-					cell_i.m_proc=undefined;
-					this.m_term.progress_value=-1;
-					UI.OnApplicationSwitch()
-					UI.Refresh();
-					//completion notification
-					if(UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
-						UI.ShowCompletionNotification();
-					}
-				}else{
-					UI.WaitOnPipe(fpoll);
-				}
-			}).bind(proc);
-			UI.NextTick(fpoll);
+		var fonfinalize=function(){
+			//finalization callback;
+			var code=this.GetExitCode()
+			if(code==259){
+				UI.setTimeout(fonfinalize,100);
+				return;
+			}
+			if(code!=0&&!cell_i.m_has_any_error){
+				this.m_term.write("=== fatal error: the script has returned an error "+code+"\n")
+			}
+			IO.DeleteFile(fn_script);
+			cell_i.m_proc=undefined;
+			this.m_term.progress_value=-1;
+			UI.OnApplicationSwitch()
+			UI.Refresh();
+			//completion notification
+			if(UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
+				UI.ShowCompletionNotification();
+			}
+		}.bind(proc);
+		if(UI.InitTerminal(proc,proc.cols,proc.rows,args,spath,fonfinalize)){
+			//do nothing
 		}else{
 			this.WriteCellOutput(id,"=== fatal error: failed to execute the script\n")
 			IO.DeleteFile(fn_script)
@@ -1626,27 +1623,15 @@ W.Terminal=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"terminal",W.terminal_prototype);
 	UI.Begin(obj)
 	if(!obj.m_term){
-		//var proc=IO.RunToolRedirected(args,spath,0);
-		if(!UI.InitTerminal(obj,obj.cols,obj.rows,obj.args,obj.spath)){
+		if(!UI.InitTerminal(obj,obj.cols,obj.rows,obj.args,obj.spath,function(){
+			this.terminated=1;
+			UI.Refresh();
+		})){
 			//no need to poll anything
 			//obj.m_term="bad";
 			//obj.Render=function(){
 			//	//do nothing
 			//}
-		}else{
-			var fpoll=(function(){
-				var twait=this.Poll();
-				if(twait>0){
-					UI.WaitOnPipe(fpoll);
-				}else if(twait<0){
-					//terminated, do nothing
-					this.terminated=1;
-					UI.Refresh()
-				}else{
-					UI.WaitOnPipe(fpoll);
-				}
-			}).bind(obj);
-			UI.NextTick(fpoll);
 		}
 	}
 	W.PureRegion(id,obj);
