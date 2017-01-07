@@ -118,6 +118,8 @@ notebook terminal
 				clunky, error-prone
 				use cp to make a backup first
 				rmate is doing cat too
+				--
+				use 'head -c #' and 'stty raw -echo'
 	recorded macros
 		put macros in a specific .qpad/foo/ directory
 		generate built-in ones like dict
@@ -128,6 +130,7 @@ notebook terminal
 		and the apt upgrade crap
 	SSH menu: machines and macros
 	terminating interactive ssh: kill tree
+	retarded charset warning, bash prompt detection
 on-boarding:
 	"new features" screen
 	full screen overlay with "Got it"
@@ -139,16 +142,6 @@ drag-out support
 		region is mixed up
 	the smart rerendering FBO... one FBO for each window? 
 		only one FBO for the foreground!
-terminal emulator
-	retarded charset warning, bash prompt detection
-	download
-		UI
-		(test) failure
-		(test) ctrl+c
-		(test) buffer but suppress input
-			except ctrl+c
-	ctrl+o
-		adjust priorities
 possible memory leak
 explicit diff visualization
 	autoedit stuff + diffupdate

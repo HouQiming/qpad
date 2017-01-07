@@ -416,8 +416,9 @@ UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
 var CreateMenus=function(){
 	var doc_area=UI.top.app.document_area;
+	var enable_ctrl_keys=!(UI.nd_focus&&UI.nd_focus.m_term);
 	var menu_file=UI.BigMenu("&File")
-	menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:1,action:function(){
+	menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:enable_ctrl_keys,action:function(){
 		var active_document=UI.top.app.document_area.active_tab
 		if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
 			UI.top.app.document_area.CloseTab();
@@ -426,7 +427,7 @@ var CreateMenus=function(){
 		UI.NewCodeEditorTab();
 		UI.Refresh()
 	}})
-	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:1,action:function(){
+	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:enable_ctrl_keys,action:function(){
 		UI.UpdateNewDocumentSearchPath()
 		var fn=IO.DoFileDialog(0,undefined,UI.m_new_document_search_path);
 		if(!fn){return;}
@@ -438,7 +439,7 @@ var CreateMenus=function(){
 		UI.Refresh()
 	}});
 	if(doc_area.active_tab&&doc_area.active_tab.Save){
-		menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:1,action:function(){
+		menu_file.AddNormalItem({text:"&Save",key:"CTRL+S",icon:'存',enable_hotkey:enable_ctrl_keys,action:function(){
 			UI.top.app.document_area.SaveCurrent();
 		}});
 		if(doc_area.active_tab.need_save){
@@ -449,11 +450,11 @@ var CreateMenus=function(){
 	}
 	if(doc_area.active_tab&&doc_area.active_tab.SaveAs){
 		if(UI.Platform.ARCH=="web"){
-			menu_file.AddNormalItem({text:"Downlo&ad as file",key:"SHIFT+CTRL+S",enable_hotkey:1,action:function(){
+			menu_file.AddNormalItem({text:"Downlo&ad as file",key:"SHIFT+CTRL+S",enable_hotkey:enable_ctrl_keys,action:function(){
 				UI.top.app.document_area.SaveAs();
 			}});
 		}else{
-			menu_file.AddNormalItem({text:"Save &as...",key:"SHIFT+CTRL+S",enable_hotkey:1,action:function(){
+			menu_file.AddNormalItem({text:"Save &as...",key:"SHIFT+CTRL+S",enable_hotkey:enable_ctrl_keys,action:function(){
 				UI.UpdateNewDocumentSearchPath();
 				UI.top.app.document_area.SaveAs();
 			}});
@@ -510,7 +511,7 @@ var CreateMenus=function(){
 	//obj.ArrangeTabs.bind(obj.current_tab_id)
 	//W.Hotkey("",{key:"ALT+Q",action:UI.ExplicitFileOpen})
 	if(UI.m_closed_windows&&UI.m_closed_windows.length>0){
-		menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:1,action:function(){
+		menu_file.AddNormalItem({text:"Restore closed",key:"SHIFT+CTRL+T",enable_hotkey:enable_ctrl_keys,action:function(){
 			if(UI.m_closed_windows.length>0){
 				var active_document=UI.top.app.document_area.active_tab
 				var fn=UI.m_closed_windows.pop();
@@ -611,7 +612,7 @@ var CreateMenus=function(){
 	}
 	menu_tools.AddNormalItem({
 		text:"&Help...",icon:"问",
-		enable_hotkey:1,key:"F1",
+		enable_hotkey:enable_ctrl_keys,key:"F1",
 		action:function(doc_code){
 			var tab_help=UI.OpenUtilTab('help_page');
 			var doc_help_edit=(tab_help&&tab_help.util_widget&&tab_help.util_widget.find_bar_edit);
@@ -637,9 +638,11 @@ var CreateMenus=function(){
 		}
 	}
 	menu_tools.AddSeparator()
-	W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
-	W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
-	W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
+	if(enable_ctrl_keys){
+		W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
+		W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
+		W.Hotkey("",{key:"CTRL+=",action:function(){UI.ZoomRelative(ZOOM_RATE)}});
+	}
 	menu_tools.AddButtonRow({icon:"扩",text:UI._("Zoom (@1%)").replace("@1",(UI.pixels_per_unit/UI.pixels_per_unit_base*100).toFixed(0))},[
 		{text:"-",tooltip:'CTRL -',action:function(){
 			UI.ZoomRelative(1/ZOOM_RATE)

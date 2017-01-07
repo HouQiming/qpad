@@ -193,7 +193,7 @@ W.TabbedDocument_prototype={
 			UI.m_closed_windows.push(fntab);
 		}
 		//close it
-		if(!tab.need_save){
+		if(!tab.need_save&&tab.SaveMetaData){
 			tab.SaveMetaData();
 			UI.SaveMetaData();
 		}
@@ -1492,6 +1492,10 @@ W.TabbedDocument=function(id,attrs){
 		}
 	UI.End()
 	if(!obj.m_is_in_menu){
+		var active_document=obj.active_tab;
+		if(active_document&&!active_document.file_name){
+			active_document=UI.GetFrontMostEditorTab();
+		}
 		if(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios"){
 			W.Hotkey("",{key:"CTRL+F4",action:function(){
 				var num_id=tabid
@@ -1499,11 +1503,13 @@ W.TabbedDocument=function(id,attrs){
 				obj.CloseTab(num_id)
 			}});
 		}
-		W.Hotkey("",{key:"CTRL+W",action:function(){
-			var num_id=tabid
-			if(num_id<0){return;}
-			obj.CloseTab(num_id)
-		}});
+		if(!(UI.nd_focus&&UI.nd_focus.m_term)){
+			W.Hotkey("",{key:"CTRL+W",action:function(){
+				var num_id=tabid
+				if(num_id<0){return;}
+				obj.CloseTab(num_id)
+			}});
+		}
 		var is_apple=(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios");
 		W.Hotkey("",{key:"CTRL+TAB",action:function(){
 			var num_id=tabid

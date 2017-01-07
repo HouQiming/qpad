@@ -773,7 +773,7 @@ Language.Register({
 /////////////////////////////////////////////
 //compiler output parsers
 //texify -q
-UI.RegisterOutputParser('([^:]*):([0-9]+): (.+)',3,function(matches){
+UI.RegisterOutputParser('([^:]*[^0-9:]):([0-9]+): (.+)',3,function(matches){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	var message=matches[3]

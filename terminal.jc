@@ -191,6 +191,7 @@ class Terminal{
 		scrollBottom=param_rows - 1
 		this.cols=param_cols
 		this.rows=param_rows
+		assert(param_cols>=2)
 		this.geometry[0]=param_cols
 		this.geometry[1]=param_rows
 		/**
@@ -625,6 +626,7 @@ class Terminal{
 									// autowrap - DECAWM
 									if (this.wraparoundMode) {
 										//this line has wrapped, update the ending state
+										this.requestLines(row+1)
 										this.line_end_states[row]=1
 										this.x=0;
 										this.y++;
@@ -3892,6 +3894,7 @@ class Terminal{
 		proto.ExportProperty(this,"n_valid_lines")
 		proto.ExportProperty(this,"progress_value")
 		proto.ExportProperty(this,"got_enter_from_input")
+		proto.ExportProperty(this,"compiler_errors")
 		proto.ExportMethod(this,"destroy",JS_destroy)
 		proto.ExportMethod(this,"write",JS_write)
 		proto.ExportMethod(this,"send",JS_send)
@@ -3907,6 +3910,7 @@ class Terminal{
 	sel_x1=0
 	sel_y1=0
 	got_enter_from_input=0
+	compiler_errors=JSObject.NULL
 	proc=System.Processes.CProcess.NULL
 	auto __done__()
 		this.destroy();
@@ -4359,7 +4363,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					if term.s_parse_buffer.n:
 						term.s_parse_buffer.push('\n')
 						js_this=JS.GetThis()
-						if JS["UI"].CallMethod(int,"ParseTerminalOutput",js_this,term.s_parse_buffer,1):
+						if JS["UI"].CallMethod(int,"ParseTerminalOutput",term,term.s_parse_buffer,1):
 							clicks=3
 					//re-select word if ParseTerminalOutput failed
 					if clicks==2:

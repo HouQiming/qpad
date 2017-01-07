@@ -1,4 +1,3 @@
-// need_save|=65536: a superfluous change that should be saved automatically without even showing '*'
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 var Language=require("res/lib/langdef");
@@ -78,6 +77,7 @@ UI.RegisterEditorPlugin(function(){
 
 var AddErrorToEditor=function(err,quiet){
 	if(!err.is_in_active_doc){
+		if(!IO.FileExists(err.file_name)){return;}
 		UI.OpenEditorWindow(err.file_name,function(){
 			var go_prev_line=0
 			//if(err.is_in_active_doc==undefined){return;}
@@ -153,9 +153,9 @@ UI.ParseCompilerOutput=function(sline){
 	if(Duktape.__byte_length(sline)>MAX_PARSABLE_LINE){return undefined;}
 	if(!g_processed_output_parser){
 		//create the grand regexp
-		var regex=new RegExp(["^(",g_output_parsers.map(function(a){return a.s}).join(")|("),")\r?\n"].join(""))
+		var regex=new RegExp(["^((",g_output_parsers.map(function(a){return a.s}).join(")|("),"))\r?\n"].join(""))
 		var match_places=[];
-		var cur_id=1;
+		var cur_id=2;
 		for(var i=0;i<g_output_parsers.length;i++){
 			match_places.push(cur_id);
 			cur_id++;
@@ -501,47 +501,6 @@ W.notebook_prototype={
 	m_cell_plugins:[function(){
 		this.m_clickable_ranges=[];
 		this.disable_line_numbers=1;
-		if(this.read_only){
-			//output-only plugins
-			var fselchange=function(do_onfocus){
-				var sel=this.GetSelection()
-				var l=0;
-				var r=this.m_clickable_ranges.length-1;
-				while(l<=r){
-					var m=(l+r)>>1;
-					if(this.m_clickable_ranges[m].loc0.ccnt<=sel[0]){
-						l=m+1
-					}else{
-						r=m-1
-					}
-				}
-				if(r>=0&&this.m_clickable_ranges[r].loc0.ccnt<=sel[0]&&sel[1]<=this.m_clickable_ranges[r].loc1.ccnt){
-					//yes, it's clickable
-					var crange=this.m_clickable_ranges[r]
-					crange.f.call(this,do_onfocus,crange.loc0.ccnt,crange.loc1.ccnt)
-					return 1
-				}
-				return 0
-			};
-			//this.AddEventHandler('selectionChange',function(){fselchange.call(this,0);})
-			this.AddEventHandler('doubleClick',function(){
-				if(fselchange.call(this,1)){
-					this.is_dragging=0;
-					UI.ReleaseMouse(this);
-				}
-			})
-			this.ClearClickableRanges=function(){
-				for(var i=0;i<this.m_clickable_ranges.length;i++){
-					var crange=this.m_clickable_ranges[i];
-					crange.loc0.discard()
-					crange.loc1.discard()
-					crange.hlobj.discard()
-					var err=crange.err;
-					ClearCompilerError(err);
-				}
-				this.m_clickable_ranges=[]
-			}
-		}
 		this.AddEventHandler('UP',function(){
 			var sel=this.GetSelection();
 			if(sel[0]!=sel[1]){return 1;}
@@ -868,6 +827,8 @@ W.notebook_prototype={
 				cols=Math.max(Math.ceil(this.w/this.panel_style.scale/dims.w/8)*8,8);
 				rows=Math.max(Math.floor(this.h/this.panel_style.scale/dims.h*0.5),2);
 			}
+			cols=(cols||80);
+			rows=(rows||25);
 			cell_i.m_output_terminal=Object.create(UI.default_styles.terminal);
 			var proc=cell_i.m_output_terminal;
 			proc.cols=cols;
@@ -906,7 +867,7 @@ W.notebook_prototype={
 					//we already have that notification
 					doc.owner.DismissNotificationsByRegexp(g_re_cancel_note);
 					this.KillCell(id)
-					cell_i.m_proc.is_terminated="forced";
+					//cell_i.m_proc.is_terminated="forced";
 					//continue execution!
 				}else{
 					UI.SetFocus(doc);
@@ -962,7 +923,7 @@ W.notebook_prototype={
 			//new terminal
 			//ignore cols / rows
 			if(UI.DetectMSYSTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols 80;stty rows 25;"+IO.ShellCmd(args),"/dev/null"];
+				args=["script","--return","-qfc","export TERM=xterm;stty cols 80;stty rows 25;"+IO.ShellCmd(args),"/dev/null"];
 			}
 			UI.OpenTerminalTab({
 				args:args,
@@ -987,11 +948,13 @@ W.notebook_prototype={
 			cols=Math.max(Math.ceil(this.w/this.panel_style.scale/dims.w/8)*8,8);
 			rows=Math.max(Math.floor(this.h/this.panel_style.scale/dims.h*0.5),2);
 		}
+		cols=(cols||80);
+		rows=(rows||25);
 		var interactive_ified=0;
 		if(s_code.indexOf('[interactive]')>=0){
 			//terminal
 			if(UI.DetectMSYSTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty -onlcr;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
+				args=["script","--return","-qfc","export TERM=xterm;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
 				interactive_ified=1;
 			}
 		}
@@ -1037,7 +1000,7 @@ W.notebook_prototype={
 		var cell_i=this.m_cells[id];
 		if(cell_i.m_proc&&!cell_i.m_proc.is_terminated){
 			this.WriteCellOutput(cell_i.m_cell_id,"Stopped...\n")
-			cell_i.m_proc.is_terminated=1;
+			//cell_i.m_proc.is_terminated=1;
 			if(cell_i.m_proc.interactive_ified){
 				//hack: interactive processes... could use a ctrl+c
 				cell_i.m_proc.m_term.send('\x03\x04');
@@ -1192,7 +1155,7 @@ W.NotebookView=function(id,attrs){
 			focus_cell_id&=-2;
 			obj.m_last_focus_cell_id=focus_cell_id;
 		}
-		if(UI.nd_focus==cur_cell.m_output_terminal){
+		if(cur_cell.m_output_terminal&&UI.nd_focus==cur_cell.m_output_terminal){
 			focus_cell_id=(focus_cell_id&-2)+1;
 			obj.m_last_focus_cell_id=(focus_cell_id&-2);
 		}
@@ -1577,6 +1540,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 		NeedMainWidget:function(){
 			if(!this.main_widget){
 				this.main_widget=Object.create(W.notebook_prototype);
+				this.main_widget.panel_style=UI.default_styles.notebook_view_v2.panel_style;
 				this.main_widget.file_name=this.file_name;
 			}
 			if(!this.main_widget.m_cells){
@@ -1807,8 +1771,8 @@ UI.OpenTerminalTab=function(options){
 				return 1;
 			}
 		},
-		Save:function(){},
-		SaveMetaData:function(){},
+		//Save:function(){},
+		//SaveMetaData:function(){},
 		OnDestroy:function(){
 			var obj=this.main_widget;
 			if(obj&&obj.m_term.compiler_errors){
@@ -1849,11 +1813,11 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 			AddErrorToEditor(err,0);
 		}else{
 			AddErrorToEditor(err,1);
+			if(term.compiler_errors==undefined){
+				term.compiler_errors=[];
+			}
+			term.compiler_errors.push(err);
 		}
-		if(!term.compiler_errors){
-			term.compiler_errors=[];
-		}
-		term.compiler_errors.push(err);
 		UI.RefreshAllTabs();
 		return 1;
 	}else{
