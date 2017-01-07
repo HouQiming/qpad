@@ -108,14 +108,6 @@ v2
 =====í¯¿í¿¿=====
 # TODO LIST
 notebook terminal
-	target buttons
-		[new window]
-		[button: ]
-		[new term]
-		[interactive]
-		(X) a top row - it's unrealistic to make good enough icons
-		just do it in the notebook menu
-	standalone terminal auto-zoom
 	download / remote edit
 		escape sequence + bash function
 			editing .bashrc isn't much better than an apt install
@@ -125,8 +117,7 @@ notebook terminal
 				control char detection
 				clunky, error-prone
 				use cp to make a backup first
-			or just record the host and do scp off the terminal
-				a tiny terminal for the scp session
+				rmate is doing cat too
 	recorded macros
 		put macros in a specific .qpad/foo/ directory
 		generate built-in ones like dict
@@ -150,7 +141,6 @@ drag-out support
 		only one FBO for the foreground!
 terminal emulator
 	retarded charset warning, bash prompt detection
-	ctrl+c vs queued output
 	download
 		UI
 		(test) failure
@@ -185,8 +175,7 @@ graph:
 		and a package listing from standard locations
 		add @include
 		sort by port relevance
-notebook saving:
-	separate input / outpu?
+build for mac
 life cycles
 	could label them on graph nodes
 	overlay ray linking the nodes together

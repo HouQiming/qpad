@@ -879,10 +879,10 @@ W.notebook_prototype={
 	},
 	ClearCellOutput:function(id){
 		var cell_i=this.m_cells[id];
-		if(cell_i.m_output_terminal){
-			if(cell_i.m_output_terminal.compiler_errors){
-				for(var i=0;i<cell_i.m_output_terminal.compiler_errors.length;i++){
-					ClearCompilerError(cell_i.m_output_terminal.compiler_errors[i]);
+		if(cell_i.m_output_terminal&&cell_i.m_output_terminal.m_term){
+			if(cell_i.m_output_terminal.m_term.compiler_errors){
+				for(var i=0;i<cell_i.m_output_terminal.m_term.compiler_errors.length;i++){
+					ClearCompilerError(cell_i.m_output_terminal.m_term.compiler_errors[i]);
 				}
 				UI.RefreshAllTabs();
 			}
@@ -1029,7 +1029,7 @@ W.notebook_prototype={
 		proc.interactive_ified=interactive_ified;
 		proc.m_unknown_progress=0;
 		proc.m_t_unknown_progress=UI.m_frame_tick;
-		proc.m_current_path=spath;
+		proc.m_term.m_current_path=spath;
 		this.m_last_focus_cell_id=id*2+0;
 		UI.Refresh()
 	},
@@ -1343,12 +1343,23 @@ W.NotebookView=function(id,attrs){
 			menu_notebook.AddNormalItem({
 				text:"&Clone cell",
 				action:obj.DupCell.bind(obj)});
+			menu_notebook.AddSeparator();
 			if(cur_cell.m_output_terminal){
 				menu_notebook.AddNormalItem({
 					text:"Clear &output",
 					enable_hotkey:1,key:"SHIFT+CTRL+C",
 					action:obj.ClearCellOutput.bind(obj,focus_cell_id>>1)})
 			}
+			menu_notebook.AddButtonRow({text:"Set cell mode"},[
+				{text:"new_window",icon:"窗",tooltip:'New window',action:function(){
+					SetCellRunTag(cur_cell.m_text_in,"[new window]");
+				}},{text:"new_term",icon:"格",tooltip:'New tab',action:function(){
+					SetCellRunTag(cur_cell.m_text_in,"[new term]");
+				}},{text:"local_term",icon:"Ｖ",tooltip:'Interactive terminal',action:function(){
+					SetCellRunTag(cur_cell.m_text_in,"[interactive]");
+				}},{text:"dumb_term",icon:"控",tooltip:'Simple terminal',action:function(){
+					SetCellRunTag(cur_cell.m_text_in,"[simple]");
+				}}])
 		}
 		menu_notebook=undefined;
 	}
@@ -1411,6 +1422,36 @@ W.NotebookView=function(id,attrs){
 	//CellCaption
 	return obj
 }
+
+var SetCellRunTag=function(doc,s_text){
+	var lang=doc.plugin_language_desc
+	var sel=doc.GetSelection();
+	var line0=doc.GetLC(sel[0])[0];
+	var line1=doc.GetLC(sel[1])[0];
+	var cmt_holder=lang;
+	if(lang.GetCommentStrings){
+		cmt_holder=lang.GetCommentStrings(doc.ed.GetStateAt(doc.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
+	}
+	var s_check=doc.ed.GetText(0,Math.min(doc.ed.GetTextSize(),4096));
+	var match=s_check.match(/(\[new window\])|(\[new term\])|(\[interactive\])|(\[simple\])/);
+	var ccnt=0,sz=0;
+	if(match){
+		ccnt=Duktape.__byte_length(s_check.substr(0,match.index))
+		sz=Duktape.__byte_length(match[0]);
+	}else{
+		s_text=(s_text?(cmt_holder&&cmt_holder.line_comment||"#")+s_text+"\n":"");
+		var pline=s_check.indexOf('\n');
+		if(pline>0){
+			ccnt=Duktape.__byte_length(s_check.substr(0,pline+1));
+		}else{
+			ccnt=doc.ed.GetTextSize();
+			s_text='\n'+s_text;
+		}
+	}
+	doc.HookedEdit([ccnt,sz,s_text]);
+	doc.CallOnChange();
+	UI.Refresh()
+};
 
 UI.BringUpNotebookTab=function(file_name,mode){
 	//var file_name=fname0||IO.GetNewDocumentName("new","txt","document")
@@ -1626,7 +1667,7 @@ W.Terminal=function(id,attrs){
 		if(!UI.InitTerminal(obj,obj.cols,obj.rows,obj.args,obj.spath,function(){
 			this.terminated=1;
 			UI.Refresh();
-		})){
+		}.bind(obj))){
 			//no need to poll anything
 			//obj.m_term="bad";
 			//obj.Render=function(){
@@ -1640,27 +1681,32 @@ W.Terminal=function(id,attrs){
 		x:obj.x,y:obj.y,w:obj.w,h:obj.h,
 		color:obj.panel_style.bgcolor,
 	})
-	var value=obj.GetScrollValue();
-	var dims=UI.MeasureText(obj.font,' ');
+	var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
 	var w_term=obj.m_term.cols*dims.w;
 	var h_term=obj.m_term.rows*dims.h;
-	var w_area=w_term+(value>=0?obj.w_scroll_bar:0);
-	var x_term=obj.x+(obj.w-w_area)*0.5;
+	var value=obj.GetScrollValue();
+	var w_term_area=w_term+(value>=0?obj.w_scroll_bar:0);
+	var scale=Math.min(Math.min(obj.w/w_term_area,obj.h/h_term),1);
+	obj.font=UI.ScaleFont(UI.default_styles.terminal.font,scale);
+	w_term*=scale;
+	h_term*=scale;
+	w_term_area*=scale;
+	var x_term=obj.x+(obj.w-w_term_area)*0.5;
 	var y_term=obj.y+(obj.h-h_term)*0.5;
 	UI.RoundRect({
 		x:x_term-obj.panel_style.shadow_size,y:y_term-obj.panel_style.shadow_size,
-		w:w_area+obj.panel_style.shadow_size*2,h:h_term+obj.panel_style.shadow_size*2,
+		w:w_term_area+obj.panel_style.shadow_size*2,h:h_term+obj.panel_style.shadow_size*2,
 		color:obj.panel_style.shadow_color,
 		border_width:-obj.panel_style.shadow_size,
 		round:obj.panel_style.shadow_size,
 	});
 	UI.RoundRect({
 		x:x_term-obj.panel_style.border_width,y:y_term-obj.panel_style.border_width,
-		w:w_area+obj.panel_style.border_width*2,h:h_term+obj.panel_style.border_width*2,
+		w:w_term_area+obj.panel_style.border_width*2,h:h_term+obj.panel_style.border_width*2,
 		color:obj.panel_style.border_color,
 		round:obj.panel_style.border_width,
 	});
-	UI.PushCliprect(x_term,y_term,w_area,h_term);
+	UI.PushCliprect(x_term,y_term,w_term_area,h_term);
 	obj.Render(x_term,y_term,w_term,h_term);
 	if(value>=0){
 		W.ScrollBar("sbar",{
@@ -1765,9 +1811,9 @@ UI.OpenTerminalTab=function(options){
 		SaveMetaData:function(){},
 		OnDestroy:function(){
 			var obj=this.main_widget;
-			if(obj&&obj.compiler_errors){
-				for(var i=0;i<obj.compiler_errors.length;i++){
-					ClearCompilerError(obj.compiler_errors[i]);
+			if(obj&&obj.m_term.compiler_errors){
+				for(var i=0;i<obj.m_term.compiler_errors.length;i++){
+					ClearCompilerError(obj.m_term.compiler_errors[i]);
 				}
 				UI.RefreshAllTabs();
 			}
@@ -1779,23 +1825,23 @@ UI.OpenTerminalTab=function(options){
 	return ret;
 };
 
-UI.ParseTerminalOutput=function(obj,sline,is_clicked){
-	if(obj.m_term.got_enter_from_input){
-		if(obj.compiler_errors){
-			for(var i=0;i<obj.compiler_errors.length;i++){
-				ClearCompilerError(obj.compiler_errors[i]);
+UI.ParseTerminalOutput=function(term,sline,is_clicked){
+	if(term.got_enter_from_input){
+		if(term.compiler_errors){
+			for(var i=0;i<term.compiler_errors.length;i++){
+				ClearCompilerError(term.compiler_errors[i]);
 			}
-			obj.compiler_errors=undefined;
+			term.compiler_errors=undefined;
 			UI.RefreshAllTabs();
 		}
-		obj.m_term.got_enter_from_input=0
+		term.got_enter_from_input=0
 	}
 	var err=UI.ParseCompilerOutput(sline);
 	if(err){
 		var fn_raw=err.file_name;
 		if(!(fn_raw.search(g_regexp_abspath)>=0)&&!IO.FileExists(fn_raw)){
-			var fn_search_found=UI.SearchIncludeFile((obj.m_current_path||'.')+'/'+fn_raw,fn_raw);
-			err.file_name=(fn_search_found||((obj.m_current_path||'.')+'/'+err.file_name));
+			var fn_search_found=UI.SearchIncludeFile((term.m_current_path||'.')+'/'+fn_raw,fn_raw);
+			err.file_name=(fn_search_found||((term.m_current_path||'.')+'/'+err.file_name));
 		}
 		if(is_clicked){
 			//do not create a new highlight for the error, but noisily focus it
@@ -1804,10 +1850,10 @@ UI.ParseTerminalOutput=function(obj,sline,is_clicked){
 		}else{
 			AddErrorToEditor(err,1);
 		}
-		if(!obj.compiler_errors){
-			obj.compiler_errors=[];
+		if(!term.compiler_errors){
+			term.compiler_errors=[];
 		}
-		obj.compiler_errors.push(err);
+		term.compiler_errors.push(err);
 		UI.RefreshAllTabs();
 		return 1;
 	}else{

@@ -416,8 +416,7 @@ class Terminal{
 		if this.s_parse_buffer.n:
 			//this... should always be the terminal object
 			this.s_parse_buffer.push('\n')
-			js_this=JS.GetThis()
-			is_compiler_error=JS["UI"].CallMethod(int,"ParseTerminalOutput",js_this,this.s_parse_buffer,0)
+			is_compiler_error=JS["UI"].CallMethod(int,"ParseTerminalOutput",this,this.s_parse_buffer,0)
 			if is_compiler_error:
 				row=row_initial
 				for(;;)
@@ -2169,6 +2168,7 @@ class Terminal{
 		this.OnData(data);
 	};
 	WriteInput=function(){
+		if !proc:return
 		auto nwritten=proc.pipe.Write(this.input_pipe_queue)
 		if nwritten>0&&nwritten<this.input_pipe_queue.n:
 			copy(this.input_pipe_queue[0:],this.input_pipe_queue[nwritten:])
