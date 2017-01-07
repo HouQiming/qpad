@@ -805,7 +805,7 @@ UI.RegisterOutputParser('(.*?):([0-9]+)[.][.]([0-9]+): (.*)',4,function(matches)
 })
 
 //unix cc
-UI.RegisterOutputParser('(.*?):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*)',8,function(matches){
+UI.RegisterOutputParser('(.*?[^0-9]):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*)',8,function(matches){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	var message=matches[8]

@@ -1,8 +1,8 @@
+v2
 {
  "cells": [
   {
    "m_language": "Markdown",
-   "m_text_in": "# TODO LIST\nnotebook terminal\n\ttarget buttons\n\t\t[new window]\n\t\t[button: ]\n\t\t[new term]\n\t\t[interactive]\n\t\t(X) a top row - it's unrealistic to make good enough icons\n\t\tjust do it in the notebook menu\n\tdownload / remote edit\n\t\tescape sequence + bash function\n\t\t\tediting .bashrc isn't much better than an apt install\n\t\t\t\twe don't need port forwarding\n\t\t\t\tbut the experience will be much shittier\n\t\t\tcat save:\n\t\t\t\tcontrol char detection\n\t\t\t\tclunky, error-prone\n\t\t\t\tuse cp to make a backup first\n\t\t\tor just record the host and do scp off the terminal\n\t\t\t\ta tiny terminal for the scp session\n\trecorded macros\n\t\tput macros in a specific .qpad/foo/ directory\n\t\tgenerate built-in ones like dict\n\t\ta menu with some on-boarding hint?\n\t\t\twhen ssh-ed to a new host\n\t\t\tthe first-time a SSH menu pops up\n\t\tbasically various tasks for setting up a new host\n\t\tand the apt upgrade crap\n\tSSH menu: machines and macros\n\tterminating interactive ssh: kill tree\non-boarding:\n\t\"new features\" screen\n\tfull screen overlay with \"Got it\"\n\tpersistent\ndrag-out support\n\tsecondary windows\n\t\twithout menu / stuff\n\t\trendering works as is\n\t\tregion is mixed up\n\tthe smart rerendering FBO... one FBO for each window? \n\t\tonly one FBO for the foreground!\nterminal emulator\n\tretarded charset warning, bash prompt detection\n\tctrl+c vs queued output\n\tdownload\n\t\tUI\n\t\t(test) failure\n\t\t(test) ctrl+c\n\t\t(test) buffer but suppress input\n\t\t\texcept ctrl+c\n\tctrl+o\n\t\tadjust priorities\npossible memory leak\nctrl+o when focusing weird documents (e.g. terminal)\nexplicit diff visualization\n\tautoedit stuff + diffupdate\ngraph:\n\tjc nodes\n\t\t__c_function\n\t\t__generate_json\n\t\t\tthe few purposes\n\tauto-select and auto-scroll to the current cursor location\n\tonly show new nodes that can be connected to the current selection and has non-zero relevance\n\t\tif the selection is empty, show top-level stuff\n\tleave a hole for the text editor\n\t\tor a dedicated util tab showing the current graph(s)\n\t---\n\tcolor / type text in nodes\n\tfix up some existing code\n\t\tprogramming techniques - micro patterns\n\t\t\tstatic irregular array\n\t\t\tobfuscated zip ...\n\t\t\t--\n\t\tcould use (deduced) node groups\n\tED_GetAllComboNames - per-file package activation\n\t\ttracking owning packages\n\t\tand a package listing from standard locations\n\t\tadd @include\n\t\tsort by port relevance\nnotebook saving:\n\tseparate input / outpu?\nlife cycles\n\tcould label them on graph nodes\n\toverlay ray linking the nodes together\nfile view class list\n\tsearchable classes\nstyle enforcement\n\tpotentially per-project\n\t\tor per-file with a default\n\tspace rules enforcement\n\t\tlet the parser decide\n\t\tmaybe also enforce it in the find bar\n(reproduce?) project-in-unopenable-location crash\niOS bluetooth keyboard support\n\t- keyCommands\nstop / clear buttons in notebook v2\nF5/CTRL+F5 indicators\ntouch: scrolling, touch detection, ac modes, mouse over, typos\n\ttouch-awareness\ntab switch\n\tto previously edited file?\n\t\tnavigate backward - but it isn't reliable for this\n\tan option\nrelease on github, again\n\tlinux buildable source .tar.gz\n\t\tbuild-it-yourself release\nremove the help system?\n\tlinks in help\n\trunning a markdown: open as help page?\nruntime completion\n\tPython / node.js\n\tactually run an interpreter session and dump the \"require\"d objects to a file\n\t\tsecurity concerns...\ncode beautifier\nAC plugins\n\ttex ref\n\tbash\n\tjs member name in certain strings\n\t--\n\tmulti-source combination\n\t\tsome candidates may smash a context\n\t\tput this in as a property of the candidates\n\tHTML tag properties, CSS\n\tproviding explanation in AC sources\nput plugins in ~/.qpad\nmake top hint / notification dodge MouseOver / cursor\nswap ctrl+shift+v and ctrl+v?\nbinary editor reloading?\nrendering\n\ttrue AA for roundrect\ntex\n\tport more of deferred.qpadscript\n\tenabling/disabling plugins in menu\nCJK PPM:\n\twork in conjunction with IME?\n\t\tcould have blind prediction...\n\tiphone prediction isn't that useful\n\t--\n\tor LSTM\nbinary editor\n\tduk buffer size limit\nnotebook cell ops undo/redo\nnested directory in the file browser\n`#pragma region` folding\na few built-in themes\n\t~/.qpad_debug/theme_dark1.json\nmac\n\tzoom hotkey\n\tsystem menu\nUnicode-aware case handling\n\twe don't want to screw up the case insensitive performance\nfor non-familiar users:\n\tmore concise system for translation / hotkey scripts\n\t[ new window ] and [ button: ... ] in help\npeek definition:\n\tCEO and hide cannot overlap\nweird bookmark display in tophint\n\tbad tophint y0 - the hiding mode has changed!\n",
    "m_text_out": "",
    "m_cell_id": 0,
    "m_has_any_error": 0,
@@ -23,7 +23,6 @@
   },
   {
    "m_language": "Windows BAT",
-   "m_text_in": "@echo off\nrem build script for the project\nrem [button: Debug]\nset LANG=zh_CN.utf8\njc --readable_c_code -awin64 qpad.jc --run\n",
    "m_text_out": "s7res.c\r\n   Creating library ./bin/win64/qpad.lib and object ./bin/win64/qpad.exp\r\ncreating FBO: 1920 1017\r\n",
    "m_cell_id": 1,
    "m_completion_time": [
@@ -48,23 +47,22 @@
   },
   {
    "m_language": "Windows BAT",
-   "m_text_in": "@echo off\nrem build script for 'qpad.jc'\nrem [button: Release]\ncd /d c:/tp/qpad\ngit log --pretty=format:%%H -n 1 > res/misc/commit.txt\njc -brelease -awin64 qpad.jc\njc -brelease -awin32 qpad.jc\nrem jc -brelease -amac qpad.jc\ncd bin\\win32_release\ndel qpad3beta_32.7z\n7z a qpad3beta_32.7z qpad.exe\ncd /d c:\\tp\\qpad\ncd bin\\win64_release\ndel qpad3beta_64.7z\n7z a qpad3beta_64.7z qpad.exe\ndel c:\\software\\cmder\\bin\\qpad_old.exe\nren c:\\software\\cmder\\bin\\qpad.exe qpad_old.exe\ncopy qpad.exe c:\\software\\cmder\\bin\\qpad.exe\n",
-   "m_text_out": "s7main.c\r\ns7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\nc:/tp/qpad/code-editor.jc:4912,20-22: parameter #0 type mismatch: 'i64' expected but 'i32' provided (error)\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4654592 bytes (4546 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1597118 bytes (1560 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 5062144 bytes (4944 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1720142 bytes (1680 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
+   "m_text_out": "s7main.c\r\ndmp.c\r\npipe_waiter.c\r\nspaprt_portable.c\r\ns7res.c\r\n   Creating library ./bin/win64_release/qpad.lib and object ./bin/win64_release/qpad.exp\r\ns7main.c\r\ndmp.c\r\npipe_waiter.c\r\ns7res.c\r\n   Creating library ./bin/win32_release/qpad.lib and object ./bin/win32_release/qpad.exp\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 4897792 bytes (4783 KiB)\r\n\r\nCreating archive: qpad3beta_32.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1640843 bytes (1603 KiB)\r\nEverything is Ok\r\n\r\n7-Zip [64] 15.14 : Copyright (c) 1999-2015 Igor Pavlov : 2015-12-31\r\n\r\nScanning the drive:\r\n1 file, 5204992 bytes (5083 KiB)\r\n\r\nCreating archive: qpad3beta_64.7z\r\n\r\nItems to compress: 1\r\n\r\n\r\nFiles read from disk: 1\r\nArchive size: 1734304 bytes (1694 KiB)\r\nEverything is Ok\r\n        1 file(s) copied.\r\n",
    "m_cell_id": 2,
-   "m_has_any_error": 1,
+   "m_has_any_error": 0,
    "m_current_path": "c:/tp/qpad",
    "m_completion_time": [
-    2016,
-    11,
-    26,
-    23,
-    37,
-    1,
-    2
+    2017,
+    0,
+    6,
+    0,
+    16,
+    8,
+    6
    ],
    "m_button_name": "Release",
-   "m_unknown_progress": 0.8285692181002381,
-   "m_t_unknown_progress": 41615392085,
+   "m_unknown_progress": 0.27189300115874526,
+   "m_t_unknown_progress": 16171352666,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
@@ -72,7 +70,6 @@
   },
   {
    "m_language": "Unix Shell Script",
-   "m_text_in": "#!/bin/sh\n#[button: Translate]\n# After this is done, re-run qpad to generate 'translation.json'\ncd /c/tp/qpad/res\ngrep -ERoh text:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * > ../build/translation.txt\ngrep -ERoh UI\\._\\\\\\(\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\)\\\\\\) * >> ../build/translation.txt\ngrep -ERoh UI\\.Format\\\\\\(\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\), * >> ../build/translation.txt\ngrep -ERoh tooltip:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * >> ../build/translation.txt\ngrep -ERoh ,name:\\(\\([\\\"][^\\\"]+[\\\"]\\)\\|\\([\\'][^\\']+[\\']\\)\\) * >> ../build/translation.txt\n",
    "m_text_out": "",
    "m_cell_id": 3,
    "m_has_any_error": 0,
@@ -96,7 +93,6 @@
   },
   {
    "m_language": "Markdown",
-   "m_text_in": "Search result",
    "m_text_out": "c:/tp/qpad/res/main.js:23202..23228: IO.StartWaitingForPipes();\nc:/tp/qpad/res/main.js:29439..29465: IO.StartWaitingForPipes();\n",
    "m_has_any_error": 1,
    "m_cell_id": 4,
@@ -109,3 +105,213 @@
  ],
  "m_last_focus_cell_id": 0
 }
+=====í¯¿í¿¿=====
+# TODO LIST
+crazy CPU-eat-up of a simple SSH terminal
+	WaitForMultipleObjects doesn't even work on pipes
+	have to use libuv pipe... which doesn't play along with SDL
+	create a dedicated thread for libuv, put in dummy libuv callbacks that merely posts events to SDL
+		and call the callback in SDL
+		socket...
+	----
+	for windows, just create a read-1-byte-and-post-sdl-event thread for each pipe
+		need a general "JC callback" event
+notebook terminal
+	target buttons
+		[new window]
+		[button: ]
+		[new term]
+		[interactive]
+		(X) a top row - it's unrealistic to make good enough icons
+		just do it in the notebook menu
+	standalone terminal auto-zoom
+	download / remote edit
+		escape sequence + bash function
+			editing .bashrc isn't much better than an apt install
+				we don't need port forwarding
+				but the experience will be much shittier
+			cat save:
+				control char detection
+				clunky, error-prone
+				use cp to make a backup first
+			or just record the host and do scp off the terminal
+				a tiny terminal for the scp session
+	recorded macros
+		put macros in a specific .qpad/foo/ directory
+		generate built-in ones like dict
+		a menu with some on-boarding hint?
+			when ssh-ed to a new host
+			the first-time a SSH menu pops up
+		basically various tasks for setting up a new host
+		and the apt upgrade crap
+	SSH menu: machines and macros
+	terminating interactive ssh: kill tree
+on-boarding:
+	"new features" screen
+	full screen overlay with "Got it"
+	persistent
+drag-out support
+	secondary windows
+		without menu / stuff
+		rendering works as is
+		region is mixed up
+	the smart rerendering FBO... one FBO for each window? 
+		only one FBO for the foreground!
+terminal emulator
+	retarded charset warning, bash prompt detection
+	ctrl+c vs queued output
+	download
+		UI
+		(test) failure
+		(test) ctrl+c
+		(test) buffer but suppress input
+			except ctrl+c
+	ctrl+o
+		adjust priorities
+possible memory leak
+ctrl+o when focusing weird documents (e.g. terminal)
+explicit diff visualization
+	autoedit stuff + diffupdate
+graph:
+	jc nodes
+		__c_function
+		__generate_json
+			the few purposes
+	auto-select and auto-scroll to the current cursor location
+	only show new nodes that can be connected to the current selection and has non-zero relevance
+		if the selection is empty, show top-level stuff
+	leave a hole for the text editor
+		or a dedicated util tab showing the current graph(s)
+	---
+	color / type text in nodes
+	fix up some existing code
+		programming techniques - micro patterns
+			static irregular array
+			obfuscated zip ...
+			--
+		could use (deduced) node groups
+	ED_GetAllComboNames - per-file package activation
+		tracking owning packages
+		and a package listing from standard locations
+		add @include
+		sort by port relevance
+notebook saving:
+	separate input / outpu?
+life cycles
+	could label them on graph nodes
+	overlay ray linking the nodes together
+file view class list
+	searchable classes
+style enforcement
+	potentially per-project
+		or per-file with a default
+	space rules enforcement
+		let the parser decide
+		maybe also enforce it in the find bar
+(reproduce?) project-in-unopenable-location crash
+iOS bluetooth keyboard support
+	- keyCommands
+stop / clear buttons in notebook v2
+F5/CTRL+F5 indicators
+touch: scrolling, touch detection, ac modes, mouse over, typos
+	touch-awareness
+tab switch
+	to previously edited file?
+		navigate backward - but it isn't reliable for this
+	an option
+release on github, again
+	linux buildable source .tar.gz
+		build-it-yourself release
+remove the help system?
+	links in help
+	running a markdown: open as help page?
+runtime completion
+	Python / node.js
+	actually run an interpreter session and dump the "require"d objects to a file
+		security concerns...
+code beautifier
+AC plugins
+	tex ref
+	bash
+	js member name in certain strings
+	--
+	multi-source combination
+		some candidates may smash a context
+		put this in as a property of the candidates
+	HTML tag properties, CSS
+	providing explanation in AC sources
+put plugins in ~/.qpad
+make top hint / notification dodge MouseOver / cursor
+swap ctrl+shift+v and ctrl+v?
+binary editor reloading?
+rendering
+	true AA for roundrect
+tex
+	port more of deferred.qpadscript
+	enabling/disabling plugins in menu
+CJK PPM:
+	work in conjunction with IME?
+		could have blind prediction...
+	iphone prediction isn't that useful
+	--
+	or LSTM
+binary editor
+	duk buffer size limit
+notebook cell ops undo/redo
+nested directory in the file browser
+`#pragma region` folding
+a few built-in themes
+	~/.qpad_debug/theme_dark1.json
+mac
+	zoom hotkey
+	system menu
+Unicode-aware case handling
+	we don't want to screw up the case insensitive performance
+for non-familiar users:
+	more concise system for translation / hotkey scripts
+	[ new window ] and [ button: ... ] in help
+peek definition:
+	CEO and hide cannot overlap
+weird bookmark display in tophint
+	bad tophint y0 - the hiding mode has changed!
+
+=====í¯¿í¿¿=====
+@echo off
+rem build script for the project
+rem [button: Debug]
+set LANG=zh_CN.utf8
+jc --readable_c_code -awin64 qpad.jc --run
+
+=====í¯¿í¿¿=====
+@echo off
+rem build script for 'qpad.jc'
+rem [button: Release]
+cd /d c:/tp/qpad
+git log --pretty=format:%%H -n 1 > res/misc/commit.txt
+jc -brelease -awin64 qpad.jc
+jc -brelease -awin32 qpad.jc
+rem jc -brelease -amac qpad.jc
+cd bin\win32_release
+del qpad3beta_32.7z
+7z a qpad3beta_32.7z qpad.exe
+cd /d c:\tp\qpad
+cd bin\win64_release
+del qpad3beta_64.7z
+7z a qpad3beta_64.7z qpad.exe
+del c:\software\cmder\bin\qpad_old.exe
+ren c:\software\cmder\bin\qpad.exe qpad_old.exe
+copy qpad.exe c:\software\cmder\bin\qpad.exe
+
+=====í¯¿í¿¿=====
+#!/bin/sh
+#[button: Translate]
+# After this is done, re-run qpad to generate 'translation.json'
+cd /c/tp/qpad/res
+grep -ERoh text:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * > ../build/translation.txt
+grep -ERoh UI\._\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\)\\\) * >> ../build/translation.txt
+grep -ERoh UI\.Format\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\), * >> ../build/translation.txt
+grep -ERoh tooltip:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
+grep -ERoh ,name:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
+
+=====í¯¿í¿¿=====
+Search result

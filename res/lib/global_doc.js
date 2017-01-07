@@ -210,13 +210,14 @@ UI.WaitOnPipe=function(f){
 UI.OnCustomEvent=function(event){
 	if(event.code==4){
 		//gotta run the pipe pollers
+		//console.log('pipe wakeup',Math.random());
 		var cbs=g_pipe_callbacks;
 		g_pipe_callbacks=[];
 		for(var i=0;i<cbs.length;i++){
 			var f=cbs[i];
 			f();
 		}
-		IO.StartWaitingForPipes();
+		//IO.StartWaitingForPipes();
 	}
 };
 

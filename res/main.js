@@ -793,22 +793,21 @@ UI.Application=function(id,attrs){
 		UI.SetTaskbarProgress(app.__hwnd,app.progress||0);
 	}
 	if(UI.Platform.BUILD=="debug"){
-		//todo: test terminal
-		W.Hotkey("",{key:"SHIFT+CTRL+X",action:function(){
-			//UI.OpenTerminalTab(["bash","-i"],".");
-			UI.OpenTerminalTab({
-				//args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty line 30;bash -i","/dev/null"],
-				args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;bash -i","/dev/null"],
-				//args:["bad_command"],
-				//args:["powershell"],
-				//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;winpty cmd","/dev/null"],
-				//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;ssh a@192.168.111.51","/dev/null"],
-				spath:".",
-				//cols:"132",
-				//rows:"30",
-				auto_close:1,
-			});
-		}});
+		//W.Hotkey("",{key:"SHIFT+CTRL+X",action:function(){
+		//	//UI.OpenTerminalTab(["bash","-i"],".");
+		//	UI.OpenTerminalTab({
+		//		//args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty line 30;bash -i","/dev/null"],
+		//		args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;bash -i","/dev/null"],
+		//		//args:["bad_command"],
+		//		//args:["powershell"],
+		//		//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;winpty cmd","/dev/null"],
+		//		//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;ssh a@192.168.111.51","/dev/null"],
+		//		spath:".",
+		//		//cols:"132",
+		//		//rows:"30",
+		//		auto_close:1,
+		//	});
+		//}});
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
 			UI.BeforeGC()

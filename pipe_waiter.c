@@ -42,6 +42,7 @@ static DWORD WINAPI win_thread(void* unused_param){
 		if(ret>=WAIT_OBJECT_0+1&&ret<WAIT_OBJECT_0+g_all_handles.n){
 			a.user.data1=g_all_handles.p[ret-WAIT_OBJECT_0];
 		}
+		//printf("%d %d\n",ret-WAIT_OBJECT_0,g_all_handles.n);fflush(stdout);
 		SDL_PushEvent(&a);
 		//////////////
 		//wait for the next frame

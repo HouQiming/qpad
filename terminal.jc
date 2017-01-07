@@ -217,8 +217,8 @@ class Terminal{
 		this.writable=false;
 		this.lines=int[].NULL;
 		if this.proc:
-			if this.proc.pipe:
-				PipeWaiter.RemovePipe(proc.pipe)
+			//if this.proc.pipe:
+			//	PipeWaiter.RemovePipe(proc.pipe)
 			if this.proc.pipe_2nd:
 				PipeWaiter.RemovePipe(proc.pipe_2nd)
 			this.proc=System.Processes.CProcess.NULL
@@ -4001,8 +4001,8 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				proc=System.Processes.RunPiped(args,spath,0,"input,output,error")
 		else
 			proc=typeof(proc).NULL
-		if proc&&proc.pipe:
-			PipeWaiter.AddPipe(proc.pipe)
+		//if proc&&proc.pipe:
+		//	PipeWaiter.AddPipe(proc.pipe)
 		if proc&&proc.pipe_2nd:
 			PipeWaiter.AddPipe(proc.pipe_2nd)
 		//if !proc:
@@ -4277,11 +4277,13 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				JS_UI.CallMethod(int,"Refresh")
 			else if !proc||!proc.isRunning():
 				poll_delay=-1
-				if proc.pipe:
-					proc.pipe.Close()
-					proc.pipe=typeof(proc.pipe).NULL
+				//if proc.pipe:
+				//	PipeWaiter.RemovePipe(proc.pipe)
+				//	//proc.pipe.Close()
+				//	proc.pipe=typeof(proc.pipe).NULL
 				if proc.pipe_2nd:
-					proc.pipe_2nd.Close()
+					PipeWaiter.RemovePipe(proc.pipe_2nd)
+					//proc.pipe_2nd.Close()
 					proc.pipe_2nd=typeof(proc.pipe_2nd).NULL
 			return JS.Return(poll_delay)
 		}
