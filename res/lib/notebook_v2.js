@@ -1696,7 +1696,7 @@ W.Terminal=function(id,attrs){
 		var menu_terminal=undefined;
 		menu_terminal=UI.BigMenu("Ter&minal");
 		menu_terminal.AddNormalItem({
-			text:"Install remote editing script",
+			text:"Install remote editing feature",
 			icon:"远",
 			action:function(){
 				var s_script=IO.UIReadAll('res/misc/qpad.sh');
@@ -1709,7 +1709,7 @@ W.Terminal=function(id,attrs){
 		var s_ssh_command=(obj.ssh_command||obj.m_term.last_ssh_command);
 		if(s_ssh_command&&UI.DetectMSYSTools()){
 			menu_terminal.AddNormalItem({
-				text:UI.Format("&Pin '@1' to this menu",s_ssh_command),
+				text:UI.Format("Pin '@1' to this menu",s_ssh_command),
 				action:function(s_ssh_command){
 					var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];
 					if(!pinned_terms){
@@ -1780,9 +1780,9 @@ UI.OpenTerminalTab=function(options){
 				if(!body.terminated){
 					this.in_save_dialog=1;
 					this.save_dialog_desc={
-						text:UI._("It's still running..."),
+						text:UI._("It's still connected..."),
 						buttons:[{
-							text:UI._("Stop it"),is_good:1,
+							text:UI._("Hang up"),is_good:1,
 							hotkeys:["K","Y","RETURN","SPACE"],
 							std_action:"close",
 							OnClick:function(){
@@ -1894,7 +1894,7 @@ UI.DetectMSYSTools=function(){
 
 UI.RegisterSpecialFile("remote",{
 	GetDisplayName:function(obj_widget){
-		return obj_widget&&obj_widget.doc&&(UI.Format("@1 <Remote>",obj_widget.doc.m_fn_remote));
+		return obj_widget&&obj_widget.doc&&(UI.Format("@1 (remote)",obj_widget.doc.m_fn_remote));
 	},
 	Load:function(obj_widget){
 		return '';
@@ -1933,7 +1933,7 @@ UI.RegisterSpecialFile("remote",{
 					this.owner.CreateNotification({id:'saving_progress',icon:'警',text:"THE TERMINAL HAS BEEN CLOSED!\nCan't upload anymore. Save your changes under another name before it's lost."})
 				}
 				this.saved_point=-1;
-				this.m_file_name=UI._('<lost file>');
+				this.m_file_name='<lost file>';
 				this.owner.file_name=this.m_file_name;
 				UI.Refresh();
 			}
