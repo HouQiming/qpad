@@ -114,8 +114,6 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-on-boarding:
-	Maya-like "highlight new" in menus
 drag-out support
 	secondary windows
 		without menu / stuff
@@ -123,6 +121,8 @@ drag-out support
 		region is mixed up
 	the smart rerendering FBO... one FBO for each window? 
 		only one FBO for the foreground!
+on-boarding:
+	Maya-like "highlight new" in menus
 possible memory leak
 explicit diff visualization
 	autoedit stuff + diffupdate

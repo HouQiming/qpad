@@ -665,12 +665,17 @@ var CreateMenus=function(){
 	if(UI.DetectMSYSTools()){
 		var menu_terminal=undefined;
 		menu_terminal=UI.BigMenu("Ter&minal");
-		menu_terminal.AddNormalItem({text:"&Open new terminal...",icon:'格',enable_hotkey:1,key:"CTRL+ALT+M",action:OpenShellTerm})
+		menu_terminal.AddNormalItem({text:"Open new terminal...",icon:'控',enable_hotkey:1,key:"CTRL+ALT+M",action:OpenShellTerm})
 		var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];
 		if(pinned_terms){
 			menu_terminal.AddSeparator();
+			var hotkey_list='1234567890abcdefghijklmnopqrstuvwxyz';
 			for(var i=0;i<pinned_terms.length;i++){
-				menu_terminal.AddButtonRow({text:pinned_terms[i],default_button:0},[
+				var s_menu_text=pinned_terms[i];
+				if(i<hotkey_list.length){
+					s_menu_text="&"+hotkey_list[i]+" "+s_menu_text;
+				}
+				menu_terminal.AddButtonRow({text:s_menu_text,default_button:0},[
 					{
 						text:"connect_"+i.toString(),icon:"控",tooltip:'Connect',
 						action:function(s_ssh_command){

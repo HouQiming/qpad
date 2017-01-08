@@ -1760,7 +1760,24 @@ W.CFancyMenuDesc.prototype={
 				W.Hotkey("",{key:button_i.key,action:button_i.action})
 			}
 		}
-		children.push({type:'newline',action:attrs.default_button!=undefined&&buttons[attrs.default_button].action})
+		var default_action=(attrs.default_button!=undefined&&buttons[attrs.default_button].action);
+		children.push({type:'newline',action:default_action})
+		if(default_action){
+			var p_and=attrs.text.indexOf('&');
+			if(p_and>=0){
+				//underlined hotkey
+				children.push({type:'hotkey',key:attrs.text.substr(p_and+1,1).toUpperCase(),
+					context_menu_group:attrs.context_menu_group,
+					tab_menu_group:attrs.tab_menu_group,
+					action:default_action})
+				if(UI.Platform.ARCH!="mac"){
+					children.push({type:'hotkey',key:"ALT+"+attrs.text.substr(p_and+1,1).toUpperCase(),
+						context_menu_group:attrs.context_menu_group,
+						tab_menu_group:attrs.tab_menu_group,
+						action:default_action})
+				}
+			}
+		}
 	},
 	AddSeparator:function(){
 		var children=this.$

@@ -1696,7 +1696,8 @@ W.Terminal=function(id,attrs){
 		var menu_terminal=undefined;
 		menu_terminal=UI.BigMenu("Ter&minal");
 		menu_terminal.AddNormalItem({
-			text:"&Install remote editing script",
+			text:"Install remote editing script",
+			icon:"远",
 			action:function(){
 				var s_script=IO.UIReadAll('res/misc/qpad.sh');
 				var s_send=['STTY_STATE=`stty -g`;stty raw -echo;(head -c ',
