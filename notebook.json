@@ -92,10 +92,17 @@ v2
    "out_m_enable_wrapping": 0
   },
   {
+   "m_language": "Windows BAT",
+   "m_cell_id": 4,
+   "m_button_name": "SSH test",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0
+  },
+  {
    "m_language": "Markdown",
    "m_text_out": "c:/tp/qpad/res/main.js:23202..23228: IO.StartWaitingForPipes();\nc:/tp/qpad/res/main.js:29439..29465: IO.StartWaitingForPipes();\n",
    "m_has_any_error": 1,
-   "m_cell_id": 4,
+   "m_cell_id": 5,
    "m_button_name": "â€¢ Search result",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
@@ -107,34 +114,8 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-notebook terminal
-	download / remote edit
-		escape sequence + bash function
-			editing .bashrc isn't much better than an apt install
-				we don't need port forwarding
-				but the experience will be much shittier
-			cat save:
-				control char detection
-				clunky, error-prone
-				use cp to make a backup first
-				rmate is doing cat too
-				--
-				use 'head -c #' and 'stty raw -echo'
-	recorded macros
-		put macros in a specific .qpad/foo/ directory
-		generate built-in ones like dict
-		a menu with some on-boarding hint?
-			when ssh-ed to a new host
-			the first-time a SSH menu pops up
-		basically various tasks for setting up a new host
-		and the apt upgrade crap
-	SSH menu: machines and macros
-	terminating interactive ssh: kill tree
-	retarded charset warning, bash prompt detection
 on-boarding:
-	"new features" screen
-	full screen overlay with "Got it"
-	persistent
+	Maya-like "highlight new" in menus
 drag-out support
 	secondary windows
 		without menu / stuff
@@ -284,6 +265,12 @@ grep -ERoh UI\._\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\)\\\) * >> ../build
 grep -ERoh UI\.Format\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\), * >> ../build/translation.txt
 grep -ERoh tooltip:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
 grep -ERoh ,name:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
+
+=====í¯¿í¿¿=====
+@echo off
+rem [interactive]
+rem [button: SSH test]
+ssh a@192.168.111.50
 
 =====í¯¿í¿¿=====
 Search result

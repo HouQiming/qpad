@@ -923,12 +923,14 @@ W.notebook_prototype={
 			//new terminal
 			//ignore cols / rows
 			if(UI.DetectMSYSTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty cols 80;stty rows 25;"+IO.ShellCmd(args),"/dev/null"];
+				args=["script","--return","-qfc","export TERM=xterm;stty cols 132;stty rows 24;"+IO.ShellCmd(args),"/dev/null"];
 			}
 			UI.OpenTerminalTab({
 				args:args,
 				spath:spath,
 				auto_close:1,
+				cols:132,
+				rows:24,
 			});
 			UI.Refresh();
 			return;
@@ -1689,6 +1691,37 @@ W.Terminal=function(id,attrs){
 	//	}});
 	//}
 	UI.PopCliprect();
+	//a terminal menu - standard scripts, "first command" history
+	if(UI.HasFocus(obj)){
+		var menu_terminal=undefined;
+		menu_terminal=UI.BigMenu("Ter&minal");
+		menu_terminal.AddNormalItem({
+			text:"&Install remote editing script",
+			action:function(){
+				var s_script=IO.UIReadAll('res/misc/qpad.sh');
+				var s_send=['STTY_STATE=`stty -g`;stty raw -echo;(head -c ',
+					Duktape.__byte_length(s_script).toString(),
+				'|sh);stty "${STTY_STATE}";source ~/.bashrc\r',s_script].join('');
+				obj.m_term.send(s_send);
+				UI.Refresh()
+			}})
+		var s_ssh_command=(obj.ssh_command||obj.m_term.last_ssh_command);
+		if(s_ssh_command&&UI.DetectMSYSTools()){
+			menu_terminal.AddNormalItem({
+				text:UI.Format("&Pin '@1' to this menu",s_ssh_command),
+				action:function(s_ssh_command){
+					var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];
+					if(!pinned_terms){
+						pinned_terms=[];
+						UI.m_ui_metadata["<pinned_terminals>"]=pinned_terms;
+					}
+					pinned_terms.push(s_ssh_command);
+					UI.Refresh();
+				}.bind(null,s_ssh_command)
+			});
+		}
+		menu_terminal=undefined;
+	}
 	UI.End();
 	return obj;
 };
@@ -1728,6 +1761,7 @@ UI.OpenTerminalTab=function(options){
 				'spath':options.spath,
 				'cols':options.cols,
 				'rows':options.rows,
+				'ssh_command':options.ssh_command,
 				'default_focus':1,
 			});
 			if(!had_body){
@@ -1831,6 +1865,7 @@ var ReallyDetectMSYSTools=function(){
 		var paths=IO.ProcessUnixFileName("%PATH%").split(/[; \t]/);
 		var got_script=0;
 		var got_stty=0;
+		var got_bash=0;
 		for(var i=0;i<paths.length;i++){
 			var path_i=paths[i];
 			if(!got_script&&IO.FileExists(path_i+"\\script.exe")){
@@ -1839,8 +1874,11 @@ var ReallyDetectMSYSTools=function(){
 			if(!got_stty&&IO.FileExists(path_i+"\\stty.exe")){
 				got_stty=1;
 			}
+			if(!got_bash&&IO.FileExists(path_i+"\\bash.exe")){
+				got_bash=1;
+			}
 		}
-		return (got_script&&got_stty);
+		return (got_script&&got_stty&&got_bash);
 	}else{
 		return 1;
 	}
@@ -1851,4 +1889,77 @@ UI.DetectMSYSTools=function(){
 		UI.m_has_unix_tools=ReallyDetectMSYSTools();
 	}
 	return UI.m_has_unix_tools;
+};
+
+UI.RegisterSpecialFile("remote",{
+	GetDisplayName:function(obj_widget){
+		return obj_widget&&obj_widget.doc&&(UI.Format("@1 <Remote>",obj_widget.doc.m_fn_remote));
+	},
+	Load:function(obj_widget){
+		return '';
+	},
+	Save:function(s_content,obj_widget){
+		var doc=obj_widget.doc;
+		if(!doc.m_linked_terminal.writable){return;}
+		var s_final='s'+Duktape.__byte_length(s_content).toString()+';'+s_content;
+		doc.m_upload_size=Duktape.__byte_length(s_final);
+		doc.m_linked_terminal.setRemoteSavingCallback(function(n_queued){
+			if(!n_queued){
+				obj_widget.CreateNotification({id:'saving_progress',text:"Waiting for response..."})
+				return;
+			}
+			if(n_queued<0){
+				this.owner.DismissNotification('saving_progress');
+				doc.m_linked_terminal.setRemoteSavingCallback(null);
+				this.ed.saving_context=undefined;
+				return;
+			}
+			this.owner.CreateNotification({id:'saving_progress',text:UI.Format("Uploading @1%...",((this.m_upload_size-n_queued)/this.m_upload_size*100).toFixed(0))})
+		}.bind(doc));
+		doc.ed.saving_context={/*nothing*/};
+		obj_widget.CreateNotification({id:'saving_progress',text:"Uploading to the terminal..."})
+		doc.m_linked_terminal.send(s_final)
+	},
+	plugin:function(){
+		this.AddEventHandler('close',function(){
+			if(this.m_linked_terminal){
+				this.m_linked_terminal.send('q');
+			}
+		});
+		this.AddEventHandler('menu',function(){
+			if(this.m_linked_terminal&&!this.m_linked_terminal.writable){
+				if(this.owner){
+					this.owner.CreateNotification({id:'saving_progress',icon:'警',text:"THE TERMINAL HAS BEEN CLOSED!\nCan't upload anymore. Save your changes under another name before it's lost."})
+				}
+				this.saved_point=-1;
+				this.m_file_name=UI._('<lost file>');
+				this.owner.file_name=this.m_file_name;
+				UI.Refresh();
+			}
+		});
+	},
+});
+
+UI.OpenRemoteEditorTab=function(terminal,fn){
+	var tab=UI.OpenEditorWindow("*remote",function(){
+		this.m_linked_terminal=terminal;
+		this.m_fn_remote=fn;
+		this.ed.hfile_loading={
+			progress:0,
+			discard:function(){},
+		};
+		terminal.setRemoteLoadingCallback(function(s_content,progress,is_done){
+			if(this.m_is_destroyed){return 0;}
+			if(s_content){
+				this.ed.Edit([this.ed.GetTextSize(),0,s_content],1);
+			}
+			if(is_done){
+				this.ed.hfile_loading=undefined;
+			}else{
+				this.ed.hfile_loading.progress=progress;
+			}
+			return 1;
+		}.bind(this));
+	});
+	tab.m_fn_remote=fn;
 };

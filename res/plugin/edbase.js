@@ -583,9 +583,49 @@ Language.Register({
 	file_icon_color:0xff444444,
 	file_icon:'プ',
 	rules:function(lang){
-		return f_shell_like(lang,{
-			'keyword':['if','fi','else','function','for','while','do','done'],
-		})
+		lang.DefineDefaultColor("color_symbol")
+		var bid_comment=lang.ColoredDelimiter("key","#","\n","color_comment");
+		var bid_string_param=lang.DefineDelimiter("key","${","}");
+		var bid_string=lang.ColoredDelimiter("key",'"','"',"color_string");
+		var bid_string2=lang.ColoredDelimiter("key","'","'","color_string");
+		var bid_string_es6=lang.ColoredDelimiter("key","`","`","color_meta");
+		var bid_bracket=lang.DefineDelimiter("nested",['(','[','{','${'],['}',']',')']);
+		var crid_string_param=lang.AddColorRule(bid_string_param,"color_symbol","exclusive");
+		var tok_es6_string_param_left=lang.DefineToken("${");
+		var tok_curly_bracket1=lang.DefineToken("}");
+		lang.DefineToken("\\\\")
+		lang.DefineToken("\\'")
+		lang.DefineToken('\\"')
+		lang.DefineToken('\\\n')
+		var kwset=lang.DefineKeywordSet("color_symbol");
+		var keywords={
+			'keyword':['if','fi','then','else','function','for','while','do','done','case','esac'],
+			'type':['alias','apropos','apt','aptitude','aspell','awk','basename','bash','bc','bg','bind','break','builtin','bzip2','cal','cat','cd','cfdisk','chgrp','chmod','chown','chroot','chkconfig','cksum','clear','cmp','comm','command','continue','cp','cron','crontab','csplit','curl','cut','date','dc','dd','ddrescue','declare','df','diff','diff3','dig','dir','dircolors','dirname','dirs','dmesg','du','echo','egrep','eject','enable','env','ethtool','eval','exec','exit','expect','expand','export','expr','false','fdformat','fdisk','fg','fgrep','file','find','fmt','fold','format','free','fsck','ftp','fuser','gawk',
+				'getopts','grep','groupadd','groupdel','groupmod','groups','gzip','hash','head','help','history','hostname','htop','iconv','id','ifconfig','ifdown','ifup','import','install','ip','jobs','join','kill','killall','less','let','link','ln','local','locate','logname','logout','look','lpc','lpr','lprint','lprintd','lprintq','lprm','lsblk','ls','lsof','make','man','mkdir','mkfifo','mkisofs','mknod','more','most','mount','mtools','mtr','mv','mmv','nc','netstat','nice','nl','nohup','notify-send','nslookup','open','op','passwd','paste','pathchk','ping','pgrep','pkill','popd','pr','printcap','printenv','printf','ps','pushd','pv','pwd','quota','quotacheck','ram','rar','rcp','read','readarray','readonly','reboot','rename','renice','remsync','return','rev','rm','rmdir','rsync','screen','scp','sdiff','sed','select','seq','set','sftp','shift','shopt','shutdown','sleep','slocate','sort','source','split','ss','ssh','stat','strace','su','sudo','sum','suspend','sync','tail','tar','tee','test','time','timeout','times','touch','top','tput','traceroute','trap','tr','true','tsort','tty','type','ulimit','umask','umount','unalias','uname','unexpand','uniq','units','unrar','unset','unshar','until','uptime','useradd','userdel','usermod','users','uuencode','uudecode','v','vdir','vi','vmstat','wait','watch','wc','whereis','which','who','whoami','wget','write','xargs','xdg-open','xz','yes','zip',
+				'stty','script']
+		};
+		for(var k in keywords){
+			kwset.DefineKeywords("color_"+k,keywords[k])
+		}
+		kwset.DefineWordColor("color")
+		kwset.DefineWordType("color_number","0-9")
+		lang.BindKeywordSet(crid_string_param,kwset);
+		return (function(lang){
+			lang.SetExclusive([bid_comment,bid_string,bid_string2,bid_string_es6]);
+			if(lang.isInside(bid_comment)||lang.isInside(bid_string)||lang.isInside(bid_string2)||lang.isInside(bid_string_es6)){
+				lang.Disable(bid_bracket);
+			}else{
+				lang.Enable(bid_bracket);
+			}
+			//`${}`-specific rules
+			if(lang.isInside(bid_string_es6)||lang.isInside(bid_string)){
+				lang.Enable(bid_string_param);
+			}else{
+				lang.Disable(bid_string_param);
+			}
+			lang.EnableToken(tok_es6_string_param_left);
+			lang.EnableToken(tok_curly_bracket1);
+		});
 	}
 });
 
@@ -3441,7 +3481,7 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 		})
 		this.AddEventHandler('global_menu',function(){
 			var menu_tools=UI.BigMenu("&Tools")
-			menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
+			/*menu_tools.AddNormalItem({text:"Debug: Query QInfo (&E)...",key:"CTRL+E",enable_hotkey:1,action:function(){
 				//coulddo: size-limiting
 				var ret=UI.ED_QueryQInfo(this,0,this.sel1.ccnt);
 				var cands=[];
@@ -3457,7 +3497,7 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 				if(cands.length){
 					this.StartACWithCandidates(cands);
 				}
-			}.bind(this)});
+			}.bind(this)});*/
 			menu_tools.AddNormalItem({text:"Debug: parse combo...",key:"SHIFT+CTRL+E",enable_hotkey:1,action:function(){
 				var ret=UI.ED_ParseAsCombo(this,0,this.ed.GetTextSize());
 				this.m_graph=UI.BuildComboGraph(this,ret);

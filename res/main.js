@@ -412,6 +412,16 @@ var OpenShell=function(){
 	}
 };
 
+var OpenShellTerm=function(){
+	UI.OpenTerminalTab({
+		args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty rows 24;bash -i","/dev/null"],
+		spath:".",
+		cols:132,
+		rows:24,
+		auto_close:1,
+	});
+};
+
 UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
 var CreateMenus=function(){
@@ -652,6 +662,43 @@ var CreateMenus=function(){
 			UI.ZoomRelative(ZOOM_RATE)
 		}}])
 	menu_tools=undefined;
+	if(UI.DetectMSYSTools()){
+		var menu_terminal=undefined;
+		menu_terminal=UI.BigMenu("Ter&minal");
+		menu_terminal.AddNormalItem({text:"&Open new terminal...",icon:'格',enable_hotkey:1,key:"CTRL+ALT+M",action:OpenShellTerm})
+		var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];
+		if(pinned_terms){
+			menu_terminal.AddSeparator();
+			for(var i=0;i<pinned_terms.length;i++){
+				menu_terminal.AddButtonRow({text:pinned_terms[i],default_button:0},[
+					{
+						text:"connect_"+i.toString(),icon:"控",tooltip:'Connect',
+						action:function(s_ssh_command){
+							UI.OpenTerminalTab({
+								args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty rows 24;"+s_ssh_command,"/dev/null"],
+								spath:".",
+								cols:132,
+								rows:24,
+								auto_close:1,
+								ssh_command:s_ssh_command,
+							});
+						}.bind(null,pinned_terms[i])
+					},{
+						text:"unpin_"+i.toString(),icon:"✕",tooltip:'Unpin',
+						action:function(s_ssh_command){
+							var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];
+							if(!pinned_terms){
+								pinned_terms=[];
+							}
+							UI.m_ui_metadata["<pinned_terminals>"]=pinned_terms.filter(function(s){return s!=s_ssh_command;});
+							UI.Refresh();
+						}.bind(null,pinned_terms[i]),
+					}
+				]);
+			}
+		}
+		menu_terminal=undefined;
+	}
 	obj_active_tab=undefined;
 	obj_real_active_tab=undefined;
 	//////////////////////////

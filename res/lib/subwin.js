@@ -352,7 +352,9 @@ W.TabbedDocument_prototype={
 				}
 				ret=1
 			}
-			tab_i.SaveMetaData()
+			if(tab_i.SaveMetaData){
+				tab_i.SaveMetaData();
+			}
 		}
 		if(ret==0){
 			if(!this.m_is_close_pending){
@@ -1741,6 +1743,7 @@ W.CFancyMenuDesc.prototype={
 			var button_i=buttons[i]
 			button_i.type='button';
 			button_i.action=WrapMenuAction(button_i.action);
+			button_i.no_sel=(attrs.default_button!=undefined);
 			children.push(button_i);
 			/////////////////
 			if(button_i.text){
@@ -1757,7 +1760,7 @@ W.CFancyMenuDesc.prototype={
 				W.Hotkey("",{key:button_i.key,action:button_i.action})
 			}
 		}
-		children.push({type:'newline'})
+		children.push({type:'newline',action:attrs.default_button!=undefined&&buttons[attrs.default_button].action})
 	},
 	AddSeparator:function(){
 		var children=this.$
@@ -2027,6 +2030,7 @@ W.FancyMenu=function(id,attrs){
 		obj.h=h_acc+obj.vertical_padding*2
 		//compute x y w h everywhere, assign icon with text and draw it at 0,y
 		var selectable_items=[]
+		var w_newline_item=w_needed;
 		part_id=0;w_acc=obj.side_padding+w_icon;h_acc=obj.vertical_padding;
 		for(var i=0;i<items.length;i++){
 			var item_i=items[i]
@@ -2037,6 +2041,9 @@ W.FancyMenu=function(id,attrs){
 				item_i.y=h_acc
 				w_acc+=UI.MeasureText(obj.font,item_i.text.replace('&','')).w
 			}else if(s_type=='button'){
+				if(w_newline_item>w_acc){
+					w_newline_item=w_acc;
+				}
 				item_i.x=w_acc
 				item_i.y=h_acc+(obj.h_menu_line-obj.h_button)*0.5
 				w_acc+=obj.button_padding
@@ -2044,7 +2051,9 @@ W.FancyMenu=function(id,attrs){
 				w_acc+=obj.button_padding
 				item_i.w=w_acc-item_i.x
 				item_i.h=obj.h_button
-				selectable_items.push(i)
+				if(!item_i.no_sel){
+					selectable_items.push(i)
+				}
 			}else if(s_type=='rubber'){
 				w_acc=per_part_w[part_id]
 				part_id++
@@ -2065,7 +2074,7 @@ W.FancyMenu=function(id,attrs){
 				}
 				item_i.x=obj.side_padding*0.5
 				item_i.y=h_acc
-				item_i.w=w_needed-obj.side_padding
+				item_i.w=w_newline_item-obj.side_padding
 				item_i.h=obj.h_menu_line
 				part_id=0;
 				w_acc=obj.side_padding+w_icon;
@@ -2074,6 +2083,7 @@ W.FancyMenu=function(id,attrs){
 					item_i.sel_id=selectable_items.length
 					selectable_items.push(i)
 				}
+				w_newline_item=w_needed;
 			}
 			//again ignore 'hotkey'
 		}
@@ -2104,7 +2114,7 @@ W.FancyMenu=function(id,attrs){
 		var item_i=items[i]
 		var s_type=item_i.type
 		var dx=0;
-		var selected=(i>=sel_id0&&i<=sel_id1)
+		var selected=(i>=sel_id0&&i<=sel_id1&&!item_i.no_sel)
 		if(sel_id0<sel_id1&&i==sel_id0){
 			var item_sel1=items[sel_id1]
 			UI.RoundRect({x:obj.x+item_sel1.x,y:obj.y+item_sel1.y,w:item_sel1.w,h:item_sel1.h,

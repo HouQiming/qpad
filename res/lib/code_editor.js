@@ -144,6 +144,14 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(spell_checker){
 			this.m_spell_checker=spell_checker;
 		}
+		if(this.m_file_name&&this.m_file_name.length&&this.m_file_name[0]=='*'){
+			//special file plugins
+			var fn_special=this.m_file_name.substr(1);
+			var fplugin=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].plugin);
+			if(fplugin){
+				fplugin.call(this)
+			}
+		}
 		//if(UI.enable_timing){
 		//	UI.TimingEvent('before W.Edit_prototype.Init');
 		//}
@@ -387,11 +395,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			var floader=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].Load);
 			var s_content="";
 			if(floader){
-				s_content=(floader()||"");
+				s_content=(floader(this)||"");
 			}else{
 				s_content=(IO.UIReadAll(fn_special)||"");
 			}
-			ed.Edit([0,0,s_content],1);
+			if(s_content){
+				ed.Edit([0,0,s_content],1);
+			}
 			//this.ResetSaveDiff()
 			this.OnLoad()
 			UI.Refresh();
@@ -3015,11 +3025,15 @@ W.CodeEditorWidget_prototype={
 			this.CreateNotification({id:'saving_progress',icon:'错',text:"You cannot save a file before it finishes loading"})
 			return
 		}
+		if(doc.ed.saving_context){
+			//already saving
+			return
+		}
 		if(fn.length&&fn[0]=='*'){
 			var fn_special=fn.substr(1);
 			var fsaver=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].Save);
 			if(fsaver){
-				fsaver(this.doc.ed.GetText());
+				fsaver(this.doc.ed.GetText(),this);
 				doc.saved_point=doc.ed.GetUndoQueueLength()
 				doc.ResetSaveDiff()
 			}
@@ -6257,7 +6271,11 @@ W.CodeEditor=function(id,attrs){
 				//	}
 				//}
 				if(!doc){
-					doc=UI.OpenCodeEditorDocument(obj.file_name,obj.m_is_preview);
+					var lang_remote=(obj.m_fn_remote?Language.GetNameByExt(UI.GetFileNameExtension(obj.m_fn_remote)):null);
+					if(lang_remote&&lang_remote=='Binary'){
+						lang_remote=null;
+					}
+					doc=UI.OpenCodeEditorDocument(obj.file_name,obj.m_is_preview,lang_remote);
 					obj.m_tabswitch_count=((obj.file_name&&UI.m_ui_metadata[obj.file_name]||{}).m_tabswitch_count||{});
 					obj.doc=doc;
 					if(doc.m_is_help_page_preview){
@@ -7512,8 +7530,12 @@ UI.NewCodeEditorTab=function(fname0){
 			var arr_editors=UI.g_editor_from_file[fn_display];
 			if(fn_display.length&&fn_display[0]=='*'){
 				var special_file_desc=UI.m_special_files[fn_display.substr(1)];
-				if(special_file_desc&&special_file_desc.display_name){
-					fn_display=special_file_desc.display_name;
+				if(special_file_desc){
+					if(special_file_desc.display_name){
+						fn_display=special_file_desc.display_name;
+					}else if(special_file_desc.GetDisplayName&&this.main_widget){
+						fn_display=(special_file_desc.GetDisplayName(this.main_widget)||fn_display);
+					}
 				}
 			}else{
 				fn_display=IO.NormalizeFileName(fn_display,1);
@@ -7552,6 +7574,7 @@ UI.NewCodeEditorTab=function(fname0){
 				'x':0,'y':0,
 				'w_tab':UI.context_parent.w,'h_tab':UI.context_parent.h,
 				'file_name':this.file_name,
+				'm_fn_remote':this.m_fn_remote,
 				'is_a_tab':1,
 			};
 			if(!this.main_widget&&!fname0){
@@ -7687,7 +7710,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			//console.log('BumpHistory',fname)
 		}
 	}
-	if(is_quiet!='restore_workspace'){
+	if(is_quiet!='restore_workspace'&&fname!='*remote'){
 		var obj_tab=undefined;
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
 			if(UI.g_all_document_windows[i].file_name==fname){

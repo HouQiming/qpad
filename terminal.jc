@@ -14,6 +14,8 @@ Qiming HOU 1/1/2017:
 	abandoned the mouse stuff in favor of quickedit-like operations
 */
 module detail{
+DEBUG_DUMP=0
+
 /**
 * xterm.js: xterm, in the browser
 * Originally forked from (with the author's permission):
@@ -170,11 +172,15 @@ class Terminal{
 
 	// Store if user went browsing history in scrollback
 	userScrolling=false
+	is_remote_editing=0
 	download_buf=string.NULL
 	download_written_size=0LL
 	download_size=-1LL
 	download_start=0LL
-	download_file=System.IO.CFile.NULL
+	download_fn=string.NULL
+	download_write_cb=JSObject.NULL
+	upload_progress_cb=JSObject.NULL
+	//download_file=System.IO.CFile.NULL
 	/**
 	* Creates a new `Terminal` object.
 	*
@@ -481,7 +487,7 @@ class Terminal{
 		if pchop<data.n:
 			this.s_lingering=new(data[pchop:])
 			data.n=pchop
-		for code in Gui2D.Utf8Chars(data) {
+		for code,I in Gui2D.Utf8Chars(data) {
 			switch (this.state) {
 				case normal_state:
 					switch (code) {
@@ -660,10 +666,11 @@ class Terminal{
 										this.lines[plastchar+2]=0
 								}
 	
-								auto pcurchar=(row*this.cols+this.x)*3;
-								this.lines[pcurchar+0]=this.curAttr
-								this.lines[pcurchar+1]=code
-								this.lines[pcurchar+2]=ch_width;
+								if u32(this.x)<u32(this.cols):
+									auto pcurchar=(row*this.cols+this.x)*3;
+									this.lines[pcurchar+0]=this.curAttr
+									this.lines[pcurchar+1]=code
+									this.lines[pcurchar+2]=ch_width;
 								this.x++;
 								
 								// fullwidth char - set next cell width to zero and advance cursor
@@ -977,6 +984,22 @@ class Terminal{
 							case 117:
 							case 118:
 								// reset colors
+								break;
+							case 9000:
+								//remote edit
+								if this.currentStringParam.n:
+									this.is_remote_editing=1
+									this.download_buf=new string
+									this.download_size=-1LL
+									this.download_written_size=0LL
+									this.download_fn=new(this.currentStringParam)
+									this.downloadWrite(data[I+1:])
+									JS["UI"].CallMethod(int,"OpenRemoteEditorTab",this,this.download_fn)
+									//this.download_file=System.IO.CreateFile(fn_local)
+									this.params.clear();
+									this.currentParam=0;
+									this.state=normal_state;
+									return
 								break;
 						}
 	
@@ -1624,12 +1647,12 @@ class Terminal{
 			return 0;
 		}
 	
-		if this.download_buf:
-			if result.key=="\x03":
-				//CTRL+C
-				this.input_during_download=string.NULL
-				this.cancelDownload()
-				return 1
+		if this.is_remote_editing:
+			//if result.key=="\x03":
+			//	//CTRL+C
+			//	this.input_during_download=string.NULL
+			//	this.cancelDownload()
+			//	return 1
 			if !this.input_during_download:
 				this.input_during_download=new string
 			this.input_during_download.push(result.key)
@@ -1688,7 +1711,39 @@ class Terminal{
 				// return/enter
 				result.key="\r";
 				result.cancel=true;
-				this.got_enter_from_input=1;
+				if !modifiers:
+					this.got_enter_from_input=1;
+					//identify ssh commands
+					auto ytop=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
+					auto row=(this.ybase+this.y)%this.scrollback
+					auto row0=row
+					auto cnt=0
+					while row!=ytop:
+						auto y0next=row-1
+						if y0next<0:
+							y0next+=this.scrollback
+						if uptr(y0next)>=uptr(this.line_end_states.n)||this.line_end_states[y0next]==0:
+							break
+						row=y0next
+						cnt++
+						if cnt>3:break
+					if cnt<=3:
+						this.s_parse_buffer.n=0
+						for(;;)
+							for i=0:this.cols-1
+								auto addr=(row*this.cols+i)*3
+								if addr+2<this.lines.n&&this.lines[addr+2]:
+									this.s_parse_buffer.PushUnicode(this.lines[addr+1])
+							if row==row0:break
+							row++
+							if row>=this.scrollback:
+								row-=this.scrollback
+						auto s_command=this.s_parse_buffer
+						auto pssh=s_command.IndexOf('$ ssh')
+						if pssh<0:
+							pssh=s_command.IndexOf('# ssh')
+						if pssh>=0:
+							this.last_ssh_command=new(s_command[pssh+2:])
 				break;
 			case 27:
 				// escape
@@ -1975,7 +2030,7 @@ class Terminal{
 		//selection won't matter here - it can't possibly be a hotkey, just send it
 		//if this.selecting>0:
 		//when downloading, though, we have to buffer it
-		if this.download_buf:
+		if this.is_remote_editing:
 			if !this.input_during_download:
 				this.input_during_download=new string
 			this.input_during_download.push(text)
@@ -2180,6 +2235,8 @@ class Terminal{
 				WriteInput();
 				return 0;
 			})
+		if this.upload_progress_cb:
+			this.upload_progress_cb.Call(int,int(this.input_pipe_queue.n))
 	}
 	OnData=function(string s0){
 		if !proc||!proc.pipe:return
@@ -3374,8 +3431,8 @@ class Terminal{
 	*/
 	scrollUp=function(params) {
 		auto param=(params.n>=1?params[0]:1);
-		param=min(max(param,1),n_lines_area)
 		auto n_lines_area=this.scrollBottom+1-this.scrollTop
+		param=min(max(param,1),n_lines_area)
 		auto n_lines_kept=n_lines_area-param
 		this.moveRows(this.ybase+this.scrollTop,this.ybase+this.scrollTop+param,n_lines_kept)
 		row=(this.ybase + this.scrollTop+n_lines_kept)%this.scrollback;
@@ -3803,70 +3860,109 @@ class Terminal{
 	
 	//	//this.maxRange();
 	//};
-	download=function(string fn_local,string fn_remote){
-		if this.download_buf:return 0
-		fn_bash=fn_remote.Replace(["'","'\\''"])
-		this.download_buf=new string
-		this.download_size=-1LL
-		this.download_written_size=0LL
-		this.download_file=System.IO.CreateFile(fn_local)
-		this.send("ONLCR=`stty|grep onlcr`;stty -onlcr;wc -c '"+fn_bash+"'|cut -f 1 -d ' ';cat '"+fn_bash+"';stty $ONLCR;\r")
-		return 1
-	}
+	//download=function(string fn_local,string fn_remote){
+	//	if this.download_buf:return 0
+	//	fn_bash=fn_remote.Replace(["'","'\\''"])
+	//	this.download_buf=new string
+	//	this.download_size=-1LL
+	//	this.download_written_size=0LL
+	//	this.download_file=System.IO.CreateFile(fn_local)
+	//	this.send("ONLCR=`stty|grep onlcr`;stty -onlcr;wc -c '"+fn_bash+"'|cut -f 1 -d ' ';cat '"+fn_bash+"';stty $ONLCR;\r")
+	//	return 1
+	//}
 	downloadWrite=function(string s){
 		if !this.writable:return
 		this.download_buf.push(s)
 		if this.download_size<0LL:
 			//try to parse the header
-			pnewline=this.download_buf.IndexOf('\n')
-			if pnewline>=0:
-				sline_header=this.download_buf[pnewline+1:]
-				pnewline2=sline_header.IndexOf('\n')
-				if pnewline2>=0:
-					this.download_size=sline_header[:pnewline2-1].as(i64)
-					//Writeln('>>> ',sline_header[:pnewline2-1],' ',this.download_size)
-					if this.download_size<0LL:
-						this.download_size=0LL
-					//write the command itself
-					this.write(this.download_buf[:pnewline-1])
-					this.write("\r\n")
-					this.download_buf=new(this.download_buf[iptr(pnewline+1+pnewline2+1):])
+			//pnewline=this.download_buf.IndexOf('\n')
+			//if pnewline>=0:
+			//sline_header=this.download_buf[pnewline+1:]
+			sline_header=this.download_buf
+			pnewline2=sline_header.IndexOf('\n')
+			if pnewline2>=0:
+				this.download_size=sline_header[:pnewline2-1].as(i64)
+				//Writeln('>>> ',sline_header[:pnewline2-1],' ',this.download_size)
+				if this.download_size<0LL:
+					this.download_size=0LL
+				this.download_buf=new(this.download_buf[iptr(pnewline2+1):])
+			//write the command itself
+			//this.write(this.download_buf[:pnewline-1])
+			//this.write("\r\n")
+			//this.download_buf=new(this.download_buf[iptr(pnewline+1+pnewline2+1):])
 		if this.download_size<0LL:
 			//need a header
 			return 0
 		n_remaining=this.download_size-this.download_written_size
-		if i64(this.download_buf.n)>=n_remaining:
-			//write the remaining stuff
-			//Writeln(this.download_written_size,' ',this.download_size,' ',this.download_buf.n)
-			this.write("\rDownload completed\r\n")
-			this.write(this.download_buf[iptr(n_remaining):])
-			this.download_file.Write(this.download_buf[:n_remaining-1])
-			this.download_file.Close()
-			this.download_file=System.IO.CFile.NULL
-			this.download_buf=string.NULL
-			if this.input_during_download:
-				s_input=this.input_during_download
-				this.input_during_download=string.NULL
-				this.send(s_input)
-			return 1
-		this.write(FormatAsText('\r',formatNumber(float(this.download_written_size+i64(this.download_buf.n))/float(this.download_size)*100.f,{frac:1}),'%'))
-		if this.download_buf.n>=1048576L:
-			//need to flush the result every so often, don't buffer too much
-			this.download_written_size+=i64(this.download_buf.n)
-			this.download_file.Write(this.download_buf)
+		if i64(this.download_buf.n)>n_remaining:
+			//sth wrong happened
+			this.cancelRemoteEditing()
+			return 0
+		if this.download_write_cb:
+			this.download_written_size+=this.download_buf.n
+			this.download_write_cb.Call(int,this.download_buf,float(this.download_written_size)/float(this.download_size),(this.download_written_size>=this.download_size))
 			this.download_buf.n=0
+			if this.download_written_size>=this.download_size:
+				this.enterUploadStage()
+		//if i64(this.download_buf.n)>=n_remaining:
+		//	//write the remaining stuff
+		//	Writeln(this.download_written_size,' ',this.download_size,' ',this.download_buf.n)
+		//	this.write("\rDownload completed\r\n")
+		//	this.write(this.download_buf[iptr(n_remaining):])
+		//	this.download_file.Write(this.download_buf[:n_remaining-1])
+		//	this.download_file.Close()
+		//	this.download_file=System.IO.CFile.NULL
+		//	this.download_buf=string.NULL
+		//	if this.input_during_download:
+		//		s_input=this.input_during_download
+		//		this.input_during_download=string.NULL
+		//		this.send(s_input)
+		//	return 1
+		//this.write(FormatAsText('\r',formatNumber(float(this.download_written_size+i64(this.download_buf.n))/float(this.download_size)*100.f,{frac:1}),'%'))
+		//if this.download_buf.n>=1048576L:
+		//	//need to flush the result every so often, don't buffer too much
+		//	this.download_written_size+=i64(this.download_buf.n)
+		//	this.download_file.Write(this.download_buf)
+		//	this.download_buf.n=0
 		return 0
 	}
-	cancelDownload=function(){
-		n_remaining=iptr(min(this.download_size-this.download_written_size,i64(this.download_buf.n)))
-		this.write("\rDownload canceled\r\n")
-		this.download_file.Write(this.download_buf[:n_remaining-1])
-		this.download_file.Close()
-		this.download_file=System.IO.CFile.NULL
-		this.download_buf=string.NULL
-		//we need to actually send the CTRL+C
-		this.send("\x03")
+	JS_setRemoteLoadingCallback=function(JSContext JS){
+		if this.is_remote_editing!=1:return 0
+		this.download_write_cb=JS.Param(0).as(JSObject)
+		this.download_written_size+=this.download_buf.n
+		this.download_write_cb.Call(int,this.download_buf,float(this.download_written_size)/float(this.download_size),(this.download_written_size>=this.download_size))
+		this.download_buf.n=0
+		if this.download_written_size>=this.download_size:
+			this.enterUploadStage()
+		return JS.Return(1)
 	}
+	JS_setRemoteSavingCallback=function(JSContext JS){
+		if this.is_remote_editing!=2:return 0
+		this.upload_progress_cb=JS.Param(0).as(JSObject)
+		return JS.Return(1)
+	}
+	cancelRemoteEditing=function(){
+		this.is_remote_editing=0
+		this.download_write_cb=JSObject.NULL
+		this.upload_progress_cb=JSObject.NULL
+		if this.input_during_download:
+			this.send(this.input_during_download)
+			this.input_during_download=string.NULL
+	}
+	enterUploadStage=function(){
+		this.is_remote_editing=2
+		this.download_write_cb=JSObject.NULL
+	}
+	//cancelDownload=function(){
+	//	n_remaining=iptr(min(this.download_size-this.download_written_size,i64(this.download_buf.n)))
+	//	this.write("\rDownload canceled\r\n")
+	//	this.download_file.Write(this.download_buf[:n_remaining-1])
+	//	this.download_file.Close()
+	//	this.download_file=System.IO.CFile.NULL
+	//	this.download_buf=string.NULL
+	//	//we need to actually send the CTRL+C
+	//	this.send("\x03")
+	//}
 	JS_destroy=function(JSContext JS){
 		this.destroy()
 		return 0;
@@ -3895,10 +3991,14 @@ class Terminal{
 		proto.ExportProperty(this,"progress_value")
 		proto.ExportProperty(this,"got_enter_from_input")
 		proto.ExportProperty(this,"compiler_errors")
+		proto.ExportProperty(this,"writable")
+		proto.ExportProperty(this,"last_ssh_command")
 		proto.ExportMethod(this,"destroy",JS_destroy)
 		proto.ExportMethod(this,"write",JS_write)
 		proto.ExportMethod(this,"send",JS_send)
 		proto.ExportMethod(this,"getBgcolor",JS_getBgcolor)
+		proto.ExportMethod(this,"setRemoteLoadingCallback",JS_setRemoteLoadingCallback)
+		proto.ExportMethod(this,"setRemoteSavingCallback",JS_setRemoteSavingCallback)
 	}
 	
 	/////////////
@@ -3910,6 +4010,7 @@ class Terminal{
 	sel_x1=0
 	sel_y1=0
 	got_enter_from_input=0
+	last_ssh_command=string.NULL
 	compiler_errors=JSObject.NULL
 	proc=System.Processes.CProcess.NULL
 	auto __done__()
@@ -4022,9 +4123,28 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		term.proc=proc
 		if proc&&proc.pipe_2nd:
 			PipeWaiter.SetPipeDataCallback(proc.pipe_2nd,function(string s){
-				if term.download_buf:
-					term.downloadWrite(s)
+				if term.is_remote_editing:
+					if term.is_remote_editing==1:
+						//we're loading the remote file
+						term.downloadWrite(s)
+					else
+						//it's a command response
+						for ch,I in s
+							if ch=='s':
+								if term.upload_progress_cb:
+									term.upload_progress_cb.Call(int,-1)
+							else if ch=='q':
+								term.cancelRemoteEditing()
+								term.write(s[I+1:])
+								break
+							else
+								//invalid response
+								term.cancelRemoteEditing()
+								term.write(s[I:])
+								break
 				else
+					if DEBUG_DUMP:
+						Writeln(s.Replace(["\r","\\r","\e","\\e"]))
 					term.write(s)
 				JS_UI.CallMethod(int,"Refresh")
 			},function(){
@@ -4050,12 +4170,12 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			term.has_focus=0
 			return 0
 		}
-		js_term["Download"]=function(JSContext JS){
-			fn_local=JS.Param(0).as(string)
-			fn_remote=JS.Param(1).as(string)
-			term.download(fn_local,fn_remote)
-			return 0
-		}
+		//js_term["Download"]=function(JSContext JS){
+		//	fn_local=JS.Param(0).as(string)
+		//	fn_remote=JS.Param(1).as(string)
+		//	term.download(fn_local,fn_remote)
+		//	return 0
+		//}
 		js_term["Render"]=function(JSContext JS){
 			////////////////////
 			g_renderer=Gui2D.detail.g_renderer
@@ -4404,6 +4524,8 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 						lg=System.OS_API.strlen(s)
 						text=new string
 						text.BindToPointer(s,lg)
+						if Platform.IS_WINDOWS:
+							text=text.Replace(["\r",""])
 						term.onTextInput(text)
 						text.discard()
 						SDL.detail.SDL_free(s)
