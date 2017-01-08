@@ -7,7 +7,7 @@ function qpad(){
 	local SIZE
 	if [ "$#" -lt 1 ]
 	then
-      echo "usage: qpad <file> "
+      echo "usage: qpad <file>"
       return
 	fi
 	if ! [ -f "$1" ]

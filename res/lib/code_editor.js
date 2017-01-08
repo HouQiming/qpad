@@ -7954,8 +7954,19 @@ UI.RegisterEditorPlugin(function(){
 				return;
 			}
 			//try to reload
-			if(this.owner.file_name.indexOf('<')>=0&&!Language.GetDescObjectByName(name).is_binary){
-				//new file
+			if(this.owner.file_name=="*remote"&&Language.GetDescObjectByName(name).is_binary){
+				this.owner.CreateNotification({id:'language_reload_warning',text:"Remote editing of binary files is not supported yet"})
+				return;
+			}
+			if(this.ed.saving_context||this.ed.hfile_loading){
+				this.owner.CreateNotification({id:'language_reload_warning',text:"You cannot switch language while loading or saving a file"})
+				return;
+			}
+			if(this.owner.file_name.indexOf('<')>=0&&!Language.GetDescObjectByName(name).is_binary||this.owner.file_name=="*remote"){
+				//new file / remote file
+				this.owner.DismissNotification('language_reload_warning');
+				var bak_m_linked_terminal=this.m_linked_terminal;
+				var bak_m_fn_remote=this.m_fn_remote;
 				this.owner.SaveMetaData("forced");
 				var s_text_bak=this.ed.GetText();
 				this.owner.Reload();
@@ -7964,12 +7975,15 @@ UI.RegisterEditorPlugin(function(){
 				if(s_text_bak){
 					this.owner.doc.ed.Edit([0,0,s_text_bak]);
 				}
+				this.owner.doc.m_linked_terminal=bak_m_linked_terminal;
+				this.owner.doc.m_fn_remote=bak_m_fn_remote;
 			}else if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
 				//make a notification
 				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file for the language change to take effect"})
 				this.saved_point=-1;
 			}else{
 				//what is reload? nuke it
+				this.owner.DismissNotification('language_reload_warning');
 				this.owner.SaveMetaData("forced");
 				if(Language.GetDescObjectByName(name).is_binary){
 					var fn=this.owner.file_name;
