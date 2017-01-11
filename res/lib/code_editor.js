@@ -7528,6 +7528,7 @@ UI.NewCodeEditorTab=function(fname0){
 			var doc=(this.main_widget&&this.main_widget.doc);
 			var fn_display=(doc&&doc.m_file_name||this.file_name)
 			var arr_editors=UI.g_editor_from_file[fn_display];
+			var fn_display_original=fn_display;
 			if(fn_display.length&&fn_display[0]=='*'){
 				var special_file_desc=UI.m_special_files[fn_display.substr(1)];
 				if(special_file_desc){
@@ -7541,7 +7542,7 @@ UI.NewCodeEditorTab=function(fname0){
 				fn_display=IO.NormalizeFileName(fn_display,1);
 			}
 			this.title=UI.GetSmartTabName(fn_display);
-			if(arr_editors&&arr_editors.length>1){
+			if(fn_display_original!="*remote"&&arr_editors&&arr_editors.length>1){
 				var dup_id=undefined;
 				var cur_dup_id=0;
 				for(var i=0;i<arr_editors.length;i++){

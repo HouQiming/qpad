@@ -413,9 +413,10 @@ var OpenShell=function(){
 };
 
 var OpenShellTerm=function(){
+	UI.UpdateNewDocumentSearchPath();
 	UI.OpenTerminalTab({
 		args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty rows 24;bash -i","/dev/null"],
-		spath:".",
+		spath:UI.m_new_document_search_path,
 		cols:132,
 		rows:24,
 		auto_close:1,
@@ -688,6 +689,38 @@ var CreateMenus=function(){
 								ssh_command:s_ssh_command,
 							});
 						}.bind(null,pinned_terms[i])
+					},{
+						text:"move_up_"+i.toString(),icon:"上",tooltip:'Move up',
+						action:function(s_ssh_command){
+							var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];
+							if(!pinned_terms){
+								return;
+							}
+							for(var i=1;i<pinned_terms.length;i++){
+								if(pinned_terms[i]==s_ssh_command){
+									var tmp=pinned_terms[i-1];
+									pinned_terms[i-1]=pinned_terms[i];
+									pinned_terms[i]=tmp;
+								}
+							}
+							UI.Refresh();
+						}.bind(null,pinned_terms[i]),
+					},{
+						text:"move_down_"+i.toString(),icon:"下",tooltip:'Move down',
+						action:function(s_ssh_command){
+							var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];
+							if(!pinned_terms){
+								return;
+							}
+							for(var i=1;i<pinned_terms.length;i++){
+								if(pinned_terms[i-1]==s_ssh_command){
+									var tmp=pinned_terms[i-1];
+									pinned_terms[i-1]=pinned_terms[i];
+									pinned_terms[i]=tmp;
+								}
+							}
+							UI.Refresh();
+						}.bind(null,pinned_terms[i]),
 					},{
 						text:"unpin_"+i.toString(),icon:"✕",tooltip:'Unpin',
 						action:function(s_ssh_command){

@@ -10,7 +10,8 @@ import Javascript.*
 
 /*
 Qiming HOU 1/1/2017:
-	adapting the whole thing to jc
+	translated the whole thing to jc
+	rewrote the framebuffer for OpenGL rendering
 	abandoned the mouse stuff in favor of quickedit-like operations
 */
 module detail{
@@ -938,7 +939,7 @@ class Terminal{
 						switch (this.params[0]) {
 							case 0,1,2:
 								if (this.currentStringParam.n) {
-									this.title=this.currentStringParam;
+									this.title=new(this.currentStringParam);
 								}
 								break;
 							case 3:
@@ -993,6 +994,7 @@ class Terminal{
 									this.download_size=-1LL
 									this.download_written_size=0LL
 									this.download_fn=new(this.currentStringParam)
+									//send whatever data following to the edito
 									this.downloadWrite(data[I+1:])
 									JS["UI"].CallMethod(int,"OpenRemoteEditorTab",this,this.download_fn)
 									//this.download_file=System.IO.CreateFile(fn_local)
@@ -1000,6 +1002,12 @@ class Terminal{
 									this.currentParam=0;
 									this.state=normal_state;
 									return
+								break;
+							case 9001:
+								//qpad detection - wipe the "no qpad" message
+								this.eraseLeft(this.x, this.y)
+								this.x=0
+								this.send("#")
 								break;
 						}
 	
