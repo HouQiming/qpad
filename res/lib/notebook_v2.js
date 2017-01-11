@@ -1846,7 +1846,7 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 			//do not create a new highlight for the error, but noisily focus it
 			err.is_quiet=1;
 			AddErrorToEditor(err,0);
-		}else{
+		}else if(!err.is_quiet){
 			AddErrorToEditor(err,1);
 			if(term.compiler_errors==undefined){
 				term.compiler_errors=[];

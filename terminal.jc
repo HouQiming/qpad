@@ -1673,6 +1673,34 @@ class Terminal{
 		return 1;
 	};
 	
+	getCursorLine=function(){
+		auto ytop=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
+		auto row=(this.ybase+this.y)%this.scrollback
+		auto row0=row
+		auto cnt=0
+		while row!=ytop:
+			auto y0next=row-1
+			if y0next<0:
+				y0next+=this.scrollback
+			if uptr(y0next)>=uptr(this.line_end_states.n)||this.line_end_states[y0next]==0:
+				break
+			row=y0next
+			cnt++
+			if cnt>3:break
+		this.s_parse_buffer.n=0
+		if cnt<=3:
+			for(;;)
+				for i=0:this.cols-1
+					auto addr=(row*this.cols+i)*3
+					if addr+2<this.lines.n&&this.lines[addr+2]:
+						this.s_parse_buffer.PushUnicode(this.lines[addr+1])
+				if row==row0:break
+				row++
+				if row>=this.scrollback:
+					row-=this.scrollback
+		return this.s_parse_buffer
+	}
+	
 	/**
 	* Returns an object that determines how a KeyboardEvent should be handled. The key of the
 	* returned value is the new key code to pass to the PTY.
@@ -1722,36 +1750,12 @@ class Terminal{
 				if !modifiers:
 					this.got_enter_from_input=1;
 					//identify ssh commands
-					auto ytop=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
-					auto row=(this.ybase+this.y)%this.scrollback
-					auto row0=row
-					auto cnt=0
-					while row!=ytop:
-						auto y0next=row-1
-						if y0next<0:
-							y0next+=this.scrollback
-						if uptr(y0next)>=uptr(this.line_end_states.n)||this.line_end_states[y0next]==0:
-							break
-						row=y0next
-						cnt++
-						if cnt>3:break
-					if cnt<=3:
-						this.s_parse_buffer.n=0
-						for(;;)
-							for i=0:this.cols-1
-								auto addr=(row*this.cols+i)*3
-								if addr+2<this.lines.n&&this.lines[addr+2]:
-									this.s_parse_buffer.PushUnicode(this.lines[addr+1])
-							if row==row0:break
-							row++
-							if row>=this.scrollback:
-								row-=this.scrollback
-						auto s_command=this.s_parse_buffer
-						auto pssh=s_command.IndexOf('$ ssh')
-						if pssh<0:
-							pssh=s_command.IndexOf('# ssh')
-						if pssh>=0:
-							this.last_ssh_command=new(s_command[pssh+2:])
+					s_command=getCursorLine();
+					auto pssh=s_command.IndexOf('$ ssh')
+					if pssh<0:
+						pssh=s_command.IndexOf('# ssh')
+					if pssh>=0:
+						this.last_ssh_command=new(s_command[pssh+2:])
 				break;
 			case 27:
 				// escape
@@ -4154,6 +4158,14 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					if DEBUG_DUMP:
 						Writeln(s.Replace(["\r","\\r","\e","\\e"]))
 					term.write(s)
+					if !term.is_remote_editing&&term.x>=2&&term.x<term.cols:
+						//detect bash prompt
+						auto row=(term.ybase+term.y)%term.scrollback
+						auto addr=(row*term.cols+term.x)*3;
+						if(!term.lines[addr+2]&&term.lines[addr+(2-3)]==1&&term.lines[addr+(2-6)]==1&&
+						term.lines[addr+(1-3)]==32&&(term.lines[addr+(1-6)]=='$'||term.lines[addr+(1-6)]=='#')):
+							//looks like one...
+							JS_UI["m_bash_prompt_detected"]=1
 				JS_UI.CallMethod(int,"Refresh")
 			},function(){
 				if finalization_callback:

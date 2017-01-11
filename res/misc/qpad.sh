@@ -7,15 +7,15 @@ qpad(){
 	local SIZE
 	local CHAR
 	if [ "$1" = "" ]; then
-      echo "usage: qpad <file>"
-      return
+		echo "usage: qpad <file>"
+		return
 	fi
 	if ! [ -f "$1" ]; then
-      if [ -e "$1" ]; then
-        echo "I can only edit normal files"
-        return
-      fi
-      touch "$1"
+		if [ -e "$1" ]; then
+			echo "I can only edit normal files"
+			return
+		fi
+		touch "$1"
 	fi
 	TTYS=`stty -g`
 	stty raw -echo
@@ -30,24 +30,23 @@ qpad(){
 	wc -c "$1"
 	cat "$1"
 	while true; do
-      CMD=`head -c 1`
-      if [ "${CMD}" = 's' ]; then
-        cp "$1" "$1.bak"
-        SIZE=""
-        while true
-        do
-          CHAR=`head -c 1`
-          if [ "${CHAR}" = ';' ]; then
-            break
-          fi
-          SIZE="${SIZE}${CHAR}"
-        done
-        head -c "${SIZE}" > "$1"
-        echo -n "s"
-      fi
-      if [ "${CMD}" = 'q' ]; then
-        break
-      fi
+		CMD=`head -c 1`
+		if [ "${CMD}" = 's' ]; then
+			cp "$1" "$1.bak"
+			SIZE=""
+			while true; do
+				CHAR=`head -c 1`
+				if [ "${CHAR}" = ';' ]; then
+					break
+				fi
+				SIZE="${SIZE}${CHAR}"
+			done
+			head -c "${SIZE}" > "$1"
+			echo -n "s"
+		fi
+		if [ "${CMD}" = 'q' ]; then
+			break
+		fi
 	done
 	stty "${TTYS}"
 }

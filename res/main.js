@@ -991,6 +991,15 @@ UI.HandleError=function(error){
 	}	
 };
 
+UI.OnIdle=function(){
+	if(UI.m_bash_prompt_detected){
+		if(!UI.MyWindowHasFocus()&&UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
+			UI.ShowCompletionNotification();
+		}
+	}
+	UI.m_bash_prompt_detected=0;
+};
+
 (function(){
 	//if(UI.StartupBenchmark){
 	//	console.log("--- entering main")

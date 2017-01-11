@@ -7968,7 +7968,8 @@ UI.RegisterEditorPlugin(function(){
 				this.owner.DismissNotification('language_reload_warning');
 				var bak_m_linked_terminal=this.m_linked_terminal;
 				var bak_m_fn_remote=this.m_fn_remote;
-				this.owner.SaveMetaData("forced");
+				this.m_fn_remote=undefined;
+				this.m_linked_terminal=undefined;
 				var s_text_bak=this.ed.GetText();
 				this.owner.Reload();
 				this.owner.doc=UI.OpenCodeEditorDocument(this.owner.file_name,this.owner.m_is_preview,name);

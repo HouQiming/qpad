@@ -157,7 +157,7 @@ if Platform.IS_WINDOWS:
 			GetCurrentProcessId=__c_function(int,"GetCurrentProcessId","windows.h")
 			pid=GetCurrentProcessId()
 			SetForegroundProcess=__c_function(int,"SetForegroundProcess","windows.h")
-			return JS.Return(SetForegroundProcess(pid))
+			return JS.Return(SetForegroundProcess(pid,1))
 		}
 		JS_UI["SetTaskbarProgress"]=function(JSContext JS){
 			hwnd_sdl=JS.Param(0).as(__pointer)
@@ -522,26 +522,32 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		}
 		jsio["SetForegroundProcess"]=function(JSContext JS){
 			__C(int,"@global:
+			static int g_is_flash_only=0;
 			BOOL CALLBACK sfp_enumproc(HWND hw,LPARAM lp){
 				if (IsWindowVisible(hw) && !GetParent(hw) && !GetWindow(hw,GW_OWNER)){
 					int pid=0;
 					GetWindowThreadProcessId(hw,&pid);
 					if(pid==lp){
-						SetForegroundWindow(hw);
-						if(IsIconic(hw)){
-							ShowWindow(hw,SW_SHOWNORMAL);
+						if(g_is_flash_only){
+							FlashWindow(hw,0);
+						}else{
+							SetForegroundWindow(hw);
+							if(IsIconic(hw)){
+								ShowWindow(hw,SW_SHOWNORMAL);
+							}
 						}
 						return 0;
 					};
 				}
 				return 1;
 			}
-			int SetForegroundProcess(int pid){
+			int SetForegroundProcess(int pid,int is_flash_only){
+				g_is_flash_only=is_flash_only;
 				return !EnumWindows(sfp_enumproc,pid);
 			}");
 			pid=JS.Param(0).as(int)
 			SetForegroundProcess=__c_function(int,"SetForegroundProcess","windows.h")
-			return JS.Return(SetForegroundProcess(pid))
+			return JS.Return(SetForegroundProcess(pid,0))
 		}
 		jsio["GetUserLanguage"]=function(JSContext JS){
 			GetUserDefaultUILanguage=__c_function(int,"GetUserDefaultUILanguage","windows.h")
