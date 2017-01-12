@@ -3732,7 +3732,7 @@ ApplyCase=function(string s,int case_id){
 	}
 }
 
-g_rtt_tab_backup=CJSGLRenderToTextureContext.NULL
+//g_rtt_tab_backup=CJSGLRenderToTextureContext.NULL
 registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
 		//initial read, which is a raw edit
@@ -4824,6 +4824,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return JS.Return(Unicode32ToUtf8([ch]))
 	}
 	/////////////////////////////
+	/*
 	JS_UI["GL_EnterBackupFBO"]=function(JSContext JS){
 		wnd_w=JS["UI"]["m_gl_curwindow_w"].as(int)
 		wnd_h=JS["UI"]["m_gl_curwindow_h"].as(int)
@@ -4903,6 +4904,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			myBlitFBO(JS,x0,y0,x1,y1,g_rtt_tab_backup,pdraw_fbo[0])
 		return 0;
 	}
+	*/
 	JS_UI["ED_DiffUpdateToFile"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
 		if !ed:return 0

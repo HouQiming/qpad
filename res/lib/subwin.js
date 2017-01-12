@@ -778,7 +778,7 @@ var RenderLayout=function(layout,obj,y_base){
 		var is_there=0;
 		var has_active=0;
 		var z_order=0;
-		if(nd.type=="hsplit"||nd.type=="vsplit"){
+		if(nd.type=="hsplit"||nd.type=="vsplit"||nd.type=="multiwnd"){
 			for(var i=0;i<nd.children.length;i++){
 				is_there=Math.max(is_there,dfsIsThere(nd.children[i]));
 				has_active|=nd.children[i].temp_has_active;
@@ -824,6 +824,13 @@ var RenderLayout=function(layout,obj,y_base){
 					nd.children[1]=dfsCleanUp(ch1);
 				}else{
 					return dfsCleanUp(ch0.temp_is_there?ch0:ch1);
+				}
+			}else if(nd.type=="multiwnd"){
+				var nds_there=nd.children.filter(function(ndi){return ndi.temp_is_there;})
+				if(nds_there.length==1){
+					return dfsCleanUp(nds_there[0]);
+				}else{
+					nd.children=nds_there.map(function(ndi){return dfsCleanUp(ndi)});
 				}
 			}
 			return nd;
@@ -885,6 +892,11 @@ var RenderLayout=function(layout,obj,y_base){
 			}else{
 				dfsRender(ch0.temp_is_there>=2?ch0:ch1,x,y,w,h);
 			}
+		}else if(nd.type=="multiwnd"){
+			//todo: push the stuff and handle them later? no
+			//switching *window* here
+			//instead of FBO... just reuse the saved drawcalls
+			//BeginPaint / EndPaint
 		}else{
 			//compute undragged layout
 			var h_content=h-(obj.h_caption+obj.h_bar);
@@ -912,6 +924,7 @@ var RenderLayout=function(layout,obj,y_base){
 							}
 						}else{
 							tab.backup_frame_id=0;
+							tab.backup_drawcalls=undefined;
 							tab.backup_regions=undefined;
 						}
 						tab.backup_x=x;
@@ -926,11 +939,18 @@ var RenderLayout=function(layout,obj,y_base){
 					}
 					var obj_tab=obj[s_wrapper_name];
 					if(rendering_action=="restore"&&obj_tab){
+						if(!UI.ReplayDrawcalls(tab.backup_drawcalls)){
+							//if the cache got wiped... screw it and redraw
+							tab.backup_frame_id=1;
+							rendering_action="normal";
+						}
+					}
+					if(rendering_action=="restore"&&obj_tab){
 						//print("restored tab - ",tab.title,s_wrapper_name,obj_tab)
 						UI.context_parent.__children.push(obj_tab)
-						UI.GLWidget(function(){
-							UI.GL_RestoreFromBackupFBO(1);
-						})
+						//UI.GLWidget(function(){
+						//	UI.GL_RestoreFromBackupFBO(1);
+						//})
 						var bk_focus_is_a_region=UI.context_focus_is_a_region;
 						var bk_tentative_focus=UI.context_tentative_focus;
 						for(var i=0;i<tab.backup_regions.length;i++){
@@ -951,9 +971,10 @@ var RenderLayout=function(layout,obj,y_base){
 						var n0_auto_refresh=UI.n_auto_refreshes;
 						if(rendering_action=="backup"){
 							var n0_region=UI.context_regions.length;
-							UI.GLWidget(function(){
-								UI.GL_EnterBackupFBO();
-							})
+							//UI.GLWidget(function(){
+							//	UI.GL_EnterBackupFBO();
+							//})
+							var n0_drawcalls=UI.GetDrawcallArrayState();
 						}
 						var n0_topmost=UI.RecordTopMostContext()
 						obj_tab=UI.Keep(s_wrapper_name,W.RoundRect("",{
@@ -977,12 +998,13 @@ var RenderLayout=function(layout,obj,y_base){
 						UI.End()
 						UI.FlushTopMostContext(n0_topmost)
 						if(rendering_action=="backup"){
-							UI.GLWidget(function(tab){
-								//0 for backup
-								UI.GL_LeaveBackupFBO();
-								//if somehow the GLWidget is skipped (e.g. frame invalidated, we need to re-backup)
-								tab.backup_frame_id=2;
-							}.bind(undefined,tab));
+							//UI.GLWidget(function(tab){
+							//	//0 for backup
+							//	UI.GL_LeaveBackupFBO();
+							//	//if somehow the GLWidget is skipped (e.g. frame invalidated, we need to re-backup)
+							//}.bind(undefined,tab));
+							tab.backup_drawcalls=UI.SaveDrawcalls(n0_drawcalls,UI.GetDrawcallArrayState());
+							tab.backup_frame_id=2;
 							tab.backup_regions=[];
 							for(var i=n0_region;i<UI.context_regions.length;i++){
 								var rgn=UI.context_regions[i];

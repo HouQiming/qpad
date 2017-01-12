@@ -807,6 +807,9 @@ UI.Application=function(id,attrs){
 			}
 			//////////////////////////
 		UI.End();
+		////////////////////////////////////
+		//secondary windows
+		//todo
 	UI.End();
 	if(!UI.g_app_inited){
 		//UI.TimingEvent("!UI.g_app_inited")

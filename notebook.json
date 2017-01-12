@@ -92,17 +92,10 @@ v2
    "out_m_enable_wrapping": 0
   },
   {
-   "m_language": "Windows BAT",
-   "m_cell_id": 4,
-   "m_button_name": "SSH test",
-   "in_m_current_wrap_width": 512,
-   "in_m_enable_wrapping": 0
-  },
-  {
    "m_language": "Markdown",
    "m_text_out": "c:/tp/qpad/res/main.js:23202..23228: IO.StartWaitingForPipes();\nc:/tp/qpad/res/main.js:29439..29465: IO.StartWaitingForPipes();\n",
    "m_has_any_error": 1,
-   "m_cell_id": 5,
+   "m_cell_id": 4,
    "m_button_name": "â€¢ Search result",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
@@ -114,8 +107,10 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-remote image viewer
-	it won't be secure
+draw call save / replay
+	UI.SaveDrawcalls
+	UI.ReplayDrawcalls
+ctrl+c terminal copy failure
 drag-out support
 	secondary windows
 		without menu / stuff
@@ -123,6 +118,8 @@ drag-out support
 		region is mixed up
 	the smart rerendering FBO... one FBO for each window? 
 		only one FBO for the foreground!
+remote image viewer
+	it won't be secure
 on-boarding:
 	Maya-like "highlight new" in menus
 possible memory leak
@@ -267,12 +264,6 @@ grep -ERoh UI\._\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\)\\\) * >> ../build
 grep -ERoh UI\.Format\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\), * >> ../build/translation.txt
 grep -ERoh tooltip:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
 grep -ERoh ,name:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
-
-=====í¯¿í¿¿=====
-@echo off
-rem [interactive]
-rem [button: SSH test]
-ssh a@192.168.111.50
 
 =====í¯¿í¿¿=====
 Search result
