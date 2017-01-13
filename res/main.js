@@ -228,7 +228,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 	UI.InstallQPad=function(){
 		//windows installation, generate .reg and run it
 		if(UI.Platform.BUILD=="debug"){
-			print("*** WARNING: INSTALLING A DEBUG VERSION! ***")
+			console.log("*** WARNING: INSTALLING A DEBUG VERSION! ***")
 		}
 		var sexe=IO.m_my_name.replace(/[/]/g,"\\");
 		var sregfile=["\ufeffWindows Registry Editor Version 5.00\n"];
@@ -301,7 +301,7 @@ if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 	UI.InstallQPad=function(){
 		//linux installation, generate .desktop and copy it
 		if(UI.Platform.BUILD=="debug"){
-			print("*** WARNING: INSTALLING A DEBUG VERSION! ***")
+			console.log("*** WARNING: INSTALLING A DEBUG VERSION! ***")
 		}
 		var a_desktop_file=[
 			"[Desktop Entry]\n",
@@ -567,7 +567,7 @@ var CreateMenus=function(){
 	//////////////////////////
 	var menu_tools=UI.BigMenu("&Tools")
 	var obj_real_active_tab=UI.top.app.document_area.active_tab;
-	if(obj_real_active_tab&&obj_real_active_tab.file_name){
+	if(obj_real_active_tab&&obj_real_active_tab.file_name&&obj_real_active_tab.file_name[0]!='<'){
 		menu_tools.AddNormalItem({text:"Copy path",tab_menu_group:'tools',enable_hotkey:0,
 			action:function(fn){
 				var s=IO.NormalizeFileName(fn,1);
@@ -590,7 +590,7 @@ var CreateMenus=function(){
 		}.bind(null,obj_real_active_tab.file_name)})
 		menu_tools.AddSeparator()
 	}
-	if(obj_active_tab&&obj_active_tab.file_name){
+	if(obj_active_tab&&obj_active_tab.file_name&&obj_active_tab.file_name[0]!='<'){
 		//polite GetEditorProject is identical to UI.GetNotebookProject
 		var spath_repo=UI.GetEditorProject(obj_active_tab.file_name,"polite");
 		if(spath_repo){
@@ -809,6 +809,28 @@ UI.Application=function(id,attrs){
 		UI.End();
 		////////////////////////////////////
 		//secondary windows
+		if(UI.m_global_doc_extra_windows){
+			for(var i=0;i<UI.m_global_doc_extra_windows.length;i++){
+				var wnd_desc_i=UI.m_global_doc_extra_windows[i];
+				var wnd_i=UI.Begin(W.Window('wnd_'+wnd_desc_i.unique_id,{
+				title:'QPad Window',w:wnd_desc_i.w,h:wnd_desc_i.h,
+				bgcolor:UI.default_styles.tabbed_document.color,
+				icon:"res/misc/icon_win.png",
+				flags:UI.SDL_WINDOW_RESIZABLE,
+				OnClose:function(){return 1;}}));
+					if(wnd_i.w!=wnd_desc_i.w||wnd_i.h!=wnd_desc_i.h){
+						UI.InvalidateCurrentFrame();
+						UI.RefreshAllTabs();
+						UI.Refresh();
+					}else{
+						UI.ReplayDrawcalls(wnd_desc_i.drawcalls);
+						for(var j=0;j<wnd_desc_i.regions.length;j++){
+							W.RestoreRegion(wnd_desc_i.regions[j]);
+						}
+					}
+				UI.End();
+			}
+		}
 		//todo
 	UI.End();
 	if(!UI.g_app_inited){
@@ -833,6 +855,9 @@ UI.Application=function(id,attrs){
 				}else if(workspace[i].document_type=='terminal'){
 					//do nothing - terminal tabs can't be restored
 				}else{
+					if(workspace[i].file_name&&workspace[i].file_name[0]=='*'){
+						continue;
+					}
 					UI.OpenEditorWindow(workspace[i].file_name,undefined,'restore_workspace')
 				}
 				var item=UI.top.app.document_area.items[UI.top.app.document_area.items.length-1];
@@ -906,7 +931,7 @@ UI.Application=function(id,attrs){
 			UI.detectLeaks();
 		}});
 		W.Hotkey("",{key:"SHIFT+CTRL+M",action:function(){
-			print("=== manual gc call")
+			console.log("=== manual gc call")
 			UI.BeforeGC()
 			Duktape.gc()
 			UI.debugDumpHeap()

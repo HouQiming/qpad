@@ -751,7 +751,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	//	Writeln(fn)
 	//Writeln('main: ',sbox.UIReadAll("res/main.js"))
 	//Writeln(formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-g_startup_tick)*1000.0,{frac:2}),'ms since startup - sbox.UIRunJS');
-	System.Env.SetEnvironmentString("TERM","xterm")
+	//System.Env.SetEnvironmentString("TERM","xterm")
 	//PipeWaiter.InitPipeWaiter()
 	sbox.UIRunJS(JS,"res/main.js")
 	//PipeWaiter.StopPipeWaiter()

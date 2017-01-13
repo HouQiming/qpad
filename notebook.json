@@ -107,19 +107,17 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-draw call save / replay
-	UI.SaveDrawcalls
-	UI.ReplayDrawcalls
-ctrl+c terminal copy failure
+(test) shouldn't restore *remote tabs
+ctrl+shift+f bad autoscroll for certain items
+maximizing terminals
 drag-out support
-	secondary windows
-		without menu / stuff
-		rendering works as is
-		region is mixed up
-	the smart rerendering FBO... one FBO for each window? 
-		only one FBO for the foreground!
-remote image viewer
-	it won't be secure
+	tab label rendering - need window info in rendered_areas
+	dragging
+	actually dragging things out
+	upgrading <layout> from old metadata
+(retest) per-render memory leak
+	JS-side cyclic reference involving GetHandlerByID
+ctrl+c terminal copy failure
 on-boarding:
 	Maya-like "highlight new" in menus
 possible memory leak

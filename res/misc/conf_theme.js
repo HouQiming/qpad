@@ -781,6 +781,8 @@ UI.CustomTheme=function(){
 				shadow_size:12,
 				shadow_size_embedded:6,
 				shadow_color:C_shadow,
+				bell_color:L?0xff1c1aa3:0xff5555ff,
+				bell_border_width:4,
 			},
 		},
 		tip_window:{

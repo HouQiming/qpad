@@ -1666,12 +1666,19 @@ W.Terminal=function(id,attrs){
 		border_width:-obj.panel_style.shadow_size,
 		round:obj.panel_style.shadow_size,
 	});
+	var in_bell=obj.m_term.isInBell();
+	var C_bell=UI.lerp_rgba(obj.panel_style.bell_color&0xffffff,obj.panel_style.bell_color,Math.min(Math.max(in_bell,0.0),1.0));
 	UI.RoundRect({
 		x:x_term-obj.panel_style.border_width,y:y_term-obj.panel_style.border_width,
 		w:w_term_area+obj.panel_style.border_width*2,h:h_term+obj.panel_style.border_width*2,
 		color:obj.panel_style.border_color,
 		round:obj.panel_style.border_width,
+		border_color:C_bell,
+		border_width:in_bell?obj.panel_style.bell_border_width:0,
 	});
+	if(in_bell){
+		UI.AutoRefresh();
+	}
 	UI.PushCliprect(x_term,y_term,w_term_area,h_term);
 	obj.Render(x_term,y_term,w_term,h_term);
 	if(value>=0){
@@ -1692,7 +1699,7 @@ W.Terminal=function(id,attrs){
 	//}
 	UI.PopCliprect();
 	//a terminal menu - standard scripts, "first command" history
-	if(UI.HasFocus(obj)){
+	if(obj.activated){
 		var menu_terminal=undefined;
 		menu_terminal=UI.BigMenu("Ter&minal");
 		menu_terminal.AddNormalItem({
@@ -1735,6 +1742,7 @@ UI.OpenTerminalTab=function(options){
 		//tooltip:file_name,
 		document_type:"terminal",
 		area_name:"doc_default",
+		//area_name:"terminals",
 		UpdateTitle:function(){
 			var title=UI._("Terminal");
 			if(this.main_widget){
@@ -1763,6 +1771,7 @@ UI.OpenTerminalTab=function(options){
 				'cols':options.cols,
 				'rows':options.rows,
 				'ssh_command':options.ssh_command,
+				'activated':this==UI.top.app.document_area.active_tab,
 				'default_focus':1,
 			});
 			if(!had_body){

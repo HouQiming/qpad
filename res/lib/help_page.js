@@ -50,7 +50,7 @@ W.HelpPage_prototype={
 		}
 	},
 	ShowError:function(s){
-		print(s)
+		console.log(s)
 		//todo: dialog box
 	},
 };

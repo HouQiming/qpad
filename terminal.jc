@@ -2055,7 +2055,12 @@ class Terminal{
 	* Note: We could do sweet things with webaudio here
 	*/
 	bell=function() {
-		this.bell_tick=System.Time.tick64()+System.Time.SecondsToTicks(VISUAL_BELL_DURATION)
+		tick_now=System.Time.tick64()
+		if !((this.bell_tick-tick_now)>0LL):
+			//a new bell
+			if Platform.IS_WINDOWS:
+				__C(int,"MessageBeep(MB_ICONERROR)")
+		this.bell_tick=tick_now+System.Time.SecondsToTicks(VISUAL_BELL_DURATION)
 	};
 	
 	/**
@@ -3996,6 +4001,10 @@ class Terminal{
 		auto bg=this.curAttr & 0x1ff;
 		return JS.Return(colors[bg])
 	}
+	JS_isInBell=function(JSContext JS){
+		tick_now=System.Time.tick64()
+		return JS.Return(System.Time.TicksToSeconds(max(this.bell_tick-tick_now,0LL))/VISUAL_BELL_DURATION)
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"cols")
 		proto.ExportProperty(this,"rows")
@@ -4011,6 +4020,7 @@ class Terminal{
 		proto.ExportMethod(this,"getBgcolor",JS_getBgcolor)
 		proto.ExportMethod(this,"setRemoteLoadingCallback",JS_setRemoteLoadingCallback)
 		proto.ExportMethod(this,"setRemoteSavingCallback",JS_setRemoteSavingCallback)
+		proto.ExportMethod(this,"isInBell",JS_isInBell)
 	}
 	
 	/////////////
@@ -4236,11 +4246,11 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			//term.resize(cols,rows)
 			//////////////
 			//the bell shake
-			tick_now=System.Time.tick64()
-			if (term.bell_tick-tick_now)>0LL:
-				//we're in the bell, shake the whole screen
-				x+=w_char*0.25f*(Random(f32)-0.5f)
-				JS_UI.CallMethod(int,"AutoRefresh")
+			//tick_now=System.Time.tick64()
+			//if (term.bell_tick-tick_now)>0LL:
+			//	//we're in the bell, shake the whole screen
+			//	x+=w_char*0.25f*(Random(f32)-0.5f)
+			//	JS_UI.CallMethod(int,"AutoRefresh")
 			//////////////
 			//render the content
 			lines=term.lines

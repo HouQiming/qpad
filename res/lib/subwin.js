@@ -749,8 +749,13 @@ var g_sizing_rect_prototype={
 	},
 };
 var g_rerender_events=["OnMouseOver","OnMouseOut","OnMouseMove","OnMouseDown","OnMouseUp","OnMouseWheel","OnClick","OnDblClick","OnFocus","OnBlur","OnTextInput","OnTextEdit","OnKeyDown","OnKeyUp"];
+var g_per_run_id=0;
+var CreateUniqueID=function(){
+	return [(new Date()).toUTCString(), g_per_run_id++].join('_');
+};
 var RenderLayout=function(layout,obj,y_base){
 	//per-tab z_order, sort and reset on workspace save / restore
+	UI.m_global_doc_extra_windows=[];
 	var has_area_name={};
 	var windows_to_render={};
 	var items=obj.items;
@@ -844,6 +849,7 @@ var RenderLayout=function(layout,obj,y_base){
 	var id_sizing_rect=0;
 	var all_shadows=[];
 	var enable_smart_tab_repainting=UI.TestOption("enable_smart_tab_repainting");
+	var window_unique_id=undefined;
 	var dfsRender=function(nd,x,y,w,h){
 		if(nd.type=="hsplit"||nd.type=="vsplit"){
 			var ch0=nd.children[0];
@@ -893,16 +899,57 @@ var RenderLayout=function(layout,obj,y_base){
 				dfsRender(ch0.temp_is_there>=2?ch0:ch1,x,y,w,h);
 			}
 		}else if(nd.type=="multiwnd"){
-			//todo: push the stuff and handle them later? no
-			//switching *window* here
-			//instead of FBO... just reuse the saved drawcalls
-			//BeginPaint / EndPaint
+			//we should only have one multiwnd
+			var nds_there=nd.children.filter(function(ndi){return ndi.temp_is_there>=2;})
+			for(var i=0;i<nds_there.length;i++){
+				var chi=nds_there[i];
+				if(i==0){
+					//the first window is the main window
+					window_unique_id=undefined;
+					dfsRender(chi,x,y,w,h);
+				}else{
+					//grab drawcalls here, replay them later
+					var bk_UI_context_tentative_focus=UI.context_tentative_focus;
+					var bk_UI_context_focus_is_a_region=UI.context_focus_is_a_region;
+					var bk_UI_context_mouse_over_is_a_region=UI.context_mouse_over_is_a_region;
+					if(!chi.unique_id){
+						chi.unique_id=CreateUniqueID();
+					}
+					var wnd_i=UI.top["wnd_"+chi.unique_id];
+					var w_wnd=(wnd_i&&wnd_i.w||chi.w_wnd||1280);
+					var h_wnd=(wnd_i&&wnd_i.h||chi.h_wnd||720);
+					var new_window_scale=UI.sub_window_stack[0][4];
+					/////////
+					var bk_viewport_hack_h=UI.__get_viewport_hack_h();
+					UI.__set_viewport_hack_h(Math.floor(h_wnd*new_window_scale+0.5));
+					var n0_drawcalls=UI.GetDrawcallArrayState()
+					var n0_region=UI.context_regions.length;
+					UI.PushSubWindowRaw([0,0,w_wnd*new_window_scale,h_wnd*new_window_scale,new_window_scale],1)
+					window_unique_id="wnd_"+chi.unique_id;
+					dfsRender(chi,0,0,w_wnd,h_wnd);
+					UI.m_global_doc_extra_windows.push({
+						w:w_wnd,
+						h:h_wnd,
+						unique_id:chi.unique_id,
+						drawcalls:UI.SaveDrawcalls(n0_drawcalls,UI.GetDrawcallArrayState()),
+						regions:UI.context_regions.slice(n0_region),
+					});
+					UI.PopSubWindow()
+					UI.context_regions=UI.context_regions.slice(0,n0_region);
+					UI.RestoreDrawcallArrayState(n0_drawcalls)
+					UI.__set_viewport_hack_h(bk_viewport_hack_h);
+					/////////
+					UI.context_tentative_focus=bk_UI_context_tentative_focus;
+					UI.context_focus_is_a_region=bk_UI_context_focus_is_a_region;
+					UI.context_mouse_over_is_a_region=bk_UI_context_mouse_over_is_a_region;
+				}
+			}
 		}else{
 			//compute undragged layout
 			var h_content=h-(obj.h_caption+obj.h_bar);
 			if(h_content>0){
 				var tab=windows_to_render[nd.name];
-				rendered_areas.push({name:nd.name,x:x,y:y,w:w,h:h})
+				rendered_areas.push({name:nd.name,window:window_unique_id,x:x,y:y,w:w,h:h})
 				if(tab){
 					W.RoundRect("",{
 						x:x,y:y+obj.h_caption,w:w,h:obj.h_bar,
@@ -940,9 +987,9 @@ var RenderLayout=function(layout,obj,y_base){
 					var obj_tab=obj[s_wrapper_name];
 					if(rendering_action=="restore"&&obj_tab){
 						if(!UI.ReplayDrawcalls(tab.backup_drawcalls)){
-							//if the cache got wiped... screw it and redraw
+							//if the cache got wiped... screw it and re-backup
 							tab.backup_frame_id=1;
-							rendering_action="normal";
+							rendering_action="backup";
 						}
 					}
 					if(rendering_action=="restore"&&obj_tab){
@@ -1176,6 +1223,8 @@ W.TabbedDocument=function(id,attrs){
 		//the big menu
 		UI.m_global_menu=new W.CFancyMenuDesc()
 		UI.BigMenu("&File");
+		UI.BigMenu("&Edit")
+		UI.BigMenu("&Tools")
 		if(obj.m_is_in_menu||!auto_hide_menu){
 			w_menu=obj.w;
 			//if(layout.m_is_maximized){
@@ -2125,6 +2174,7 @@ W.FancyMenu=function(id,attrs){
 				w_newline_item=w_needed;
 			}
 			//again ignore 'hotkey'
+			//console.log('FancyMenu item',i,Math.random(),item_i.s_type,obj.x,item_i.x,obj.y,item_i.y);
 		}
 		obj.selectable_items=selectable_items
 	}
