@@ -431,6 +431,7 @@ W.TabbedDocument_prototype={
 		this.m_dragging_tab_x_offset=event.x-x_label;
 		this.m_dragging_tab_y_offset=event.y-y_label;
 		this.m_dragging_tab_src_tabid=tabid
+		this.m_dragging_tab_target_window=undefined;
 		this.m_dragging_tab_target=undefined;
 		this.m_dragging_mouse_moved=0;
 		this.m_dragging_mouse_x=event.x;
@@ -440,9 +441,10 @@ W.TabbedDocument_prototype={
 		for(var i=0;i<caption_areas.length;i++){
 			var area_i=caption_areas[i];
 			for(var j=0;j<area_i.tabs.length;j++){
-				var tabid_j=area_i.tabs[j];
+				var tabid_j=area_i.tabids[j];
 				if(tabid_j==tabid){
 					area_i.has_dragging_src=1;
+					this.m_dragging_tab_target_window=area_i.window;
 				}
 			}
 		}
@@ -455,21 +457,56 @@ W.TabbedDocument_prototype={
 			return;
 		}
 		var target_position=undefined;
+		//todo: need to test on mac
+		//determine the window, set m_dragging_tab_target_window
+		//var mouse_state=UI.GetMouseState();
+		//var best_obj_window=undefined;
+		//var best_dist=1e10,best_age=0;
+		//for(var k in UI.m_window_map){
+		//	var obj_window=UI.m_window_map[k];
+		//	if(!obj_window){
+		//		continue;
+		//	}
+		//	var rect_k=UI.GetWindowRect(obj_window.__hwnd);
+		//	var dist_k=Math.max(Math.min(
+		//		Math.max(rect_k[0]-mouse_state[0],mouse_state[0]-(rect_k[0]+rect_k[2])),
+		//		Math.max(rect_k[1]-mouse_state[1],mouse_state[1]-(rect_k[3]+rect_k[3]))),0);
+		//	var age_k=(obj_window.m_focus_age||0);
+		//	if(best_dist>dist_k||best_dist==dist_k&&best_age<age_k){
+		//		best_dist=dist_k;
+		//		best_age=age_k;
+		//		best_obj_window=obj_window;
+		//		event.x=mouse_state[0]-rect_k[0];
+		//		event.y=mouse_state[1]-rect_k[1];
+		//	}
+		//}
+		var obj_window_mfocus=undefined;
+		var mouse_state=UI.GetSDLMouseState();
+		if(mouse_state.hwnd){
+			obj_window_mfocus=UI.m_window_map[mouse_state.hwnd.toString()];
+			event.x=mouse_state.x;
+			event.y=mouse_state.y;
+		}
+		this.m_dragging_tab_target_window=(obj_window_mfocus&&obj_window_mfocus.window_unique_id);
+		if(!this.m_dragging_tab_target_window){this.m_dragging_tab_target_window=undefined;}
 		this.m_dragging_mouse_moved=1;
 		this.m_dragging_mouse_x=event.x;
 		this.m_dragging_mouse_y=event.y;
 		var layout=UI.m_ui_metadata["<layout>"];
 		for(var i=0;i<caption_areas.length;i++){
 			var area_i=caption_areas[i];
+			if(area_i.window!==this.m_dragging_tab_target_window){
+				continue;
+			}
 			var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
 			if(segDist(area_i.y,area_i.y+area_i.h,event.y)<this.caption_drag_tolerance_y){
-				for(var j=0;j<area_i.tabs.length;j++){
-					var tabid_j=area_i.tabs[j];
+				for(var j=0;j<area_i.tabids.length;j++){
+					var tabid_j=area_i.tabids[j];
 					var x0_j=area_i.x0_w_tabs[j*2]-scroll_x;
 					var x1_j=x0_j+area_i.x0_w_tabs[j*2+1];
 					x0_j=Math.max(x0_j,area_i.x);
 					x1_j=Math.min(x1_j,area_i.x+area_i.w);
-					var dist=segDist(x0_j,j==area_i.tabs.length-1?area_i.x+area_i.w:x1_j,event.x);
+					var dist=segDist(x0_j,j==area_i.tabids.length-1?area_i.x+area_i.w:x1_j,event.x);
 					//dist<this.caption_drag_tolerance_x
 					if(target_position==undefined||target_position.score>dist){
 						//source area / other area
@@ -493,7 +530,7 @@ W.TabbedDocument_prototype={
 			}
 			//window splitting check - cross-split
 			var box=area_i.content_box;
-			if(box.w>0&&box.h>0&&!layout.m_is_maximized&&!(area_i.has_dragging_src&&area_i.tabs.length==1)){
+			if(box.w>0&&box.h>0&&!layout.m_is_maximized&&!(area_i.has_dragging_src&&area_i.tabids.length==1)){
 				var dist=segDist(box.x,box.x+box.w,event.x)+segDist(box.y,box.y+box.h,event.y)+this.split_penalty;
 				if(target_position==undefined||target_position.score>dist){
 					//source area / other area
@@ -540,8 +577,8 @@ W.TabbedDocument_prototype={
 			var x_caption=area_i.x;
 			var out_area_i={};out_area_i.__proto__=area_i;
 			out_area_i.x0_w_tabs=[];
-			for(var j=0;j<area_i.tabs.length;j++){
-				var tabid_j=area_i.tabs[j];
+			for(var j=0;j<area_i.tabids.length;j++){
+				var tabid_j=area_i.tabids[j];
 				if(target_position&&tabid_j==this.m_dragging_tab_src_tabid){
 					out_area_i.x0_w_tabs[j*2]=undefined;
 					out_area_i.x0_w_tabs[j*2+1]=undefined;
@@ -753,9 +790,23 @@ var g_per_run_id=0;
 var CreateUniqueID=function(){
 	return [(new Date()).toUTCString(), g_per_run_id++].join('_');
 };
+var RenderInExtraWindow=function(id,f){
+	UI.HackCallback(f);
+	if(!id){
+		f();
+		return;
+	}
+	var cbs=UI.m_global_doc_extra_windows_rendering_callbacks[id];
+	if(!cbs){
+		cbs=[];
+		UI.m_global_doc_extra_windows_rendering_callbacks[id]=cbs;
+	}
+	cbs.push(f);
+};
 var RenderLayout=function(layout,obj,y_base){
 	//per-tab z_order, sort and reset on workspace save / restore
 	UI.m_global_doc_extra_windows=[];
+	UI.m_global_doc_extra_windows_rendering_callbacks={};
 	var has_area_name={};
 	var windows_to_render={};
 	var items=obj.items;
@@ -888,7 +939,7 @@ var RenderLayout=function(layout,obj,y_base){
 						shadow_rect={x:x-obj.shadow_size,y:y_split-obj.shadow_size,w:w+obj.shadow_size*2,h:obj.shadow_size*2,
 							color:obj.shadow_color,border_width:-obj.shadow_size,round:obj.shadow_size};
 					}
-					all_shadows.push(sizing_rect,shadow_rect)
+					all_shadows.push(sizing_rect,shadow_rect,window_unique_id)
 					sizing_rect.nd=nd;
 					sizing_rect.area_size={x:x,y:y,w:w,h:h};
 					sizing_rect.mouse_cursor=(nd.type=="hsplit"?"sizewe":"sizens"),
@@ -908,6 +959,7 @@ var RenderLayout=function(layout,obj,y_base){
 					window_unique_id=undefined;
 					dfsRender(chi,x,y,w,h);
 				}else{
+					if(UI.IS_MOBILE){continue;}
 					//grab drawcalls here, replay them later
 					var bk_UI_context_tentative_focus=UI.context_tentative_focus;
 					var bk_UI_context_focus_is_a_region=UI.context_focus_is_a_region;
@@ -922,9 +974,9 @@ var RenderLayout=function(layout,obj,y_base){
 					/////////
 					var bk_viewport_hack_h=UI.__get_viewport_hack_h();
 					UI.__set_viewport_hack_h(Math.floor(h_wnd*new_window_scale+0.5));
+					UI.PushSubWindowRaw([0,0,w_wnd*new_window_scale,h_wnd*new_window_scale,new_window_scale],1)
 					var n0_drawcalls=UI.GetDrawcallArrayState()
 					var n0_region=UI.context_regions.length;
-					UI.PushSubWindowRaw([0,0,w_wnd*new_window_scale,h_wnd*new_window_scale,new_window_scale],1)
 					window_unique_id="wnd_"+chi.unique_id;
 					dfsRender(chi,0,0,w_wnd,h_wnd);
 					UI.m_global_doc_extra_windows.push({
@@ -932,12 +984,11 @@ var RenderLayout=function(layout,obj,y_base){
 						h:h_wnd,
 						unique_id:chi.unique_id,
 						drawcalls:UI.SaveDrawcalls(n0_drawcalls,UI.GetDrawcallArrayState()),
-						regions:UI.context_regions.slice(n0_region),
+						regions:UI.context_regions.splice(n0_region,UI.context_regions.length-n0_region),
 					});
-					UI.PopSubWindow()
-					UI.context_regions=UI.context_regions.slice(0,n0_region);
 					UI.RestoreDrawcallArrayState(n0_drawcalls)
 					UI.__set_viewport_hack_h(bk_viewport_hack_h);
+					UI.PopSubWindow()
 					/////////
 					UI.context_tentative_focus=bk_UI_context_tentative_focus;
 					UI.context_focus_is_a_region=bk_UI_context_focus_is_a_region;
@@ -1385,108 +1436,110 @@ W.TabbedDocument=function(id,attrs){
 			for(var i=0;i<rendering_caption_areas.length;i++){
 				var area_i=rendering_caption_areas[i];
 				if(!(area_i.w>0)){continue;}
-				var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
-				UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
-				for(var j=0;j<area_i.tabs.length;j++){
-					var tab_j=obj.items[area_i.tabs[j]];
-					if(area_i.tabs[j]==obj.m_dragging_tab_src_tabid){continue;}
-					W.TabLabel(tab_j.__global_tab_id,{
-						x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
-						selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
-						title:tab_j.title, tooltip:UI.TranslateTooltip(tab_j.tooltip),
-						hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
-						alpha:tab_alphas[tab_j.__global_tab_id],
-						tabid:tab_j.__global_tab_id,owner:obj})
-				}
-				UI.PopCliprect();
+				RenderInExtraWindow(area_i.window,function(area_i,pass_i){
+					var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
+					UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
+					for(var j=0;j<area_i.tabids.length;j++){
+						var tab_j=obj.items[area_i.tabids[j]];
+						if(area_i.tabids[j]==obj.m_dragging_tab_src_tabid){continue;}
+						W.TabLabel(tab_j.__global_tab_id,{
+							x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
+							selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
+							title:tab_j.title, tooltip:UI.TranslateTooltip(tab_j.tooltip),
+							hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
+							alpha:tab_alphas[tab_j.__global_tab_id],
+							tabid:tab_j.__global_tab_id,owner:obj})
+					}
+					UI.PopCliprect();
+				}.bind(null,area_i,pass_i));
 			}
 			//active (src) tab
 			var tab_dragging_src=obj.items[obj.m_dragging_tab_src_tabid];
 			var w_src_at_target=UI.MeasureText(tab_label_style.font,tab_dragging_src.title).w+tab_label_style.padding*2;
 			obj[tab_dragging_src.__global_tab_id]=undefined;
-			UI.TopMostWidget(function(){
-				W.TabLabel(tab_dragging_src.__global_tab_id,{
-					x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
-					w:w_src_at_target,h:area_i.h,
-					selected:2,
-					title:tab_dragging_src.title, tooltip:UI.TranslateTooltip(tab_dragging_src.tooltip),
-					hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
-					alpha:tab_alphas[tab_dragging_src.__global_tab_id],
-					tabid:tab_dragging_src.__global_tab_id,owner:obj})
-			})
-			//splitting shade
-			if(obj.m_dragging_tab_target&&obj.m_dragging_tab_target.split_side){
-				var target_position=obj.m_dragging_tab_target;
-				var box=rendering_caption_areas[target_position.area_id].content_box;
-				var sside=target_position.split_side;
-				var box_shade=undefined
-				if(sside=="left"){
-					box_shade={x:box.x,y:box.y,w:box.w*0.5,h:box.h}
-				}else if(sside=="right"){
-					box_shade={x:box.x+box.w*0.5,y:box.y,w:box.w*0.5,h:box.h}
-				}else if(sside=="up"){
-					box_shade={x:box.x,y:box.y,w:box.w,h:box.h*0.5}
-				}else{
-					UI.assert(sside=="down");
-					box_shade={x:box.x,y:box.y+box.h*0.5,w:box.w,h:box.h*0.5}
-				}
-				if(box_shade){
+			RenderInExtraWindow(obj.m_dragging_tab_target_window,function(){
+				UI.TopMostWidget(function(){
+					W.TabLabel(tab_dragging_src.__global_tab_id,{
+						x_animated:obj.m_dragging_mouse_x-obj.m_dragging_tab_x_offset,y:obj.m_dragging_mouse_y-obj.m_dragging_tab_y_offset,
+						w:w_src_at_target,h:area_i.h,
+						selected:2,
+						title:tab_dragging_src.title, tooltip:UI.TranslateTooltip(tab_dragging_src.tooltip),
+						hotkey_str:tab_dragging_src.__global_tab_id<10?String.fromCharCode(48+(tab_dragging_src.__global_tab_id+1)%10):undefined,
+						alpha:tab_alphas[tab_dragging_src.__global_tab_id],
+						tabid:tab_dragging_src.__global_tab_id,owner:obj})
+				})
+				//splitting shade
+				if(obj.m_dragging_tab_target&&obj.m_dragging_tab_target.split_side){
+					var target_position=obj.m_dragging_tab_target;
+					var box=rendering_caption_areas[target_position.area_id].content_box;
+					var sside=target_position.split_side;
+					var box_shade=undefined
+					if(sside=="left"){
+						box_shade={x:box.x,y:box.y,w:box.w*0.5,h:box.h}
+					}else if(sside=="right"){
+						box_shade={x:box.x+box.w*0.5,y:box.y,w:box.w*0.5,h:box.h}
+					}else if(sside=="up"){
+						box_shade={x:box.x,y:box.y,w:box.w,h:box.h*0.5}
+					}else{
+						UI.assert(sside=="down");
+						box_shade={x:box.x,y:box.y+box.h*0.5,w:box.w,h:box.h*0.5}
+					}
+					if(box_shade){
+						box_shade.color=obj.bgcolor_split_shade;
+						box_shade.border_width=0;
+						UI.RoundRect(box_shade)
+					}
+				}else if(obj.m_dragging_tab_target&&obj.m_dragging_tab_target.name!=(tab_dragging_src.area_name||"doc_default")){
+					var target_position=obj.m_dragging_tab_target;
+					var box=rendering_caption_areas[target_position.area_id].content_box;
+					var sside=target_position.split_side;
+					var box_shade={x:box.x,y:box.y,w:box.w,h:box.h};
 					box_shade.color=obj.bgcolor_split_shade;
 					box_shade.border_width=0;
-					UI.RoundRect(box_shade)
+					UI.RoundRect(box_shade);
 				}
-			}else if(obj.m_dragging_tab_target&&obj.m_dragging_tab_target.name!=(tab_dragging_src.area_name||"doc_default")){
-				var target_position=obj.m_dragging_tab_target;
-				var box=rendering_caption_areas[target_position.area_id].content_box;
-				var sside=target_position.split_side;
-				var box_shade={x:box.x,y:box.y,w:box.w,h:box.h};
-				box_shade.color=obj.bgcolor_split_shade;
-				box_shade.border_width=0;
-				UI.RoundRect(box_shade);
-			}
+			});
 		}else{
 			for(var pass_i=0;pass_i<2;pass_i++){
 				for(var i=0;i<rendered_areas.length;i++){
 					var area_i=rendered_areas[i];
 					if(!(area_i.w>0)){continue;}
-					var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
-					UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
-					for(var j=0;j<area_i.tabs.length;j++){
-						var tab_j=area_i.tabs[j];
-						if((tab_j==obj.active_tab)==(pass_i==1)){
-							W.TabLabel(tab_j.__global_tab_id,{
-								x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
-								selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
-								title:tab_j.title, tooltip:UI.TranslateTooltip(tab_j.tooltip),
-								hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
-								alpha:tab_alphas[tab_j.__global_tab_id],
-								tabid:tab_j.__global_tab_id,owner:obj})
+					RenderInExtraWindow(area_i.window,function(area_i,pass_i){
+						var scroll_x=(UI.g_caption_scroll_by_name[area_i.name]||0);
+						UI.PushCliprect(area_i.x,area_i.y,area_i.w,area_i.h);
+						for(var j=0;j<area_i.tabs.length;j++){
+							var tab_j=area_i.tabs[j];
+							if((tab_j==obj.active_tab)==(pass_i==1)){
+								W.TabLabel(tab_j.__global_tab_id,{
+									x_animated:area_i.x0_w_tabs[j*2]-scroll_x,y:area_i.y,w:area_i.x0_w_tabs[j*2+1],h:area_i.h,
+									selected:tab_j==windows_to_render[area_i.name]?tab_j==obj.active_tab?2:1:0,
+									title:tab_j.title, tooltip:UI.TranslateTooltip(tab_j.tooltip),
+									hotkey_str:tab_j.__global_tab_id<10?String.fromCharCode(48+(tab_j.__global_tab_id+1)%10):undefined,
+									alpha:tab_alphas[tab_j.__global_tab_id],
+									tabid:tab_j.__global_tab_id,owner:obj})
+							}
 						}
-					}
-					//if(pass_i==1){
-					//	//scrolling regions
-					//	if(scroll_x>0){
-					//	}
-					//	if(area_i.wtot>area_i.w&&scroll_x<area_i.wtot-area_i.w){
-					//	}
-					//}
-					UI.PopCliprect();
+						UI.PopCliprect();
+					}.bind(null,area_i,pass_i));
 				}
 			}
 			//save areas for dragging
 			for(var i=0;i<rendered_areas.length;i++){
-				rendered_areas[i].tabs=rendered_areas[i].tabs.map(function(a){return a.__global_tab_id});
+				rendered_areas[i].tabids=rendered_areas[i].tabs.map(function(a){return a.__global_tab_id});
 			}
 			obj.m_caption_areas=rendered_areas;
 		}
 		//render the separation shadows
-		for(var i=0;i<all_shadows.length;i+=2){
+		for(var i=0;i<all_shadows.length;i+=3){
 			var sizing_rect=all_shadows[i+0];
 			var shadow_rect=all_shadows[i+1];
-			UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h);
-			UI.RoundRect(shadow_rect);
-			W.Region(sizing_rect.__id,sizing_rect,g_sizing_rect_prototype)
-			UI.PopCliprect();
+			var shadow_window=all_shadows[i+2];
+			RenderInExtraWindow(shadow_window,function(sizing_rect,shadow_rect){
+				UI.PushCliprect(sizing_rect.x,sizing_rect.y,sizing_rect.w,sizing_rect.h);
+				UI.RoundRect(shadow_rect);
+				W.Region(sizing_rect.__id,sizing_rect,g_sizing_rect_prototype)
+				UI.PopCliprect();
+			}.bind(null,sizing_rect,shadow_rect));
 		}
 		//restore button
 		if(layout.m_is_maximized&&!obj.m_is_in_menu&&auto_hide_menu){
@@ -1583,6 +1636,10 @@ W.TabbedDocument=function(id,attrs){
 				obj.CloseTab(num_id)
 			}});
 		}
+		W.Hotkey("",{key:"F11",action:function(){
+			UI.top.app.document_area.ToggleMaximizeMode();
+			UI.Refresh()
+		}});
 		var is_apple=(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios");
 		W.Hotkey("",{key:"CTRL+TAB",action:function(){
 			var num_id=tabid

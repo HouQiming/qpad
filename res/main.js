@@ -817,6 +817,7 @@ UI.Application=function(id,attrs){
 				bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
 				flags:UI.SDL_WINDOW_RESIZABLE,
+				window_unique_id:'wnd_'+wnd_desc_i.unique_id,
 				OnClose:function(){return 1;}}));
 					if(wnd_i.w!=wnd_desc_i.w||wnd_i.h!=wnd_desc_i.h){
 						UI.InvalidateCurrentFrame();
@@ -828,10 +829,15 @@ UI.Application=function(id,attrs){
 							W.RestoreRegion(wnd_desc_i.regions[j]);
 						}
 					}
+					var cbs=UI.m_global_doc_extra_windows_rendering_callbacks['wnd_'+wnd_desc_i.unique_id];
+					if(cbs){
+						for(var j=0;j<cbs.length;j++){
+							cbs[j]();
+						}
+					}
 				UI.End();
 			}
 		}
-		//todo
 	UI.End();
 	if(!UI.g_app_inited){
 		//UI.TimingEvent("!UI.g_app_inited")

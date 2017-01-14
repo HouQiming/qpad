@@ -266,28 +266,34 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			g_vbo_tech.Draw(vbo,GL_TRIANGLES,real_batch/4)
 		return 0
 	}
-	/*
-	auto RecursiveCopy(string dir_src,string dir_tar)
-		System.IO.CreateDirectory(dir_tar)
-		if !System.IO.DirExists(dir_tar):return 0
-		for fn,fi in System.IO.EnumFiles(dir_src+'/*',System.IO.ENUM_FILE|System.IO.ENUM_DIR)
-			pslash=fn.LastIndexOf('/')
-			fn_tar=dir_tar+"/"+fn[pslash+1:]
-			if fi.is_dir():
-				if !RecursiveCopy(fn,fn_tar):return 0
-			else
-				if !System.IO.CopyFile(fn,fn_tar):return 0
-		return 1
-	JS_UI["RecursiveCopy"]=function(JSContext JS){
-		dir_src=JS.Param(0).as(string)
-		dir_tar=JS.Param(1).as(string)
-		return JS.Return(RecursiveCopy(dir_src,dir_tar))
-	}
-	*/
 	//JS_UI["StartupBenchmark"]=function(JSContext JS){
 	//	Writeln(formatNumber(System.Time.TicksToSeconds(System.Time.tick64()-g_startup_tick)*1000.0,{frac:2}),'ms since startup');
 	//	return 0
 	//}
+	SDL_GetWindowSize=__c_function(int,"SDL_GetWindowSize","SDL.h")
+	SDL_GetWindowPosition=__c_function(int,"SDL_GetWindowPosition","SDL.h")
+	SDL_GetMouseState=__c_function(int,"SDL_GetMouseState","SDL.h")
+	SDL_GetMouseFocus=__c_function(__pointer,"SDL_GetMouseFocus","SDL.h")
+	//JS_UI["GetWindowRect"]=function(JSContext JS){
+	//	hwnd=JS.Param(0).or(NULL)
+	//	wx=0;wy=0;ww=0;wh=0
+	//	SDL_GetWindowPosition(hwnd,&wx,&wy)
+	//	SDL_GetWindowSize(hwnd,&ww,&wh)
+	//	return JS.Return([wx,wy,ww,wh])
+	//}
+	JS_UI["GetSDLMouseState"]=function(JSContext JS){
+		mx=0;my=0
+		btn_state=SDL_GetMouseState(&mx,&my)
+		hwnd=SDL_GetMouseFocus();
+		//if hwnd:
+		//	SDL_GetWindowPosition(hwnd,&wx,&wy)
+		ret=JS.New()
+		ret["button"]=btn_state
+		ret["x"]=mx
+		ret["y"]=my
+		ret["hwnd"]=hwnd
+		return JS.Return(ret)
+	}
 });
 
 (function(){

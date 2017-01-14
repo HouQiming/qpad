@@ -109,12 +109,7 @@ v2
 # TODO LIST
 (test) shouldn't restore *remote tabs
 ctrl+shift+f bad autoscroll for certain items
-maximizing terminals
-drag-out support
-	tab label rendering - need window info in rendered_areas
-	dragging
-	actually dragging things out
-	upgrading <layout> from old metadata
+resizing terminals
 (retest) per-render memory leak
 	JS-side cyclic reference involving GetHandlerByID
 ctrl+c terminal copy failure
@@ -224,6 +219,14 @@ peek definition:
 	CEO and hide cannot overlap
 weird bookmark display in tophint
 	bad tophint y0 - the hiding mode has changed!
+drag-out support
+	SDL is garbage, disable it for now
+	don't limit mouse when grabbing
+	propagate unique_id on split
+	window-awareness in SetFocus and stuff
+	actually dragging things out
+	upgrading <layout> from old metadata
+	flashing / activating the right window
 
 =====í¯¿í¿¿=====
 @echo off

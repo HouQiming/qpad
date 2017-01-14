@@ -1741,8 +1741,8 @@ UI.OpenTerminalTab=function(options){
 		title:UI._("Terminal"),
 		//tooltip:file_name,
 		document_type:"terminal",
-		area_name:"doc_default",
-		//area_name:"terminals",
+		//area_name:"doc_default",
+		area_name:UI.IS_MOBILE?"doc_default":"terminals",
 		UpdateTitle:function(){
 			var title=UI._("Terminal");
 			if(this.main_widget){
