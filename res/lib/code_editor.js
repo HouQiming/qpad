@@ -3897,7 +3897,7 @@ var ParseGit=function(spath){
 			}.bind(undefined,g_repo_parsing_context))
 		})
 	})
-	QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
+	QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context,null));
 	return my_repo
 }
 
@@ -4192,7 +4192,7 @@ var GenerateGitRepoTreeView=function(repo){
 	return ret;
 };*/
 
-var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context){
+var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context,find_context0){
 	if(!IO.DirExists(spath+"/doc")||my_repo.m_helps_parsed){
 		my_repo.m_helps_parsed=1;
 		if(g_repo_parsing_context){
@@ -4204,7 +4204,7 @@ var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context){
 		my_repo.m_helps=[];
 	}
 	//file-only, recursive
-	var find_context=IO.CreateEnumFileContext(spath+"/doc/*.md",5);
+	var find_context=(find_context0||IO.CreateEnumFileContext(spath+"/doc/*.md",5));
 	for(var i=0;i<FILE_LISTING_BUDGET_HELP_INDEXING;i++){
 		var fnext=find_context()
 		if(!fnext){
@@ -4228,7 +4228,7 @@ var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context){
 		}
 	}
 	if(find_context){
-		UI.NextTick(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
+		UI.NextTick(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context,find_context));
 	}else{
 		my_repo.m_helps_parsed=1;
 		ResumeProjectParsing(g_repo_parsing_context);
@@ -4240,7 +4240,7 @@ UI.ReindexHelp=function(spath){
 	if(!my_repo){return;}
 	my_repo.m_helps_parsed=0;
 	my_repo.m_helps=undefined;
-	QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context));
+	QueueProjectParser(IndexHelpFiles.bind(undefined,spath,my_repo,g_repo_parsing_context,null));
 }
 
 var ParseProject=function(spath){

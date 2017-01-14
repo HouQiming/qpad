@@ -107,17 +107,18 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+(test) memory / CPU going crazy
+	trigger unknown - 2nd console?
+	one has to open a terminal tab
+	killed process?
+	it's a *timer* gone crazy
+		IndexHelpFiles
+		C:\tp\osslib\nan\doc\
 (test) shouldn't restore *remote tabs
 ctrl+shift+f bad autoscroll for certain items
 resizing terminals
-(retest) per-render memory leak
+per-render memory leak
 	JS-side cyclic reference involving GetHandlerByID
-ctrl+c terminal copy failure
-on-boarding:
-	Maya-like "highlight new" in menus
-possible memory leak
-explicit diff visualization
-	autoedit stuff + diffupdate
 graph:
 	jc nodes
 		__c_function
@@ -220,13 +221,16 @@ peek definition:
 weird bookmark display in tophint
 	bad tophint y0 - the hiding mode has changed!
 drag-out support
-	SDL is garbage, disable it for now
-	don't limit mouse when grabbing
+	SDL mouse support is garbage, disable it for now
 	propagate unique_id on split
 	window-awareness in SetFocus and stuff
-	actually dragging things out
+	actually dragging things *out*
 	upgrading <layout> from old metadata
 	flashing / activating the right window
+on-boarding:
+	Maya-like "highlight new" in menus
+explicit diff visualization
+	autoedit stuff + diffupdate
 
 =====í¯¿í¿¿=====
 @echo off
