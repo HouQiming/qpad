@@ -103,17 +103,11 @@ v2
    "out_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 4
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-(test) memory / CPU going crazy
-	trigger unknown - 2nd console?
-	one has to open a terminal tab
-	killed process?
-	it's a *timer* gone crazy
-		IndexHelpFiles
-		C:\tp\osslib\nan\doc\
+delete at the head of an empty line
 (test) shouldn't restore *remote tabs
 ctrl+shift+f bad autoscroll for certain items
 resizing terminals

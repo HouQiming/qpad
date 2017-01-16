@@ -1801,15 +1801,17 @@ var PrepareAPEM=function(){
 				}
 			}
 		}
-		for(var i=hist.length-1;i>=0;i--){
-			var fn=hist[i];
-			var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
-			if(!arv[fn_path]){
-				arv[fn_path]=1;
-				if(check_drive&&(fn.length<2||!valid_drives[fn_path[0]]||fn_path[1]!=':')){
-					continue;
+		if(hist){
+			for(var i=hist.length-1;i>=0;i--){
+				var fn=hist[i];
+				var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
+				if(!arv[fn_path]){
+					arv[fn_path]=1;
+					if(check_drive&&(fn.length<2||!valid_drives[fn_path[0]]||fn_path[1]!=':')){
+						continue;
+					}
+					UI.g_all_paths_ever_mentioned.push(fn_path);
 				}
-				UI.g_all_paths_ever_mentioned.push(fn_path);
 			}
 		}
 	}

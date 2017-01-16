@@ -7,6 +7,7 @@ var TYPE_INT=1;
 var TYPE_UINT=2;
 var TYPE_FLOAT=3;
 var TYPE_MASK_BE=16;
+var toNodeBuffer=function(a){return Buffer(a.buffer);};
 W.BinaryEditor_prototype={
 	ResetWBytes:function(w_bytes){
 		this.m_w_bytes=w_bytes;
@@ -407,7 +408,7 @@ W.BinaryEditor_prototype={
 		this.m_data_raw=undefined;
 		this.m_data=undefined;
 		this.m_data_raw=UI.BIN_MapCopyOnWrite(this.file_name);
-		this.m_data=Buffer(Duktape.Buffer(this.m_data_raw));
+		this.m_data=toNodeBuffer((this.m_data_raw));
 		this.m_file_name_mapped=this.file_name;
 		////////////
 		this.saved_point=this.m_undo_queue.length
@@ -543,7 +544,7 @@ W.BinaryEditor_prototype={
 	},
 	OnDestroy:function(){
 		this.m_data_raw=new Buffer(0);
-		this.m_data=Buffer(Duktape.Buffer(this.m_data_raw));
+		this.m_data=toNodeBuffer((this.m_data_raw));
 		Duktape.gc();
 	},
 };
@@ -715,7 +716,7 @@ W.BinaryEditor=function(id,attrs){
 			}else{
 				obj.m_file_name_mapped=obj.file_name;
 			}
-			obj.m_data=Buffer(Duktape.Buffer(obj.m_data_raw));
+			obj.m_data=toNodeBuffer((obj.m_data_raw));
 			if(!loaded_metadata.ranges){
 				//coulddo: default parsing script
 			}
