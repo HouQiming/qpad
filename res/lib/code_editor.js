@@ -7731,6 +7731,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			bk_current_tab_id=UI.top.app.document_area.current_tab_id;
 		}
 		var lang=UI.ED_GetFileLanguage(fname);
+		//console.log(fname,lang.is_binary,!UI.m_ui_metadata[fname],UI.m_ui_metadata[fname].m_language_id,UI.ED_DetectBinaryFile(fname))
 		if(lang.is_binary||!UI.m_ui_metadata[fname]&&UI.ED_DetectBinaryFile(fname)){
 			obj_tab=UI.NewBinaryEditorTab(fname)
 		}else{

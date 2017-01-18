@@ -2628,8 +2628,8 @@ UI.RegisterEditorPlugin(function(){
 			//auto-delete spaces after enter
 			var ed=this.ed;
 			if(this.plugin_class=="code_editor"&&this.m_is_main_editor){
-				if(String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt)[0])=='\n'){
-					if(ccnt_original>=this.GetEnhancedHome(ccnt_original)){
+				if(ed.GetUtf8CharNeighborhood(ccnt)[0]==10){
+					if(ccnt_original>=this.GetEnhancedHome(ccnt_original)&&ed.GetUtf8CharNeighborhood(ccnt_original)[0]!=10){
 						this.sel1.ccnt=this.ed.MoveToBoundary(ccnt,1,"space")
 					}
 				}

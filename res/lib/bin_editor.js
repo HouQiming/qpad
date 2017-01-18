@@ -349,7 +349,9 @@ W.BinaryEditor_prototype={
 		new_metadata.bookmarks=this.m_bookmarks;
 		new_metadata.w_bytes=this.m_w_bytes;
 		new_metadata.m_scroll=this.m_scroll;
-		new_metadata.m_language_id='Binary';
+		if(!new_metadata.m_language_id){
+			new_metadata.m_language_id='Binary';
+		}
 		UI.m_ui_metadata[this.file_name]=new_metadata
 	},
 	PushUndo:function(addr,sz){
@@ -1276,14 +1278,17 @@ W.BinaryEditor=function(id,attrs){
 		}
 		UI.FillLanguageMenu(UI.GetFileNameExtension(obj.file_name),'Binary',function(name){
 			if(name=='Binary'){return;}
+			if((obj.saved_point||0)==obj.m_undo_queue.length){
+				obj.SaveMetaData();
+			}
 			var new_metadata=(UI.m_ui_metadata[obj.file_name]||{});
 			new_metadata.m_language_id=name;
 			UI.m_ui_metadata[obj.file_name]=new_metadata;
+			//console.log('>>>',obj.file_name,new_metadata.m_language_id);
 			if((obj.saved_point||0)!=obj.m_undo_queue.length){
 				obj.CreateNotification("警",UI._("Save and reload to reopen it in the text editor"))
 			}else{
 				var fn=obj.file_name;
-				obj.SaveMetaData();
 				UI.top.app.document_area.just_created_a_tab=1;
 				UI.top.app.document_area.CloseTab();
 				UI.OpenEditorWindow(fn);

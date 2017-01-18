@@ -1707,10 +1707,11 @@ W.Terminal=function(id,attrs){
 			icon:"远",
 			action:function(){
 				var s_script=IO.UIReadAll('res/misc/qpad.sh');
-				var s_send=['STTY_STATE=`stty -g`;stty raw -echo;(head -c ',
-					Duktape.__byte_length(s_script).toString(),
-				'|sh);stty "${STTY_STATE}";source ~/.bashrc\r',s_script].join('');
-				obj.m_term.send(s_send);
+				//var s_send=['STTY_STATE=`stty -g`;stty raw -echo;(head -c ',
+				//	Duktape.__byte_length(s_script).toString(),
+				//'|sh);stty "${STTY_STATE}";source ~/.profile\r',s_script].join('');
+				//obj.m_term.send(s_send);
+				obj.m_term.send(s_script);
 				UI.Refresh()
 			}})
 		var s_ssh_command=(obj.ssh_command||obj.m_term.last_ssh_command);

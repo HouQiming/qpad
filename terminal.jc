@@ -3898,7 +3898,14 @@ class Terminal{
 			sline_header=this.download_buf
 			pnewline2=sline_header.IndexOf('\n')
 			if pnewline2>=0:
-				this.download_size=sline_header[:pnewline2-1].as(i64)
+				p_nonspace=0L
+				for(;p_nonspace<pnewline2;p_nonspace++)
+					if sline_header[p_nonspace]!=' '&&sline_header[p_nonspace]!='\n':break
+				p_shit_begin=p_nonspace
+				for(;p_shit_begin<pnewline2;p_shit_begin++)
+					if sline_header[p_shit_begin]<'0'&&sline_header[p_shit_begin]>'9':break
+				s_wc_output=sline_header[p_nonspace:p_shit_begin-1]
+				this.download_size=s_wc_output.as(i64)
 				//Writeln('>>> ',sline_header[:pnewline2-1],' ',this.download_size)
 				if this.download_size<0LL:
 					this.download_size=0LL

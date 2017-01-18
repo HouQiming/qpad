@@ -103,13 +103,13 @@ v2
    "out_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-delete at the head of an empty line
 (test) shouldn't restore *remote tabs
 ctrl+shift+f bad autoscroll for certain items
+ctrl+shift+f restore cursor after cancel
 resizing terminals
 per-render memory leak
 	JS-side cyclic reference involving GetHandlerByID
