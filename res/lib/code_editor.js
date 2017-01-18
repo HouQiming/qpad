@@ -2805,13 +2805,13 @@ var find_context_prototype={
 					}
 				}
 			}
-		}else{
-			var doc=this.m_starting_doc;
-			doc.sel0.ccnt=this.m_sel0_before_find
-			doc.sel1.ccnt=this.m_sel1_before_find
-			doc.AutoScroll('center')
-			doc.scrolling_animation=undefined
-		}
+		}//else{
+		var doc=this.m_starting_doc;
+		doc.sel0.ccnt=this.m_sel0_before_find
+		doc.sel1.ccnt=this.m_sel1_before_find
+		doc.AutoScroll('center')
+		doc.scrolling_animation=undefined
+		//}
 	},
 	CancelFind:function(){
 		this.RestoreSel();
@@ -2889,10 +2889,10 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 		if(ctx.m_result_cell){
 			ctx.m_result_cell.obj_notebook.ClearCellOutput(ctx.m_result_cell.cell_id)
 		}
-	}else{
-		ctx.m_sel0_before_find=doc.sel0.ccnt;
-		ctx.m_sel1_before_find=doc.sel1.ccnt;
-	}
+	}//else{
+	ctx.m_sel0_before_find=doc.sel0.ccnt;
+	ctx.m_sel1_before_find=doc.sel1.ccnt;
+	//}
 	ctx.__proto__=find_context_prototype;
 	var y_id=doc.ed.XYFromCcnt(ccnt1).y
 	var y_id0=Math.max(y_id-hc*ctx.m_context_size,0),y_id1=Math.min(y_id+hc*(ctx.m_context_size+1),ytot)

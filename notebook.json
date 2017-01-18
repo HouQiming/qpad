@@ -109,7 +109,6 @@ v2
 # TODO LIST
 (test) shouldn't restore *remote tabs
 ctrl+shift+f bad autoscroll for certain items
-ctrl+shift+f restore cursor after cancel
 resizing terminals
 per-render memory leak
 	JS-side cyclic reference involving GetHandlerByID
