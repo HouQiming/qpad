@@ -3078,7 +3078,7 @@ W.CodeEditorWidget_prototype={
 			force_ccnt==this.m_current_find_context.m_starting_ccnt0&&
 			!this.m_changed_after_find&&
 			sneedle==this.m_current_find_context.m_needle&&
-			!(this.m_current_find_context.m_flags&UI.SEARCH_FLAG_FUZZY)){
+			!(this.m_current_find_context.m_flags&(UI.SEARCH_FLAG_FUZZY|UI.SEARCH_FLAG_GLOBAL))){
 				return;
 			}
 		}
@@ -6052,7 +6052,7 @@ W.CodeEditor=function(id,attrs){
 				show_at_scrollbar_find_minimap&&
 				!obj.m_changed_after_find&&
 				s_autofind_needle==obj.m_current_find_context.m_needle&&
-				!(obj.m_current_find_context.m_flags&UI.SEARCH_FLAG_FUZZY)){
+				!(obj.m_current_find_context.m_flags&(UI.SEARCH_FLAG_FUZZY|UI.SEARCH_FLAG_GLOBAL))){
 					if(!UI.IsSearchFrontierCompleted(obj.m_current_find_context.m_backward_frontier)&&UI.GetSearchFrontierCcnt(obj.m_current_find_context.m_backward_frontier)>rendering_ccnt0){
 						//the previous context went out of range
 						need_new_ctx=1;
@@ -8514,6 +8514,7 @@ UI.CloseCodeEditorDocument=function(doc){
 	doc.m_ed_refcnt--;
 	if(!(doc.m_ed_refcnt>0)){
 		var fn=doc.m_file_name;
+		//console.log('close',fn)
 		doc.OnDestroy();
 		RemoveDocFromByFileList(doc,fn);
 	}

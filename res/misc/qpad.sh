@@ -47,6 +47,7 @@ if [ "$D" = 'q' ];then
 break
 fi
 done
+printf '\033]0;Terminal\007'
 stty "$T"
 }
 # Remote editing script installed to ~/.profile

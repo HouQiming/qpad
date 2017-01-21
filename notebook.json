@@ -107,11 +107,9 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-(test) shouldn't restore *remote tabs
-ctrl+shift+f bad autoscroll for certain items
+ctrl+shift+f
+	bad autoscroll for certain items
 resizing terminals
-per-render memory leak
-	JS-side cyclic reference involving GetHandlerByID
 graph:
 	jc nodes
 		__c_function
@@ -135,6 +133,10 @@ graph:
 		and a package listing from standard locations
 		add @include
 		sort by port relevance
+	--
+	easier template creation
+	auto-updating templated code
+memory leak
 build for mac
 life cycles
 	could label them on graph nodes

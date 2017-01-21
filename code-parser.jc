@@ -2604,7 +2604,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 							ptok1=PNextToken(ptok1)
 						else
 							break
-					if (tok1=='{'||tok1==';'&&is_header)&&ptok_function_id>=0:
+					if (tok1=='{'||(is_header&&(tok1==';'||tok1=='=')))&&ptok_function_id>=0:
 						//this should go through even if there was a . before the name
 						fid_is_valid=1
 						if has_post_ctor_initializer:
