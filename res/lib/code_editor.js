@@ -501,6 +501,18 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.CallHooks("load")
 		this.ParseFile()
 		this.m_finished_loading=1
+		//////////////
+		//initial compiler errors
+		if(this.m_file_name){
+			var errs=UI.m_unopened_file_errors[this.m_file_name];
+			if(errs){
+				for(var i=0;i<errs.length;i++){
+					UI.AddErrorToDocument(this,errs[i]);
+				}
+				UI.m_unopened_file_errors[this.m_file_name]=undefined;
+			}
+		}
+		//////////////
 		var cbs=this.opening_callbacks
 		if(cbs){
 			for(var i=0;i<cbs.length;i++){

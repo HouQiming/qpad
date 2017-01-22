@@ -75,60 +75,76 @@ UI.RegisterEditorPlugin(function(){
 	})
 });//.prototype.desc={category:"Tools",name:"Error overlays",stable_name:"error_overlay"};
 
-var AddErrorToEditor=function(err,quiet){
+UI.AddErrorToDocument=function(doc,err){
+	var go_prev_line=0
+	//if(err.is_in_active_doc==undefined){return;}
+	if(err.ccnt0==undefined||err.ccnt1==undefined){
+		if(err.line1==undefined){
+			err.line1=err.line0
+		}
+		if(err.col0==undefined){
+			err.col0=0;
+			err.col1=0;
+			if(err.line0==err.line1){
+				err.line1++
+				go_prev_line=1
+			}
+		}else if(err.col1==undefined){
+			err.col1=1e9;
+		}
+		err.ccnt0=doc.SeekLC(err.line0,err.col0)
+		err.ccnt1=doc.SeekLC(err.line1,err.col1)
+	}
+	if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
+	if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
+	/////////////////
+	if(!err.is_quiet){
+		var hl_items=doc.CreateTransientHighlight({
+			'depth':1,
+			'color':err.color||doc.color_tilde_compiler_error,
+			'display_mode':UI.HL_DISPLAY_MODE_TILDE,
+			'invertible':0,
+		});
+		hl_items[0].ccnt=err.ccnt0;err.sel_ccnt0=hl_items[0];hl_items[0].undo_tracked=1
+		hl_items[1].ccnt=err.ccnt1;err.sel_ccnt1=hl_items[1];hl_items[1].undo_tracked=1
+		err.highlight=hl_items[2];
+		err.id=doc.m_error_overlays.length
+		err.is_in_active_doc=1
+		////////////
+		doc.m_error_overlays.push(err)
+	}
+};
+
+var CreateCompilerError=function(err,is_click){
 	if(!err.is_in_active_doc){
 		if(!IO.FileExists(err.file_name)){return;}
+		if(!is_click){
+			var tab=UI.SearchForEditorTab(err.file_name);
+			if(!tab){
+				var errs=UI.m_unopened_file_errors[err.file_name];
+				if(!errs){
+					errs=[];
+					UI.m_unopened_file_errors[err.file_name]=errs;
+				}
+				errs.push(err);
+				return;
+			}
+		}
 		UI.OpenEditorWindow(err.file_name,function(){
-			var go_prev_line=0
-			//if(err.is_in_active_doc==undefined){return;}
-			if(err.ccnt0==undefined||err.ccnt1==undefined){
-				if(err.line1==undefined){
-					err.line1=err.line0
-				}
-				if(err.col0==undefined){
-					err.col0=0;
-					err.col1=0;
-					if(err.line0==err.line1){
-						err.line1++
-						go_prev_line=1
-					}
-				}else if(err.col1==undefined){
-					err.col1=1e9;
-				}
-				err.ccnt0=this.SeekLC(err.line0,err.col0)
-				err.ccnt1=this.SeekLC(err.line1,err.col1)
-			}
-			if(!(err.ccnt1>err.ccnt0)){err.ccnt1=err.ccnt0+1;}
-			if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
-			/////////////////
-			if(!err.is_quiet){
-				var hl_items=this.CreateTransientHighlight({
-					'depth':1,
-					'color':err.color||this.color_tilde_compiler_error,
-					'display_mode':UI.HL_DISPLAY_MODE_TILDE,
-					'invertible':0,
-				});
-				hl_items[0].ccnt=err.ccnt0;err.sel_ccnt0=hl_items[0];hl_items[0].undo_tracked=1
-				hl_items[1].ccnt=err.ccnt1;err.sel_ccnt1=hl_items[1];hl_items[1].undo_tracked=1
-				err.highlight=hl_items[2];
-				err.id=this.m_error_overlays.length
-				err.is_in_active_doc=1
-				////////////
-				this.m_error_overlays.push(err)
-			}
-			if(!quiet){
+			UI.AddErrorToDocument(this,err);
+			if(is_click){
 				this.SetSelection(err.ccnt0,err.ccnt1);
 				UI.SetFocus(this)
 			}
-		},quiet?"quite":undefined);
+		},is_click?undefined:"quite");
 	}else{
 		UI.OpenEditorWindow(err.file_name,function(){
-			if(!quiet){
+			if(!is_click){
 				this.SetSelection(err.sel_ccnt0.ccnt,err.sel_ccnt0.ccnt)
 				this.CallOnSelectionChange();
 				UI.SetFocus(this)
 			}
-		},quiet?"quite":undefined)
+		},is_click?undefined:"quite")
 	}
 };
 
@@ -440,6 +456,8 @@ W.CellCaption=function(id,attrs){
 	UI.End()
 	return obj
 };
+
+UI.m_unopened_file_errors={};
 
 var ClearCompilerError=function(err){
 	if(err.sel_ccnt0){err.sel_ccnt0.discard();err.sel_ccnt0=undefined;}
@@ -1857,9 +1875,9 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 		if(is_clicked){
 			//do not create a new highlight for the error, but noisily focus it
 			err.is_quiet=1;
-			AddErrorToEditor(err,0);
+			CreateCompilerError(err,"click");
 		}else if(!err.is_quiet){
-			AddErrorToEditor(err,1);
+			CreateCompilerError(err);
 			if(term.compiler_errors==undefined){
 				term.compiler_errors=[];
 			}
