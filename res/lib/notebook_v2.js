@@ -921,16 +921,18 @@ W.notebook_prototype={
 		}
 		if(s_code.indexOf('[new term]')>=0){
 			//new terminal
-			//ignore cols / rows
+			//ignore previous cols / rows
+			var cols=132;
+			var rows=24;
 			if(UI.DetectMSYSTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty cols 132;stty rows 24;"+IO.ShellCmd(args),"/dev/null"];
+				args=["script","--return","-qfc","export TERM=xterm;stty cols "+cols+";stty rows "+rows+";"+IO.ShellCmd(args),"/dev/null"];
 			}
 			UI.OpenTerminalTab({
 				args:args,
 				spath:spath,
 				auto_close:1,
-				cols:132,
-				rows:24,
+				cols:cols,
+				rows:rows,
 			});
 			UI.Refresh();
 			return;

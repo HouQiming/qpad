@@ -107,9 +107,10 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+warning file: don't open at all, maybe do an error list
+	nama
 ctrl+shift+f
 	bad autoscroll for certain items
-resizing terminals
 graph:
 	jc nodes
 		__c_function
@@ -226,6 +227,9 @@ on-boarding:
 	Maya-like "highlight new" in menus
 explicit diff visualization
 	autoedit stuff + diffupdate
+[interactive] in windows bat
+	fails on Qin Hao's machine
+auto-resize tab terminals
 
 =====í¯¿í¿¿=====
 @echo off
