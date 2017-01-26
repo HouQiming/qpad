@@ -12,7 +12,7 @@ import TextBox.*
 import TextBox.detail.*
 import Encoding.*
 
-ENABLE_EXPERIMENTAL_FEATURES=1//todo: (Platform.BUILD=="debug")
+ENABLE_EXPERIMENTAL_FEATURES=0
 MAX_WORD_LENGTH_TEXT=64
 
 /////////////////////////////////////

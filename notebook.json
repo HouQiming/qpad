@@ -107,8 +107,18 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-ctrl+shift+f
-	bad autoscroll for certain items
+sticker wall
+	the old tags idea
+	but with non-linear layout
+	save in code
+		layout data in sticker wall
+		use native node boundaries
+			{}
+			ctrl+g
+		could store code template / code generator as sticker scripts
+weird error appearance in android build output
+	TERM=xterm? no
+terminal gets overwhelmed by large amounts of output
 graph:
 	jc nodes
 		__c_function

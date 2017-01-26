@@ -4433,6 +4433,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				sret.push(ch)
 		}
 		code_box_id=0
+		is_after_caption=0
 		fseektag=JS["UI"]["SeekTag"].as(JSObject)
 		foreach sline,I in sblock.TokenizeEx("\n",sblock.TOKENIZE_ALLOW_EMPTY|sblock.TOKENIZE_INCLUDE_SEPARATOR)
 			if sline.StartsWith('```'):
@@ -4474,7 +4475,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				nlines_code++
 				continue
 			////////////
+			if sline.n>1&&is_after_caption:
+				if sret.n&&sret.back()!='\n':sret.push('\n')
+				sret.push('\n')
+				is_after_caption=0
 			if sline.StartsWith("#"):
+				if sret.n&&sret.back()!='\n':sret.push('\n')
 				//heading
 				level=0L
 				for j=1:sline.n-2
@@ -4500,7 +4506,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//if level==1L:
 				//	//center it
 				//	sret.PushUnicode(COMMAND_RUBBER_SPACE)
-				//sret.push('\n')
+				is_after_caption=1
 				continue
 			if sline.StartsWith("\t")||sline.StartsWith("    "):
 				//inactive code-like
@@ -4637,6 +4643,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			if sline.n==1:
 				if sret.n&&sret.back()!='\n':sret.push('\n')
 				sret.push('\n')
+				is_after_caption=0
 			else
 				if !sret.n||sret.back()=='\n':
 					//detect action descriptions - ops

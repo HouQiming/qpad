@@ -15,7 +15,7 @@ name=JS.Param(/*@qcombo-slot id(__default='0')*/).as(type);
 //@qcombo-begin JSReturn()
 //@qcombo-desc Return a value to Javascript
 //@qcombo-part js_code(js_code)
-return JS.Return((/*@qcombo-slot value(__default='0')*/)
+return JS.Return(/*@qcombo-slot value(__default='0')*/)
 //@qcombo-end
 
 //@qcombo-begin JCUIExtension(JS_UI,sbox,is_real)

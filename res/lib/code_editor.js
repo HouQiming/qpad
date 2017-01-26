@@ -507,7 +507,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			var errs=UI.m_unopened_file_errors[this.m_file_name];
 			if(errs){
 				for(var i=0;i<errs.length;i++){
-					UI.AddErrorToDocument(this,errs[i]);
+					if(!errs[i].is_removed){
+						UI.AddErrorToDocument(this,errs[i]);
+					}
 				}
 				UI.m_unopened_file_errors[this.m_file_name]=undefined;
 			}
@@ -6533,7 +6535,21 @@ W.CodeEditor=function(id,attrs){
 				var renderer=doc.GetRenderer();
 				var bk_m_enable_hidden=renderer.m_enable_hidden;
 				renderer.m_enable_hidden=((current_find_context.m_flags&UI.SEARCH_FLAG_HIDDEN)?0:1)
+				if(current_find_context.m_temp_documents){
+					var bk_m_enable_hidden_tdoc=[];
+					for(var tdoci=0;tdoci<current_find_context.m_temp_documents.length;tdoci++){
+						var renderer_tdoci=current_find_context.m_temp_documents[tdoci].GetRenderer();
+						bk_m_enable_hidden_tdoc[tdoci]=renderer_tdoci.m_enable_hidden;
+						renderer_tdoci.m_enable_hidden=((current_find_context.m_flags&UI.SEARCH_FLAG_HIDDEN)?0:1)
+					}
+				}
 				current_find_context.RenderVisibleFindItems(w_line_numbers+obj.padding,w_find_items,h_obj_area-obj.h_find_bar)
+				if(current_find_context.m_temp_documents&&bk_m_enable_hidden_tdoc){
+					for(var tdoci=bk_m_enable_hidden_tdoc.length-1;tdoci>=0;tdoci--){
+						var renderer_tdoci=current_find_context.m_temp_documents[tdoci].GetRenderer();
+						renderer_tdoci.m_enable_hidden=bk_m_enable_hidden_tdoc[tdoci];
+					}
+				}
 				renderer.m_enable_hidden=bk_m_enable_hidden;
 				if(!current_find_context.m_forward_matches.length&&!current_find_context.m_backward_matches.length&&
 				current_find_context.m_needle.length&&

@@ -120,6 +120,10 @@ var CreateCompilerError=function(err,is_click){
 		if(!IO.FileExists(err.file_name)){return;}
 		if(!is_click){
 			var tab=UI.SearchForEditorTab(err.file_name);
+			//console.log(err.file_name,err.is_quiet,!!tab);
+			//for(var i=0;i<UI.g_all_document_windows.length;i++){
+			//	console.log(i,UI.g_all_document_windows[i].file_name)
+			//}
 			if(!tab){
 				var errs=UI.m_unopened_file_errors[err.file_name];
 				if(!errs){
@@ -464,6 +468,7 @@ var ClearCompilerError=function(err){
 	if(err.sel_ccnt1){err.sel_ccnt1.discard();err.sel_ccnt1=undefined;}
 	if(err.highlight){err.highlight.discard();err.highlight=undefined;}
 	err.is_in_active_doc=undefined;
+	err.is_removed=1;
 }
 
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
@@ -1868,9 +1873,14 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 	var err=UI.ParseCompilerOutput(sline);
 	if(err){
 		var fn_raw=err.file_name;
-		if(!(fn_raw.search(g_regexp_abspath)>=0)&&!IO.FileExists(fn_raw)){
+		//if(!(fn_raw.search(g_regexp_abspath)>=0)&&!IO.FileExists(fn_raw)){
+		if(!IO.FileExists(fn_raw)){
 			var fn_search_found=UI.SearchIncludeFile((term.m_current_path||'.')+'/'+fn_raw,fn_raw);
-			err.file_name=(fn_search_found||((term.m_current_path||'.')+'/'+err.file_name));
+			if(!fn_search_found){
+				fn_raw=UI.RemovePath(fn_raw);
+				fn_search_found=UI.SearchIncludeFile((term.m_current_path||'.')+'/'+fn_raw,fn_raw);
+			}
+			err.file_name=IO.NormalizeFileName((fn_search_found||((term.m_current_path||'.')+'/'+err.file_name)));
 		}
 		if(is_clicked){
 			//do not create a new highlight for the error, but noisily focus it
