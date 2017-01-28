@@ -1108,7 +1108,7 @@ UI.RegisterEditorPlugin(function(){
 				var doc_in=cell_i.m_text_in;
 				var size=doc_in.ed.GetTextSize();
 				if(size==Duktape.__byte_length(s_mark_search)){
-					doc_in.ed.Edit([0,size,s_mark+s_script]);
+					doc_in.ed.HookedEdit([0,size,s_mark+s_script]);
 					doc_in.m_cell_id=cell_i.m_cell_id;
 					doc_in.CallOnChange();
 				}

@@ -1255,6 +1255,7 @@ UI.CustomTheme=function(){
 			caption_text_color:0xff000000,
 			caption_icon_color:L?0xff7f7f7f:0xff444444,
 		},
+		//////////////////////
 		graph_view:{
 			//todo: dark theme support
 			color:0x7fe8e8e8,
@@ -1404,6 +1405,22 @@ UI.CustomTheme=function(){
 				caret_width:UI.IS_MOBILE?1:2,
 				caret_color:L?0xff000000:0xffe8e8e8,
 				caret_flicker:500,
+			},
+		},
+		//////////////////////
+		sticker_wall:{
+			sticker_styles:{
+				code:{
+					bgcolor:GetThemeColor("background",L?0xffe8e8e8:0xff3f3f3f),
+				},
+				note:{
+					bgcolor:L?0xffafebf7:0xffafebf7,
+				},
+			},
+			common_style:{
+				padding:6,
+				shadow_size:8,
+				shadow_color:C_shadow,
 			},
 		},
 	};

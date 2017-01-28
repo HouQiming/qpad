@@ -194,7 +194,7 @@ TOK_LSHIFT_EQ=int('s')
 TOK_RSHIFT_EQ=int('t')
 ////////////////
 TOK_COMMENT=int('u')
-TOK_COMBO_SLOT=int('v')
+TOK_COMBO_SLOT=int('v') //not a real token
 
 g_id_include=getid("#include")
 g_id_define=getid("#define")
@@ -222,7 +222,7 @@ struct TParsedTag
 	int epos
 class CTag
 	int id,idfn
-	int epos0,epos1
+	int epos
 auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 	auto feed=sdata[0:].ConvertToAsBinary(u8)
 	//we want feed to be zero-terminated
@@ -308,7 +308,6 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 	inds=new int[]
 	brastk=new TBracket[]
 	toks=new TToken[]
-	//tags=new TParsedTag[]
 	ignore_indents=g_ignore_indents
 	last_significant_newline_position=-1L
 	last_line_comment_position=-1L
@@ -650,9 +649,14 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 			if ch=='/':
 				ptr++
 				efeed0=ptr
-				if ENABLE_EXPERIMENTAL_FEATURES&&ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad ",6)==0:
-					ptr+=6
-					push_token(TOK_COMMENT,int(efeed0-2),int(ptr))
+				if ENABLE_EXPERIMENTAL_FEATURES&&ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad",5)==0:
+					if feed[ptr+5]==' ':
+						ptr+=6
+						push_token(TOK_COMMENT,int(efeed0-2),int(ptr))
+					else if feed[ptr+5]=='#':
+						//qpad# tag_name
+						ptr+=6
+						push_token(TOK_ID+g_id_pragma_mark,int(efeed0-2),int(ptr))
 				else
 					for(;;)
 						ch=int(feed[ptr])
@@ -823,7 +827,7 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 						skipchars(CharSet.spaces)
 						if ptr<feed.n&&int(feed[ptr])=='-':
 							ptr++
-							push_token(g_id_pragma_mark,int(pword),int(ptr))
+							push_token(TOK_ID+g_id_pragma_mark,int(pword),int(ptr))
 							skipchars(CharSet.spaces)
 							id=getid(cite_raw(ptr,bk_ptr))
 							push_token(TOK_ID+id,int(ptr),int(bk_ptr))
@@ -3059,6 +3063,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		g_color_table_time++
 		return 0
 	}
+	JS_UI["ED_ForceIntoParseQueueFront"]=function(JSContext JS){
+		fn=JS.Param(0).as(string)
+		if !(fn.n&&fn[0]=='*'):
+			fn=System.Env.NormalizeFileName(fn)
+		g_c_like_parse_queue.push(getid(fn))
+		return 0
+	}
 	JS_UI["ED_ParseMore"]=function(JSContext JS){
 		while g_c_like_parse_queue.n:
 			idfn=g_c_like_parse_queue.pop()
@@ -3398,13 +3409,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return 0
 	}
 	JS_UI["ED_QueryKeyDeclByNeedle"]=function(JSContext JS){
-		doc=JS.Param(0).as(JSObject)
+		fidx=JS.Param(0).as(CFileIndex)
 		s_needle=JS.Param(1).as(string)
-		fidx=doc["ed"]["m_file_index"].as(CFileIndex)
-		ed=doc["ed"].as(CEditableText)
-		//s=JS.Param(1).as(string)
+		if !fidx:
+			doc=JS.Param(0).as(JSObject)
+			fidx=doc["ed"]["m_file_index"].as(CFileIndex)
+			//ed=doc["ed"].as(CEditableText)
+			//if !ed:return JS.ReturnError("invalid editor object")
+			//s=JS.Param(1).as(string)
 		if !fidx||!fidx.m_all_decls:return 0
-		if !ed:return JS.ReturnError("invalid editor object")
 		diff_from_save=doc["m_diff_from_save"].as(CDiffTracker)
 		//if !s:s=new string
 		all_key_decls=fidx.m_all_key_decls

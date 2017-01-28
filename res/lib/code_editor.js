@@ -515,6 +515,23 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			}
 		}
 		//////////////
+		//join the sync group
+		if(this.m_file_name&&this.m_file_name!="*remote"){
+			var arr_docs=UI.g_editor_from_file[this.m_file_name];
+			var found=0;
+			if(arr_docs){
+				for(var i=0;i<arr_docs.length;i++){
+					if(arr_docs[i]===this){
+						found=1;
+						break;
+					}
+				}
+				if(found){
+					UI.SetEditorSyncGroup(arr_docs);
+				}
+			}
+		}
+		//////////////
 		var cbs=this.opening_callbacks
 		if(cbs){
 			for(var i=0;i<cbs.length;i++){
@@ -1164,7 +1181,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(edstyle.line_number_font,56);
 		}
 		var w_bookmark=UI.GetCharacterAdvance(edstyle.bookmark_font,56)+4;
-		w_line_numbers+=edstyle.padding+w_bookmark;
+		if(show_line_numbers){
+			w_line_numbers+=edstyle.padding+w_bookmark;
+		}
 		this.m_rendering_w_line_numbers=w_line_numbers;
 		//prepare bookmarks - they appear under line numbers
 		var bm_xys=undefined;
@@ -1999,12 +2018,25 @@ var fsave_code_editor=UI.HackCallback(function(){
 	}
 	var ret=UI.EDSaver_Write(ctx,doc.ed)
 	if(ret=="done"){
+		////////////
+		//*remote won't get here
 		doc.saved_point=doc.ed.GetUndoQueueLength()
 		this.ReleaseEditLock();
 		ctx.discard();
 		doc.ed.saving_context=undefined
 		doc.ResetSaveDiff()
-		doc.m_loaded_time=IO.GetFileTimestamp(this.file_name)
+		tstamp=IO.GetFileTimestamp(this.file_name);
+		doc.m_loaded_time=tstamp;
+		var arr_sync=UI.g_editor_from_file[doc.m_file_name];
+		if(arr_sync){
+			for(var i=0;i<arr_sync.length;i++){
+				if(arr_sync[i].ed){
+					arr_sync[i].saved_point=arr_sync[i].ed.GetUndoQueueLength()
+					arr_sync[i].ResetSaveDiff();
+					arr_sync[i].m_loaded_time=tstamp;
+				}
+			}
+		}
 		this.OnSave();
 		this.DismissNotification('saving_progress')
 		UI.RefreshAllTabs()
@@ -6029,6 +6061,9 @@ W.CodeEditor=function(id,attrs){
 			//find highlight
 			if(!obj.show_find_bar&&s_autofind_needle&&!obj.m_hide_find_highlight){
 				//repeat the animation to get the correct scrolling information
+				if(doc.disable_x_scroll){
+					doc.scroll_x=0;
+				}
 				UI.Begin(doc)
 					//alway bound the scroll to valid ranges
 					var sx0=doc.scroll_x;
@@ -6112,8 +6147,10 @@ W.CodeEditor=function(id,attrs){
 			w_line_numbers=Math.max(lmax.toString().length,3)*UI.GetCharacterAdvance(obj.line_number_font,56);
 		}
 		var is_find_mode_rendering=(!obj.m_edit_lock&&obj.show_find_bar&&current_find_context);
-		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4
-		w_line_numbers+=obj.padding+w_bookmark;
+		var w_bookmark=UI.GetCharacterAdvance(obj.bookmark_font,56)+4;
+		if(show_line_numbers){
+			w_line_numbers+=obj.padding+w_bookmark;
+		}
 		if(is_find_mode_rendering){
 			UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area})
 		}
@@ -6150,13 +6187,13 @@ W.CodeEditor=function(id,attrs){
 			var renderer=doc.GetRenderer();
 			renderer.m_virtual_diffs=undefined;
 		}
-		if(doc&&doc.m_enable_wrapping&&!obj.m_is_preview){
+		if(doc&&doc.m_enable_wrapping&&!obj.m_is_preview&&obj.show_background!==0){
 			var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+12;
 			if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
 				w_right_shadow=x_wrap_bar;
 			}
 		}
-		if(!is_find_mode_rendering){
+		if(!is_find_mode_rendering&&obj.show_background!==0){
 			UI.RoundRect({color:obj.read_only?UI.default_styles.code_editor.line_number_bgcolor:UI.default_styles.code_editor.bgcolor,
 				x:obj.x+w_line_numbers,
 				y:obj.y,
@@ -6341,7 +6378,7 @@ W.CodeEditor=function(id,attrs){
 				//doc.precise_ctrl_lr_stop=UI.TestOption("precise_ctrl_lr_stop");
 				//doc.same_line_only_left_right=!UI.TestOption("left_right_line_wrap");
 				//wrap width widget
-				if(obj.doc.m_enable_wrapping&&!obj.m_is_preview){
+				if(obj.doc.m_enable_wrapping&&!obj.m_is_preview&&obj.show_background!==0){
 					var x_wrap_bar=w_line_numbers+obj.doc.displayed_wrap_width-obj.doc.visible_scroll_x+12;
 					if(w_obj_area-w_scrolling_area-x_wrap_bar>0){
 						//UI.RoundRect({
@@ -6402,7 +6439,7 @@ W.CodeEditor=function(id,attrs){
 					}
 				}
 				//status overlay
-				if(doc&&obj.h>=UI.GetCharacterHeight(doc.font)*2){
+				if(doc&&obj.h>=UI.GetCharacterHeight(doc.font)*2&&UI.HasFocus(doc)){
 					var sel=doc.GetSelection()
 					var lcinfo0=doc.GetLC(sel[0])
 					var s_status="";
@@ -7512,6 +7549,9 @@ var RemoveDocFromByFileList=function(doc,fn){
 		var arr_new=arr_ori.filter(function(doc_i){return doc_i!=doc})
 		if(arr_new.length<arr_ori.length){
 			UI.g_editor_from_file[fn]=(arr_new.length?arr_new:undefined);
+			if(fn!="*remote"){
+				UI.SetEditorSyncGroup(arr_new);
+			}
 			return 1;
 		}
 	}
@@ -7758,12 +7798,17 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 		if(is_quiet){
 			bk_current_tab_id=UI.top.app.document_area.current_tab_id;
 		}
-		var lang=UI.ED_GetFileLanguage(fname);
-		//console.log(fname,lang.is_binary,!UI.m_ui_metadata[fname],UI.m_ui_metadata[fname].m_language_id,UI.ED_DetectBinaryFile(fname))
-		if(lang.is_binary||!UI.m_ui_metadata[fname]&&UI.ED_DetectBinaryFile(fname)){
-			obj_tab=UI.NewBinaryEditorTab(fname)
+		var s_ext=UI.GetFileNameExtension(fname);
+		if(s_ext=="stickerwall"){
+			obj_tab=UI.OpenStickerWallTab(fname);
 		}else{
-			obj_tab=UI.NewCodeEditorTab(fname)
+			var lang=UI.ED_GetFileLanguage(fname);
+			//console.log(fname,lang.is_binary,!UI.m_ui_metadata[fname],UI.m_ui_metadata[fname].m_language_id,UI.ED_DetectBinaryFile(fname))
+			if(lang.is_binary||!UI.m_ui_metadata[fname]&&UI.ED_DetectBinaryFile(fname)){
+				obj_tab=UI.NewBinaryEditorTab(fname)
+			}else{
+				obj_tab=UI.NewCodeEditorTab(fname)
+			}
 		}
 		if(is_quiet){
 			UI.top.app.document_area.current_tab_id=bk_current_tab_id;
@@ -8006,7 +8051,7 @@ UI.RegisterEditorPlugin(function(){
 				this.owner.doc=UI.OpenCodeEditorDocument(this.owner.file_name,this.owner.m_is_preview,name);
 				this.owner.doc.Init();
 				if(s_text_bak){
-					this.owner.doc.ed.Edit([0,0,s_text_bak]);
+					this.owner.doc.ed.HookedEdit([0,0,s_text_bak]);
 				}
 				this.owner.doc.m_linked_terminal=bak_m_linked_terminal;
 				this.owner.doc.m_fn_remote=bak_m_fn_remote;

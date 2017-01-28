@@ -93,22 +93,27 @@ v2
   },
   {
    "m_language": "Markdown",
-   "m_text_out": "c:/tp/qpad/res/main.js:23202..23228: IO.StartWaitingForPipes();\nc:/tp/qpad/res/main.js:29439..29465: IO.StartWaitingForPipes();\n",
-   "m_has_any_error": 1,
    "m_cell_id": 4,
-   "m_button_name": "â€¢ Search result",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "out_m_current_wrap_width": 512,
-   "out_m_enable_wrapping": 0
+   "m_button_name": "â€¢ Search result"
   }
  ],
  "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+sync groups:
+	partial sync groups - sticker
+tab caption dragging vs zoom
+limit sticker height
+out-of-screen subwindow
+error clean up on cell deletion
+ESC in terminal: release focus
+busy loop again
 sticker wall
 	the old tags idea
+		//qpad#
 	but with non-linear layout
 	save in code
 		layout data in sticker wall
@@ -116,9 +121,17 @@ sticker wall
 			{}
 			ctrl+g
 		could store code template / code generator as sticker scripts
+	ctrl+c / ctrl+v sticking
+	-----
+	global view actions
+	moving stickers
+	shadow
+truly stateless UI framework
+	re-call Render during message processing and remove auto-saving...
 weird error appearance in android build output
 	TERM=xterm? no
 terminal gets overwhelmed by large amounts of output
+	ctrl+s / ctrl+q?
 graph:
 	jc nodes
 		__c_function

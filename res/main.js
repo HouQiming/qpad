@@ -5,6 +5,7 @@ require("res/lib/bin_editor");
 require("res/lib/subwin");
 require("res/lib/notebook_v2");
 require("res/lib/help_page");
+require("res/lib/stickerwall");
 //require("res/lib/graphview");
 require("res/plugin/edbase");
 var Language=require("res/lib/langdef");
@@ -372,7 +373,7 @@ var SetHelpText=function(doc_code){
 			}
 			if(sel[0]<sel[1]){
 				//auto-search
-				doc_help_edit.ed.Edit([
+				doc_help_edit.ed.HookedEdit([
 					0,doc_help_edit.ed.GetTextSize(),doc_code.ed.GetText(sel[0],sel[1]-sel[0])])
 				doc_help_edit.SetSelection(0,doc_help_edit.ed.GetTextSize())
 				doc_help_edit.CallOnChange()

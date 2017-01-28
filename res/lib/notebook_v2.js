@@ -4,7 +4,7 @@ var Language=require("res/lib/langdef");
 require("res/lib/global_doc");
 require("res/lib/code_editor");
 
-var MeasureEditorSize=function(doc,w_content){
+UI.MeasureEditorSize=function(doc,w_content){
 	var ed=doc.ed;
 	var ccnt_tot=ed.GetTextSize();
 	var hc=ed.GetCharacterHeightAt(ccnt_tot);
