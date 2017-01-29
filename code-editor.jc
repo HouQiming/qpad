@@ -2574,7 +2574,7 @@ WRITE_BATCH=4194304
 //INITIAL_READ_SIZE=233
 //WRITE_BATCH=4194304
 class CLoadingContext
-	i64 sz
+	i64 sz,sz_read
 	int encoding
 	//////////
 	//string fn
@@ -3737,16 +3737,23 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Open"]=function(JSContext JS){
 		//initial read, which is a raw edit
 		ed=JS.Param(0).as(CEditableText)
-		fn=JS.Param(1).or(new string)
-		szread=JS.Param(2).or(INITIAL_READ_SIZE)
+		params=JS.Param(1).as(JSObject)
+		fn=params["file_name"].or(new string)
+		szread=params["read_batch"].or(INITIAL_READ_SIZE)
+		offset0=params["offset0"].or(0LL)
+		offset1=params["offset1"].or(-1LL)
 		hf=System.IO.OpenFile(fn)
 		if !hf:return 0
-		s=hf.Read(szread)
+		if offset0:
+			hf.Seek(offset0)
+		szread_real=int(min(u64(offset1-offset0),u64(szread)))
+		s=hf.Read(szread_real)
+		szread_returned=s.n
 		if s.n:
 			//encoding detection
 			encoding=DetectEncoding(s)
 			if encoding!=ENCODING_UTF8&&encoding!=ENCODING_INVALID:
-				fwarning=JS.Param(3).as(JSObject)
+				fwarning=params["OnEncodingDetected"].as(JSObject)
 				fwarning.Call(int,encoding)
 			(s_utf8,s_lingering)=ConvertToUTF8(encoding,s)
 			if s_utf8.n:
@@ -3754,14 +3761,15 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		else
 			s_utf8=string.NULL
 			s_lingering=string.NULL
-		if s.n<szread:
+		if szread_returned<szread_real:
 			if s_lingering&&s_lingering.n:
 				ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:s_lingering}])
 			hf.Close()
 			return JS.Return(0)
 		ret=new CLoadingContext
 		ret.encoding=encoding
-		ret.sz=System.IO.GetFileSize(fn)
+		ret.sz=i64(min(u64(System.IO.GetFileSize(fn)),u64(offset1-offset0)))
+		ret.sz_read=szread_returned
 		ret.s_lingering=s_lingering
 		//ret.fn=fn
 		ret.hf=hf
@@ -3771,7 +3779,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Read"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
 		ret=JS.Param(1).as(CLoadingContext)
-		szread=JS.Param(2).or(NEXT_READ_SIZE)
+		szread=min(JS.Param(2).or(NEXT_READ_SIZE),ret.sz-ret.sz_read)
 		hf=ret.hf
 		//if ret.s_lingering:
 		//	ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
@@ -3784,9 +3792,10 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			ret.s_lingering=string.NULL
 		(s_utf8,s_lingering)=ConvertToUTF8(ret.encoding,s)
 		ret.s_lingering=s_lingering
+		ret.sz_read+=n_read
 		if s_utf8.n:
 			ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:s_utf8}])
-		if n_read<szread:
+		if ret.sz_read>=ret.sz||!n_read:
 			if ret.s_lingering:
 				ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
 				ret.s_lingering=string.NULL

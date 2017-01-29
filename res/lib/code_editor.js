@@ -407,15 +407,48 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			UI.Refresh();
 			return;
 		}
-		ed.hfile_loading=UI.EDLoader_Open(ed,fn,is_preview?4096:(this.hyphenator?262144:4194304),function(encoding){
-			if(this.owner){
-				this.owner.CreateNotification({id:'saving_progress',icon:'警',
-					text:UI._("The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.").replace(
-						"@1",g_encoding_names[encoding]||UI._("an unknown")),
-				})
+		////////////////////////////////
+		//if we're in a sync group, replicate their text / history, synchronously
+		var doc_peer=undefined;
+		var arr_docs=UI.g_editor_from_file[this.m_file_name];
+		if(arr_docs){
+			for(var i=0;i<arr_docs.length;i++){
+				if(arr_docs[i]!==this&&arr_docs[i].ed&&
+				!arr_docs[i].ed.hfile_loading&&
+				arr_docs[i].m_sync_group_ccnt0===undefined&&
+				arr_docs[i].m_sync_group_ccnt1===undefined){
+					doc_peer=arr_docs[i];
+					break;
+				}
 			}
-			return 0
-		}.bind(this))
+		}
+		if(doc_peer){
+			//replicate their text / undo history / diff, synchronously
+			ed.SyncToPeer(doc_peer.ed);
+			if(this.m_sync_group_ccnt0!==undefined&&this.m_sync_group_ccnt1!==undefined){
+				//create sub-range
+				ed.Edit([
+					0,this.m_sync_group_ccnt0,null,
+					this.m_sync_group_ccnt1,ed.GetTextSize()-this.m_sync_group_ccnt1,null],1);
+			}
+		}else{
+			//load the file normally
+			ed.hfile_loading=UI.EDLoader_Open(ed,{
+				file_name:fn,
+				read_batch:is_preview?4096:(this.hyphenator?262144:4194304),
+				offset0:this.m_sync_group_ccnt0,
+				offset1:this.m_sync_group_ccnt1,
+				OnEncodingDetected:function(encoding){
+					if(this.owner){
+						this.owner.CreateNotification({id:'saving_progress',icon:'警',
+							text:UI._("The file was using @1 encoding. Should you save it, it will be converted to UTF-8 instead.").replace(
+								"@1",g_encoding_names[encoding]||UI._("an unknown")),
+						})
+					}
+					return 0
+				}.bind(this),
+			});
+		}
 		//abandonment should work as is...
 		var floadNext=(function(){
 			if(this.m_is_destroyed){

@@ -481,12 +481,12 @@ W.TabbedDocument_prototype={
 		//	}
 		//}
 		var obj_window_mfocus=undefined;
-		var mouse_state=UI.GetSDLMouseState();
-		if(mouse_state.hwnd){
-			obj_window_mfocus=UI.m_window_map[mouse_state.hwnd.toString()];
-			event.x=mouse_state.x;
-			event.y=mouse_state.y;
-		}
+		//var mouse_state=UI.GetSDLMouseState();
+		//if(mouse_state.hwnd){
+		//	obj_window_mfocus=UI.m_window_map[mouse_state.hwnd.toString()];
+		//	event.x=mouse_state.x;
+		//	event.y=mouse_state.y;
+		//}
 		this.m_dragging_tab_target_window=(obj_window_mfocus&&obj_window_mfocus.window_unique_id);
 		if(!this.m_dragging_tab_target_window){this.m_dragging_tab_target_window=undefined;}
 		this.m_dragging_mouse_moved=1;

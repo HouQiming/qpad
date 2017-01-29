@@ -105,7 +105,9 @@ v2
 # TODO LIST
 sync groups:
 	partial sync groups - sticker
-tab caption dragging vs zoom
+	loading files from... existing editor documents
+	(X) do not sync too-large files
+		hard to implement
 limit sticker height
 out-of-screen subwindow
 error clean up on cell deletion
