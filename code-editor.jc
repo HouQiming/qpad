@@ -3768,7 +3768,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return JS.Return(0)
 		ret=new CLoadingContext
 		ret.encoding=encoding
-		ret.sz=i64(min(u64(System.IO.GetFileSize(fn)),u64(offset1-offset0)))
+		ret.sz=i64(min(u64(System.IO.GetFileSize(fn)-offset0),u64(offset1-offset0)))
 		ret.sz_read=szread_returned
 		ret.s_lingering=s_lingering
 		//ret.fn=fn

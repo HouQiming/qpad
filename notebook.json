@@ -103,12 +103,13 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-sync groups:
-	partial sync groups - sticker
-	loading files from... existing editor documents
-	(X) do not sync too-large files
-		hard to implement
-limit sticker height
+sticker code:
+	relative file name support
+	prevent accidental saves
+	properly restoring focus
+	actually adding stickers
+	manipulating stickers
+(test) limit sticker height
 out-of-screen subwindow
 error clean up on cell deletion
 ESC in terminal: release focus

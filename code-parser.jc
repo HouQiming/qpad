@@ -3409,14 +3409,12 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			return 0
 	}
 	JS_UI["ED_QueryKeyDeclByNeedle"]=function(JSContext JS){
-		fidx=JS.Param(0).as(CFileIndex)
+		doc=JS.Param(0).as(JSObject)
 		s_needle=JS.Param(1).as(string)
-		if !fidx:
-			doc=JS.Param(0).as(JSObject)
-			fidx=doc["ed"]["m_file_index"].as(CFileIndex)
-			//ed=doc["ed"].as(CEditableText)
-			//if !ed:return JS.ReturnError("invalid editor object")
-			//s=JS.Param(1).as(string)
+		//ed=doc["ed"].as(CEditableText)
+		//if !ed:return JS.ReturnError("invalid editor object")
+		//s=JS.Param(1).as(string)
+		fidx=doc["ed"]["m_file_index"].as(CFileIndex)
 		if !fidx||!fidx.m_all_decls:return 0
 		diff_from_save=doc["m_diff_from_save"].as(CDiffTracker)
 		//if !s:s=new string

@@ -458,23 +458,25 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				}
 				return
 			}
-			ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?262144:4194304))
-			if(this.m_owner){
-				this.m_owner.m_is_rendering_good=0;
-			}
-			//this.ResetSaveDiff()
-			if(is_preview){
-				var rendering_ccnt1=this.SeekXY(0,this.h)
-				if(rendering_ccnt1<ed.GetTextSize()){
-					//abandon and stop loading without calling OnLoad
-					if(ed.hfile_loading){
-						ed.hfile_loading.discard()
-						ed.hfile_loading=undefined
-					}
-					UI.Refresh()
-					return
+			do{
+				ed.hfile_loading=UI.EDLoader_Read(ed,ed.hfile_loading,is_preview?16384:(this.hyphenator?262144:4194304))
+				if(this.m_owner){
+					this.m_owner.m_is_rendering_good=0;
 				}
-			}
+				//this.ResetSaveDiff()
+				if(is_preview){
+					var rendering_ccnt1=this.SeekXY(0,this.h)
+					if(rendering_ccnt1<ed.GetTextSize()){
+						//abandon and stop loading without calling OnLoad
+						if(ed.hfile_loading){
+							ed.hfile_loading.discard()
+							ed.hfile_loading=undefined
+						}
+						UI.Refresh()
+						return
+					}
+				}
+			}while(ed.hfile_loading&&this.m_load_sync);
 			if(ed.hfile_loading){
 				UI.NextTick(floadNext);
 			}else{
@@ -8569,6 +8571,9 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 				}
 			}
 		}
+		is_preview=0;
+	}else if(is_preview==-2){
+		//forced new document mode
 		is_preview=0;
 	}
 	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
