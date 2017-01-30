@@ -5613,12 +5613,12 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 
 UI.SearchIncludeFile=function(fn_base,fn_include){
 	var fn_found=UI.SearchIncludeFileShallow(fn_base,fn_include);
-	if(fn_found=='<dangling>'||fn_found=='<deep>'){
-		PrepareAPEM();
-	}
+	//if(fn_found=='<dangling>'||fn_found=='<deep>'){
+	//}
 	fn_found=UI.g_deep_search_cache[fn_include];
 	if(fn_found==undefined){
 		//all paths ever mentioned
+		PrepareAPEM();
 		fn_found=null;
 		var paths=UI.g_all_paths_ever_mentioned;
 		for(var i=0;i<paths.length;i++){
@@ -6209,7 +6209,7 @@ W.CodeEditor=function(id,attrs){
 		}
 		//parsing progress
 		var parsing_jobs=UI.ED_GetRemainingParsingJobs();
-		if(doc&&!doc.notebook_owner&&parsing_jobs&&g_is_parse_more_running){
+		if(doc&&!doc.notebook_owner&&!doc.m_sticker_wall_owner&&parsing_jobs&&g_is_parse_more_running){
 			var fn_next=UI.GetSmartTabName(parsing_jobs.fn_next);
 			obj.CreateNotification({
 				id:'parsing_progress',

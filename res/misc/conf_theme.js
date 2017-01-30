@@ -1418,9 +1418,24 @@ UI.CustomTheme=function(){
 				},
 			},
 			common_style:{
-				padding:6,
+				padding:4,
+				move_padding:3,
 				shadow_size:8,
 				shadow_color:C_shadow,
+				/////
+				dragsel_bgcolor:L?(C&0x55ffffff):(C_raw&0x55ffffff),
+				dragsel_border_color:C,
+				dragsel_border_width:0,
+				/////
+				selection_color:C,
+				selection_width:1,
+				knob_scale:{
+					w:8,
+					h:8,
+					color:0xffffffff,
+					border_color:C,
+					border_width:1,
+				},
 			},
 		},
 	};

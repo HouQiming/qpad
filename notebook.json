@@ -104,11 +104,17 @@ v2
 =====í¯¿í¿¿=====
 # TODO LIST
 sticker code:
-	relative file name support
-	prevent accidental saves
-	properly restoring focus
 	actually adding stickers
+		code copy-paste
 	manipulating stickers
+		sticker toolbar
+			adjusting font size
+			go to original
+		z-order
+	edges
+	(X) render filename in code stickers? sticker caption bar?
+	keyboard control
+		navigating among stickers
 (test) limit sticker height
 out-of-screen subwindow
 error clean up on cell deletion
