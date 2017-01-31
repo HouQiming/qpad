@@ -110,11 +110,13 @@ sticker code:
 		sticker toolbar
 			adjusting font size
 			go to original
+		ESC inside sticker
 		z-order
 	edges
 	(X) render filename in code stickers? sticker caption bar?
 	keyboard control
 		navigating among stickers
+		moving / resizing
 (test) limit sticker height
 out-of-screen subwindow
 error clean up on cell deletion

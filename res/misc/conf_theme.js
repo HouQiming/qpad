@@ -1436,6 +1436,14 @@ UI.CustomTheme=function(){
 					border_color:C,
 					border_width:1,
 				},
+				/////
+				h_toolbar:32,
+				toolbar_color:L?0xffffffff:0xff666666,
+				toolbar_shadow_size:8,
+				toolbar_shadow_color:C_shadow,
+				/////
+				bgcolor0:L?0xffffffff:0xff666666,
+				bgcolor1:L?0xffe8e8e8:0xff444444,
 			},
 		},
 	};

@@ -75,21 +75,45 @@ var ScaleKnob_prototype={
 var MoveKnob_prototype={
 	OnMouseDown:function(event){
 		var obj=this.owner;
-		this.dx=obj.x-event.x;
-		this.dy=obj.y-event.y;
+		var wall=this.wall_owner;
+		this.dx=-event.x;
+		this.dy=-event.y;
 		this.is_dragging=1;
+		if(!obj.m_is_selected){
+			wall.ClearSelection();
+			obj.m_is_selected=1;
+		}
+		for(var i=0;i<wall.m_stickers.length;i++){
+			var sticker_i=wall.m_stickers[i];
+			if(sticker_i.m_is_selected){
+				sticker_i.drag_x=sticker_i.x;
+				sticker_i.drag_y=sticker_i.y;
+			}
+		}
 		UI.CaptureMouse(this);
 	},
 	OnMouseMove:function(event){
 		if(!this.is_dragging){return;}
-		var obj=this.owner;
-		obj.x=this.dx+event.x;
-		obj.y=this.dy+event.y;
+		var wall=this.wall_owner;
+		for(var i=0;i<wall.m_stickers.length;i++){
+			var sticker_i=wall.m_stickers[i];
+			if(sticker_i.m_is_selected){
+				sticker_i.x=sticker_i.drag_x+this.dx+event.x;
+				sticker_i.y=sticker_i.drag_y+this.dy+event.y;
+			}
+		}
 		UI.Refresh();
 	},
 	OnMouseUp:function(event){
 		this.OnMouseMove(event);
-		var obj=this.owner;
+		var wall=this.wall_owner;
+		for(var i=0;i<wall.m_stickers.length;i++){
+			var sticker_i=wall.m_stickers[i];
+			if(sticker_i.m_is_selected){
+				sticker_i.drag_x=undefined;
+				sticker_i.drag_y=undefined;
+			}
+		}
 		this.is_dragging=0;
 		UI.ReleaseMouse(this);
 		UI.Refresh();
@@ -121,8 +145,93 @@ edges
 	mainly connect to text range in code
 */
 var g_sw_separator='\n=====\udbff\udfff stickerwall =====\n',g_sw_separator_re=new RegExp(g_sw_separator,'g');
+var g_checker_shader=IO.UIReadAll("res/misc/checker.glsl");
 var sticker_wall_prototype={
 	//todo: save
+	InitSticker:function(sticker_i,text){
+		switch(sticker_i.type){
+		case "code":
+			var fn_i=sticker_i.file_name;
+			var fn_found=UI.SearchIncludeFile(this.m_file_name,fn_i);
+			if(fn_found){fn_i=fn_found;}
+			if(!IO.FileExists(fn_i)){break;}
+			var doc_host=UI.OpenCodeEditorDocument(fn_i,-1);
+			if(!doc_host.ed){
+				doc_host.m_load_sync=1;
+				doc_host.Init();
+			}
+			var diff_host=doc_host.m_diff_from_save;
+			var ccnt_tag0=0,ccnt_tag1=0;
+			if(!doc_host.ed.m_file_index){
+				var parse_ret=UI.ParseNow(fn_i);
+				if(parse_ret&&parse_ret.file_index){
+					doc_host.ed.m_file_index=parse_ret.file_index;
+				}
+			}
+			var decls=UI.ED_QueryKeyDeclByNeedle(doc_host,sticker_i.tag0_name);
+			ccnt_tag0=((decls&&decls[(sticker_i.tag0_number||0)*2])||0);
+			if(diff_host){ccnt_tag0=diff_host.BaseToCurrent(ccnt_tag0);}
+			if(sticker_i.tag1_name===undefined){
+				//{} auto-pairing mode
+				var line_tag0=doc_host.GetLC(ccnt_tag0)[0];
+				var ccnt_lend_tag0=doc_host.GetEnhancedEnd(ccnt_tag0);
+				var blevel_tag0=doc_host.GetBracketLevel(doc_host.SeekLC(line_tag0,0));
+				var blevel_lend_tag0=doc_host.GetBracketLevel(ccnt_lend_tag0);
+				if(blevel_lend_tag0==blevel_tag0){
+					//try the next line
+					var ccnt_lnext_tag0=doc_host.GetEnhancedEnd(doc_host.SeekLC(line_tag0+1,0));
+					var blevel_lnext_tag0=doc_host.GetBracketLevel(ccnt_lnext_tag0);
+					if(blevel_lnext_tag0>blevel_tag0){
+						blevel_lend_tag0=blevel_lnext_tag0;
+						ccnt_lend_tag0=ccnt_lnext_tag0;
+					}
+				}
+				if(blevel_lend_tag0>blevel_tag0){
+					ccnt_tag1=doc_host.FindOuterBracket(ccnt_lend_tag0,1);
+				}
+			}else{
+				decls=UI.ED_QueryKeyDeclByNeedle(doc_host,sticker_i.tag1_name);
+				ccnt_tag1=((decls&&decls[(sticker_i.tag1_number||0)*2])||ccnt_tag0);
+				if(diff_host){ccnt_tag1=diff_host.BaseToCurrent(ccnt_tag1);}
+			}
+			if(ccnt_tag1>ccnt_tag0){
+				ccnt_tag0=doc_host.SeekLC(doc_host.GetLC(ccnt_tag0)[0],0);
+				ccnt_tag1=doc_host.SeekLC(doc_host.GetLC(ccnt_tag1)[0]+1,0);
+				if(ccnt_tag1>ccnt_tag0){
+					var doc_code=UI.OpenCodeEditorDocument(fn_i,-2);
+					doc_code.m_sync_group_ccnt0=ccnt_tag0;
+					doc_code.m_sync_group_ccnt1=ccnt_tag1;
+					doc_code.show_background=0;
+					doc_code.m_sticker_wall_owner=this;
+					doc_code.disable_line_numbers=1;
+					doc_code.Init()
+					sticker_i.doc=doc_code;
+				}
+			}
+			UI.CloseCodeEditorDocument(doc_host);
+			break;
+		case "note":
+			var doc_note=UI.CreateEmptyCodeEditor("Markdown");
+			//doc_note.plugins=this.m_cell_plugins;
+			doc_note.m_enable_wrapping=1;
+			doc_note.m_current_wrap_width=sticker_i.w/sticker_i.scale-UI.default_styles.code_editor.padding;
+			doc_note.wrap_width=doc_note.m_current_wrap_width;
+			doc_note.disable_x_scroll=1;
+			doc_note.show_background=0;
+			doc_note.disable_line_numbers=1;
+			doc_note.m_sticker_wall_owner=this;
+			doc_note.Init();
+			doc_note.scroll_x=0;doc_note.scroll_y=0;
+			if(text){doc_note.ed.Edit([0,0,text],1);}
+			doc_note.saved_point=doc_note.ed.GetUndoQueueLength();
+			sticker_i.doc=doc_note;
+			break;
+		//case "script":
+		//	break;
+		//case "image":
+		//	break;
+		}
+	},
 	Init:function(){
 		this.m_is_inited=1;
 		this.m_stickers=[];
@@ -137,89 +246,11 @@ var sticker_wall_prototype={
 		var ppart=1;
 		for(var i=0;i<this.m_stickers.length;i++){
 			var sticker_i=this.m_stickers[i];
-			switch(sticker_i.type){
-			case "code":
-				var fn_i=sticker_i.file_name;
-				var fn_found=UI.SearchIncludeFile(fn,fn_i);
-				if(fn_found){fn_i=fn_found;}
-				if(!IO.FileExists(fn_i)){break;}
-				var doc_host=UI.OpenCodeEditorDocument(fn_i,-1);
-				if(!doc_host.ed){
-					doc_host.m_load_sync=1;
-					doc_host.Init();
-				}
-				var diff_host=doc_host.m_diff_from_save;
-				var ccnt_tag0=0,ccnt_tag1=0;
-				if(!doc_host.ed.m_file_index){
-					var parse_ret=UI.ParseNow(fn_i);
-					if(parse_ret&&parse_ret.file_index){
-						doc_host.ed.m_file_index=parse_ret.file_index;
-					}
-				}
-				var decls=UI.ED_QueryKeyDeclByNeedle(doc_host,sticker_i.tag0_name);
-				ccnt_tag0=((decls&&decls[(sticker_i.tag0_number||0)*2])||0);
-				if(diff_host){ccnt_tag0=diff_host.BaseToCurrent(ccnt_tag0);}
-				if(sticker_i.tag1_name===undefined){
-					//{} auto-pairing mode
-					var line_tag0=doc_host.GetLC(ccnt_tag0)[0];
-					var ccnt_lend_tag0=doc_host.GetEnhancedEnd(ccnt_tag0);
-					var blevel_tag0=doc_host.GetBracketLevel(doc_host.SeekLC(line_tag0,0));
-					var blevel_lend_tag0=doc_host.GetBracketLevel(ccnt_lend_tag0);
-					if(blevel_lend_tag0==blevel_tag0){
-						//try the next line
-						var ccnt_lnext_tag0=doc_host.GetEnhancedEnd(doc_host.SeekLC(line_tag0+1,0));
-						var blevel_lnext_tag0=doc_host.GetBracketLevel(ccnt_lnext_tag0);
-						if(blevel_lnext_tag0>blevel_tag0){
-							blevel_lend_tag0=blevel_lnext_tag0;
-							ccnt_lend_tag0=ccnt_lnext_tag0;
-						}
-					}
-					if(blevel_lend_tag0>blevel_tag0){
-						ccnt_tag1=doc_host.FindOuterBracket(ccnt_lend_tag0,1);
-					}
-				}else{
-					decls=UI.ED_QueryKeyDeclByNeedle(doc_host,sticker_i.tag1_name);
-					ccnt_tag1=((decls&&decls[(sticker_i.tag1_number||0)*2])||ccnt_tag0);
-					if(diff_host){ccnt_tag1=diff_host.BaseToCurrent(ccnt_tag1);}
-				}
-				if(ccnt_tag1>ccnt_tag0){
-					ccnt_tag0=doc_host.SeekLC(doc_host.GetLC(ccnt_tag0)[0],0);
-					ccnt_tag1=doc_host.SeekLC(doc_host.GetLC(ccnt_tag1)[0]+1,0);
-					if(ccnt_tag1>ccnt_tag0){
-						var doc_code=UI.OpenCodeEditorDocument(fn_i,-2);
-						doc_code.m_sync_group_ccnt0=ccnt_tag0;
-						doc_code.m_sync_group_ccnt1=ccnt_tag1;
-						doc_code.show_background=0;
-						doc_code.m_sticker_wall_owner=this;
-						doc_code.disable_line_numbers=1;
-						doc_code.Init()
-						sticker_i.doc=doc_code;
-					}
-				}
-				UI.CloseCodeEditorDocument(doc_host);
-				break;
-			case "note":
-				var text=(parts[ppart++]||"");
-				var doc_note=UI.CreateEmptyCodeEditor("Markdown");
-				//doc_note.plugins=this.m_cell_plugins;
-				doc_note.m_enable_wrapping=1;
-				doc_note.m_current_wrap_width=sticker_i.w/sticker_i.scale-UI.default_styles.code_editor.padding;
-				doc_note.wrap_width=doc_note.m_current_wrap_width;
-				doc_note.disable_x_scroll=1;
-				doc_note.show_background=0;
-				doc_note.disable_line_numbers=1;
-				doc_note.m_sticker_wall_owner=this;
-				doc_note.Init();
-				doc_note.scroll_x=0;doc_note.scroll_y=0;
-				if(text){doc_note.ed.Edit([0,0,text],1);}
-				doc_note.saved_point=doc_note.ed.GetUndoQueueLength();
-				sticker_i.doc=doc_note;
-				break;
-			//case "script":
-			//	break;
-			//case "image":
-			//	break;
+			var text="";
+			if(sticker_i.type=="note"){
+				text=(parts[ppart++]||"");
 			}
+			this.InitSticker(sticker_i,text);
 		}
 	},
 	Render:function(){
@@ -237,6 +268,17 @@ var sticker_wall_prototype={
 			tr.trans=[0,0];
 		}
 		//view transformation
+		UI.PushSubWindow(this.x,this.y,this.w,this.h,1.0);
+		UI.GLWidget(function(){
+			UI.ED_DrawFullScreenEffect(g_checker_shader,{
+				coord_scale:[this.w,this.h],
+				trans:tr.trans,
+				scale:tr.scale,
+				color_0:common_style.bgcolor0,
+				color_1:common_style.bgcolor1,
+			});
+		}.bind(this));
+		UI.PopSubWindow();
 		UI.PushSubWindow(this.x,this.y,this.w,this.h,tr.scale);
 		var move_padding=common_style.move_padding/tr.scale+common_style.padding;
 		for(var i=0;i<stickers.length;i++){
@@ -274,11 +316,13 @@ var sticker_wall_prototype={
 			//	break;
 			}
 			//moving borders
+			var sticker_name=("sticker_"+i.toString());
 			W.Region(sticker_name+"_move_knob",{
 				x:x-move_padding,y:y-move_padding,
 				w:sticker_i.w+move_padding*2,
 				h:sticker_i.h+move_padding*2,
 				owner:sticker_i,
+				wall_owner:this,
 				mouse_cursor:"sizeall",
 			},MoveKnob_prototype);
 			//render background
@@ -298,7 +342,6 @@ var sticker_wall_prototype={
 			});
 			//render content
 			UI.PushSubWindow(x,y,sticker_i.w,sticker_i.h,sticker_i.scale)
-			var sticker_name=("sticker_"+i.toString());
 			switch(sticker_i.type){
 			case "code":
 				W.CodeEditor(sticker_name,{
@@ -382,11 +425,10 @@ var sticker_wall_prototype={
 	///////////////////////////
 	OnMouseDown:function(event){
 		UI.SetFocus(this);
-		this.m_temp_ui=undefined;
-		this.m_temp_ui_desc=undefined;
 		this.m_drag_ctx={mode:"translation",x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.m_tr))};
 		if(event.button==UI.SDL_BUTTON_LEFT){
 			this.m_drag_ctx.mode="selection";
+			UI.SetFocus(this);
 		}
 		UI.CaptureMouse(this);
 		UI.Refresh();
@@ -425,15 +467,17 @@ var sticker_wall_prototype={
 		UI.ReleaseMouse(this);
 	},
 	OnMouseWheel:function(event){
-		var mx_world=((UI.m_absolute_mouse_position.x-this.x)-this.m_tr.trans[0])/this.m_tr.scale;
-		var my_world=((UI.m_absolute_mouse_position.y-this.y)-this.m_tr.trans[1])/this.m_tr.scale;
+		var x_real=UI.m_absolute_mouse_position.x/UI.pixels_per_unit-this.x;
+		var y_real=UI.m_absolute_mouse_position.y/UI.pixels_per_unit-this.y;
+		var mx_world=(x_real-this.m_tr.trans[0])/this.m_tr.scale;
+		var my_world=(y_real-this.m_tr.trans[1])/this.m_tr.scale;
 		var log_scale=Math.log(this.m_tr.scale);
 		log_scale+=event.y*0.1;
 		this.m_tr.scale=(Math.exp(log_scale)||1);
-		this.m_tr.trans[0]=(UI.m_absolute_mouse_position.x-this.x)-mx_world*this.m_tr.scale;
-		this.m_tr.trans[1]=(UI.m_absolute_mouse_position.y-this.y)-my_world*this.m_tr.scale;
+		this.m_tr.trans[0]=x_real-mx_world*this.m_tr.scale;
+		this.m_tr.trans[1]=y_real-my_world*this.m_tr.scale;
 		if(this.m_drag_ctx){
-			this.m_drag_ctx={x:event.x,y:event.y, tr:JSON.parse(JSON.stringify(this.m_tr))};
+			this.m_drag_ctx={x:x_real,y:y_real, tr:JSON.parse(JSON.stringify(this.m_tr))};
 		}
 		UI.Refresh();
 	},
@@ -443,6 +487,102 @@ var sticker_wall_prototype={
 		for(var i=0;i<stickers.length;i++){
 			stickers[i].m_is_selected=0;
 		}
+	},
+	DeleteSelection:function(){
+		var stickers=this.m_stickers;
+		var n2=0;
+		for(var i=0;i<stickers.length;i++){
+			if(!stickers[i].m_is_selected){
+				this["sticker_"+n2.toString()]=this["sticker_"+i.toString()];
+				stickers[n2]=stickers[i];
+				n2++;
+			}
+		}
+		stickers.length=n2;
+		UI.Refresh();
+	},
+	PlaceSticker:function(new_sticker){
+		//O(n^3) search: enum all x/y combos, find the nearest not-covered one
+		var separation=32;
+		var stickers=this.m_stickers;
+		var n=stickers.length;
+		var xs=[];
+		var ys=[];
+		var x_min=0,y_min=0,x_max=0,y_max=0;
+		for(var i=0;i<n;i++){
+			xs.push(stickers[i].x-separation-new_sticker.w, stickers[i].x+stickers[i].w+separation);
+			ys.push(stickers[i].y-separation-new_sticker.h, stickers[i].y+stickers[i].h+separation);
+			xs.push(stickers[i].x, stickers[i].x+stickers[i].w-new_sticker.w);
+			ys.push(stickers[i].y, stickers[i].y+stickers[i].h-new_sticker.h);
+			if(!i){
+				x_min=stickers[i].x;
+				y_min=stickers[i].y;
+				x_max=stickers[i].x+stickers[i].w;
+				y_max=stickers[i].y+stickers[i].h;
+			}else{
+				x_min=Math.min(x_min,stickers[i].x);
+				y_min=Math.min(y_min,stickers[i].y);
+				x_max=Math.max(x_max,stickers[i].x+stickers[i].w);
+				y_max=Math.max(y_max,stickers[i].y+stickers[i].h);
+			}
+		}
+		xs.sort();ys.sort();
+		var best_dist=1e30;
+		var best_area=1e30;
+		new_sticker.x=0;
+		new_sticker.y=0;
+		for(var xi=0;xi<xs.length;xi++){
+			for(var yi=0;yi<ys.length;yi++){
+				var x=xs[xi],y=ys[yi];
+				var area_xy=(Math.max(x_max,x)-Math.min(x_min,x))*(Math.max(y_max,y)-Math.min(y_min,y));
+				if(best_area<area_xy){continue;}
+				var dist_nearest=1e30;
+				for(var i=0;i<n;i++){
+					var sticker_i=stickers[i];
+					var x0=sticker_i.x-separation-new_sticker.w;
+					var y0=sticker_i.y-separation-new_sticker.h;
+					var x1=sticker_i.x+sticker_i.w+separation;
+					var y1=sticker_i.y+sticker_i.h+separation;
+					if(x0<x&&x<x1&&y0<y&&y<y1){
+						area_xy=1e31;
+						dist_nearest=1e31;
+						break;
+					}
+					var dx=Math.max(x0-x,x-x1,0);
+					var dy=Math.max(y0-y,y-y1,0);
+					var dist_i=dx*dx+dy*dy;
+					if(sticker_i.m_is_selected){
+						dist_i/=2;
+					}
+					if(dist_nearest>dist_i){
+						dist_nearest=dist_i;
+					}
+				}
+				if(best_area>area_xy||best_area==area_xy&&(best_dist>dist_nearest||best_dist==dist_nearest&&(new_sticker.y>y||new_sticker.y==y&&new_sticker.x>x))){
+					best_area=area_xy;
+					best_dist=dist_nearest;
+					new_sticker.x=x;
+					new_sticker.y=y;
+				}
+			}
+		}
+		this.m_stickers.push(new_sticker);
+		this.InitSticker(new_sticker,"");
+		//auto scroll
+		this.AutoScrollToShow(new_sticker)
+	},
+	AutoScrollToShow:function(sticker_i){
+		this.m_tr.trans[0]=-Math.min(Math.max(-this.m_tr.trans[0],sticker_i.x+sticker_i.w+8-this.w),sticker_i.x-8);
+		this.m_tr.trans[1]=-Math.min(Math.max(-this.m_tr.trans[1],sticker_i.y+sticker_i.h+8-this.h),sticker_i.y-8);
+	},
+	InsertNote:function(){
+		var new_sticker={
+			"type":"note",
+			"w":300,"h":32,
+			"scale":1,
+		};
+		this.PlaceSticker(new_sticker);
+		UI.Refresh();
 	},
 };
 W.StickerWall=function(id,attrs){
@@ -488,10 +628,13 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 		body:function(){
 			//use styling for editor themes
 			UI.context_parent.body=this.main_widget;
+			var common_style=UI.default_styles.sticker_wall.common_style;
 			if(this.main_widget){this.file_name=this.main_widget.m_file_name}
+			//sticker wall area
 			var attrs={
-				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
-				'x':0,'y':0,
+				'x':0,'y':common_style.h_toolbar,
+				'w':UI.context_parent.w,
+				'h':UI.context_parent.h-common_style.h_toolbar,
 				'm_file_name':this.file_name,
 				'activated':this==UI.top.app.document_area.active_tab,
 			};
@@ -501,6 +644,49 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 			}
 			this.need_save=this.main_widget.need_save;
 			this.UpdateTitle();
+			//toolbar
+			UI.RoundRect({
+				x:-common_style.toolbar_shadow_size,y:common_style.h_toolbar-common_style.toolbar_shadow_size,
+				w:UI.context_parent.w+common_style.toolbar_shadow_size*2,h:common_style.toolbar_shadow_size*2,
+				round:common_style.toolbar_shadow_size,
+				border_width:-common_style.toolbar_shadow_size,
+				color:common_style.toolbar_shadow_color,
+			});
+			UI.RoundRect({
+				x:0,y:0,
+				w:UI.context_parent.w,h:common_style.h_toolbar,
+				color:common_style.toolbar_color,
+			});
+			var x_current=0;
+			//new sticker buttons
+			x_current+=W.Button("new_note",{
+				x:x_current,y:0,
+				w:32,h:32,
+				font:UI.Font(UI.icon_font_name,24),
+				text:"T",
+				tooltip:"Add note - CTRL+M",
+				OnClick:function(){body.InsertNote();},
+			}).w;
+			x_current+=W.Button("del_note",{
+				x:x_current,y:0,
+				w:32,h:32,
+				font:UI.Font(UI.icon_font_name,24),
+				text:"剪",
+				tooltip:"Delete stickers - DELETE",
+				OnClick:function(){body.DeleteSelection();},
+			}).w;
+			if(UI.HasFocus(body)){
+				W.Hotkey("",{
+					key:"CTRL+M",
+					action:function(){body.InsertNote();},
+				});
+				W.Hotkey("",{
+					key:"DELETE",
+					action:function(){body.DeleteSelection();},
+				});
+			}
+			x_current+=32;
+			//todo: buttons - font, goto, button style
 			return body;
 		},
 		Save:function(){

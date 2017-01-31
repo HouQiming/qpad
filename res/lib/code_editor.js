@@ -13,6 +13,16 @@ var MAX_ALLOWED_INDENTATION=20;//has to match the similarly-named const in code-
 var MAX_HIGHLIGHTED_MATCHES=1024;
 var MAX_HISTORY_ITEMS=20;
 
+UI.Map2Array=function(a){
+	var ret=[];
+	if(a){
+		for(var i in a){
+			ret.push(i,a[i]);
+		}
+	}
+	return ret;
+};
+
 UI.m_code_editor_persistent_members_doc=[
 	"m_language_id",
 	"m_current_wrap_width",
