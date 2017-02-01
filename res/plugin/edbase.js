@@ -3388,50 +3388,93 @@ UI.RegisterEditorPlugin(function(){
 //var CODE_TAG_LENGTH=12;
 var CreateFileTag=function(){
 	//return IO.SHA1([UI.g_git_email,Date.now()].join('&')).substr(0,CODE_TAG_LENGTH);
-	return [UI.g_git_name,UI.g_git_email,(new Date()).toISOString()].join('_').replace(/[\-: ]/g,'_');
+	return [UI.g_git_name,UI.g_git_email,(new Date()).toISOString()].join('_').replace(/[^0-9a-zA-Z_]/g,'_');
 };
 
-//if(!UI.m_ui_metadata["<tag_cache>"]){
-//	UI.m_ui_metadata["<tag_cache>"]={};
-//}
-/*
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
 		if(!UI.HasFocus(this)){return;}
 		var sel=this.GetSelection();
+		if(!(sel[0]<sel[1])){return;}
 		var menu_tools=UI.BigMenu("&Tools")
-		if(sel[0]<sel[1]){
-			menu_tools.AddSeparator();
-			menu_tools.AddNormalItem({text:"Tag the code &block",enable_hotkey:1,key:"CTRL+B",action:function(){
-				var stag=CreateFileTag();
-				var sel=this.GetSelection();
-				var line0=this.GetLC(sel[0])[0];
-				var line1=this.GetLC(sel[1])[0];
-				if(this.SeekLC(line1,0)<sel[1]){line1++;}
-				sel[0]=this.SeekLC(line0,0);
-				sel[1]=this.SeekLC(line1,0);
-				var sindent0=this.ed.GetText(sel[0],CountSpacesAfter(this.ed,sel[0]));
-				var sindent1=sindent0;//this.ed.GetText(sel[1],CountSpacesAfter(this.ed,sel[1]));
-				var lang=this.plugin_language_desc
-				var cmt_holder=lang;
-				if(lang.GetCommentStrings){
-					cmt_holder=lang.GetCommentStrings(this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
+		menu_tools.AddSeparator();
+		menu_tools.AddNormalItem({text:"&Copy as sticker",enable_hotkey:1,key:"SHIFT+CTRL+C",action:function(){
+			var is_keydecl_mode=0;
+			var stag=CreateFileTag();
+			var sel=this.GetSelection();
+			var line0=this.GetLC(sel[0])[0];
+			var line1=this.GetLC(sel[1])[0];
+			if(this.SeekLC(line1,0)<sel[1]){line1++;}
+			sel[0]=this.SeekLC(line0,0);
+			sel[1]=this.SeekLC(line1,0);
+			//try to use the keydecl mode
+			var ccnt_lineend_1st=this.SeekLC(line0+1,0);
+			var all_keydecls=(UI.ED_QueryKeyDeclByNeedle(this,"")||[]);
+			var s_keydecl_tag=undefined;
+			for(var i=0;i<all_keydecls.length;i+=2){
+				var ccnt_i=all_keydecls[i];
+				if(sel[0]<=ccnt_i&&ccnt_i<ccnt_lineend_1st){
+					//it has to be unique
+					var s_key=this.ed.GetText(all_keydecls[i],all_keydecls[i+1]-all_keydecls[i]);
+					if((UI.ED_QueryKeyDeclByNeedle(this,s_key)||[]).length!=2){
+						continue;
+					}
+					s_keydecl_tag=s_key;
+					//found one
+					is_keydecl_mode=1;
+					var ccnt_lend_tag0=this.GetEnhancedEnd(sel[0]);
+					var blevel_tag0=this.GetBracketLevel(this.SeekLC(line0,0));
+					var blevel_lend_tag0=this.GetBracketLevel(ccnt_lend_tag0);
+					if(blevel_lend_tag0==blevel_tag0){
+						//try the next line
+						var ccnt_lnext_tag0=this.GetEnhancedEnd(this.SeekLC(line0+1,0));
+						var blevel_lnext_tag0=this.GetBracketLevel(ccnt_lnext_tag0);
+						if(blevel_lnext_tag0>blevel_tag0){
+							blevel_lend_tag0=blevel_lnext_tag0;
+							ccnt_lend_tag0=ccnt_lnext_tag0;
+						}
+					}
+					if(blevel_lend_tag0>blevel_tag0){
+						var ccnt_tag1=this.FindOuterBracket(ccnt_lend_tag0,1);
+						ccnt_tag1=this.SeekLC(this.GetLC(ccnt_tag1)[0]+1,0);
+						if(ccnt_tag1==sel[1]){
+							is_keydecl_mode=3;
+						}
+					}
+					break;
 				}
-				var s_line_comment=cmt_holder.line_comment||'//';
-				this.HookedEdit([
-					sel[0],0,sindent0+s_line_comment+'#b+'+stag+'\n',
-					sel[1],0,sindent1+s_line_comment+'#b-'+stag+'\n']);
-				this.SetSelection(sel[0],this.SeekLC(line1+2,0))
-				UI.SDL_SetClipboardText(['\n![](qtag://',stag,')\n\n'].join(''));
-				//UI.m_ui_metadata["<tag_cache>"][stag]=this.m_file_name;
-				UI.Refresh();
-			}.bind(this)});
-		}
+			}
+			var sindent0=this.ed.GetText(sel[0],CountSpacesAfter(this.ed,sel[0]));
+			var sindent1=sindent0;//this.ed.GetText(sel[1],CountSpacesAfter(this.ed,sel[1]));
+			var lang=this.plugin_language_desc
+			var cmt_holder=lang;
+			if(lang.GetCommentStrings){
+				cmt_holder=lang.GetCommentStrings(this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
+			}
+			var s_line_comment=cmt_holder.line_comment||'//';
+			var ops=[];
+			if(!(is_keydecl_mode&1)){ops.push(sel[0],0,[sindent0,s_line_comment,'qpad# ',stag,'_0\n'].join(''));}
+			if(!(is_keydecl_mode&2)){ops.push(sel[1],0,[sindent1,s_line_comment,'qpad# ',stag,'_1\n'].join(''));}
+			if(ops&&ops.length){
+				this.HookedEdit(ops);
+				this.SetSelection(sel[0],this.SeekLC(line1+!(is_keydecl_mode&1)+!(is_keydecl_mode&2),0));
+			}
+			var ret=undefined;
+			if(is_keydecl_mode==1){
+				ret={tag0_name:s_keydecl_tag,tag1_name:stag+'_1'};
+			}else if(is_keydecl_mode==3){
+				ret={tag0_name:s_keydecl_tag};
+			}else{
+				ret={tag0_name:stag+'_0',tag1_name:stag+'_1'};
+			}
+			ret.file_name=this.m_file_name;
+			UI.SDL_SetClipboardText(UI.g_clipboard_flag_stickerwall+JSON.stringify(ret));
+			UI.Refresh();
+		}.bind(this)});
 		menu_tools=undefined;
-	})
+	});
 });
-*/
 
 //markdown
 UI.RegisterEditorPlugin(function(){

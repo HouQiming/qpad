@@ -3739,7 +3739,7 @@ W.CodeEditorWidget_prototype={
 			this.GotoDefinitionByID(is_peek,id);
 		}
 	}
-}
+};
 
 var ffindbar_plugin=function(){
 	this.AddEventHandler('ESC',function(){
@@ -7006,6 +7006,7 @@ W.CodeEditor=function(id,attrs){
 					doc.CallOnSelectionChange()
 					UI.Refresh()
 				}})
+				//menu_edit.p_copy=menu_edit.$.length
 				if(doc.sel0.ccnt!=doc.sel1.ccnt){
 					menu_edit.AddNormalItem({text:"&Copy",icon:"拷",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+C",action:function(){
 						doc.Copy()

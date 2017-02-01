@@ -5,6 +5,30 @@ require("res/lib/global_doc");
 require("res/lib/code_editor");
 var H_MAX_STICKER=1440;
 var SIZE_MIN=100;
+/*
+the wall itself is simple
+	x,y,type
+	graphview-like global zoom / scale / ...
+	boxdoc-like per-item zoom / scale
+the problem is node types
+	code range
+		a separate editor with the proper index loaded?
+		and sync the edits ccnt-by-ccnt...
+			could be a good idea, the sync part
+			since it always remains as a ccnt sub-range
+	documentation
+	editing script
+		e.g.
+			adding a new FBO to libnama
+			adding a new message type to ctp_trader
+			a semi-auto nodejs noob guide
+	notebook cell
+		a button to an actual notebook cell
+	image...
+	3D model...
+edges
+	mainly connect to text range in code
+*/
 
 UI.ParseNow=function(fn){
 	UI.ED_ForceIntoParseQueueFront(fn);
@@ -120,35 +144,14 @@ var MoveKnob_prototype={
 	},
 };
 
-/*
-the wall itself is simple
-	x,y,type
-	graphview-like global zoom / scale / ...
-	boxdoc-like per-item zoom / scale
-the problem is node types
-	code range
-		a separate editor with the proper index loaded?
-		and sync the edits ccnt-by-ccnt...
-			could be a good idea, the sync part
-			since it always remains as a ccnt sub-range
-	documentation
-	editing script
-		e.g.
-			adding a new FBO to libnama
-			adding a new message type to ctp_trader
-			a semi-auto nodejs noob guide
-	notebook cell
-		a button to an actual notebook cell
-	image...
-	3D model...
-edges
-	mainly connect to text range in code
-*/
+UI.g_clipboard_flag_stickerwall='\u1234_a_\u5678_b_\uabcd_c_';
+var g_clipboard_flag_stickerwall_re=new RegExp('^'+UI.g_clipboard_flag_stickerwall+'(.*)');
 var g_sw_separator='\n=====\udbff\udfff stickerwall =====\n',g_sw_separator_re=new RegExp(g_sw_separator,'g');
 var g_checker_shader=IO.UIReadAll("res/misc/checker.glsl");
 var sticker_wall_prototype={
 	//todo: save
 	InitSticker:function(sticker_i,text){
+		sticker_i.text=undefined;
 		switch(sticker_i.type){
 		case "code":
 			var fn_i=sticker_i.file_name;
@@ -567,7 +570,7 @@ var sticker_wall_prototype={
 			}
 		}
 		this.m_stickers.push(new_sticker);
-		this.InitSticker(new_sticker,"");
+		this.InitSticker(new_sticker,new_sticker.text||"");
 		//auto scroll
 		this.AutoScrollToShow(new_sticker)
 	},
@@ -581,6 +584,33 @@ var sticker_wall_prototype={
 			"w":300,"h":32,
 			"scale":1,
 		};
+		this.PlaceSticker(new_sticker);
+		UI.Refresh();
+	},
+	Paste:function(){
+		var new_sticker=undefined;
+		var text=UI.SDL_GetClipboardText();
+		var match=text.match(g_clipboard_flag_stickerwall_re);
+		if(match){
+			//code
+			try{
+				new_sticker=JSON.parse(match[1]);
+			}catch(err){
+				return;
+			}
+			new_sticker.type="code";
+			new_sticker.scale=1;
+			new_sticker.w=300;
+			new_sticker.h=300;
+		}else{
+			//note
+			new_sticker={
+				"type":"note",
+				"w":300,"h":300,
+				"scale":1,
+				"text":text,
+			};
+		}
 		this.PlaceSticker(new_sticker);
 		UI.Refresh();
 	},
@@ -684,6 +714,22 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 					key:"DELETE",
 					action:function(){body.DeleteSelection();},
 				});
+			}
+			if(UI.SDL_HasClipboardText()){
+				x_current+=W.Button("paste",{
+					x:x_current,y:0,
+					w:32,h:32,
+					font:UI.Font(UI.icon_font_name,24),
+					text:"粘",
+					tooltip:"Paste - CTRL+V",
+					OnClick:function(){body.Paste();},
+				}).w;
+				if(UI.HasFocus(body)){
+					W.Hotkey("",{
+						key:"CTRL+V",
+						action:function(){body.Paste();},
+					});
+				}
 			}
 			x_current+=32;
 			//todo: buttons - font, goto, button style
