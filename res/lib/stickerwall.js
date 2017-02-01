@@ -502,6 +502,7 @@ var sticker_wall_prototype={
 			}
 		}
 		stickers.length=n2;
+		//todo: also copy it
 		UI.Refresh();
 	},
 	PlaceSticker:function(new_sticker){
@@ -598,10 +599,12 @@ var sticker_wall_prototype={
 			}catch(err){
 				return;
 			}
-			new_sticker.type="code";
-			new_sticker.scale=1;
-			new_sticker.w=300;
-			new_sticker.h=300;
+			if(new_sticker.type==undefined){
+				new_sticker.type="code";
+				new_sticker.scale=1;
+				new_sticker.w=300;
+				new_sticker.h=300;
+			}
 		}else{
 			//note
 			new_sticker={
@@ -612,6 +615,31 @@ var sticker_wall_prototype={
 			};
 		}
 		this.PlaceSticker(new_sticker);
+		UI.Refresh();
+	},
+	MultiplyScale:function(scale){
+		var stickers=this.m_stickers;
+		for(var i=0;i<stickers.length;i++){
+			if(stickers[i].m_is_selected){
+				stickers[i].scale*=scale;
+			}
+		}
+		UI.Refresh();
+	},
+	GotoOriginal:function(){
+		var stickers=this.m_stickers;
+		for(var i=0;i<stickers.length;i++){
+			if(stickers[i].m_is_selected&&stickers[i].type=="code"){
+				var sticker_i=stickers[i];
+				UI.OpenEditorWindow(sticker_i.doc.m_file_name,function(){
+					UI.SetSelectionEx(this,
+						sticker_i.doc.sel0.ccnt+sticker_i.doc.m_sync_group_ccnt0,
+						sticker_i.doc.sel1.ccnt+sticker_i.doc.m_sync_group_ccnt0,
+						'sticker_goto');
+				});
+				break;
+			}
+		}
 		UI.Refresh();
 	},
 };
@@ -687,39 +715,53 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 				w:UI.context_parent.w,h:common_style.h_toolbar,
 				color:common_style.toolbar_color,
 			});
-			var x_current=0;
 			//new sticker buttons
+			var has_any_sel=0;
+			var has_code_sel=0;
+			for(var i=0;i<body.m_stickers.length;i++){
+				if(body.m_stickers[i].m_is_selected){
+					has_any_sel=1;
+					if(body.m_stickers[i].type=="code"){
+						has_code_sel=1;
+					}
+				}
+			}
+			var x_current=0;
 			x_current+=W.Button("new_note",{
 				x:x_current,y:0,
 				w:32,h:32,
-				font:UI.Font(UI.icon_font_name,24),
+				font:UI.Font(UI.icon_font_name,28),
 				text:"T",
 				tooltip:"Add note - CTRL+M",
 				OnClick:function(){body.InsertNote();},
 			}).w;
-			x_current+=W.Button("del_note",{
-				x:x_current,y:0,
-				w:32,h:32,
-				font:UI.Font(UI.icon_font_name,24),
-				text:"剪",
-				tooltip:"Delete stickers - DELETE",
-				OnClick:function(){body.DeleteSelection();},
-			}).w;
-			if(UI.HasFocus(body)){
-				W.Hotkey("",{
-					key:"CTRL+M",
-					action:function(){body.InsertNote();},
-				});
-				W.Hotkey("",{
-					key:"DELETE",
-					action:function(){body.DeleteSelection();},
-				});
+			//if(UI.HasFocus(body)){
+			W.Hotkey("",{
+				key:"CTRL+M",
+				action:function(){body.InsertNote();},
+			});
+			//}
+			if(has_any_sel){
+				x_current+=W.Button("del_note",{
+					x:x_current,y:0,
+					w:32,h:32,
+					font:UI.Font(UI.icon_font_name,28),
+					text:"剪",
+					tooltip:"Delete stickers - DELETE",
+					OnClick:function(){body.DeleteSelection();},
+				}).w;
+				if(UI.HasFocus(body)){
+					W.Hotkey("",{
+						key:"DELETE",
+						action:function(){body.DeleteSelection();},
+					});
+				}
 			}
 			if(UI.SDL_HasClipboardText()){
 				x_current+=W.Button("paste",{
 					x:x_current,y:0,
 					w:32,h:32,
-					font:UI.Font(UI.icon_font_name,24),
+					font:UI.Font(UI.icon_font_name,28),
 					text:"粘",
 					tooltip:"Paste - CTRL+V",
 					OnClick:function(){body.Paste();},
@@ -731,8 +773,55 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 					});
 				}
 			}
-			x_current+=32;
-			//todo: buttons - font, goto, button style
+			if(has_any_sel){
+				x_current+=W.Button("font_bigger",{
+					x:x_current,y:0,
+					w:32,h:32,
+					font:UI.Font(UI.icon_font_name,28),
+					text:"大",
+					tooltip:"Bigger font - SHIFT+CTRL+'+'",
+					OnClick:function(){
+						body.MultiplyScale(1.105);
+					},
+				}).w;
+				x_current+=W.Button("font_smaller",{
+					x:x_current,y:0,
+					w:32,h:32,
+					font:UI.Font(UI.icon_font_name,28),
+					text:"小",
+					tooltip:"Smaller font - SHIFT+CTRL+'-'",
+					OnClick:function(){
+						body.MultiplyScale(1.0/1.105);
+					},
+				}).w;
+				//if(UI.HasFocus(body)){
+				W.Hotkey("",{
+					key:"SHIFT+CTRL+-",
+					action:function(){body.MultiplyScale(1.0/1.105);},
+				});
+				W.Hotkey("",{
+					key:"SHIFT+CTRL+=",
+					action:function(){body.MultiplyScale(1.105);},
+				});
+				//}
+			}
+			if(has_code_sel){
+				x_current+=W.Button("goto_code",{
+					x:x_current,y:0,
+					w:32,h:32,
+					font:UI.Font(UI.icon_font_name,28),
+					text:"去",
+					tooltip:"Go to original - CTRL+ALT+G",
+					OnClick:function(){
+						body.GotoOriginal();
+					},
+				}).w;
+				W.Hotkey("",{
+					key:"CTRL+ALT+G",
+					action:function(){body.GotoOriginal();},
+				});
+			}
+			//todo: buttons - button style
 			return body;
 		},
 		Save:function(){
