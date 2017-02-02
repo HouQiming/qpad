@@ -3437,10 +3437,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			//direct test
 			is_bad=0
 			if s_needle.n:
-				for j=0:min(s_needle.n,sym.n)-1
-					if !chrequi(s_needle[j],g_strings[sym.p_name+j]):
-						is_bad=1
-						break
+				if sym.n<s_needle.n:
+					is_bad=1
+				else
+					for j=0:s_needle.n-1
+						if !chrequi(s_needle[j],g_strings[sym.p_name+j]):
+							is_bad=1
+							break
 				//abbrv test
 				if is_bad:
 					ch0='_'

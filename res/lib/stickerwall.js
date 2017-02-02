@@ -83,6 +83,7 @@ var ScaleKnob_prototype={
 		}else{
 			y_scale=1.0;
 		}
+		this.wall_owner.need_save=1;
 		//doc.SetTransform({"scale":[x_scale,y_scale],"relative_anchor":[this.x_anchor_rel,this.y_anchor_rel]});
 		//obj.OnChange(obj);
 		UI.Refresh()
@@ -126,6 +127,7 @@ var MoveKnob_prototype={
 				sticker_i.y=sticker_i.drag_y+this.dy+event.y;
 			}
 		}
+		wall.need_save=1;
 		UI.Refresh();
 	},
 	OnMouseUp:function(event){
@@ -149,7 +151,6 @@ var g_clipboard_flag_stickerwall_re=new RegExp('^'+UI.g_clipboard_flag_stickerwa
 var g_sw_separator='\n=====\udbff\udfff stickerwall =====\n',g_sw_separator_re=new RegExp(g_sw_separator,'g');
 var g_checker_shader=IO.UIReadAll("res/misc/checker.glsl");
 var sticker_wall_prototype={
-	//todo: save
 	InitSticker:function(sticker_i,text){
 		sticker_i.text=undefined;
 		switch(sticker_i.type){
@@ -254,6 +255,56 @@ var sticker_wall_prototype={
 				text=(parts[ppart++]||"");
 			}
 			this.InitSticker(sticker_i,text);
+		}
+		var loaded_metadata=(UI.m_ui_metadata[this.m_file_name]||{});
+		this.m_tr=loaded_metadata.tr;
+	},
+	TestNeedSave:function(){
+		var ret=this.need_save;
+		for(var i=0;i<this.m_stickers.length;i++){
+			var sticker_i=this.m_stickers[i];
+			if(sticker_i.type=="note"){
+				var doc=sticker_i.doc;
+				if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
+					ret|=2;
+					break;
+				}
+			}
+		}
+		return ret;
+	},
+	Save:function(){
+		var fn=this.m_file_name;
+		var parts=[''];
+		var docs=[];
+		for(var i=0;i<this.m_stickers.length;i++){
+			var sticker_i=this.m_stickers[i];
+			if(sticker_i.type=="note"){
+				parts.push(sticker_i.doc.ed.GetText());
+			}
+			docs[i]=sticker_i.doc;
+			sticker_i.doc=undefined;
+		}
+		parts[0]=JSON.stringify({m_stickers:this.m_stickers});
+		for(var i=0;i<this.m_stickers.length;i++){
+			this.m_stickers[i].doc=docs[i];
+		}
+		var save_ret=UI.SafeSave(this.m_file_name,parts.join(g_sw_separator));
+		if(!save_ret){
+			return 0;
+		}
+		this.need_save=0;
+		UI.RefreshAllTabs()
+		return 1;
+	},
+	SaveMetaData:function(){
+		var new_metadata=(UI.m_ui_metadata[this.m_file_name]||{});
+		new_metadata.tr=this.m_tr;
+		UI.m_ui_metadata[this.m_file_name]=new_metadata;
+	},
+	OnDestroy:function(){
+		for(var i=0;i<this.m_stickers.length;i++){
+			this.DestroyStickerEditor(this.m_stickers[i]);
 		}
 	},
 	Render:function(){
@@ -403,14 +454,14 @@ var sticker_wall_prototype={
 				var y2=y0+sticker_i.h+common_style.padding*2;
 				var x1=(x0+x2)*0.5;
 				var y1=(y0+y2)*0.5;
-				knob.x=x0;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob00",{x_anchor_rel:2*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,x_anchor:x2+dx,y_anchor:y2+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
-				knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob10",{x_anchor_rel:1*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,y_anchor:y2+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
-				knob.x=x2;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob20",{x_anchor_rel:0*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,x_anchor:x0+dx,y_anchor:y2+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
-				knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob01",{x_anchor_rel:2*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,x_anchor:x2+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
-				knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob21",{x_anchor_rel:0*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,x_anchor:x0+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
-				knob.x=x0;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob02",{x_anchor_rel:2*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,x_anchor:x2+dx,y_anchor:y0+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
-				knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob12",{x_anchor_rel:1*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,y_anchor:y0+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
-				knob.x=x2;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob22",{x_anchor_rel:0*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,owner:sticker_i,x_anchor:x0+dx,y_anchor:y0+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
+				knob.x=x0;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob00",{x_anchor_rel:2*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,y_anchor:y2+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
+				knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob10",{x_anchor_rel:1*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y2+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+				knob.x=x2;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob20",{x_anchor_rel:0*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,y_anchor:y2+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
+				knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob01",{x_anchor_rel:2*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+				knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob21",{x_anchor_rel:0*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+				knob.x=x0;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob02",{x_anchor_rel:2*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,y_anchor:y0+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
+				knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob12",{x_anchor_rel:1*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y0+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+				knob.x=x2;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob22",{x_anchor_rel:0*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,y_anchor:y0+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
 			}
 		}
 		//drag rect
@@ -491,19 +542,37 @@ var sticker_wall_prototype={
 			stickers[i].m_is_selected=0;
 		}
 	},
+	DestroyStickerEditor:function(sticker_i){
+		if(sticker_i.type=="note"){
+			sticker_i.text=sticker_i.doc.ed.GetText();
+			sticker_i.doc.OnDestroy();
+			sticker_i.doc=undefined;
+		}else{
+			UI.CloseCodeEditorDocument(sticker_i.doc);
+			sticker_i.doc=undefined;
+		}
+	},
 	DeleteSelection:function(){
 		var stickers=this.m_stickers;
+		var deleted_stickers=[];
 		var n2=0;
 		for(var i=0;i<stickers.length;i++){
-			if(!stickers[i].m_is_selected){
+			var sticker_i=stickers[i];
+			if(!sticker_i.m_is_selected){
 				this["sticker_"+n2.toString()]=this["sticker_"+i.toString()];
-				stickers[n2]=stickers[i];
+				stickers[n2]=sticker_i;
 				n2++;
+			}else{
+				this.DestroyStickerEditor(sticker_i);
+				deleted_stickers.push(sticker_i);
 			}
 		}
 		stickers.length=n2;
-		//todo: also copy it
+		if(deleted_stickers){
+			UI.SDL_SetClipboardText(UI.g_clipboard_flag_stickerwall+JSON.stringify(deleted_stickers));
+		}
 		UI.Refresh();
+		this.need_save=1;
 	},
 	PlaceSticker:function(new_sticker){
 		//O(n^3) search: enum all x/y combos, find the nearest not-covered one
@@ -570,10 +639,12 @@ var sticker_wall_prototype={
 				}
 			}
 		}
+		new_sticker.m_is_selected=1;
 		this.m_stickers.push(new_sticker);
 		this.InitSticker(new_sticker,new_sticker.text||"");
 		//auto scroll
 		this.AutoScrollToShow(new_sticker)
+		this.need_save=1;
 	},
 	AutoScrollToShow:function(sticker_i){
 		this.m_tr.trans[0]=-Math.min(Math.max(-this.m_tr.trans[0],sticker_i.x+sticker_i.w+8-this.w),sticker_i.x-8);
@@ -593,16 +664,29 @@ var sticker_wall_prototype={
 		var text=UI.SDL_GetClipboardText();
 		var match=text.match(g_clipboard_flag_stickerwall_re);
 		if(match){
-			//code
 			try{
 				new_sticker=JSON.parse(match[1]);
+				if(match[1][0]=='['){
+					//pasting cut stickers
+					this.ClearSelection();
+					for(var i=0;i<new_sticker.length;i++){
+						var sticker_i=new_sticker[i];
+						this.InitSticker(sticker_i,sticker_i.text||"");
+						this.m_stickers.push(sticker_i);
+						sticker_i.m_is_selected=1;
+					}
+					this.need_save=1;
+					UI.Refresh();
+					return;
+				}
 			}catch(err){
 				return;
 			}
+			//code
 			if(new_sticker.type==undefined){
 				new_sticker.type="code";
 				new_sticker.scale=1;
-				new_sticker.w=300;
+				new_sticker.w=800;
 				new_sticker.h=300;
 			}
 		}else{
@@ -680,6 +764,8 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 			if(this.main_widget){
 				var body=this.main_widget;
 				var s_name=UI.GetMainFileName((this.file_name));
+				this.need_save=body.TestNeedSave();
+				this.title=s_name+(this.need_save?'*':'');
 				this.tooltip=this.file_name;
 			}
 		},
@@ -700,7 +786,7 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 			if(!this.main_widget){
 				this.main_widget=body;
 			}
-			this.need_save=this.main_widget.need_save;
+			this.need_save=this.main_widget.TestNeedSave();
 			this.UpdateTitle();
 			//toolbar
 			UI.RoundRect({
@@ -747,12 +833,12 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 					w:32,h:32,
 					font:UI.Font(UI.icon_font_name,28),
 					text:"剪",
-					tooltip:"Delete stickers - DELETE",
+					tooltip:"Cut stickers - SHIFT+CTRL+X",
 					OnClick:function(){body.DeleteSelection();},
 				}).w;
 				if(UI.HasFocus(body)){
 					W.Hotkey("",{
-						key:"DELETE",
+						key:"SHIFT+CTRL+X",
 						action:function(){body.DeleteSelection();},
 					});
 				}
@@ -832,9 +918,6 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 			}
 			this.main_widget.Save();
 			this.need_save=this.main_widget.need_save;
-			if(this.is_default&&this.need_save){
-				this.need_save=65536;
-			}
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}

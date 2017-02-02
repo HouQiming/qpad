@@ -103,39 +103,25 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-sticker code:
-	manipulating stickers
-		sticker toolbar
-			adjusting font size
-			go to original
-		delete -> cut
-		ESC inside sticker
-		z-order
-	edges
-	(X) render filename in code stickers? sticker caption bar?
-	keyboard control
-		navigating among stickers
-		moving / resizing
-(test) limit sticker height
 out-of-screen subwindow
-error clean up on cell deletion
+sticker code:
+	edges
+		F12
+		it's only useful when multi-connecting
+	copying already-tagged code
+	code -> sticker navigation
+	shift+click-inside
+	keyboard navigation / moving / resizing
+	var-dup
+	ESC inside sticker
+		set / unset textbox focus
+	sticker z-order
+	(X) render filename in code stickers? sticker caption bar?
+	could store code template / code generator as sticker scripts
+(test) limit sticker height
+error clean up on notebook cell deletion
 ESC in terminal: release focus
 busy loop again
-sticker wall
-	the old tags idea
-		//qpad#
-	but with non-linear layout
-	save in code
-		layout data in sticker wall
-		use native node boundaries
-			{}
-			ctrl+g
-		could store code template / code generator as sticker scripts
-	ctrl+c / ctrl+v sticking
-	-----
-	global view actions
-	moving stickers
-	shadow
 truly stateless UI framework
 	re-call Render during message processing and remove auto-saving...
 weird error appearance in android build output
