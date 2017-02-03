@@ -514,21 +514,25 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	OnLoad:function(){
 		var loaded_metadata=this.LoadMetaData()
-		if(loaded_metadata.m_bookmarks){
-			for(var i=0;i<10;i++){
-				if(loaded_metadata.m_bookmarks[i]!='n/a'&&!this.m_bookmarks[i]){
-					this.m_bookmarks[i]=this.ed.CreateLocator(Math.max(Math.min(loaded_metadata.m_bookmarks[i],this.ed.GetTextSize()),0))
+		if(this.m_sync_group_ccnt0!==undefined&&this.m_sync_group_ccnt1!==undefined){
+			//don't load bookmarks / sel for stickers
+		}else{
+			if(loaded_metadata.m_bookmarks){
+				for(var i=0;i<10;i++){
+					if(loaded_metadata.m_bookmarks[i]!='n/a'&&!this.m_bookmarks[i]){
+						this.m_bookmarks[i]=this.ed.CreateLocator(Math.max(Math.min(loaded_metadata.m_bookmarks[i],this.ed.GetTextSize()),0))
+					}
 				}
 			}
-		}
-		if(loaded_metadata.m_unkeyed_bookmarks){
-			var bm=loaded_metadata.m_unkeyed_bookmarks
-			for(var i=0;i<bm.length;i++){
-				this.m_unkeyed_bookmarks.push(this.ed.CreateLocator(Math.max(Math.min(bm[i],this.ed.GetTextSize()),0)))
+			if(loaded_metadata.m_unkeyed_bookmarks){
+				var bm=loaded_metadata.m_unkeyed_bookmarks
+				for(var i=0;i<bm.length;i++){
+					this.m_unkeyed_bookmarks.push(this.ed.CreateLocator(Math.max(Math.min(bm[i],this.ed.GetTextSize()),0)))
+				}
 			}
+			if(loaded_metadata.sel0){this.sel0.ccnt=Math.max(Math.min(loaded_metadata.sel0,this.ed.GetTextSize()),0);}
+			if(loaded_metadata.sel1){this.sel1.ccnt=Math.max(Math.min(loaded_metadata.sel1,this.ed.GetTextSize()),0);}
 		}
-		if(loaded_metadata.sel0){this.sel0.ccnt=Math.max(Math.min(loaded_metadata.sel0,this.ed.GetTextSize()),0);}
-		if(loaded_metadata.sel1){this.sel1.ccnt=Math.max(Math.min(loaded_metadata.sel1,this.ed.GetTextSize()),0);}
 		for(var i=0;i<UI.m_code_editor_persistent_members_doc.length;i++){
 			var name_i=UI.m_code_editor_persistent_members_doc[i]
 			var value_i=loaded_metadata[name_i];
@@ -3113,7 +3117,7 @@ W.CodeEditorWidget_prototype={
 			if(arr_ori&&arr_ori.length>1){
 				for(var i=0;i<arr_ori.length;i++){
 					var doc=arr_ori[i];
-					if(doc!=this.doc&&doc.owner){
+					if(doc!=this.doc&&doc.owner&&!doc.m_sticker_wall_owner){
 						CheckEditorExternalChange(doc.owner);
 					}
 				}
@@ -8585,7 +8589,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 		if(arr_ori){
 			for(var i=0;i<arr_ori.length;i++){
 				var doc=arr_ori[i];
-				if(doc){
+				if(doc&&!(doc.m_sync_group_ccnt0>0)){
 					doc.m_ed_refcnt++;
 					return doc;
 				}

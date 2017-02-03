@@ -106,9 +106,9 @@ v2
 sticker code:
 	make a real wall for nama
 		new stickerwall
-	exclude the tag lines and the final EOL?
-		when it's a qpad tag line
-	ctrl+s not working
+	(test) false alarm: "file deleted"
+	(test) bad bookmark and stuff
+	ctrl+s failure... after ESC!?
 	edges
 		F12
 		it's only useful when multi-connecting

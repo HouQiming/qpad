@@ -605,20 +605,20 @@ UI.CustomTheme=function(){
 				{font:UI.Font(UI.font_name,18,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
 			],
 			accands_styles2:[
-				{font:UI.Font("res/fonts/opensans.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//normal
-				{font:UI.Font("res/fonts/opensansi.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//emph
-				{font:UI.Font("res/fonts/opensans.ttf",18,150),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
+				{font:UI.Font("res/fonts/cmunrm.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//normal
+				{font:UI.Font("res/fonts/cmunti.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//emph
+				{font:UI.Font("res/fonts/cmunrb.ttf",18,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
 				{
 					font:UI.Font("res/fonts/inconsolata.ttf",16,0),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,150),
 					paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa
 				},//code
-				{font:UI.Font("res/fonts/opensans.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//list
-				{font:UI.Font("res/fonts/opensansi.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa,},//quote
-				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
-				{font:UI.Font("res/fonts/opensans.ttf",22,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
-				{font:UI.Font("res/fonts/opensans.ttf",20,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
-				{font:UI.Font("res/fonts/opensans.ttf",18,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
+				{font:UI.Font("res/fonts/cmunrm.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//list
+				{font:UI.Font("res/fonts/cmunti.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa,},//quote
+				{font:UI.Font("res/fonts/cmunss.ttf",24,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
+				{font:UI.Font("res/fonts/cmunss.ttf",22,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
+				{font:UI.Font("res/fonts/cmunss.ttf",20,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
+				{font:UI.Font("res/fonts/cmunss.ttf",18,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
 			],
 			autoedit_button_size:24,
 			autoedit_button_padding:2,
@@ -711,8 +711,6 @@ UI.CustomTheme=function(){
 				{font:UI.Font(UI.font_name,16,-50),paragraph_space:12,color:L?0xff7f7f7f:0xffaaaaaa}, //grey small
 				{font:UI.Font(UI.font_name,16,50),paragraph_space:12,color:L?0xff000000:0xffe8e8e8}, //bold small
 				{font:UI.Font(UI.font_name,16,200),paragraph_space:12,color:L?0xffb4771f:0xffe3cea6}, //very bold colored small
-				//{font:UI.Font("res/fonts/inconsolata.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //code
-				//{font:UI.Font("res/fonts/opensansi.ttf",20,0),paragraph_space:16,color:L?0xff000000:0xffe8e8e8}, //italic
 			],
 			progress_color:C_sel,
 			text_color:L?0xff000000:0xffe8e8e8,
@@ -893,20 +891,20 @@ UI.CustomTheme=function(){
 			w_max_img_width_percentage:0.875,
 			w_code_box_percentage:0.875,
 			styles:[
-				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//normal
-				{font:UI.Font("res/fonts/opensansi.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//emph
-				{font:UI.Font("res/fonts/opensans.ttf",24,150),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
+				{font:UI.Font("res/fonts/cmunrm.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//normal
+				{font:UI.Font("res/fonts/cmunti.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//emph
+				{font:UI.Font("res/fonts/cmunrb.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
 				{
 					font:UI.Font("res/fonts/inconsolata.ttf",21,0),
 					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",21,150),
 					paragraph_space:20,color:L?0xff000000:0xffe8e8e8
 				},//code
-				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//list
-				{font:UI.Font("res/fonts/opensansi.ttf",24,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa,},//quote
-				{font:UI.Font("res/fonts/opensans.ttf",32,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
-				{font:UI.Font("res/fonts/opensans.ttf",28,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
-				{font:UI.Font("res/fonts/opensans.ttf",26,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
-				{font:UI.Font("res/fonts/opensans.ttf",24,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
+				{font:UI.Font("res/fonts/cmunrm.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//list
+				{font:UI.Font("res/fonts/cmunti.ttf",24,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa,},//quote
+				{font:UI.Font("res/fonts/cmunss.ttf",32,0),paragraph_space:0,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h1
+				{font:UI.Font("res/fonts/cmunss.ttf",28,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h2
+				{font:UI.Font("res/fonts/cmunss.ttf",26,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h3
+				{font:UI.Font("res/fonts/cmunss.ttf",24,0),paragraph_space:20,raise_height:-10,color:L?0xff000000:0xffe8e8e8},//h4
 			],
 		},
 		help_item:{

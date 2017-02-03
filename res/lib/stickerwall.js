@@ -146,6 +146,15 @@ var MoveKnob_prototype={
 	},
 };
 
+var TestQPadTag=function(doc,line_tag){
+	var ccnt_tag=doc.SeekLC(line_tag,0);
+	var s_line=doc.ed.GetText(ccnt_tag,Math.min(doc.ed.GetTextSize()-ccnt_tag,128));
+	var pnewline=s_line.indexOf('\n');
+	if(pnewline<0){pnewline=s_line.length;}
+	var ptag=s_line.indexOf('//@qpad#');
+	return ptag>=0&&ptag<pnewline;
+};
+
 UI.g_clipboard_flag_stickerwall='\u1234_a_\u5678_b_\uabcd_c_';
 var g_clipboard_flag_stickerwall_re=new RegExp('^'+UI.g_clipboard_flag_stickerwall+'(.*)');
 var g_sw_separator='\n=====\udbff\udfff stickerwall =====\n',g_sw_separator_re=new RegExp(g_sw_separator,'g');
@@ -206,8 +215,17 @@ var sticker_wall_prototype={
 				//if(diff_host){ccnt_tag1=diff_host.BaseToCurrent(ccnt_tag1);}
 			}
 			if(ccnt_tag1>ccnt_tag0){
-				ccnt_tag0=doc_host.SeekLC(doc_host.GetLC(ccnt_tag0)[0],0);
-				ccnt_tag1=doc_host.SeekLC(doc_host.GetLC(ccnt_tag1)[0]+1,0);
+				var line_tag0=doc_host.GetLC(ccnt_tag0)[0];
+				var line_tag1=doc_host.GetLC(ccnt_tag1)[0];
+				if(TestQPadTag(doc_host,line_tag0)){
+					line_tag0++;
+				}
+				if(TestQPadTag(doc_host,line_tag1)){
+					line_tag1--;
+				}
+				line_tag1++;
+				ccnt_tag0=doc_host.SeekLC(line_tag0,0);
+				ccnt_tag1=doc_host.SeekLC(line_tag1,0);
 				if(ccnt_tag1>ccnt_tag0){
 					var doc_code=UI.OpenCodeEditorDocument(fn_i,-2);
 					doc_code.m_sync_group_ccnt0=ccnt_tag0;
@@ -751,24 +769,48 @@ var sticker_wall_prototype={
 		var stickers=this.m_stickers;
 		for(var i=0;i<stickers.length;i++){
 			if(stickers[i].m_is_selected){
-				sel_x=stickers[i].x;
-				sel_y=stickers[i].y;
+				sel_x=stickers[i].x+stickers[i].w*0.5;
+				sel_y=stickers[i].y+stickers[i].h*0.5;
 				break;
 			}
 		}
-		var best=1e30;
+		var best_cosine=0;
+		for(var i=0;i<stickers.length;i++){
+			var dx_i=stickers[i].x+stickers[i].w*0.5-sel_x;
+			var dy_i=stickers[i].y+stickers[i].h*0.5-sel_y;
+			var ilg=1.0/Math.sqrt(dx_i*dx_i+dy_i*dy_i);
+			if(ilg>0){
+				dx_i*=ilg;
+				dy_i*=ilg;
+			}else{
+				continue;
+			}
+			var cosine=dx_i*dx+dy_i*dy;
+			if(best_cosine<cosine){
+				best_cosine=cosine;
+			}
+		}
+		var best_lg=1e10;
 		var best_i=-1;
 		for(var i=0;i<stickers.length;i++){
-			var dist=(stickers[i].x-sel_x)*dx+(stickers[i].y-sel_y)*dy;
-			if(best>dist&&dist>0){
-				if(best_i<0){
-					this.ClearSelection();
-				}
-				best=dist;
+			var dx_i=stickers[i].x+stickers[i].w*0.5-sel_x;
+			var dy_i=stickers[i].y+stickers[i].h*0.5-sel_y;
+			var lg=Math.sqrt(dx_i*dx_i+dy_i*dy_i);
+			var ilg=1.0/lg;
+			if(ilg>0){
+				dx_i*=ilg;
+				dy_i*=ilg;
+			}else{
+				continue;
+			}
+			var cosine=dx_i*dx+dy_i*dy;
+			if(cosine>best_cosine*0.9&&best_lg>lg){
+				best_lg=lg;
 				best_i=i;
 			}
 		}
 		if(best_i>=0){
+			this.ClearSelection();
 			stickers[best_i].m_is_selected=1;
 		}
 		UI.Refresh();
