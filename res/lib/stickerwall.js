@@ -150,6 +150,12 @@ UI.g_clipboard_flag_stickerwall='\u1234_a_\u5678_b_\uabcd_c_';
 var g_clipboard_flag_stickerwall_re=new RegExp('^'+UI.g_clipboard_flag_stickerwall+'(.*)');
 var g_sw_separator='\n=====\udbff\udfff stickerwall =====\n',g_sw_separator_re=new RegExp(g_sw_separator,'g');
 var g_checker_shader=IO.UIReadAll("res/misc/checker.glsl");
+var g_sticker_doc_plugins=[function(){
+	this.AddEventHandler('ESC',function(){
+		UI.SetFocus(this.m_sticker_wall_owner);
+		UI.Refresh();
+	});
+}];
 var sticker_wall_prototype={
 	InitSticker:function(sticker_i,text){
 		sticker_i.text=undefined;
@@ -164,7 +170,8 @@ var sticker_wall_prototype={
 				doc_host.m_load_sync=1;
 				doc_host.Init();
 			}
-			var diff_host=doc_host.m_diff_from_save;
+			//keydecl queries have already taken the diff into account
+			//var diff_host=doc_host.m_diff_from_parse;
 			var ccnt_tag0=0,ccnt_tag1=0;
 			if(!doc_host.ed.m_file_index){
 				var parse_ret=UI.ParseNow(fn_i);
@@ -174,7 +181,7 @@ var sticker_wall_prototype={
 			}
 			var decls=UI.ED_QueryKeyDeclByNeedle(doc_host,sticker_i.tag0_name);
 			ccnt_tag0=((decls&&decls[(sticker_i.tag0_number||0)*2])||0);
-			if(diff_host){ccnt_tag0=diff_host.BaseToCurrent(ccnt_tag0);}
+			//if(diff_host){ccnt_tag0=diff_host.BaseToCurrent(ccnt_tag0);}
 			if(sticker_i.tag1_name===undefined){
 				//{} auto-pairing mode
 				var line_tag0=doc_host.GetLC(ccnt_tag0)[0];
@@ -196,7 +203,7 @@ var sticker_wall_prototype={
 			}else{
 				decls=UI.ED_QueryKeyDeclByNeedle(doc_host,sticker_i.tag1_name);
 				ccnt_tag1=((decls&&decls[(sticker_i.tag1_number||0)*2])||ccnt_tag0);
-				if(diff_host){ccnt_tag1=diff_host.BaseToCurrent(ccnt_tag1);}
+				//if(diff_host){ccnt_tag1=diff_host.BaseToCurrent(ccnt_tag1);}
 			}
 			if(ccnt_tag1>ccnt_tag0){
 				ccnt_tag0=doc_host.SeekLC(doc_host.GetLC(ccnt_tag0)[0],0);
@@ -208,6 +215,7 @@ var sticker_wall_prototype={
 					doc_code.show_background=0;
 					doc_code.m_sticker_wall_owner=this;
 					doc_code.disable_line_numbers=1;
+					doc_code.plugins=g_sticker_doc_plugins;
 					doc_code.Init()
 					sticker_i.doc=doc_code;
 				}
@@ -224,6 +232,7 @@ var sticker_wall_prototype={
 			doc_note.show_background=0;
 			doc_note.disable_line_numbers=1;
 			doc_note.m_sticker_wall_owner=this;
+			doc_note.plugins=g_sticker_doc_plugins;
 			doc_note.Init();
 			doc_note.scroll_x=0;doc_note.scroll_y=0;
 			if(text){doc_note.ed.Edit([0,0,text],1);}
@@ -340,6 +349,9 @@ var sticker_wall_prototype={
 			var style_i=this.sticker_styles[sticker_i.type];
 			var x=sticker_i.x+tr.trans[0]/tr.scale;
 			var y=sticker_i.y+tr.trans[1]/tr.scale;
+			if(x>=this.w/tr.scale||y>=this.h/tr.scale||x+sticker_i.w<=0||y+sticker_i.h<=0){
+				continue;
+			}
 			//measure size
 			switch(sticker_i.type){
 			case "code":
@@ -395,6 +407,8 @@ var sticker_wall_prototype={
 				border_color:common_style.selection_color,
 			});
 			//render content
+			var dx_subwin=Math.min(x,0)/sticker_i.scale;
+			var dy_subwin=Math.min(y,0)/sticker_i.scale;
 			UI.PushSubWindow(x,y,sticker_i.w,sticker_i.h,sticker_i.scale)
 			switch(sticker_i.type){
 			case "code":
@@ -402,7 +416,7 @@ var sticker_wall_prototype={
 					disable_minimap:1,
 					doc:sticker_i.doc,
 					show_background:0,
-					x:0,y:0,
+					x:dx_subwin,y:dy_subwin,
 					w:sticker_i.w/sticker_i.scale,h:sticker_i.h/sticker_i.scale,
 				});
 				sticker_i.doc.default_focus=sticker_i.m_is_selected+1;
@@ -418,7 +432,7 @@ var sticker_wall_prototype={
 					disable_minimap:1,
 					doc:sticker_i.doc,
 					show_background:0,
-					x:0,y:0,
+					x:dx_subwin,y:dy_subwin,
 					w:sticker_i.w/sticker_i.scale,h:sticker_i.h/sticker_i.scale,
 				});
 				sticker_i.doc.default_focus=sticker_i.m_is_selected+1;
@@ -543,6 +557,7 @@ var sticker_wall_prototype={
 		}
 	},
 	DestroyStickerEditor:function(sticker_i){
+		if(!sticker_i.doc){return;}
 		if(sticker_i.type=="note"){
 			sticker_i.text=sticker_i.doc.ed.GetText();
 			sticker_i.doc.OnDestroy();
@@ -688,6 +703,9 @@ var sticker_wall_prototype={
 				new_sticker.scale=1;
 				new_sticker.w=800;
 				new_sticker.h=300;
+				if(this.m_file_name&&this.m_file_name[0]!='<'){
+					new_sticker.file_name=UI.ComputeRelativePath(this.m_file_name,new_sticker.file_name);
+				}
 			}
 		}else{
 			//note
@@ -708,6 +726,7 @@ var sticker_wall_prototype={
 				stickers[i].scale*=scale;
 			}
 		}
+		this.need_save=1;
 		UI.Refresh();
 	},
 	GotoOriginal:function(){
@@ -724,6 +743,56 @@ var sticker_wall_prototype={
 				break;
 			}
 		}
+		UI.Refresh();
+	},
+	MoveCursorKeyboard:function(dx,dy){
+		var sel_x=-dx*10000;
+		var sel_y=-dy*10000;
+		var stickers=this.m_stickers;
+		for(var i=0;i<stickers.length;i++){
+			if(stickers[i].m_is_selected){
+				sel_x=stickers[i].x;
+				sel_y=stickers[i].y;
+				break;
+			}
+		}
+		var best=1e30;
+		var best_i=-1;
+		for(var i=0;i<stickers.length;i++){
+			var dist=(stickers[i].x-sel_x)*dx+(stickers[i].y-sel_y)*dy;
+			if(best>dist&&dist>0){
+				if(best_i<0){
+					this.ClearSelection();
+				}
+				best=dist;
+				best_i=i;
+			}
+		}
+		if(best_i>=0){
+			stickers[best_i].m_is_selected=1;
+		}
+		UI.Refresh();
+	},
+	MoveSelectionKeyboard:function(dx,dy){
+		for(var i=0;i<this.m_stickers.length;i++){
+			var sticker_i=this.m_stickers[i];
+			if(sticker_i.m_is_selected){
+				sticker_i.x+=dx;
+				sticker_i.y+=dy;
+			}
+		}
+		this.need_save=1;
+		UI.Refresh();
+	},
+	ResizeSelectionKeyboard:function(dx,dy){
+		for(var i=0;i<this.m_stickers.length;i++){
+			var sticker_i=this.m_stickers[i];
+			if(sticker_i.m_is_selected){
+				sticker_i.w+=dx;
+				sticker_i.h+=dy;
+			}
+		}
+		this.need_save=1;
 		UI.Refresh();
 	},
 };
@@ -836,9 +905,13 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 					tooltip:"Cut stickers - SHIFT+CTRL+X",
 					OnClick:function(){body.DeleteSelection();},
 				}).w;
+				W.Hotkey("",{
+					key:"SHIFT+CTRL+X",
+					action:function(){body.DeleteSelection();},
+				});
 				if(UI.HasFocus(body)){
 					W.Hotkey("",{
-						key:"SHIFT+CTRL+X",
+						key:"DELETE",
 						action:function(){body.DeleteSelection();},
 					});
 				}
@@ -907,7 +980,100 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 					action:function(){body.GotoOriginal();},
 				});
 			}
-			//todo: buttons - button style
+			if(UI.HasFocus(body)){
+				W.Hotkey("",{
+					key:"ESC",
+					action:function(){
+						for(var i=0;i<body.m_stickers.length;i++){
+							var sticker_i=body.m_stickers[i];
+							if(sticker_i.m_is_selected&&sticker_i.doc){
+								UI.SetFocus(sticker_i.doc);
+								UI.Refresh();
+								break;
+							}
+						}
+					},
+				});
+				////////////////////
+				//moving the cursor
+				W.Hotkey("",{
+					key:"UP",
+					action:function(){
+						//what is "up"? angle-based test
+						body.MoveCursorKeyboard(0,-1);
+					},
+				});
+				W.Hotkey("",{
+					key:"DOWN",
+					action:function(){
+						body.MoveCursorKeyboard(0,1);
+					},
+				});
+				W.Hotkey("",{
+					key:"LEFT",
+					action:function(){
+						body.MoveCursorKeyboard(-1,0);
+					},
+				});
+				W.Hotkey("",{
+					key:"RIGHT",
+					action:function(){
+						body.MoveCursorKeyboard(1,0);
+					},
+				});
+				////////////////////
+				//move the stickers... by a fixed amount
+				W.Hotkey("",{
+					key:"SHIFT+UP",
+					action:function(){
+						body.MoveSelectionKeyboard(0,-32);
+					},
+				});
+				W.Hotkey("",{
+					key:"SHIFT+DOWN",
+					action:function(){
+						body.MoveSelectionKeyboard(0,32);
+					},
+				});
+				W.Hotkey("",{
+					key:"SHIFT+LEFT",
+					action:function(){
+						body.MoveSelectionKeyboard(-32,0);
+					},
+				});
+				W.Hotkey("",{
+					key:"SHIFT+RIGHT",
+					action:function(){
+						body.MoveSelectionKeyboard(32,0);
+					},
+				});
+				////////////////////
+				//resizing the sticker
+				W.Hotkey("",{
+					key:"CTRL+UP",
+					action:function(){
+						body.ResizeSelectionKeyboard(0,-32);
+					},
+				});
+				W.Hotkey("",{
+					key:"CTRL+DOWN",
+					action:function(){
+						body.ResizeSelectionKeyboard(0,32);
+					},
+				});
+				W.Hotkey("",{
+					key:"CTRL+LEFT",
+					action:function(){
+						body.ResizeSelectionKeyboard(-32,0);
+					},
+				});
+				W.Hotkey("",{
+					key:"CTRL+RIGHT",
+					action:function(){
+						body.ResizeSelectionKeyboard(32,0);
+					},
+				});
+			}
 			return body;
 		},
 		Save:function(){
@@ -921,7 +1087,7 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}
-			var fn=IO.DoFileDialog(1,"json",
+			var fn=IO.DoFileDialog(1,"stickerwall",
 				this.main_widget.m_file_name.indexOf('<')>=0?
 					UI.m_new_document_search_path:
 					UI.GetPathFromFilename(this.main_widget.m_file_name));

@@ -174,6 +174,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		this.m_unkeyed_bookmarks=[];
 		if(this.m_is_main_editor){
 			this.m_diff_from_save=this.ed.CreateDiffTracker()
+			this.m_diff_from_parse=this.m_diff_from_save;
 			if(this.m_file_name){
 				this.StartLoading(this.m_file_name)
 			}
@@ -352,6 +353,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			this.m_diff_from_save.discard()
 			this.m_diff_from_save=this.ed.CreateDiffTracker()
 		}
+		this.m_diff_from_parse=this.m_diff_from_save;
 	},
 	FindNearestBookmark:function(ccnt,direction){
 		//just do a sequential search
@@ -440,6 +442,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				ed.Edit([
 					0,this.m_sync_group_ccnt0,null,
 					this.m_sync_group_ccnt1,ed.GetTextSize()-this.m_sync_group_ccnt1,null],1);
+				ed.ChopUndoRedo(this.m_sync_group_ccnt0,this.m_sync_group_ccnt1)
 			}
 		}else{
 			//load the file normally
@@ -585,6 +588,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			this.opening_callbacks=undefined
 		}
 		UI.Refresh()
+	},
+	ForceReparse:function(){
+		if(!this.ed){return;}
+		if(!this.m_file_name){return;}
+		this.ed.m_file_index=UI.ED_ForceReparse(this);
+		this.m_diff_from_parse=this.ed.CreateDiffTracker();
 	},
 	ParseFile:function(){
 		if(this.m_is_preview){return;}
@@ -1060,7 +1069,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					if(full_funarg_old_ccnts){
 						var full_funarg_extras=[];
 						var arv={};
-						var diff=this.m_diff_from_save;
+						var diff=this.m_diff_from_parse;
 						for(var i=0;i<full_funarg_old_ccnts.length;i+=2){
 							var ccnt0=full_funarg_old_ccnts[i+0];
 							var ccnt1=full_funarg_old_ccnts[i+1];
@@ -1913,12 +1922,12 @@ var CallParseMore=function(){
 		var terminate_now=0;
 		for(;;){
 			while(UI.g_include_jobs.length>0){
-				if(!(UI.g_include_jobs.length&127)){
-					terminate_now|=!!UI.TestEventInPollJob();
-					if(terminate_now){
-						break;
-					}
+				//if(!(UI.g_include_jobs.length&127)){
+				terminate_now|=!!UI.TestEventInPollJob();
+				if(terminate_now){
+					break;
 				}
+				//}
 				var ijob=UI.g_include_jobs.pop();
 				var fn_found=UI.SearchIncludeFileShallow(ijob.fn_base,ijob.fn_include);
 				//console.log(ijob.fn_include,JSON.stringify(fn_found));
@@ -1973,7 +1982,7 @@ var CallParseMore=function(){
 							break;
 						}
 						work_load++;
-						if(work_load>=MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
+						if(work_load>=16){
 							work_load=0;
 							terminate_now|=!!UI.TestEventInPollJob();
 							if(terminate_now){
@@ -3645,8 +3654,8 @@ W.CodeEditorWidget_prototype={
 				UI.OpenEditorWindow(fn,ccnt_go!=undefined&&function(){
 					var doc=this;
 					var ccnt=ccnt_go;
-					if(doc.m_diff_from_save){
-						ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
+					if(doc.m_diff_from_parse){
+						ccnt=doc.m_diff_from_parse.BaseToCurrent(ccnt)
 					}
 					doc.SetSelection(ccnt,ccnt)
 					if(new_def_context){
@@ -3672,13 +3681,13 @@ W.CodeEditorWidget_prototype={
 			ccnt=fol_ret.ccnt_editor;
 			ccnt_query=fol_ret.ccnt_parser;
 			if(!(ccnt>=0)){ccnt=0;}
-			if(doc.m_diff_from_save){
-				ccnt_query=doc.m_diff_from_save.CurrentToBase(ccnt_query)
+			if(doc.m_diff_from_parse){
+				ccnt_query=doc.m_diff_from_parse.CurrentToBase(ccnt_query)
 			}
 			var ccnt_decl=UI.ED_QueryDecl(doc,ccnt_query,id)
 			if(ccnt_decl>=0){
-				if(doc.m_diff_from_save){
-					ccnt_decl=doc.m_diff_from_save.BaseToCurrent(ccnt_decl)
+				if(doc.m_diff_from_parse){
+					ccnt_decl=doc.m_diff_from_parse.BaseToCurrent(ccnt_decl)
 				}
 				if(ccnt_decl!=ccnt0){
 					//UI.SetSelectionEx(doc,ccnt_decl,ccnt_decl,"go_to_definition")
@@ -3694,8 +3703,8 @@ W.CodeEditorWidget_prototype={
 		var fn=doc.owner.file_name
 		var p_target=0
 		ccnt=ccnt0
-		if(doc.m_diff_from_save){
-			ccnt=doc.m_diff_from_save.CurrentToBase(ccnt)
+		if(doc.m_diff_from_parse){
+			ccnt=doc.m_diff_from_parse.CurrentToBase(ccnt)
 		}
 		for(var i=0;i<gkds.length;i+=2){
 			if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
@@ -3717,7 +3726,7 @@ W.CodeEditorWidget_prototype={
 		var sel=doc.GetSelection();
 		var ed=doc.ed
 		var ccnt_sel1=doc.sel1.ccnt
-		if(doc.m_diff_from_save){ccnt_sel1=doc.m_diff_from_save.CurrentToBase(ccnt_sel1)}
+		if(doc.m_diff_from_parse){ccnt_sel1=doc.m_diff_from_parse.CurrentToBase(ccnt_sel1)}
 		var s_dep_file=UI.ED_QueryDepTokenByBaseCcnt(doc,ccnt_sel1)
 		if(s_dep_file){
 			//UI.OpenEditorWindow(s_dep_file)
@@ -5622,20 +5631,20 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 };
 
 UI.SearchIncludeFile=function(fn_base,fn_include){
-	var fn_found=UI.SearchIncludeFileShallow(fn_base,fn_include);
-	//if(fn_found=='<dangling>'||fn_found=='<deep>'){
-	//}
-	fn_found=UI.g_deep_search_cache[fn_include];
+	var fn_found=UI.g_deep_search_cache[fn_include];
 	if(fn_found==undefined){
-		//all paths ever mentioned
-		PrepareAPEM();
-		fn_found=null;
-		var paths=UI.g_all_paths_ever_mentioned;
-		for(var i=0;i<paths.length;i++){
-			var fn=paths[i]+'/'+fn_include;
-			if(IO.FileExists(fn)){
-				fn_found=fn;
-				break;
+		fn_found=UI.SearchIncludeFileShallow(fn_base,fn_include);
+		if(!fn_found){
+			//all paths ever mentioned
+			PrepareAPEM();
+			fn_found=null;
+			var paths=UI.g_all_paths_ever_mentioned;
+			for(var i=0;i<paths.length;i++){
+				var fn=paths[i]+'/'+fn_include;
+				if(IO.FileExists(fn)){
+					fn_found=fn;
+					break;
+				}
 			}
 		}
 		if(fn_found!=undefined){
@@ -7191,8 +7200,8 @@ W.CodeEditor=function(id,attrs){
 						UI.OpenEditorWindow(gkds[gotoctx.p_target+0],function(){
 							var doc=this
 							var ccnt=ccnt_go
-							if(doc.m_diff_from_save){
-								ccnt=doc.m_diff_from_save.BaseToCurrent(ccnt)
+							if(doc.m_diff_from_parse){
+								ccnt=doc.m_diff_from_parse.BaseToCurrent(ccnt)
 							}
 							doc.SetSelection(ccnt,ccnt)
 							UI.g_goto_definition_context=gotoctx;

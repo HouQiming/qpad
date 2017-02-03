@@ -3388,7 +3388,7 @@ UI.RegisterEditorPlugin(function(){
 //var CODE_TAG_LENGTH=12;
 var CreateFileTag=function(){
 	//return IO.SHA1([UI.g_git_email,Date.now()].join('&')).substr(0,CODE_TAG_LENGTH);
-	return [UI.g_git_name,UI.g_git_email,(new Date()).toISOString()].join('_').replace(/[^0-9a-zA-Z_]/g,'_');
+	return ["_tag",UI.g_git_name,UI.g_git_email,(new Date()).toISOString()].join('_').replace(/[^0-9a-zA-Z_]/g,'_');
 };
 
 UI.RegisterEditorPlugin(function(){
@@ -3410,8 +3410,10 @@ UI.RegisterEditorPlugin(function(){
 			sel[1]=this.SeekLC(line1,0);
 			//try to use the keydecl mode
 			var ccnt_lineend_1st=this.SeekLC(line0+1,0);
+			var ccnt_linestart_2nd=this.SeekLC(Math.max(line1-1,0),0);
 			var all_keydecls=(UI.ED_QueryKeyDeclByNeedle(this,"")||[]);
 			var s_keydecl_tag=undefined;
+			var s_keydecl_tag1=undefined;
 			for(var i=0;i<all_keydecls.length;i+=2){
 				var ccnt_i=all_keydecls[i];
 				if(sel[0]<=ccnt_i&&ccnt_i<ccnt_lineend_1st){
@@ -3445,6 +3447,21 @@ UI.RegisterEditorPlugin(function(){
 					break;
 				}
 			}
+			if(is_keydecl_mode==1){
+				//the range cannot be covered with one func(){}, try to find a second tag for this
+				for(var i=0;i<all_keydecls.length;i+=2){
+					var ccnt_i=all_keydecls[i];
+					if(ccnt_linestart_2nd<=ccnt_i&&ccnt_i<sel[1]){
+						var s_key=this.ed.GetText(all_keydecls[i],all_keydecls[i+1]-all_keydecls[i]);
+						if((UI.ED_QueryKeyDeclByNeedle(this,s_key)||[]).length!=2){
+							continue;
+						}
+						s_keydecl_tag1=s_key;
+						is_keydecl_mode=3;
+						break;
+					}
+				}
+			}
 			var sindent0=this.ed.GetText(sel[0],CountSpacesAfter(this.ed,sel[0]));
 			var sindent1=sindent0;//this.ed.GetText(sel[1],CountSpacesAfter(this.ed,sel[1]));
 			var lang=this.plugin_language_desc
@@ -3454,17 +3471,21 @@ UI.RegisterEditorPlugin(function(){
 			}
 			var s_line_comment=cmt_holder.line_comment||'//';
 			var ops=[];
-			if(!(is_keydecl_mode&1)){ops.push(sel[0],0,[sindent0,s_line_comment,'qpad# ',stag,'_0\n'].join(''));}
-			if(!(is_keydecl_mode&2)){ops.push(sel[1],0,[sindent1,s_line_comment,'qpad# ',stag,'_1\n'].join(''));}
+			if(!(is_keydecl_mode&1)){ops.push(sel[0],0,[sindent0,s_line_comment,'@qpad# ',stag,'_0\n'].join(''));}
+			if(!(is_keydecl_mode&2)){ops.push(sel[1],0,[sindent1,s_line_comment,'@qpad# ',stag,'_1\n'].join(''));}
 			if(ops&&ops.length){
 				this.HookedEdit(ops);
 				this.SetSelection(sel[0],this.SeekLC(line1+!(is_keydecl_mode&1)+!(is_keydecl_mode&2),0));
+				this.CallOnChange();
+				this.CallOnSelectionChange();
+				//immediate reparse
+				this.ForceReparse();
 			}
 			var ret=undefined;
 			if(is_keydecl_mode==1){
 				ret={tag0_name:s_keydecl_tag,tag1_name:stag+'_1'};
 			}else if(is_keydecl_mode==3){
-				ret={tag0_name:s_keydecl_tag};
+				ret={tag0_name:s_keydecl_tag,tag1_name:s_keydecl_tag1};
 			}else{
 				ret={tag0_name:stag+'_0',tag1_name:stag+'_1'};
 			}

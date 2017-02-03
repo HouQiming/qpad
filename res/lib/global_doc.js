@@ -201,6 +201,27 @@ UI.BumpHistory=function(file_name){
 	UI.SaveMetaData();
 }
 
+UI.ComputeRelativePath=function(fn_from,fn_to){
+	var paths_from=fn_from.split('/');
+	var paths_to=fn_to.split('/');
+	var psame=0;
+	for(var i=0;i<paths_from.length-1;i++){
+		if(paths_from[i]!=paths_to[i]){
+			break;
+		}
+		psame=i+1;
+	}
+	if(!psame){return fn_to;}
+	var paths_final=[];
+	for(var i=psame;i<paths_from.length-1;i++){
+		paths_final.push('..');
+	}
+	for(var i=psame;i<paths_to.length;i++){
+		paths_final.push(paths_to[i]);
+	}
+	return paths_final.join('/');
+};
+
 ////////////////////////////////////
 IO.RunTool=function(args,work_dir, sregex,fparse,ffinalize){
 	//segment by line, then test regexp

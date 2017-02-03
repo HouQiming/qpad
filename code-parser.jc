@@ -649,12 +649,12 @@ auto tokenize(string sdata,int g_ignore_indents,int allow_unpaired_brackets)
 			if ch=='/':
 				ptr++
 				efeed0=ptr
-				if ENABLE_EXPERIMENTAL_FEATURES&&ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad",5)==0:
-					if feed[ptr+5]==' ':
+				if ptr<feed.n-6&&__basic_api.memcmp(__pointer(feed.d+ptr),"@qpad",5)==0&&(feed[ptr+5]==u8(' ')||feed[ptr+5]==u8('#')):
+					if feed[ptr+5]==u8(' '):
 						ptr+=6
 						push_token(TOK_COMMENT,int(efeed0-2),int(ptr))
-					else if feed[ptr+5]=='#':
-						//qpad# tag_name
+					else if feed[ptr+5]==u8('#'):
+						//@qpad# tag_name
 						ptr+=6
 						push_token(TOK_ID+g_id_pragma_mark,int(efeed0-2),int(ptr))
 				else
@@ -3070,6 +3070,57 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		g_c_like_parse_queue.push(getid(fn))
 		return 0
 	}
+	ParseOneFile=inline(JS,fn,timestamp,getData){
+		auto idfn=getid(fn)
+		//n0_parsemore=g_c_like_parse_queue.n
+		options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
+		//n1_parsemore=g_c_like_parse_queue.n
+		sparser=options["parser"].or("text")
+		if sparser=="none":
+			ids=new int[]
+			appendKeywords(ids,options)
+			ret=new CFileIndex(){m_ids:ComputeIDOrderingMaps(ids)}
+			//ret.m_ids.Sort()
+			//ret.m_ids.Unique()
+		else
+			sdata=getData(fn)
+			if !sdata:return CFileIndex.NULL
+			//tick0=System.Time.tick64()
+			encoding=DetectEncoding(sdata)
+			if encoding!=ENCODING_UTF8&&encoding!=ENCODING_INVALID:
+				(s_utf8,s_lingering)=ConvertToUTF8(encoding,sdata)
+				sdata=s_utf8
+			//Writeln('ED_ParserMore ',fn)
+			if sparser=="C":
+				ret=parseAsCLike(JS,idfn,sdata,options)
+			else
+				ret=parseAsText(sdata,options)
+			ret.m_idfn=idfn
+			//Writeln('parse ',idfn,' ',getIdString(idfn),' ',!!ret.m_all_key_decls)
+			if ret.m_all_key_decls:
+				kdf=ApplyKeyDecls(idfn,ret,timestamp)
+				//if n0_parsemore<n1_parsemore:
+				//	kdf.idfn_parsemore_deps=new(g_c_like_parse_queue[n0_parsemore:n1_parsemore-1])
+			g_color_table_time_dense++
+			//secs=System.Time.TicksToSeconds(System.Time.tick64()-tick0)
+			//if secs>0.1f:
+			//	Writeln('parse ',getIdString(idfn),' ',formatNumber(secs*1000.f,{frac:1}),'ms')
+		return ret
+	}
+	JS_UI["ED_ForceReparse"]=function(JSContext JS){
+		doc=JS.Param(0).as(JSObject)
+		fidx=doc["ed"]["m_file_index"].as(CFileIndex)
+		ed=doc["ed"].as(CEditableText)
+		fn=doc["m_file_name"].as(string)
+		timestamp=0uLL
+		foreach fnx,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
+			timestamp=fi.latest_time()
+			break
+		ret=ParseOneFile(JS,fn,timestamp,inline(fn){
+			return ed.GetText(0LL,ed.GetTextSize())
+		})
+		return JS.Return(ret)
+	}
 	JS_UI["ED_ParseMore"]=function(JSContext JS){
 		while g_c_like_parse_queue.n:
 			idfn=g_c_like_parse_queue.pop()
@@ -3086,42 +3137,14 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				jsret["file_index"]=prev_kdf.fidx
 				return JS.Return(jsret)
 			//call JS to get the language desc
-			//n0_parsemore=g_c_like_parse_queue.n
-			options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
-			//n1_parsemore=g_c_like_parse_queue.n
-			sparser=options["parser"].or("text")
-			if sparser=="none":
-				ids=new int[]
-				appendKeywords(ids,options)
-				ret=new CFileIndex(){m_ids:ComputeIDOrderingMaps(ids)}
-				//ret.m_ids.Sort()
-				//ret.m_ids.Unique()
-			else
+			ret=ParseOneFile(JS,fn,timestamp,inline(fn){
 				if fn.n&&fn[0]=='*':
 					sdata=sbox.UIReadAll(fn[1:])
 				else
 					sdata=System.IO.ReadAll(fn)
-				if !sdata:continue
-				//tick0=System.Time.tick64()
-				encoding=DetectEncoding(sdata)
-				if encoding!=ENCODING_UTF8&&encoding!=ENCODING_INVALID:
-					(s_utf8,s_lingering)=ConvertToUTF8(encoding,sdata)
-					sdata=s_utf8
-				//Writeln('ED_ParserMore ',fn)
-				if sparser=="C":
-					ret=parseAsCLike(JS,idfn,sdata,options)
-				else
-					ret=parseAsText(sdata,options)
-				ret.m_idfn=idfn
-				//Writeln('parse ',idfn,' ',getIdString(idfn),' ',!!ret.m_all_key_decls)
-				if ret.m_all_key_decls:
-					kdf=ApplyKeyDecls(idfn,ret,timestamp)
-					//if n0_parsemore<n1_parsemore:
-					//	kdf.idfn_parsemore_deps=new(g_c_like_parse_queue[n0_parsemore:n1_parsemore-1])
-				g_color_table_time_dense++
-				//secs=System.Time.TicksToSeconds(System.Time.tick64()-tick0)
-				//if secs>0.1f:
-				//	Writeln('parse ',getIdString(idfn),' ',formatNumber(secs*1000.f,{frac:1}),'ms')
+				return sdata
+			})
+			if !ret:continue
 			jsret=JS.New()
 			jsret["file_name"]=fn
 			jsret["file_index"]=ret
@@ -3416,7 +3439,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		//s=JS.Param(1).as(string)
 		fidx=doc["ed"]["m_file_index"].as(CFileIndex)
 		if !fidx||!fidx.m_all_decls:return 0
-		diff_from_save=doc["m_diff_from_save"].as(CDiffTracker)
+		diff_from_save=doc["m_diff_from_parse"].as(CDiffTracker)
 		//if !s:s=new string
 		all_key_decls=fidx.m_all_key_decls
 		if !all_key_decls:return 0
@@ -3502,7 +3525,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		ccnt0=JS.Param(1).as(i64)
 		ccnt1=JS.Param(2).as(i64)
 		if !fidx||!fidx.m_all_key_decls:return 0
-		diff_from_save=doc["m_diff_from_save"].as(CDiffTracker)
+		diff_from_save=doc["m_diff_from_parse"].as(CDiffTracker)
 		if diff_from_save:
 			ccnt0=diff_from_save.CurrentToBase(ccnt0)
 			ccnt1=diff_from_save.CurrentToBase(ccnt1)

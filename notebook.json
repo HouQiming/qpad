@@ -103,27 +103,31 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-out-of-screen subwindow
 sticker code:
+	make a real wall for nama
+		new stickerwall
+	exclude the tag lines and the final EOL?
+		when it's a qpad tag line
+	ctrl+s not working
 	edges
 		F12
 		it's only useful when multi-connecting
-	copying already-tagged code
+		edge-based
+			co-editing
+			code template
 	code -> sticker navigation
 	shift+click-inside
-	keyboard navigation / moving / resizing
+		shift selection
 	var-dup
-	ESC inside sticker
-		set / unset textbox focus
 	sticker z-order
 	(X) render filename in code stickers? sticker caption bar?
 	could store code template / code generator as sticker scripts
-(test) limit sticker height
+auto-reparse on idle?
+	and when the parse queue is empty
+	the recurses could be expensive
 error clean up on notebook cell deletion
 ESC in terminal: release focus
 busy loop again
-truly stateless UI framework
-	re-call Render during message processing and remove auto-saving...
 weird error appearance in android build output
 	TERM=xterm? no
 terminal gets overwhelmed by large amounts of output
