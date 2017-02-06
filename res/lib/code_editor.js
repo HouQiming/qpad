@@ -5638,7 +5638,7 @@ UI.SearchIncludeFile=function(fn_base,fn_include){
 	var fn_found=UI.g_deep_search_cache[fn_include];
 	if(fn_found==undefined){
 		fn_found=UI.SearchIncludeFileShallow(fn_base,fn_include);
-		if(!fn_found){
+		if(!fn_found||fn_found=='<deep>'||fn_found=='<dangling>'){
 			//all paths ever mentioned
 			PrepareAPEM();
 			fn_found=null;

@@ -2248,10 +2248,16 @@ class Terminal{
 			copy(this.input_pipe_queue[0:],this.input_pipe_queue[nwritten:])
 		this.input_pipe_queue.n-=nwritten
 		if this.input_pipe_queue.n>0:
-			JS["UI"].CallMethod(int,"NextTick",function(JSContext JS){
-				WriteInput();
-				return 0;
-			})
+			if nwritten>0:
+				JS["UI"].CallMethod(int,"NextTick",function(JSContext JS){
+					WriteInput();
+					return 0;
+				})
+			else
+				JS["UI"].CallMethod(int,"setTimeout",function(JSContext JS){
+					WriteInput();
+					return 0;
+				},1000)
 		if this.upload_progress_cb:
 			this.upload_progress_cb.Call(int,int(this.input_pipe_queue.n))
 	}
@@ -4186,6 +4192,8 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				if !term.is_remote_editing&&term.writable:
 					JS_UI.CallMethod(int,"Refresh")
 			},function(){
+				if term.input_pipe_queue:
+					term.input_pipe_queue.clear()
 				if finalization_callback:
 					finalization_callback.Call(int)
 			})

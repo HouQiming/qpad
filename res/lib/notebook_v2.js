@@ -1062,7 +1062,7 @@ W.notebook_prototype={
 		doc_in.m_enable_wrapping=0;
 		doc_in.m_current_wrap_width=512;
 		doc_in.notebook_owner=this;
-		doc_in.disable_x_scroll=1;
+		//doc_in.disable_x_scroll=1;
 		doc_in.Init();
 		doc_in.scroll_x=0;doc_in.scroll_y=0;
 		if(s_text){doc_in.ed.Edit([0,0,s_text],1);}

@@ -1442,6 +1442,8 @@ UI.CustomTheme=function(){
 				/////
 				bgcolor0:L?0xffffffff:0xff666666,
 				bgcolor1:L?0xffe8e8e8:0xff444444,
+				file_name_color:L?0xff444444:0xffffffff,
+				h_caption:0,
 			},
 		},
 	};

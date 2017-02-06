@@ -5,6 +5,7 @@ require("res/lib/notebook_v2");
 
 Language.RegisterFileIcon("M",["png","jpg","jpeg", "gif","tif","tiff", "bmp","ppm","webp","ico", "tga","dds","exr","iff","pfm","hdr"]);
 Language.RegisterFileIcon("V",["mp4","mpg","mpeg","h264","avi","mov","rm","rmvb"]);
+Language.RegisterFileIcon("T",["stickerwall","wall"]);
 Language.RegisterFileIcon("文",["txt"]);
 
 var f_C_like=function(lang,keywords,has_preprocessor,objc_keywords){

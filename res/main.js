@@ -439,6 +439,15 @@ var CreateMenus=function(){
 		UI.NewCodeEditorTab();
 		UI.Refresh()
 	}})
+	menu_file.AddNormalItem({text:"New sticker wall",icon:'T',action:function(){
+		var active_document=UI.top.app.document_area.active_tab
+		if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
+			UI.top.app.document_area.CloseTab();
+		}
+		UI.UpdateNewDocumentSearchPath()
+		UI.OpenStickerWallTab("<new>");
+		UI.Refresh()
+	}})
 	menu_file.AddNormalItem({text:"&Open",icon:'开',key:"CTRL+O",enable_hotkey:enable_ctrl_keys,action:function(){
 		UI.UpdateNewDocumentSearchPath()
 		var fn=IO.DoFileDialog(0,undefined,UI.m_new_document_search_path);

@@ -104,24 +104,27 @@ v2
 =====í¯¿í¿¿=====
 # TODO LIST
 sticker code:
-	make a real wall for nama
-		new stickerwall
-	(test) false alarm: "file deleted"
-	(test) bad bookmark and stuff
-	ctrl+s failure... after ESC!?
+	node types
+		notebook cell reference
+		generic rectangle
+	make a real wall
+		pasting inside a note
 	edges
-		F12
+		F12 relationship
 		it's only useful when multi-connecting
 		edge-based
 			co-editing
+				or groups?
 			code template
 	code -> sticker navigation
-	shift+click-inside
-		shift selection
+		mainly the qpad tags
+		tag on paste? that would allow us to insert the wall name
 	var-dup
 	sticker z-order
-	(X) render filename in code stickers? sticker caption bar?
+	render filename in code stickers? sticker caption bar?
 	could store code template / code generator as sticker scripts
+(test) busyloop
+	WriteInput
 auto-reparse on idle?
 	and when the parse queue is empty
 	the recurses could be expensive

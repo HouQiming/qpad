@@ -173,7 +173,10 @@ var sticker_wall_prototype={
 			var fn_i=sticker_i.file_name;
 			var fn_found=UI.SearchIncludeFile(this.m_file_name,fn_i);
 			if(fn_found){fn_i=fn_found;}
-			if(!IO.FileExists(fn_i)){break;}
+			if(!IO.FileExists(fn_i)){
+				console.log('referenced file not found: '+fn_i);
+				break;
+			}
 			var doc_host=UI.OpenCodeEditorDocument(fn_i,-1);
 			if(!doc_host.ed){
 				doc_host.m_load_sync=1;
@@ -214,7 +217,7 @@ var sticker_wall_prototype={
 				ccnt_tag1=((decls&&decls[(sticker_i.tag1_number||0)*2])||ccnt_tag0);
 				//if(diff_host){ccnt_tag1=diff_host.BaseToCurrent(ccnt_tag1);}
 			}
-			if(ccnt_tag1>ccnt_tag0){
+			if(ccnt_tag1>=ccnt_tag0){
 				var line_tag0=doc_host.GetLC(ccnt_tag0)[0];
 				var line_tag1=doc_host.GetLC(ccnt_tag1)[0];
 				if(TestQPadTag(doc_host,line_tag0)){
@@ -226,6 +229,9 @@ var sticker_wall_prototype={
 				line_tag1++;
 				ccnt_tag0=doc_host.SeekLC(line_tag0,0);
 				ccnt_tag1=doc_host.SeekLC(line_tag1,0);
+				if(ccnt_tag1>ccnt_tag0+1){
+					ccnt_tag1--;
+				}
 				if(ccnt_tag1>ccnt_tag0){
 					var doc_code=UI.OpenCodeEditorDocument(fn_i,-2);
 					doc_code.m_sync_group_ccnt0=ccnt_tag0;
@@ -237,6 +243,8 @@ var sticker_wall_prototype={
 					doc_code.Init()
 					sticker_i.doc=doc_code;
 				}
+			}else{
+				console.log('bad sticker: '+JSON.stringify(sticker_i)+" "+ccnt0+" "+ccnt1);
 			}
 			UI.CloseCodeEditorDocument(doc_host);
 			break;
@@ -268,20 +276,24 @@ var sticker_wall_prototype={
 		this.m_stickers=[];
 		//load
 		var fn=this.m_file_name;
-		var s_file_data=IO.ReadAll(fn);
-		var parts=s_file_data.split(g_sw_separator);
-		var obj_json=JSON.parse(parts[0]);
-		if(obj_json.m_stickers){
-			this.m_stickers=obj_json.m_stickers;
-		}
-		var ppart=1;
-		for(var i=0;i<this.m_stickers.length;i++){
-			var sticker_i=this.m_stickers[i];
-			var text="";
-			if(sticker_i.type=="note"){
-				text=(parts[ppart++]||"");
+		try{
+			var s_file_data=(IO.ReadAll(fn)||'{"m_stickers":[]}');
+			var parts=s_file_data.split(g_sw_separator);
+			var obj_json=JSON.parse(parts[0]);
+			if(obj_json.m_stickers){
+				this.m_stickers=obj_json.m_stickers;
 			}
-			this.InitSticker(sticker_i,text);
+			var ppart=1;
+			for(var i=0;i<this.m_stickers.length;i++){
+				var sticker_i=this.m_stickers[i];
+				var text="";
+				if(sticker_i.type=="note"){
+					text=(parts[ppart++]||"");
+				}
+				this.InitSticker(sticker_i,text);
+			}
+		}catch(err){
+			this.m_stickers=[];
 		}
 		var loaded_metadata=(UI.m_ui_metadata[this.m_file_name]||{});
 		this.m_tr=loaded_metadata.tr;
@@ -321,6 +333,14 @@ var sticker_wall_prototype={
 			return 0;
 		}
 		this.need_save=0;
+		for(var i=0;i<this.m_stickers.length;i++){
+			var sticker_i=this.m_stickers[i];
+			if(sticker_i.type=="note"){
+				var doc=sticker_i.doc;
+				doc.saved_point=doc.ed.GetUndoQueueLength();
+				doc.ResetSaveDiff();
+			}
+		}
 		UI.RefreshAllTabs()
 		return 1;
 	},
@@ -402,24 +422,24 @@ var sticker_wall_prototype={
 			//moving borders
 			var sticker_name=("sticker_"+i.toString());
 			W.Region(sticker_name+"_move_knob",{
-				x:x-move_padding,y:y-move_padding,
+				x:x-move_padding,y:y-common_style.h_caption-move_padding,
 				w:sticker_i.w+move_padding*2,
-				h:sticker_i.h+move_padding*2,
+				h:sticker_i.h+common_style.h_caption+move_padding*2,
 				owner:sticker_i,
 				wall_owner:this,
 				mouse_cursor:"sizeall",
 			},MoveKnob_prototype);
 			//render background
 			UI.RoundRect({
-				x:x-common_style.padding,y:y-common_style.padding,
-				w:sticker_i.w+common_style.padding*2+common_style.shadow_size,h:sticker_i.h+common_style.padding*2+common_style.shadow_size,
+				x:x-common_style.padding,y:y-common_style.h_caption-common_style.padding,
+				w:sticker_i.w+common_style.padding*2+common_style.shadow_size,h:sticker_i.h+common_style.h_caption+common_style.padding*2+common_style.shadow_size,
 				round:common_style.shadow_size,
 				border_width:-common_style.shadow_size,
 				color:common_style.shadow_color,
 			});
 			UI.RoundRect({
-				x:x-common_style.padding,y:y-common_style.padding,
-				w:sticker_i.w+common_style.padding*2,h:sticker_i.h+common_style.padding*2,
+				x:x-common_style.padding,y:y-common_style.h_caption-common_style.padding,
+				w:sticker_i.w+common_style.padding*2,h:sticker_i.h+common_style.h_caption+common_style.padding*2,
 				color:style_i.bgcolor,
 				border_width:sticker_i.m_is_selected?common_style.selection_width/tr.scale:0,
 				border_color:common_style.selection_color,
@@ -427,7 +447,7 @@ var sticker_wall_prototype={
 			//render content
 			var dx_subwin=Math.min(x,0)/sticker_i.scale;
 			var dy_subwin=Math.min(y,0)/sticker_i.scale;
-			UI.PushSubWindow(x,y,sticker_i.w,sticker_i.h,sticker_i.scale)
+			UI.PushSubWindow(x,y,sticker_i.w,Math.ceil(sticker_i.h),sticker_i.scale)
 			switch(sticker_i.type){
 			case "code":
 				W.CodeEditor(sticker_name,{
@@ -481,18 +501,18 @@ var sticker_wall_prototype={
 				knob.border_width/=tr.scale;
 				var dx=knob.w*0.5;var dy=knob.h*0.5;
 				var x0=x-common_style.padding-dx;
-				var y0=y-common_style.padding-dy;
+				var y0=y-common_style.h_caption-common_style.padding-dy;
 				var x2=x0+sticker_i.w+common_style.padding*2;
-				var y2=y0+sticker_i.h+common_style.padding*2;
+				var y2=y0+common_style.h_caption+sticker_i.h+common_style.padding*2;
 				var x1=(x0+x2)*0.5;
 				var y1=(y0+y2)*0.5;
 				knob.x=x0;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob00",{x_anchor_rel:2*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,y_anchor:y2+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
-				knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob10",{x_anchor_rel:1*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y2+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+				//knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob10",{x_anchor_rel:1*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y2+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
 				knob.x=x2;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob20",{x_anchor_rel:0*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,y_anchor:y2+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
-				knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob01",{x_anchor_rel:2*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
-				knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob21",{x_anchor_rel:0*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+				//knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob01",{x_anchor_rel:2*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+				//knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob21",{x_anchor_rel:0*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
 				knob.x=x0;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob02",{x_anchor_rel:2*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,y_anchor:y0+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
-				knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob12",{x_anchor_rel:1*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y0+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+				//knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob12",{x_anchor_rel:1*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y0+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
 				knob.x=x2;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob22",{x_anchor_rel:0*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,y_anchor:y0+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
 			}
 		}
@@ -769,15 +789,15 @@ var sticker_wall_prototype={
 		var stickers=this.m_stickers;
 		for(var i=0;i<stickers.length;i++){
 			if(stickers[i].m_is_selected){
-				sel_x=stickers[i].x+stickers[i].w*0.5;
-				sel_y=stickers[i].y+stickers[i].h*0.5;
+				sel_x=stickers[i].x;
+				sel_y=stickers[i].y;
 				break;
 			}
 		}
 		var best_cosine=0;
 		for(var i=0;i<stickers.length;i++){
-			var dx_i=stickers[i].x+stickers[i].w*0.5-sel_x;
-			var dy_i=stickers[i].y+stickers[i].h*0.5-sel_y;
+			var dx_i=stickers[i].x-sel_x;
+			var dy_i=stickers[i].y-sel_y;
 			var ilg=1.0/Math.sqrt(dx_i*dx_i+dy_i*dy_i);
 			if(ilg>0){
 				dx_i*=ilg;
@@ -793,8 +813,8 @@ var sticker_wall_prototype={
 		var best_lg=1e10;
 		var best_i=-1;
 		for(var i=0;i<stickers.length;i++){
-			var dx_i=stickers[i].x+stickers[i].w*0.5-sel_x;
-			var dy_i=stickers[i].y+stickers[i].h*0.5-sel_y;
+			var dx_i=stickers[i].x-sel_x;
+			var dy_i=stickers[i].y-sel_y;
 			var lg=Math.sqrt(dx_i*dx_i+dy_i*dy_i);
 			var ilg=1.0/lg;
 			if(ilg>0){
@@ -876,7 +896,7 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 				var body=this.main_widget;
 				var s_name=UI.GetMainFileName((this.file_name));
 				this.need_save=body.TestNeedSave();
-				this.title=s_name+(this.need_save?'*':'');
+				this.title=UI.Format("@1 (Sticker wall)",s_name)+(this.need_save?'*':'');
 				this.tooltip=this.file_name;
 			}
 		},
@@ -1116,6 +1136,28 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 					},
 				});
 			}
+			//file name
+			var name_did={};
+			var s_file_name=undefined;
+			for(var i=0;i<body.m_stickers.length;i++){
+				var sticker_i=body.m_stickers[i];
+				if(sticker_i.m_is_selected){
+					if(sticker_i.type=="code"&&sticker_i.doc){
+						//if(!name_did[sticker_i.file_name]){
+						//	name_did[sticker_i.file_name]=1;
+						s_file_name=sticker_i.file_name;
+						if(UI.HasFocus(sticker_i.doc)){
+							break;
+						}
+					}
+				}
+			}
+			W.Text("",{
+				x:x_current+8,y:2,
+				font:UI.Font(UI.font_name,24),
+				text:s_file_name,
+				color:common_style.file_name_color,
+			});
 			return body;
 		},
 		Save:function(){
