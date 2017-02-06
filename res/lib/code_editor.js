@@ -7695,14 +7695,21 @@ UI.NewCodeEditorTab=function(fname0){
 				this.need_save=1
 			}
 		},
-		body:function(){
+		NeedMainWidget:function(){
+			if(!this.main_widget){
+				this.body(1);
+			}
+		},
+		body:function(is_hack){
 			//use styling for editor themes
-			UI.context_parent.body=this.main_widget;
+			if(!is_hack){
+				UI.context_parent.body=this.main_widget;
+			}
 			if(this.main_widget){this.file_name=this.main_widget.file_name}
 			var attrs={
 				'anchor':'parent','anchor_align':"fill",'anchor_valign':"fill",
 				'x':0,'y':0,
-				'w_tab':UI.context_parent.w,'h_tab':UI.context_parent.h,
+				'w_tab':is_hack?1:UI.context_parent.w,'h_tab':is_hack?1:UI.context_parent.h,
 				'file_name':this.file_name,
 				'm_fn_remote':this.m_fn_remote,
 				'is_a_tab':1,

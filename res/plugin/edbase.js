@@ -3400,8 +3400,7 @@ UI.RegisterEditorPlugin(function(){
 		var sel=this.GetSelection();
 		if(!(sel[0]<sel[1])){return;}
 		var menu_tools=UI.BigMenu("&Tools")
-		menu_tools.AddSeparator();
-		menu_tools.AddNormalItem({text:"&Copy as sticker",enable_hotkey:1,key:"SHIFT+CTRL+C",action:function(){
+		menu_tools.AddNormalItem({text:"Copy as sticker",enable_hotkey:1,key:"SHIFT+CTRL+C",action:function(){
 			var is_keydecl_mode=0;
 			var stag=CreateFileTag();
 			var sel=this.GetSelection();
@@ -3515,6 +3514,7 @@ UI.RegisterEditorPlugin(function(){
 			UI.SDL_SetClipboardText(UI.g_clipboard_flag_stickerwall+JSON.stringify(ret));
 			UI.Refresh();
 		}.bind(this)});
+		menu_tools.AddSeparator();
 		menu_tools=undefined;
 	});
 });

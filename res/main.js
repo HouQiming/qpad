@@ -578,7 +578,7 @@ var CreateMenus=function(){
 	var menu_tools=UI.BigMenu("&Tools")
 	var obj_real_active_tab=UI.top.app.document_area.active_tab;
 	if(obj_real_active_tab&&obj_real_active_tab.file_name&&obj_real_active_tab.file_name[0]!='<'){
-		menu_tools.AddNormalItem({text:"Copy path",tab_menu_group:'tools',enable_hotkey:0,
+		menu_tools.AddNormalItem({text:"&Copy path",tab_menu_group:'tools',enable_hotkey:0,
 			action:function(fn){
 				var s=IO.NormalizeFileName(fn,1);
 				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){

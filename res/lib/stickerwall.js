@@ -40,16 +40,16 @@ var ScaleKnob_prototype={
 		var obj=this.owner;
 		this.x_anchor=obj.x+obj.w*this.x_anchor_rel;
 		this.y_anchor=obj.y+obj.h*this.y_anchor_rel;
-		this.dx_base=(this.x+this.w*0.5-this.x_anchor);
-		this.dy_base=(this.y+this.h*0.5-this.y_anchor);
+		this.dx_base=(obj.x+obj.w*(1-this.x_anchor_rel)-this.x_anchor);
+		this.dy_base=(obj.y+obj.h*(1-this.y_anchor_rel)-this.y_anchor);
 		this.drag_x_anchor=this.x_anchor;
 		this.drag_y_anchor=this.y_anchor;
 		this.drag_x0=(obj.x-this.x_anchor);
 		this.drag_y0=(obj.y-this.y_anchor);
 		//this.drag_x1=(obj.x+obj.w-this.x_anchor);
 		//this.drag_y1=(obj.y+obj.h-this.y_anchor);
-		this.dx_center=(this.x+this.w*0.5)-event.x;
-		this.dy_center=(this.y+this.h*0.5)-event.y;
+		this.dx_center=(obj.x+obj.w*(1-this.x_anchor_rel))-event.x;
+		this.dy_center=(obj.y+obj.h*(1-this.y_anchor_rel))-event.y;
 		this.drag_w=obj.w;
 		this.drag_h=obj.h;
 		this.is_dragging=1;
@@ -246,6 +246,7 @@ var sticker_wall_prototype={
 			}else{
 				console.log('bad sticker: '+JSON.stringify(sticker_i)+" "+ccnt0+" "+ccnt1);
 			}
+			UI.OpenEditorWindow(fn_i,function(){},"quite").NeedMainWidget();
 			UI.CloseCodeEditorDocument(doc_host);
 			break;
 		case "note":
@@ -757,7 +758,7 @@ var sticker_wall_prototype={
 	InsertGroup:function(){
 		var new_sticker={
 			"type":"group",
-			"w":300,"h":32,
+			"w":300,"h":300,
 			"scale":1.25,
 		};
 		this.PlaceSticker(new_sticker);
@@ -917,7 +918,10 @@ W.StickerWall=function(id,attrs){
 	UI.Begin(obj)
 	W.PureRegion(id,obj)
 	if(!obj.m_is_inited){
+		var bk_active_tab=UI.top.app.document_area.active_tab;
 		obj.Init();
+		UI.top.app.document_area.BringUpTab(bk_active_tab.__global_tab_id)
+		UI.SetFocus(obj);
 	}
 	obj.Render();
 	UI.End()

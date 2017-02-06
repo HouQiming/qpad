@@ -3745,7 +3745,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		hf=System.IO.OpenFile(fn)
 		if !hf:return 0
 		if offset0:
-			hf.Seek(offset0)
+			hf.Seek(iptr(offset0))
 		szread_real=int(min(u64(offset1-offset0),u64(szread)))
 		s=hf.Read(szread_real)
 		szread_returned=s.n
@@ -3779,7 +3779,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	JS_UI["EDLoader_Read"]=function(JSContext JS){
 		ed=JS.Param(0).as(CEditableText)
 		ret=JS.Param(1).as(CLoadingContext)
-		szread=min(JS.Param(2).or(NEXT_READ_SIZE),ret.sz-ret.sz_read)
+		szread=iptr(min(JS.Param(2).or(NEXT_READ_SIZE),ret.sz-ret.sz_read))
 		hf=ret.hf
 		//if ret.s_lingering:
 		//	ed.LoaderEdit([TEditop(){ccnt:ed.GetTextSize(),s:ret.s_lingering}])
