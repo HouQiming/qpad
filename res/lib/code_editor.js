@@ -7284,7 +7284,7 @@ W.CodeEditor=function(id,attrs){
 				obj.context_menu=undefined;
 			}
 		}
-		if(!is_find_mode_rendering&&!(doc&&doc.m_is_help_page_preview)){
+		if(!is_find_mode_rendering&&!(doc&&doc.m_is_help_page_preview)&&obj.show_background!==0){
 			if(w_right_shadow!=undefined){
 				var h_right_shadow=doc.h;
 				if(y_bottom_shadow!=undefined){

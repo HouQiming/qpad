@@ -4,7 +4,7 @@ var W=require("gui2d/widgets");
 require("res/lib/global_doc");
 require("res/lib/code_editor");
 var H_MAX_STICKER=1440;
-var SIZE_MIN=100;
+var SIZE_MIN=16;
 /*
 the wall itself is simple
 	x,y,type
@@ -69,14 +69,14 @@ var ScaleKnob_prototype={
 		var y_scale=(event.y+this.dy_center-this.drag_y_anchor)/this.dy_base;
 		if(obj.disable_y_scale){y_scale=undefined;}
 		if(this.lock_aspect_ratio){x_scale=Math.min(x_scale,y_scale);y_scale=x_scale;}
-		if(x_scale){
+		if(x_scale&&this.x_anchor_rel!=0.5){
 			x_scale=Math.max(x_scale,SIZE_MIN/this.drag_w);
 			obj.x=this.drag_x_anchor+this.drag_x0*x_scale;
 			obj.w=this.drag_w*x_scale;
 		}else{
 			x_scale=1.0;
 		}
-		if(y_scale){
+		if(y_scale&&this.y_anchor_rel!=0.5){
 			y_scale=Math.max(y_scale,SIZE_MIN/this.drag_h);
 			obj.y=this.drag_y_anchor+this.drag_y0*y_scale;
 			obj.h=this.drag_h*y_scale;
@@ -249,6 +249,7 @@ var sticker_wall_prototype={
 			UI.CloseCodeEditorDocument(doc_host);
 			break;
 		case "note":
+		case "group":
 			var doc_note=UI.CreateEmptyCodeEditor("Markdown");
 			//doc_note.plugins=this.m_cell_plugins;
 			doc_note.m_enable_wrapping=1;
@@ -264,6 +265,9 @@ var sticker_wall_prototype={
 			if(text){doc_note.ed.Edit([0,0,text],1);}
 			doc_note.saved_point=doc_note.ed.GetUndoQueueLength();
 			sticker_i.doc=doc_note;
+			break;
+		case "notebook_cell":
+			//do nothing
 			break;
 		//case "script":
 		//	break;
@@ -287,7 +291,7 @@ var sticker_wall_prototype={
 			for(var i=0;i<this.m_stickers.length;i++){
 				var sticker_i=this.m_stickers[i];
 				var text="";
-				if(sticker_i.type=="note"){
+				if(sticker_i.type=="note"||sticker_i.type=="group"){
 					text=(parts[ppart++]||"");
 				}
 				this.InitSticker(sticker_i,text);
@@ -302,7 +306,7 @@ var sticker_wall_prototype={
 		var ret=this.need_save;
 		for(var i=0;i<this.m_stickers.length;i++){
 			var sticker_i=this.m_stickers[i];
-			if(sticker_i.type=="note"){
+			if(sticker_i.type=="note"||sticker_i.type=="group"){
 				var doc=sticker_i.doc;
 				if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
 					ret|=2;
@@ -318,7 +322,7 @@ var sticker_wall_prototype={
 		var docs=[];
 		for(var i=0;i<this.m_stickers.length;i++){
 			var sticker_i=this.m_stickers[i];
-			if(sticker_i.type=="note"){
+			if(sticker_i.type=="note"||sticker_i.type=="group"){
 				parts.push(sticker_i.doc.ed.GetText());
 			}
 			docs[i]=sticker_i.doc;
@@ -335,7 +339,7 @@ var sticker_wall_prototype={
 		this.need_save=0;
 		for(var i=0;i<this.m_stickers.length;i++){
 			var sticker_i=this.m_stickers[i];
-			if(sticker_i.type=="note"){
+			if(sticker_i.type=="note"||sticker_i.type=="group"){
 				var doc=sticker_i.doc;
 				doc.saved_point=doc.ed.GetUndoQueueLength();
 				doc.ResetSaveDiff();
@@ -382,111 +386,148 @@ var sticker_wall_prototype={
 		UI.PopSubWindow();
 		UI.PushSubWindow(this.x,this.y,this.w,this.h,tr.scale);
 		var move_padding=common_style.move_padding/tr.scale+common_style.padding;
-		for(var i=0;i<stickers.length;i++){
-			var sticker_i=stickers[i];
-			var style_i=this.sticker_styles[sticker_i.type];
-			var x=sticker_i.x+tr.trans[0]/tr.scale;
-			var y=sticker_i.y+tr.trans[1]/tr.scale;
-			if(x>=this.w/tr.scale||y>=this.h/tr.scale||x+sticker_i.w<=0||y+sticker_i.h<=0){
-				continue;
-			}
-			//measure size
-			switch(sticker_i.type){
-			case "code":
-			case "note":
-				if(!sticker_i.doc){
+		for(var passi=0;passi<2;passi++){
+			for(var i=0;i<stickers.length;i++){
+				var sticker_i=stickers[i];
+				if((sticker_i.type==="group")!==(passi===0)){continue;}
+				var style_i=this.sticker_styles[sticker_i.type];
+				var x=sticker_i.x+tr.trans[0]/tr.scale;
+				var y=sticker_i.y+tr.trans[1]/tr.scale;
+				if(x>=this.w/tr.scale||y>=this.h/tr.scale||x+sticker_i.w<=0||y+sticker_i.h<=0){
 					continue;
 				}
-				var w_inner=sticker_i.w/sticker_i.scale;
-				var doc_i=sticker_i.doc;
-				if(doc_i.m_enable_wrapping&&doc_i.m_current_wrap_width!=w_inner){
-					doc_i.m_current_wrap_width=w_inner;
-					var renderer=doc_i.GetRenderer();
-					var ed_caret_original=doc_i.GetCaretXY();
-					var scroll_y_original=doc_i.scroll_y;
-					renderer.ResetWrapping(doc_i.m_enable_wrapping?doc_i.m_current_wrap_width:0,doc_i)
-					doc_i.caret_is_wrapped=0
-					doc_i.ed.InvalidateStates([0,doc_i.ed.GetTextSize()])
-					var ed_caret_new=doc_i.GetCaretXY();
-					doc_i.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
+				//measure size
+				switch(sticker_i.type){
+				case "code":
+				case "note":
+					if(!sticker_i.doc){
+						continue;
+					}
+					var w_inner=sticker_i.w/sticker_i.scale;
+					var doc_i=sticker_i.doc;
+					if(doc_i.m_enable_wrapping&&doc_i.m_current_wrap_width!=w_inner){
+						doc_i.m_current_wrap_width=w_inner;
+						var renderer=doc_i.GetRenderer();
+						var ed_caret_original=doc_i.GetCaretXY();
+						var scroll_y_original=doc_i.scroll_y;
+						renderer.ResetWrapping(doc_i.m_enable_wrapping?doc_i.m_current_wrap_width:0,doc_i)
+						doc_i.caret_is_wrapped=0
+						doc_i.ed.InvalidateStates([0,doc_i.ed.GetTextSize()])
+						var ed_caret_new=doc_i.GetCaretXY();
+						doc_i.scroll_y=scroll_y_original-ed_caret_original.y+ed_caret_new.y;
+					}
+					////////////////////
+					sticker_i.h=Math.min(UI.MeasureEditorSize(sticker_i.doc,w_inner)*sticker_i.scale,Math.max(H_MAX_STICKER,sticker_i.w));
+					sticker_i.disable_y_scale=1;
+					break;
+				case "notebook_cell":
+				case "group":
+					//do nothing - let the user resize it
+					break;
+				//case "script":
+				//	break;
+				//case "image":
+				//	break;
 				}
-				////////////////////
-				sticker_i.h=Math.min(UI.MeasureEditorSize(sticker_i.doc,w_inner)*sticker_i.scale,Math.max(H_MAX_STICKER,sticker_i.w));
-				sticker_i.disable_y_scale=1;
-				break;
-			//case "script":
-			//	break;
-			//case "image":
-			//	break;
-			}
-			//moving borders
-			var sticker_name=("sticker_"+i.toString());
-			W.Region(sticker_name+"_move_knob",{
-				x:x-move_padding,y:y-common_style.h_caption-move_padding,
-				w:sticker_i.w+move_padding*2,
-				h:sticker_i.h+common_style.h_caption+move_padding*2,
-				owner:sticker_i,
-				wall_owner:this,
-				mouse_cursor:"sizeall",
-			},MoveKnob_prototype);
-			//render background
-			UI.RoundRect({
-				x:x-common_style.padding,y:y-common_style.h_caption-common_style.padding,
-				w:sticker_i.w+common_style.padding*2+common_style.shadow_size,h:sticker_i.h+common_style.h_caption+common_style.padding*2+common_style.shadow_size,
-				round:common_style.shadow_size,
-				border_width:-common_style.shadow_size,
-				color:common_style.shadow_color,
-			});
-			UI.RoundRect({
-				x:x-common_style.padding,y:y-common_style.h_caption-common_style.padding,
-				w:sticker_i.w+common_style.padding*2,h:sticker_i.h+common_style.h_caption+common_style.padding*2,
-				color:style_i.bgcolor,
-				border_width:sticker_i.m_is_selected?common_style.selection_width/tr.scale:0,
-				border_color:common_style.selection_color,
-			});
-			//render content
-			var dx_subwin=Math.min(x,0)/sticker_i.scale;
-			var dy_subwin=Math.min(y,0)/sticker_i.scale;
-			UI.PushSubWindow(x,y,sticker_i.w,Math.ceil(sticker_i.h),sticker_i.scale)
-			switch(sticker_i.type){
-			case "code":
-				W.CodeEditor(sticker_name,{
-					disable_minimap:1,
-					doc:sticker_i.doc,
-					show_background:0,
-					x:dx_subwin,y:dy_subwin,
-					w:sticker_i.w/sticker_i.scale,h:sticker_i.h/sticker_i.scale,
+				//moving borders
+				var sticker_name=("sticker_"+i.toString());
+				W.Region(sticker_name+"_move_knob",{
+					x:x-move_padding,y:y-common_style.h_caption-move_padding,
+					w:sticker_i.w+move_padding*2,
+					h:sticker_i.h+common_style.h_caption+move_padding*2,
+					owner:sticker_i,
+					wall_owner:this,
+					mouse_cursor:"sizeall",
+				},MoveKnob_prototype);
+				//render background
+				if(sticker_i.type!=="group"){
+					UI.RoundRect({
+						x:x-common_style.padding,y:y-common_style.h_caption-common_style.padding,
+						w:sticker_i.w+common_style.padding*2+common_style.shadow_size,h:sticker_i.h+common_style.h_caption+common_style.padding*2+common_style.shadow_size,
+						round:common_style.shadow_size,
+						border_width:-common_style.shadow_size,
+						color:common_style.shadow_color,
+					});
+				}
+				UI.RoundRect({
+					x:x-common_style.padding,y:y-common_style.h_caption-common_style.padding,
+					w:sticker_i.w+common_style.padding*2,h:sticker_i.h+common_style.h_caption+common_style.padding*2,
+					color:style_i.bgcolor,
+					border_width:sticker_i.m_is_selected?common_style.selection_width/tr.scale:0,
+					border_color:common_style.selection_color,
 				});
-				sticker_i.doc.default_focus=sticker_i.m_is_selected+1;
-				sticker_i.doc.OnFocus=function(sticker_i){
-					if(sticker_i.m_is_selected){return;}
-					this.ClearSelection();
-					sticker_i.m_is_selected=1;
-					UI.Refresh();
-				}.bind(this,sticker_i);
-				break;
-			case "note":
-				W.CodeEditor(sticker_name,{
-					disable_minimap:1,
-					doc:sticker_i.doc,
-					show_background:0,
-					x:dx_subwin,y:dy_subwin,
-					w:sticker_i.w/sticker_i.scale,h:sticker_i.h/sticker_i.scale,
-				});
-				sticker_i.doc.default_focus=sticker_i.m_is_selected+1;
-				sticker_i.doc.OnFocus=function(sticker_i){
-					if(sticker_i.m_is_selected){return;}
-					this.ClearSelection();
-					sticker_i.m_is_selected=1;
-					UI.Refresh();
-				}.bind(this,sticker_i);
-				break;
-			//case "script":
-			//	break;
-			//case "image":
-			//	break;
+				//render content
+				var dx_subwin=Math.min(x,0)/sticker_i.scale;
+				var dy_subwin=Math.min(y,0)/sticker_i.scale;
+				UI.PushSubWindow(x,y,sticker_i.w,Math.ceil(sticker_i.h),sticker_i.scale)
+				switch(sticker_i.type){
+				case "code":
+					W.CodeEditor(sticker_name,{
+						disable_minimap:1,
+						doc:sticker_i.doc,
+						show_background:0,
+						x:dx_subwin,y:dy_subwin,
+						w:sticker_i.w/sticker_i.scale,h:sticker_i.h/sticker_i.scale,
+					});
+					sticker_i.doc.default_focus=sticker_i.m_is_selected+1;
+					sticker_i.doc.OnFocus=function(sticker_i){
+						if(sticker_i.m_is_selected){return;}
+						this.ClearSelection();
+						sticker_i.m_is_selected=1;
+						UI.Refresh();
+					}.bind(this,sticker_i);
+					break;
+				case "note":
+				case "group":
+					W.CodeEditor(sticker_name,{
+						disable_minimap:1,
+						doc:sticker_i.doc,
+						show_background:0,
+						x:dx_subwin,y:dy_subwin,
+						w:sticker_i.w/sticker_i.scale,h:sticker_i.h/sticker_i.scale,
+					});
+					sticker_i.doc.default_focus=sticker_i.m_is_selected+1;
+					sticker_i.doc.OnFocus=function(sticker_i){
+						if(sticker_i.m_is_selected){return;}
+						this.ClearSelection();
+						sticker_i.m_is_selected=1;
+						UI.Refresh();
+					}.bind(this,sticker_i);
+					break;
+				case "notebook_cell":
+					//one big button, locate mark and run
+					//caption
+					W.Button(sticker_name,{
+						x:dx_subwin,y:dy_subwin,
+						w:sticker_i.w/sticker_i.scale,h:sticker_i.h/sticker_i.scale,
+						text:sticker_i.caption,
+						//tooltip:UI.Format("Run notebook cell '@1'",sticker_i.caption),
+						border_width:0,
+						OnClick:function(sticker_i){
+							var result_cell=UI.OpenNotebookCellFromEditor(this,"[button: "+sticker_i.caption+"]","Plain text",0,"output");
+							if(result_cell){
+								var bk_active_tab=UI.top.app.document_area.active_tab;
+								var obj_notebook=result_cell.obj_notebook;
+								if(obj_notebook.RunCell(result_cell.cell_id)=="focus"){
+									//if we got a cancel notification...
+									bk_active_tab=undefined;
+								}
+								if(bk_active_tab!=undefined){
+									UI.top.app.document_area.BringUpTab(bk_active_tab.__global_tab_id)
+									UI.SetFocus(this);
+								}
+							}
+							UI.Refresh();
+						}.bind(this,sticker_i),
+					});
+					break;
+				//case "script":
+				//	break;
+				//case "image":
+				//	break;
+				}
+				UI.PopSubWindow();
 			}
-			UI.PopSubWindow();
 		}
 		for(var i=0;i<stickers.length;i++){
 			var sticker_i=stickers[i];
@@ -507,12 +548,12 @@ var sticker_wall_prototype={
 				var x1=(x0+x2)*0.5;
 				var y1=(y0+y2)*0.5;
 				knob.x=x0;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob00",{x_anchor_rel:2*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,y_anchor:y2+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
-				//knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob10",{x_anchor_rel:1*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y2+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+				knob.x=x1;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob10",{x_anchor_rel:1*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y2+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
 				knob.x=x2;knob.y=y0;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob20",{x_anchor_rel:0*0.5,y_anchor_rel:2*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,y_anchor:y2+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
-				//knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob01",{x_anchor_rel:2*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
-				//knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob21",{x_anchor_rel:0*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+				knob.x=x0;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob01",{x_anchor_rel:2*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
+				knob.x=x2;knob.y=y1;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob21",{x_anchor_rel:0*0.5,y_anchor_rel:1*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,mouse_cursor:"sizewe"},ScaleKnob_prototype);
 				knob.x=x0;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob02",{x_anchor_rel:2*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x2+dx,y_anchor:y0+dy,mouse_cursor:"sizenesw"},ScaleKnob_prototype);
-				//knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob12",{x_anchor_rel:1*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y0+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
+				knob.x=x1;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob12",{x_anchor_rel:1*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,y_anchor:y0+dy,mouse_cursor:"sizens"},ScaleKnob_prototype);
 				knob.x=x2;knob.y=y2;UI.RoundRect(knob);W.Region(sticker_name+"_scale_knob22",{x_anchor_rel:0*0.5,y_anchor_rel:0*0.5,x:knob.x,y:knob.y,w:knob.w,h:knob.h,wall_owner:this,owner:sticker_i,x_anchor:x0+dx,y_anchor:y0+dy,mouse_cursor:"sizenwse"},ScaleKnob_prototype);
 			}
 		}
@@ -596,7 +637,7 @@ var sticker_wall_prototype={
 	},
 	DestroyStickerEditor:function(sticker_i){
 		if(!sticker_i.doc){return;}
-		if(sticker_i.type=="note"){
+		if(sticker_i.type=="note"||sticker_i.type=="group"){
 			sticker_i.text=sticker_i.doc.ed.GetText();
 			sticker_i.doc.OnDestroy();
 			sticker_i.doc=undefined;
@@ -692,6 +733,7 @@ var sticker_wall_prototype={
 				}
 			}
 		}
+		this.ClearSelection();
 		new_sticker.m_is_selected=1;
 		this.m_stickers.push(new_sticker);
 		this.InitSticker(new_sticker,new_sticker.text||"");
@@ -707,7 +749,16 @@ var sticker_wall_prototype={
 		var new_sticker={
 			"type":"note",
 			"w":300,"h":32,
-			"scale":1,
+			"scale":0.8,
+		};
+		this.PlaceSticker(new_sticker);
+		UI.Refresh();
+	},
+	InsertGroup:function(){
+		var new_sticker={
+			"type":"group",
+			"w":300,"h":32,
+			"scale":1.25,
 		};
 		this.PlaceSticker(new_sticker);
 		UI.Refresh();
@@ -736,14 +787,17 @@ var sticker_wall_prototype={
 				return;
 			}
 			//code
-			if(new_sticker.type==undefined){
-				new_sticker.type="code";
+			if(new_sticker.type=="code"){
 				new_sticker.scale=1;
 				new_sticker.w=800;
 				new_sticker.h=300;
 				if(this.m_file_name&&this.m_file_name[0]!='<'){
 					new_sticker.file_name=UI.ComputeRelativePath(this.m_file_name,new_sticker.file_name);
 				}
+			}else if(new_sticker.type=="notebook_cell"){
+				new_sticker.scale=1;
+				new_sticker.w=256;
+				new_sticker.h=32;
 			}
 		}else{
 			//note
@@ -958,6 +1012,18 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 				action:function(){body.InsertNote();},
 			});
 			//}
+			x_current+=W.Button("new group",{
+				x:x_current,y:0,
+				w:32,h:32,
+				font:UI.Font(UI.icon_font_name,28),
+				text:"组",
+				tooltip:"Add group - SHIFT+CTRL+M",
+				OnClick:function(){body.InsertGroup();},
+			}).w;
+			W.Hotkey("",{
+				key:"SHIFT+CTRL+M",
+				action:function(){body.InsertGroup();},
+			});
 			if(has_any_sel){
 				x_current+=W.Button("del_note",{
 					x:x_current,y:0,

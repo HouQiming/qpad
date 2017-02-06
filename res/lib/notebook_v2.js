@@ -897,7 +897,7 @@ W.notebook_prototype={
 					return "focus";
 				}
 			}else{
-				return;
+				return 0;
 			}
 		}
 		this.ClearCellOutput(id)
@@ -921,7 +921,7 @@ W.notebook_prototype={
 			}
 			this.need_save|=65536;
 			UI.Refresh()
-			return;
+			return 0;
 		}
 		var spath=UI.GetPathFromFilename(this.file_name);
 		//var s_prj_mark="build script for '"
@@ -940,7 +940,7 @@ W.notebook_prototype={
 			//new window
 			IO.RunProcess(args,spath,1);
 			UI.Refresh();
-			return;
+			return 0;
 		}
 		if(s_code.indexOf('[new term]')>=0){
 			//new terminal
@@ -958,7 +958,7 @@ W.notebook_prototype={
 				rows:rows,
 			});
 			UI.Refresh();
-			return;
+			return 0;
 		}
 		for(var i=0;i<this.m_cells.length;i++){
 			this.m_cells[i].m_cell_id=i;
@@ -1022,6 +1022,7 @@ W.notebook_prototype={
 		proc.m_term.m_current_path=spath;
 		this.m_last_focus_cell_id=id*2+0;
 		UI.Refresh()
+		return 0;
 	},
 	KillCell:function(id){
 		var cell_i=this.m_cells[id];

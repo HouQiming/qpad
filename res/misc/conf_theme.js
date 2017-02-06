@@ -1412,7 +1412,13 @@ UI.CustomTheme=function(){
 					bgcolor:GetThemeColor("background",L?0xffe8e8e8:0xff3f3f3f),
 				},
 				note:{
-					bgcolor:L?0xffafebf7:0xffafebf7,
+					bgcolor:L?0xffafebf7:0xff004016,
+				},
+				group:{
+					bgcolor:L?0x55444444:0x55ffffff,
+				},
+				notebook_cell:{
+					bgcolor:L?0xffe8e8e8:0xff3f3f3f,
 				},
 			},
 			common_style:{
