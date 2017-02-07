@@ -99,63 +99,33 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
 sticker code:
-	edges
-		F12 relationship
-		it's only useful when multi-connecting
-		edge-based
-			co-editing
-				or groups?
-			code template
+	(test) per-sticker unique id to avoid order-change troubles
+	build the MD notes
 	code -> sticker navigation
 		mainly the qpad tags
-		tag on paste? that would allow us to insert the wall name
-	var-dup
+		do it lazily:
+			show a "go to sticker" button on that line
+				and trigger it on F12
+			index the walls when clicked
+	connecting the same name in different stickers
+	code templates? not sticker's job...
 	sticker z-order
 	render filename in code stickers? sticker caption bar?
 	could store code template / code generator as sticker scripts
-(test) busyloop
-	WriteInput
 auto-reparse on idle?
 	and when the parse queue is empty
-	the recurses could be expensive
-error clean up on notebook cell deletion
-ESC in terminal: release focus
+	the table rebuilds could be expensive
+global search highlight clean up
 busy loop again
 weird error appearance in android build output
 	TERM=xterm? no
 terminal gets overwhelmed by large amounts of output
 	ctrl+s / ctrl+q?
-graph:
-	jc nodes
-		__c_function
-		__generate_json
-			the few purposes
-	auto-select and auto-scroll to the current cursor location
-	only show new nodes that can be connected to the current selection and has non-zero relevance
-		if the selection is empty, show top-level stuff
-	leave a hole for the text editor
-		or a dedicated util tab showing the current graph(s)
-	---
-	color / type text in nodes
-	fix up some existing code
-		programming techniques - micro patterns
-			static irregular array
-			obfuscated zip ...
-			--
-		could use (deduced) node groups
-	ED_GetAllComboNames - per-file package activation
-		tracking owning packages
-		and a package listing from standard locations
-		add @include
-		sort by port relevance
-	--
-	easier template creation
-	auto-updating templated code
 memory leak
 build for mac
 life cycles

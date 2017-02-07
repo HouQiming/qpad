@@ -156,7 +156,7 @@
 			"Edit with &QPad":"用&QPad编辑",
 			"QPad Editor":"QPad编辑器",
 			"QPad Text Editor":"QPad编辑器",
-			'Restore tab size - ESC':"恢复窗格大小 - ESC",
+			'Restore tab size - F11':"恢复窗格大小 - F11",
 			//"&Browse...":"",
 			//"&select to":"",
 			"Edit the match to start replacing":"如要进行替换，请编辑找到的文字",

@@ -318,7 +318,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					if(tab_frontmost){
 						UI.top.app.document_area.SetTab(tab_frontmost.__global_tab_id)
 					}
-				}else{
+				}else if(!obj.doc.m_sticker_wall_owner){
 					UI.top.app.document_area.ToggleMaximizeMode();
 				}
 				UI.g_goto_definition_context=undefined;
@@ -2893,6 +2893,11 @@ var find_context_prototype={
 		//	this.m_sel_backups[doc.m_file_name]=undefined;
 		//}
 		this.m_confirmed=1;
+		if(doc.owner){
+			doc.owner.m_no_more_replace=0;
+			doc.owner.DestroyReplacingContext(1);
+			doc.CallOnSelectionChange();
+		}
 		UI.SetFocus(doc);
 	},
 	RestoreSel:function(){
@@ -7284,7 +7289,7 @@ W.CodeEditor=function(id,attrs){
 				obj.context_menu=undefined;
 			}
 		}
-		if(!is_find_mode_rendering&&!(doc&&doc.m_is_help_page_preview)&&obj.show_background!==0){
+		if(!is_find_mode_rendering&&!(doc&&doc.m_is_help_page_preview)&&obj.show_background!==0&&!(doc&&doc.notebook_owner)){
 			if(w_right_shadow!=undefined){
 				var h_right_shadow=doc.h;
 				if(y_bottom_shadow!=undefined){
@@ -7865,7 +7870,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			bk_current_tab_id=UI.top.app.document_area.current_tab_id;
 		}
 		var s_ext=UI.GetFileNameExtension(fname);
-		if(s_ext=="stickerwall"){
+		if(s_ext=="stickerwall"||s_ext=="wall"){
 			obj_tab=UI.OpenStickerWallTab(fname);
 		}else{
 			var lang=UI.ED_GetFileLanguage(fname);

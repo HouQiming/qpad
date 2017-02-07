@@ -165,6 +165,10 @@ var g_sticker_doc_plugins=[function(){
 		UI.Refresh();
 	});
 }];
+var g_unique_counter=0;
+var CreateStickerID=function(){
+	return IO.SHA1([UI.g_git_email,Date.now(),g_unique_counter++].join('&'));
+};
 var sticker_wall_prototype={
 	InitSticker:function(sticker_i,text){
 		sticker_i.text=undefined;
@@ -239,6 +243,7 @@ var sticker_wall_prototype={
 					doc_code.show_background=0;
 					doc_code.m_sticker_wall_owner=this;
 					doc_code.disable_line_numbers=1;
+					doc_code.disable_top_hint=1;
 					doc_code.plugins=g_sticker_doc_plugins;
 					doc_code.Init()
 					sticker_i.doc=doc_code;
@@ -257,6 +262,7 @@ var sticker_wall_prototype={
 			doc_note.m_current_wrap_width=sticker_i.w/sticker_i.scale-UI.default_styles.code_editor.padding;
 			doc_note.wrap_width=doc_note.m_current_wrap_width;
 			doc_note.disable_x_scroll=1;
+			doc_note.disable_top_hint=1;
 			doc_note.show_background=0;
 			doc_note.disable_line_numbers=1;
 			doc_note.m_sticker_wall_owner=this;
@@ -431,7 +437,10 @@ var sticker_wall_prototype={
 				//	break;
 				}
 				//moving borders
-				var sticker_name=("sticker_"+i.toString());
+				if(!sticker_i.__unique_id){
+					sticker_i.__unique_id=CreateStickerID();
+				}
+				var sticker_name=("sticker_"+sticker_i.__unique_id);
 				W.Region(sticker_name+"_move_knob",{
 					x:x-move_padding,y:y-common_style.h_caption-move_padding,
 					w:sticker_i.w+move_padding*2,
@@ -654,7 +663,6 @@ var sticker_wall_prototype={
 		for(var i=0;i<stickers.length;i++){
 			var sticker_i=stickers[i];
 			if(!sticker_i.m_is_selected){
-				this["sticker_"+n2.toString()]=this["sticker_"+i.toString()];
 				stickers[n2]=sticker_i;
 				n2++;
 			}else{
@@ -1241,7 +1249,7 @@ UI.OpenStickerWallTab=function(file_name,is_quiet){
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}
-			var fn=IO.DoFileDialog(1,"stickerwall",
+			var fn=IO.DoFileDialog(1,"wall",
 				this.main_widget.m_file_name.indexOf('<')>=0?
 					UI.m_new_document_search_path:
 					UI.GetPathFromFilename(this.main_widget.m_file_name));

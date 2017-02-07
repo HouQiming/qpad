@@ -1551,7 +1551,7 @@ W.TabbedDocument=function(id,attrs){
 				x:obj.x+obj.w-obj.padding-obj.w_menu_button,y:y_label_area+0.5*(obj.h_caption-obj.h_menu_button),
 				w:obj.w_menu_button,h:obj.h_menu_button,
 				style:obj.menu_button_style,
-				tooltip:UI.TranslateTooltip('Restore tab size - ESC'),
+				tooltip:UI.TranslateTooltip('Restore tab size - F11'),
 				font:UI.icon_font,text:"还",
 				value:0,
 				OnClick:function(){
@@ -1636,10 +1636,6 @@ W.TabbedDocument=function(id,attrs){
 				obj.CloseTab(num_id)
 			}});
 		}
-		W.Hotkey("",{key:"F11",action:function(){
-			UI.top.app.document_area.ToggleMaximizeMode();
-			UI.Refresh()
-		}});
 		var is_apple=(UI.Platform.ARCH!="mac"&&UI.Platform.ARCH!="ios");
 		W.Hotkey("",{key:"CTRL+TAB",action:function(){
 			var num_id=tabid

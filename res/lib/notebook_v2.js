@@ -386,18 +386,12 @@ W.CellCaption=function(id,attrs){
 					round:shadow_size,border_width:-shadow_size})
 				UI.RoundRect({
 					x:obj.x,y:obj_y,w:obj.w,h:obj.h,
-					color:panel_style.cell_list_bgcolor})
+					color:panel_style.cell_list_bgcolor_selection})
 				UI.RoundRect({
 					x:obj.x,y:obj_y,w:4,h:obj.h,
 					color:sel_bgcolor})
 				UI.PopCliprect();
 			}.bind(null,obj.y));
-			//UI.RoundRect({
-			//	x:obj.x+obj.w,y:obj.y,w:16,h:obj.h,
-			//	color:[
-			//		{x:0,y:0,color:panel_style.cell_list_bgcolor},
-			//		{x:1,y:0,color:panel_style.cell_list_bgcolor&0x00ffffff},
-			//	]})
 		}
 		var name_color=(obj.text[0]=='\u2022'?obj.mystyle.dumb_name_color:obj.mystyle.name_color);
 		var font=obj.mystyle.font;
@@ -627,7 +621,7 @@ W.notebook_prototype={
 		doc_in.m_current_wrap_width=cell_i.in_m_current_wrap_width||512;
 		doc_in.wrap_width=(doc_in.m_enable_wrapping?doc_in.m_current_wrap_width:0);
 		doc_in.notebook_owner=this;
-		doc_in.disable_x_scroll=1;
+		//doc_in.disable_x_scroll=1;
 		doc_in.Init();
 		doc_in.scroll_x=0;doc_in.scroll_y=0;
 		if(cell_i.m_text_in){doc_in.ed.Edit([0,0,cell_i.m_text_in],1);}
@@ -1310,7 +1304,6 @@ W.NotebookView=function(id,attrs){
 				});
 			}
 		}
-		//todo: buttons
 	}
 	if(obj.activated){
 		var menu_notebook=undefined;

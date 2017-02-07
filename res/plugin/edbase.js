@@ -1108,8 +1108,9 @@ UI.RegisterEditorPlugin(function(){
 				var cell_i=obj_notebook.m_cells[result_cell.cell_id];
 				var doc_in=cell_i.m_text_in;
 				var size=doc_in.ed.GetTextSize();
+				//console.log(size,Duktape.__byte_length(s_mark_search));
 				if(size==Duktape.__byte_length(s_mark_search)){
-					doc_in.ed.HookedEdit([0,size,s_mark+s_script]);
+					doc_in.HookedEdit([0,size,s_mark+s_script]);
 					doc_in.m_cell_id=cell_i.m_cell_id;
 					doc_in.CallOnChange();
 				}
@@ -1296,7 +1297,7 @@ if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 			if(IO.FileExists(spath+"/vsvars32.bat")){return spath0;}
 			return 0;
 		}
-		g_vc_compiler_path=(testbat("%VS120COMNTOOLS%")||testbat("%VS110COMNTOOLS%")||testbat("%VS100COMNTOOLS%")||testbat("%VS90COMNTOOLS%")||testbat("%VS80COMNTOOLS%"));
+		g_vc_compiler_path=(testbat("%VS140COMNTOOLS%")||testbat("%VS130COMNTOOLS%")||testbat("%VS120COMNTOOLS%")||testbat("%VS110COMNTOOLS%")||testbat("%VS100COMNTOOLS%")||testbat("%VS90COMNTOOLS%")||testbat("%VS80COMNTOOLS%"));
 		if(!g_vc_compiler_path){return 0;}
 		return g_vc_compiler_path;
 	};

@@ -733,6 +733,7 @@ UI.CustomTheme=function(){
 				shadow_color:C_shadow,
 				//cell_list_bgcolor:L?0xffe8e8e8:0xff3f3f3f,
 				cell_list_bgcolor:L?0xffd0d0d0:0xff333333,
+				cell_list_bgcolor_selection:GetThemeColor("background",L?0xffe8e8e8:0xff3f3f3f),
 				button_area_shadow_size:6,
 				button_area_shadow_color:C_shadow,
 				unknown_progress_period:3,
