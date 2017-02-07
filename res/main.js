@@ -1041,7 +1041,7 @@ UI.HandleError=function(error){
 	}	
 };
 
-var AUTO_REPARSE_MAX_SIZE=1048576;
+UI.AUTO_REPARSE_MAX_SIZE=1048576;
 UI.OnIdle=function(){
 	if(UI.m_bash_prompt_detected){
 		if(!UI.MyWindowHasFocus()&&UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
@@ -1049,15 +1049,15 @@ UI.OnIdle=function(){
 		}
 	}
 	UI.m_bash_prompt_detected=0;
-	var tab_frontmost=UI.GetFrontMostEditorTab();
-	var doc_reparse=(tab_frontmost&&tab_frontmost.main_widget&&tab_frontmost.main_widget.doc);
-	if(doc_reparse&&doc_reparse.m_need_idle_reparse){
-		doc_reparse.m_need_idle_reparse=0;
-		if(doc_reparse.ed.GetTextSize()<AUTO_REPARSE_MAX_SIZE){
-			doc_reparse.ForceReparse();
-			UI.Refresh();
-		}
-	}
+	//var tab_frontmost=UI.GetFrontMostEditorTab();
+	//var doc_reparse=(tab_frontmost&&tab_frontmost.main_widget&&tab_frontmost.main_widget.doc);
+	//if(doc_reparse&&doc_reparse.m_need_idle_reparse){
+	//	doc_reparse.m_need_idle_reparse=0;
+	//	if(doc_reparse.ed.GetTextSize()<UI.AUTO_REPARSE_MAX_SIZE){
+	//		doc_reparse.ForceReparse();
+	//		UI.Refresh();
+	//	}
+	//}
 };
 
 (function(){

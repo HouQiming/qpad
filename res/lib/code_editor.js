@@ -1035,6 +1035,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			return 0;
 		}
 		//call plugin-defined AC hooks
+		if(is_explicit&&this.m_need_idle_reparse){
+			if(this.ed.GetTextSize()<UI.AUTO_REPARSE_MAX_SIZE){
+				this.ForceReparse();
+				CallParseMore();
+				UI.Refresh();
+			}
+		}
 		var is_user_defined=0;
 		var accands=undefined;
 		if(is_explicit&&!accands){
