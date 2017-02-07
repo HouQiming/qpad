@@ -294,6 +294,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					}
 				}
 				obj.DismissNotification('diff_reload_prompt');
+				this.m_need_idle_reparse=1;
 			})
 			this.AddEventHandler('ESC',function(){
 				this.CancelAutoCompletion()

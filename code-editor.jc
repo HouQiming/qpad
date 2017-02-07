@@ -4547,6 +4547,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				is_after_caption=0
 			if sline.StartsWith("#"):
 				if sret.n&&sret.back()!='\n':sret.push('\n')
+				if sret.n<2||sret[sret.n-2]!='\n':sret.push('\n')
 				//heading
 				level=0L
 				for j=1:sline.n-2

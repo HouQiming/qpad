@@ -117,20 +117,16 @@ sticker code:
 	sticker z-order
 	render filename in code stickers? sticker caption bar?
 	could store code template / code generator as sticker scripts
-auto-reparse on idle?
+(test) auto-reparse on idle?
 	and when the parse queue is empty
 	the table rebuilds could be expensive
 global search highlight clean up
-busy loop again
 weird error appearance in android build output
 	TERM=xterm? no
 terminal gets overwhelmed by large amounts of output
 	ctrl+s / ctrl+q?
 memory leak
 build for mac
-life cycles
-	could label them on graph nodes
-	overlay ray linking the nodes together
 file view class list
 	searchable classes
 style enforcement
@@ -139,11 +135,10 @@ style enforcement
 	space rules enforcement
 		let the parser decide
 		maybe also enforce it in the find bar
-(reproduce?) project-in-unopenable-location crash
 iOS bluetooth keyboard support
 	- keyCommands
 stop / clear buttons in notebook v2
-F5/CTRL+F5 indicators
+notebook - define per-cell hotkey, hotkey indicator on button
 touch: scrolling, touch detection, ac modes, mouse over, typos
 	touch-awareness
 tab switch
@@ -156,12 +151,9 @@ release on github, again
 remove the help system?
 	links in help
 	running a markdown: open as help page?
-runtime completion
-	Python / node.js
-	actually run an interpreter session and dump the "require"d objects to a file
-		security concerns...
 code beautifier
 AC plugins
+	clang
 	tex ref
 	bash
 	js member name in certain strings

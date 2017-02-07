@@ -719,7 +719,7 @@ var sticker_wall_prototype={
 					var y0=sticker_i.y-separation-new_sticker.h;
 					var x1=sticker_i.x+sticker_i.w+separation;
 					var y1=sticker_i.y+sticker_i.h+separation;
-					if(x0<x&&x<x1&&y0<y&&y<y1){
+					if(x0<x&&x<x1&&y0<y&&y<y1&&sticker_i.type!="group"){
 						area_xy=1e31;
 						dist_nearest=1e31;
 						break;
