@@ -99,27 +99,19 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+in tips
+	//@qpad import "file"
 sticker code:
 	(test) per-sticker unique id to avoid order-change troubles
-	build the MD notes
-	code -> sticker navigation
-		mainly the qpad tags
-		do it lazily:
-			show a "go to sticker" button on that line
-				and trigger it on F12
-			index the walls when clicked
 	connecting the same name in different stickers
 	code templates? not sticker's job...
 	sticker z-order
 	render filename in code stickers? sticker caption bar?
 	could store code template / code generator as sticker scripts
-(test) auto-reparse on idle?
-	and when the parse queue is empty
-	the table rebuilds could be expensive
 global search highlight clean up
 weird error appearance in android build output
 	TERM=xterm? no

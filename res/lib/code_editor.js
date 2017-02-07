@@ -1,3 +1,4 @@
+//@qpad import "code-editor.jc"
 var UI=require("gui2d/ui");
 var W=require("gui2d/widgets");
 require("res/lib/global_doc");
@@ -3743,6 +3744,21 @@ W.CodeEditorWidget_prototype={
 		var sel=doc.GetSelection();
 		var ed=doc.ed
 		var ccnt_sel1=doc.sel1.ccnt
+		if(doc.m_file_name&&!doc.IsBracketEnabledAt(ccnt_sel1)){
+			//check for file names in comments / strings / ...
+			var ccnt0_fname=ed.MoveToBoundary(sel[0],-1,"file_name_boundary");
+			var ccnt1_fname=ed.MoveToBoundary(sel[1],1,"file_name_boundary");
+			if(ccnt0_fname<ccnt1_fname){
+				var fname=ed.GetText(ccnt0_fname,ccnt1_fname-ccnt0_fname)
+				if(fname.indexOf('.')>=0){
+					var fn_include=UI.SearchIncludeFile(doc.m_file_name,fname);
+					if(fn_include){
+						this.OpenAsDefinition(fn_include,undefined,is_peek);
+						return;
+					}
+				}
+			}
+		}
 		if(doc.m_diff_from_parse){ccnt_sel1=doc.m_diff_from_parse.CurrentToBase(ccnt_sel1)}
 		var s_dep_file=UI.ED_QueryDepTokenByBaseCcnt(doc,ccnt_sel1)
 		if(s_dep_file){
