@@ -56,4 +56,6 @@ You can write `[new window]` in a notebook cell to make it run in a new window.
 
 #@プ@ Searching for Headers
 
-When QPad failed to locate some symbol in a dependent file automatically (e.g. when `MessageBox` appears black even though you did `#include <windows.h>`), just open the dependent file (e.g. `windows.h`) manually. QPad would learn to search that location the next time.
+When QPad fails to locate some symbol in a dependent file automatically (e.g. when `MessageBox` appears black even though you did `#include <windows.h>`), just open the dependent file (e.g. `windows.h`) manually. QPad would learn to search that location the next time.
+
+Yuo can also add a comment like `//@qpad import "xxxx.h"` to tell QPad to treat as a `"xxxx.h"` dependency of the current file.

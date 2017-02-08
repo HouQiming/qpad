@@ -103,15 +103,18 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-in tips
-	//@qpad import "file"
+cursor disappeared after running sth?
+sticker desync
 sticker code:
 	(test) per-sticker unique id to avoid order-change troubles
 	connecting the same name in different stickers
-	code templates? not sticker's job...
-	sticker z-order
-	render filename in code stickers? sticker caption bar?
 	could store code template / code generator as sticker scripts
+code templates? not sticker's job...
+	tool that parses and extracts example code / ... from web documentation?
+	help consolidation engine
+		keyword-based example code
+		doxygen-like param comments
+		baked help database
 global search highlight clean up
 weird error appearance in android build output
 	TERM=xterm? no
@@ -142,7 +145,6 @@ release on github, again
 		build-it-yourself release
 remove the help system?
 	links in help
-	running a markdown: open as help page?
 code beautifier
 AC plugins
 	clang

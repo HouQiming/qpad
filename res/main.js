@@ -373,7 +373,7 @@ var SetHelpText=function(doc_code){
 			}
 			if(sel[0]<sel[1]){
 				//auto-search
-				doc_help_edit.ed.HookedEdit([
+				doc_help_edit.HookedEdit([
 					0,doc_help_edit.ed.GetTextSize(),doc_code.ed.GetText(sel[0],sel[1]-sel[0])])
 				doc_help_edit.SetSelection(0,doc_help_edit.ed.GetTextSize())
 				doc_help_edit.CallOnChange()
