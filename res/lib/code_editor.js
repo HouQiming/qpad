@@ -5654,6 +5654,9 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 					fn_i=fn_i.toLowerCase().replace(/\\/g,"/")
 				}
 				if(fn_i.length<fn_include_length){continue;}
+				//if(fn_include=='src/cnn.cpp'){
+				//	console.log(fn_i,fn_base,fn_include);
+				//}
 				if(fn_i.substr(fn_i.length-fn_include_length)==fn_include&&IO.FileExists(fn_i)){
 					return fn_i
 				}

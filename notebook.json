@@ -99,15 +99,32 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+(test) chcp 65001
+increase terminal size?
+broom icon after running something
+	or close btn for terminal
+notebook cell
+	hotkey
+		CTRL+ALT+#?
+	focus-editor-affecting cell
+		text transformation should be enough?
 cursor disappeared after running sth?
 sticker desync
 sticker code:
-	(test) per-sticker unique id to avoid order-change troubles
+	auto-scroll
+		editing shouldn't be too inconvenient
+	shift-sell
 	connecting the same name in different stickers
+		manually provide add-templates as local comments? co-call by name then co-replace params
+			could even allow scripts
+				C struct -> JSON construction, etc.
+			better provided as separate nodes?
+				or local editing buttons
+		auto-deduce is kinda hard
 	could store code template / code generator as sticker scripts
 code templates? not sticker's job...
 	tool that parses and extracts example code / ... from web documentation?

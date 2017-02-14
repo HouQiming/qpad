@@ -1014,6 +1014,7 @@ W.notebook_prototype={
 		proc.m_unknown_progress=0;
 		proc.m_t_unknown_progress=UI.m_frame_tick;
 		proc.m_term.m_current_path=spath;
+		//console.log('proc.m_term.m_current_path=',spath);
 		this.m_last_focus_cell_id=id*2+0;
 		UI.Refresh()
 		return 0;
@@ -1869,6 +1870,7 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 		var fn_raw=err.file_name;
 		//if(!(fn_raw.search(g_regexp_abspath)>=0)&&!IO.FileExists(fn_raw)){
 		if(!IO.FileExists(fn_raw)){
+			//console.log('term.m_current_path=',term.m_current_path);
 			var fn_search_found=UI.SearchIncludeFile((term.m_current_path||'.')+'/'+fn_raw,fn_raw);
 			if(!fn_search_found){
 				fn_raw=UI.RemovePath(fn_raw);

@@ -4025,6 +4025,7 @@ class Terminal{
 		proto.ExportProperty(this,"progress_value")
 		proto.ExportProperty(this,"got_enter_from_input")
 		proto.ExportProperty(this,"compiler_errors")
+		proto.ExportProperty(this,"m_current_path")
 		proto.ExportProperty(this,"writable")
 		proto.ExportProperty(this,"last_ssh_command")
 		proto.ExportMethod(this,"destroy",JS_destroy)
@@ -4047,6 +4048,7 @@ class Terminal{
 	got_enter_from_input=0
 	last_ssh_command=string.NULL
 	compiler_errors=JSObject.NULL
+	m_current_path=string.NULL
 	proc=System.Processes.CProcess.NULL
 	auto __done__()
 		this.destroy();
