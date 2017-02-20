@@ -717,10 +717,17 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		return JS.Return(lg)
 	}
 	Duktape_sandbox=JS_script_sandbox.GetGlobal()["Duktape"].as(JSObject)
-	JS_script_sandbox.evalVoid("Duktape.__eval_expr=function(){try{var ret=JSON.stringify(eval(Duktape.__code));Duktape.__error=undefined;return ret;}catch(e){Duktape.__error=e.message;return undefined;}}","<eval-sandbox>")
+	JS_script_sandbox.evalVoid(sbox.UIReadAll("res/misc/sandbox_setup.js"),"<eval-sandbox>")
+	Duktape["__get_sandbox_status"]=function(JSContext JS){
+		s=JS_script_sandbox.eval(string,"JSON.stringify(Duktape.__get_status())")
+		return JS.Return(s)
+	}
 	Duktape["__eval_expr_sandbox"]=function(JSContext JS){
 		s=JS.Param(0).as(string)
+		sparam=JS.Param(1).as(string)
 		Duktape_sandbox["__code"]=s;
+		if sparam:
+			Duktape_sandbox["__param"]=sparam;
 		s_ret=JS_script_sandbox.eval(string,"Duktape.__eval_expr()")
 		if s_ret:
 			return JS.Return(s_ret)

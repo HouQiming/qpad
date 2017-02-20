@@ -405,7 +405,6 @@ var sticker_wall_prototype={
 				}
 				//measure size
 				switch(sticker_i.type){
-				case "code":
 				case "note":
 					if(!sticker_i.doc){
 						continue;
@@ -427,9 +426,11 @@ var sticker_wall_prototype={
 					sticker_i.h=Math.min(UI.MeasureEditorSize(sticker_i.doc,w_inner)*sticker_i.scale,Math.max(H_MAX_STICKER,sticker_i.w));
 					sticker_i.disable_y_scale=1;
 					break;
+				case "code":
 				case "notebook_cell":
 				case "group":
 					//do nothing - let the user resize it
+					sticker_i.disable_y_scale=0;
 					break;
 				//case "script":
 				//	break;
@@ -483,6 +484,7 @@ var sticker_wall_prototype={
 					sticker_i.doc.OnFocus=function(sticker_i){
 						if(sticker_i.m_is_selected){return;}
 						this.ClearSelection();
+						this.AutoScrollToShow(sticker_i);
 						sticker_i.m_is_selected=1;
 						UI.Refresh();
 					}.bind(this,sticker_i);
@@ -500,6 +502,7 @@ var sticker_wall_prototype={
 					sticker_i.doc.OnFocus=function(sticker_i){
 						if(sticker_i.m_is_selected){return;}
 						this.ClearSelection();
+						this.AutoScrollToShow(sticker_i);
 						sticker_i.m_is_selected=1;
 						UI.Refresh();
 					}.bind(this,sticker_i);
@@ -751,8 +754,8 @@ var sticker_wall_prototype={
 		this.need_save=1;
 	},
 	AutoScrollToShow:function(sticker_i){
-		this.m_tr.trans[0]=-Math.min(Math.max(-this.m_tr.trans[0],sticker_i.x+sticker_i.w+8-this.w),sticker_i.x-8);
-		this.m_tr.trans[1]=-Math.min(Math.max(-this.m_tr.trans[1],sticker_i.y+sticker_i.h+8-this.h),sticker_i.y-8);
+		this.m_tr.trans[0]=-Math.min(Math.max(-this.m_tr.trans[0],(sticker_i.x+sticker_i.w)*this.m_tr.scale+8-this.w),sticker_i.x*this.m_tr.scale-8);
+		this.m_tr.trans[1]=-Math.min(Math.max(-this.m_tr.trans[1],(sticker_i.y+sticker_i.h)*this.m_tr.scale+8-this.h),sticker_i.y*this.m_tr.scale-8);
 	},
 	InsertNote:function(){
 		var new_sticker={

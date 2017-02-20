@@ -64,7 +64,7 @@ class Terminal{
 	cursorBlink= false
 	//visualBell= false
 	popOnBell= false
-	scrollback= 1000
+	scrollback= 65536
 	screenKeys= false
 	debug= false
 	cancelEvents= false

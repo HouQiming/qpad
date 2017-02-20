@@ -1054,6 +1054,9 @@ var RenderLayout=function(layout,obj,y_base){
 						for(var i=0;i<tab.backup_regions.length;i++){
 							W.RestoreRegion(tab.backup_regions[i])
 						}
+						if(tab.SetPersistentHotkeys){
+							tab.SetPersistentHotkeys();
+						}
 						if(!bk_focus_is_a_region&&UI.context_focus_is_a_region&&obj.current_tab_id!=tab.__global_tab_id&&UI.nd_focus){
 							obj.just_created_a_tab=0;
 							obj.current_tab_id=tab.__global_tab_id;
@@ -1083,6 +1086,9 @@ var RenderLayout=function(layout,obj,y_base){
 							var bk_focus_is_a_region=UI.context_focus_is_a_region;
 							var bk_tentative_focus=UI.context_tentative_focus;
 							tab.body.call(tab)
+							if(tab.SetPersistentHotkeys){
+								tab.SetPersistentHotkeys();
+							}
 							if(!bk_focus_is_a_region&&UI.context_focus_is_a_region&&obj.current_tab_id!=tab.__global_tab_id&&UI.nd_focus){
 								obj.just_created_a_tab=0;
 								obj.current_tab_id=tab.__global_tab_id;

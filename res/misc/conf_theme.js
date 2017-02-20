@@ -746,8 +746,9 @@ UI.CustomTheme=function(){
 				sel_bgcolor:C,
 				sel_bgcolor_deactivated:L?0xff7f7f7f:0xff7f7f7f,
 				name_color:L?0xff000000:0xffe8e8e8,
-				dumb_name_color:L?0xff7f7f7f:0xff7f7f7f,
-				font:UI.Font(UI.font_name,20,0),
+				hotkey_color:L?0xff7f7f7f:0xffaaaaaa,
+				dumb_name_color:L?0xff7f7f7f:0xffaaaaaa,
+				font:UI.Font(UI.font_name,18,0),
 			},
 			button_style:{
 				transition_dt:0.1,

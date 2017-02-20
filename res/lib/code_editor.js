@@ -327,6 +327,17 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				UI.Refresh()
 				return 1
 			})
+			this.AddEventHandler('RETURN RETURN2',function(){
+				//reparse-on-return
+				if(this.m_need_idle_reparse){
+					if(this.ed.GetTextSize()<UI.AUTO_REPARSE_MAX_SIZE){
+						this.ForceReparse();
+						CallParseMore();
+						UI.Refresh();
+					}
+				}
+				return 1;
+			})
 			//current line highlight
 			var hl_items=this.CreateTransientHighlight({'depth':-100,'color':this.color_cur_line_highlight,'invertible':0});
 			this.cur_line_p0=hl_items[0]
@@ -1036,13 +1047,6 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			return 0;
 		}
 		//call plugin-defined AC hooks
-		if(is_explicit&&this.m_need_idle_reparse){
-			if(this.ed.GetTextSize()<UI.AUTO_REPARSE_MAX_SIZE){
-				this.ForceReparse();
-				CallParseMore();
-				UI.Refresh();
-			}
-		}
 		var is_user_defined=0;
 		var accands=undefined;
 		if(is_explicit&&!accands){
@@ -1554,7 +1558,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 	},
 	//////////////////////////
-	SmartPaste:function(){
+	SmartPaste:function(s_force_text){
 		var sel=this.GetSelection();
 		var ed=this.ed;
 		//vsel-and-paste case
@@ -1573,9 +1577,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					}
 				}
 				if(line_id>=0){
-					var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent);
+					var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent,s_force_text);
 					if(sinsert==undefined){
-						sinsert=UI.SDL_GetClipboardText();
+						sinsert=(s_force_text==undefined?UI.SDL_GetClipboardText():s_force_text);
 					}
 					var lines=sinsert.replace(/\r/g,'').split('\n');
 					var shack=UI.ED_RichTextCommandChar(0x108000);
@@ -1640,7 +1644,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			this.Paste()
 			return;
 		}
-		var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent)
+		var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent,s_force_text)
 		if(sinsert==undefined){
 			this.Paste()
 			return;
@@ -3244,11 +3248,14 @@ W.CodeEditorWidget_prototype={
 			//try to go to line number first
 			var line_id=parseInt(sneedle)
 			ctx.m_goto_line_error=undefined;
-			if(line_id>0){
+			if(line_id>=0){
 				var line_id_eval=line_id;
+				var col_id_eval=undefined;
 				var err=undefined;
 				try{
-					line_id_eval=JSON.parse(Duktape.__eval_expr_sandbox(sneedle))
+					var arr=JSON.parse(Duktape.__eval_expr_sandbox(["[",sneedle,"]"].join('')))
+					line_id_eval=arr[0];
+					col_id_eval=arr[1]-1;
 				}catch(e){
 					err=e.message;
 					line_id_eval=undefined;
@@ -3261,7 +3268,9 @@ W.CodeEditorWidget_prototype={
 				ctx.m_goto_line_number=line_id;
 				var line_ccnts=doc.SeekAllLinesBetween(line_id-1,line_id+1)
 				if(line_ccnts[0]<line_ccnts[1]){
-					var line_ccnt0=doc.ed.MoveToBoundary(line_ccnts[0],1,"space");
+					//var line_ccnt0=(col_id_eval>=0?Math.min(line_ccnts[0]+col_id_eval,line_ccnts[1]-1):doc.ed.MoveToBoundary(line_ccnts[0],1,"space"));
+					//line_ccnt0=doc.ed.SnapToCharBoundary(line_ccnt0,1);
+					var line_ccnt0=(col_id_eval>=0?Math.min(doc.SeekLC(line_id-1,col_id_eval),line_ccnts[1]-1):doc.ed.MoveToBoundary(line_ccnts[0],1,"space"));
 					var line_ccnt1=line_ccnts[1]-1
 					if(!(line_ccnt1>line_ccnt0)){line_ccnt1=line_ccnt0;}
 					matches.push(line_ccnt0,line_ccnt1)

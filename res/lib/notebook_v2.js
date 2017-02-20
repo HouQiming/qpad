@@ -413,6 +413,14 @@ W.CellCaption=function(id,attrs){
 						obj.owner.KillCell(obj.m_cell_id);
 					}
 				});
+			}else{
+				if(obj.text_hotkey){
+					var dims_hotkey=UI.MeasureText(font,obj.text_hotkey);
+					W.Text("",{
+						x:obj.x+obj.w-dims_hotkey.w-8,y:obj.y+(obj.h-dims.h)*0.5-2,
+						font:font,text:obj.text_hotkey,color:obj.mystyle.hotkey_color,
+					});
+				}
 			}
 			if(obj.progress>0){
 				var y_progress_bar=obj.y+(obj.h-dims.h)*0.5+dims.h-1;
@@ -586,6 +594,8 @@ W.notebook_prototype={
 				var obj_notebook=this.notebook_owner;
 				var cell_id=this.m_cell_id;
 				if(obj_notebook.m_cells[cell_id]){
+					///////////////////
+					//button name
 					var match=s_check.match(/\[button: (.+)\]/);
 					if(match){
 						obj_notebook.m_cells[cell_id].m_button_name=match[1];
@@ -603,6 +613,19 @@ W.notebook_prototype={
 								obj_notebook.m_cells[cell_id].m_button_name=undefined;
 							}
 						}
+					}
+					//////////////////
+					match=s_check.match(/\[hotkey: (.+)\]/);
+					if(match){
+						obj_notebook.m_cells[cell_id].m_hotkey=match[1];
+					}else{
+						obj_notebook.m_cells[cell_id].m_hotkey=undefined;
+					}
+					match=s_check.match(/build script for the project/);
+					if(match){
+						obj_notebook.m_cells[cell_id].m_project_hotkey="F5";
+					}else{
+						obj_notebook.m_cells[cell_id].m_project_hotkey=undefined;
 					}
 				}
 				//obj_notebook.m_buttons=undefined;
@@ -895,6 +918,51 @@ W.notebook_prototype={
 			}
 		}
 		this.ClearCellOutput(id)
+		if(cell_i.m_language=="Javascript"){
+			var s_code=cell_i.m_text_in.ed.GetText();
+			if(s_code.indexOf('[text transformation]')>=0){
+				var err=undefined;
+				var tab_frontmost=UI.GetFrontMostEditorTab();
+				var doc=UI.nd_focus;
+				if(!doc||!doc.ed||!doc.GetSelection){
+					doc=undefined;
+				}
+				if(doc==cell_i.m_text_in){
+					doc=(tab_frontmost&&tab_frontmost.main_widget&&tab_frontmost.main_widget.doc);
+				}
+				if(doc){
+					var sel=doc.GetSelection();
+					if(!(sel[0]<sel[1])){
+						sel[0]=0;
+						sel[1]=doc.ed.GetTextSize();
+					}
+					var s_input=doc.ed.GetText(sel[0],sel[1]-sel[0]);
+					var s_console_output='';
+					try{
+						var s_output=JSON.parse(Duktape.__eval_expr_sandbox(["(",s_code,")(Duktape.__param)"].join(''),s_input,"<script>"))
+						if(typeof(s_output)!='string'){
+							err=UI._("The script has to be a Javascript function that takes a string and returns a string");
+						}else{
+							doc.HookedEdit([sel[0],sel[1]-sel[0],s_output]);
+							doc.SetSelection(sel[0],sel[0]+Duktape.__byte_length(s_output));
+							doc.CallOnChange();
+						}
+					}catch(e){
+						err=JSON.parse(Duktape.__get_sandbox_status()).__error_stack;
+					}
+					s_console_output=JSON.parse(Duktape.__get_sandbox_status()).__console_output;
+				}else{
+					err=UI._("This cell can only be run within another active editor");
+				}
+				if(s_console_output){
+					this.WriteCellOutput(id,s_console_output);
+				}
+				if(err){
+					this.WriteCellOutput(id,err+"\n")
+				}
+				return;
+			}
+		}
 		var desc=Language.GetDescObjectByName(cell_i.m_language);
 		if(!desc.m_buildenv_by_name){return;}
 		var obj_buildenv=desc.m_buildenv_by_name[cell_i.m_compiler_name||UI.GetDefaultBuildEnv(cell_i.m_language)];
@@ -906,17 +974,17 @@ W.notebook_prototype={
 		var s_code=cell_i.m_text_in.ed.GetText();
 		IO.CreateFile(fn_script,s_code)
 		var args=obj_buildenv.CreateInterpreterCall(fn_script,undefined);
-		if(typeof(args)=='string'){
-			//qpad js
-			try{
-				eval(s_code);
-			}catch(e){
-				this.WriteCellOutput(id,e.stack);
-			}
-			this.need_save|=65536;
-			UI.Refresh()
-			return 0;
-		}
+		//if(typeof(args)=='string'){
+		//	//qpad js
+		//	try{
+		//		eval(s_code);
+		//	}catch(e){
+		//		this.WriteCellOutput(id,e.stack);
+		//	}
+		//	this.need_save|=65536;
+		//	UI.Refresh()
+		//	return 0;
+		//}
 		var spath=UI.GetPathFromFilename(this.file_name);
 		//var s_prj_mark="build script for '"
 		//var p_prj_fn=s_code.indexOf(s_prj_mark);
@@ -1072,6 +1140,15 @@ W.notebook_prototype={
 		this.m_cell_list_old_position=(this.cell_list&&this.cell_list.position);
 		this.cell_list=undefined;
 	},
+	SetPersistentHotkeys:function(){
+		if(!this.m_cells){return;}
+		for(var i=0;i<this.m_cells.length;i++){
+			var cell_i=this.m_cells[i];
+			if(cell_i.m_hotkey){
+				W.Hotkey("",{key:cell_i.m_hotkey,action:this.RunCell.bind(this,i)});
+			}
+		}
+	},
 };
 W.NotebookView=function(id,attrs){
 	if(UI.enable_timing){
@@ -1132,6 +1209,8 @@ W.NotebookView=function(id,attrs){
 				id:cell_i.m_temp_unique_name,
 				m_cell_id:i,
 				text:s_btn_name,
+				hotkey:cell_i.m_hotkey,
+				text_hotkey:cell_i.m_hotkey&&UI.LocalizeKeyName(UI.TranslateHotkey(cell_i.m_hotkey))||cell_i.m_project_hotkey&&UI.LocalizeKeyName(UI.TranslateHotkey(cell_i.m_project_hotkey)),
 				h:obj.panel_style.h_button,
 				progress:progress,
 				progress_mode:progress_mode,
@@ -1141,7 +1220,10 @@ W.NotebookView=function(id,attrs){
 	}
 	var w_buttons=96;
 	for(var i=0;i<buttons.length;i++){
-		var w_button_i=32+UI.MeasureText(UI.default_styles.button.font,buttons[i].text).w;
+		var w_button_i=32+UI.MeasureText(UI.default_styles.notebook_cell_caption.mystyle.font,buttons[i].text).w;
+		if(buttons[i].text_hotkey){
+			w_button_i+=UI.MeasureText(UI.default_styles.notebook_cell_caption.mystyle.font,buttons[i].text_hotkey).w;
+		}
 		w_buttons=Math.max(w_buttons,w_button_i);
 	}
 	w_buttons=Math.min(w_buttons,obj.w*obj.panel_style.max_button_width_ratio);
@@ -1324,19 +1406,59 @@ W.NotebookView=function(id,attrs){
 			menu_notebook.AddNormalItem({
 				text:"&Delete cell",
 				enable_hotkey:1,key:"SHIFT+CTRL+X",
+				context_menu_group:"notebook",
 				action:obj.DeleteCell.bind(obj,focus_cell_id>>1)})
 			menu_notebook.AddNormalItem({
 				text:"&Clone cell",
+				context_menu_group:"notebook",
 				action:obj.DupCell.bind(obj)});
 			menu_notebook.AddSeparator();
 			if(cur_cell.m_output_terminal){
 				menu_notebook.AddNormalItem({
 					text:"Clear &output",
 					enable_hotkey:1,key:"SHIFT+CTRL+C",
+					context_menu_group:"notebook",
 					action:obj.ClearCellOutput.bind(obj,focus_cell_id>>1)})
 			}
+			if(cur_cell.m_text_in){
+				var SetSomething=function(cur_cell,re,s_example){
+					var doc=cur_cell.m_text_in;
+					var s_check=doc.ed.GetText(0,Math.min(doc.ed.GetTextSize(),4096));
+					var match=s_check.match(re);
+					if(!match){
+						var lang=doc.plugin_language_desc
+						var sel=doc.GetSelection();
+						var cmt_holder=lang;
+						if(lang.GetCommentStrings){
+							cmt_holder=lang.GetCommentStrings(doc.ed.GetStateAt(doc.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
+						}
+						doc.SmartPaste((cmt_holder&&cmt_holder.line_comment||"#")+s_example+"\n")
+						s_check=doc.ed.GetText(0,Math.min(doc.ed.GetTextSize(),4096));
+						match=s_check.match(re);
+					}
+					if(match){
+						var ccnt0=Duktape.__byte_length(s_check.slice(0,match.index+9))
+						var ccnt1=Duktape.__byte_length(s_check.slice(0,match.index+9+match[1].length))
+						doc.SetSelection(ccnt0,ccnt1);
+					}
+					UI.Refresh();
+				};
+				menu_notebook.AddNormalItem({
+					text:"Set caption text",
+					context_menu_group:"notebook",
+					action:SetSomething.bind(null,cur_cell,/\[button: (.+)\]/,"[button: New caption]")
+				});
+				menu_notebook.AddNormalItem({
+					text:"Set hotkey",
+					context_menu_group:"notebook",
+					action:SetSomething.bind(null,cur_cell,/\[hotkey: (.+)\]/,"[hotkey: CTRL+ALT+1]")
+				});
+			}
 			menu_notebook.AddButtonRow({text:"Set cell mode"},[
-				{text:"new_window",icon:"窗",tooltip:'New window',action:function(){
+				{text:"text_transform",icon:"单",tooltip:'Apply to the editor text',action:function(){
+					obj.UpdateLanguage(cur_cell.m_text_in.m_cell_id,"Javascript")
+					SetCellRunTag(cur_cell.m_text_in,"[text transformation]");
+				}},{text:"new_window",icon:"窗",tooltip:'New window',action:function(){
 					SetCellRunTag(cur_cell.m_text_in,"[new window]");
 				}},{text:"new_term",icon:"格",tooltip:'New tab',action:function(){
 					SetCellRunTag(cur_cell.m_text_in,"[new term]");
@@ -1558,6 +1680,11 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 			//}
 			//body.tooltip=this.file_name;
 			return body;
+		},
+		SetPersistentHotkeys:function(){
+			if(this.main_widget){
+				this.main_widget.SetPersistentHotkeys();
+			}
 		},
 		NeedMainWidget:function(){
 			if(!this.main_widget){

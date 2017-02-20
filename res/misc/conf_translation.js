@@ -357,6 +357,16 @@
 			"Bigger font - SHIFT+CTRL+'+'":"加大字体 - SHIFT+CTRL+'+'",
 			"Smaller font - SHIFT+CTRL+'-'":"减小字体 - SHIFT+CTRL+'-'",
 			"Go to original - CTRL+ALT+G":"转到原始代码 - CTRL+ALT+G",
+			/////////////////////
+			"Set caption text":"设置标题文字",
+			"Set hotkey":"设置热键",
+			"Tag not found":"标记未找到",
+			"The script has to be a Javascript function that takes a string and returns a string":"编辑脚本必须是一个接收字符串并返回字符串的Javascript函数",
+			"This cell can only be run within another active editor":"这个脚本只能在开着其他编辑窗口的情况下运行",
+			"Restore tab size":"还原",
+			"Maximize tab":"最大化",
+			"Run notebook cell '@1'":"运行脚本'@1'",
+			"Apply to the editor text":"用于编辑其他窗口里的文字",
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw
