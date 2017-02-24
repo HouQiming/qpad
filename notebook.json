@@ -102,17 +102,36 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 6
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-(test) tab reparse: don't enable AC on the current identifier
-	reparse on enter instead
-cursor disappeared after running sth?
+console output filtering
+	general terminal interaction - when to enable?
+		ctrl+v / ctrl+f
+		detect vi / ... - alt buffer
+		menu option
+	interface?
+		RenderAsWidget
+		topright search bar, gather the lines in an alternative buffer
+		or an editor mode
+			need fast error / warning filtering though
+make sure we properly distinguish errors from warnings
+check/uncheck boxes in a sticker wall... or md in general
+	could use that specific unicode char
+	\u2610
+	or - / *
+		only in notes / stickers
+	markdown - / * completion
+(test) enter reparse shouldn't happen in stickers
+drag failure on gaming machine
+online update
+	could depend on node.js
 sticker desync
+	it was a 1st-op bad ccnt mapping
+	after a CTRL+SHIFT+G
+		disable those in stickers
 sticker code:
-	auto-scroll
-		editing shouldn't be too inconvenient
 	shift-sell
 	connecting the same name in different stickers
 		manually provide add-templates as local comments? co-call by name then co-replace params
@@ -129,10 +148,6 @@ code templates? not sticker's job...
 		doxygen-like param comments
 		baked help database
 global search highlight clean up
-weird error appearance in android build output
-	TERM=xterm? no
-terminal gets overwhelmed by large amounts of output
-	ctrl+s / ctrl+q?
 memory leak
 build for mac
 file view class list

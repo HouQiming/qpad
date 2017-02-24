@@ -366,7 +366,7 @@
 			"Restore tab size":"还原",
 			"Maximize tab":"最大化",
 			"Run notebook cell '@1'":"运行脚本'@1'",
-			"Apply to the editor text":"用于编辑其他窗口里的文字",
+			"Use in an editor":"用于编辑其他窗口里的文字",
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw

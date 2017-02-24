@@ -840,8 +840,8 @@ var sticker_wall_prototype={
 				var sticker_i=stickers[i];
 				UI.OpenEditorWindow(sticker_i.doc.m_file_name,function(){
 					UI.SetSelectionEx(this,
-						sticker_i.doc.sel0.ccnt+sticker_i.doc.m_sync_group_ccnt0,
-						sticker_i.doc.sel1.ccnt+sticker_i.doc.m_sync_group_ccnt0,
+						sticker_i.doc.sel0.ccnt+sticker_i.doc.ed.QueryMySyncGroupOffset(),
+						sticker_i.doc.sel1.ccnt+sticker_i.doc.ed.QueryMySyncGroupOffset(),
 						'sticker_goto');
 				});
 				break;

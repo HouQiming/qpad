@@ -329,7 +329,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			})
 			this.AddEventHandler('RETURN RETURN2',function(){
 				//reparse-on-return
-				if(this.m_need_idle_reparse){
+				if(this.m_need_idle_reparse&&this.m_sync_group_ccnt0===undefined){
 					if(this.ed.GetTextSize()<UI.AUTO_REPARSE_MAX_SIZE){
 						this.ForceReparse();
 						CallParseMore();

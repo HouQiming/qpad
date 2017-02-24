@@ -1286,11 +1286,11 @@ W.NotebookView=function(id,attrs){
 			var w_term=term.m_term.cols*dims.w;
 			var h_term=term.m_term.rows*dims.h;
 			var value=term.GetScrollValue();
-			var w_term_area=w_term+(value>=0?term.w_scroll_bar:0);
-			var scale=Math.min(Math.min(obj.w/w_term_area,obj.h/h_term),1);
+			var scale=Math.max(Math.min(Math.min((obj.w-(value>=0?term.w_scroll_bar:0)+2)/w_term,obj.h/h_term),1),0.1);
 			term.font=UI.ScaleFont(UI.default_styles.terminal.font,scale);
-			w_term_area*=scale;
+			w_term*=scale;
 			h_term*=scale;
+			var w_term_area=w_term+(value>=0?term.w_scroll_bar:0)+2;
 			var x_term=obj.x+obj.w-w_term_area;
 			var y_term=obj.y+obj.h-h_term;
 			term.x=x_term;
@@ -1455,7 +1455,7 @@ W.NotebookView=function(id,attrs){
 				});
 			}
 			menu_notebook.AddButtonRow({text:"Set cell mode"},[
-				{text:"text_transform",icon:"单",tooltip:'Apply to the editor text',action:function(){
+				{text:"text_transform",icon:"单",tooltip:'Use in an editor',action:function(){
 					obj.UpdateLanguage(cur_cell.m_text_in.m_cell_id,"Javascript")
 					SetCellRunTag(cur_cell.m_text_in,"[text transformation]");
 				}},{text:"new_window",icon:"窗",tooltip:'New window',action:function(){
