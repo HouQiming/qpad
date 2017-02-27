@@ -99,6 +99,9 @@ UI.AddErrorToDocument=function(doc,err){
 	if(go_prev_line&&err.ccnt1>err.ccnt0){err.ccnt1--}
 	/////////////////
 	if(!err.is_quiet){
+		if(err.category&&err.category!='error'){
+			err.color=doc.color_tilde_compiler_warning;
+		}
 		var hl_items=doc.CreateTransientHighlight({
 			'depth':1,
 			'color':err.color||doc.color_tilde_compiler_error,
@@ -1336,56 +1339,9 @@ W.NotebookView=function(id,attrs){
 		}
 		//actually render the terminal
 		if(cur_cell.m_output_terminal){
-			W.PureRegion("cell_term_"+(focus_cell_id&-2).toString(),term);
-			//var sz_expand=term.panel_style.border_width+term.panel_style.shadow_size_embedded;
-			//UI.RoundRect({
-			//	x:x_term-sz_expand,y:y_term-sz_expand,
-			//	w:w_term_area+sz_expand*2,h:h_term+sz_expand*2,
-			//	color:term.panel_style.shadow_color,
-			//	border_width:-term.panel_style.shadow_size_embedded,
-			//	round:term.panel_style.shadow_size_embedded,
-			//});
-			//var C_bg=term.m_term.getBgcolor();
-			var C_bg=obj.panel_style.cell_list_bgcolor;
-			var sz_expand=term.panel_style.shadow_size_embedded;
-			if(term_side=="x"){
-				UI.RoundRect({
-					x:obj.x+w_editor-sz_expand,y:obj.y-sz_expand,
-					w:sz_expand*2,h:obj.h+sz_expand*2,
-					color:term.panel_style.shadow_color,
-					border_width:-term.panel_style.shadow_size_embedded,
-					round:term.panel_style.shadow_size_embedded,
-				});
-				UI.RoundRect({x:obj.x+w_editor,y:obj.y,w:w_term_area,h:obj.h,color:C_bg,border_width:0});
-			}else{
-				UI.RoundRect({
-					x:obj.x-sz_expand,y:obj.y+h_editor-sz_expand,
-					w:obj.w+sz_expand*2,h:sz_expand*2,
-					color:term.panel_style.shadow_color,
-					border_width:-term.panel_style.shadow_size_embedded,
-					round:term.panel_style.shadow_size_embedded,
-				});
-				UI.RoundRect({x:obj.x,y:obj.y+h_editor,w:obj.w,h:h_term,color:C_bg,border_width:0});
-			}
-			UI.RoundRect({
-				x:x_term-term.panel_style.border_width,y:y_term-term.panel_style.border_width,
-				w:w_term_area+term.panel_style.border_width*2,h:h_term+term.panel_style.border_width*2,
-				color:term.panel_style.border_color,
-				//round:term.panel_style.border_width,
-			});
-			UI.PushCliprect(x_term,y_term,w_term_area,h_term);
-			term.Render(x_term,y_term,w_term,h_term);
-			UI.PopCliprect();
-			if(value>=0){
-				W.ScrollBar("cell_term_sbar_"+(focus_cell_id&-2).toString(),{
-					x:x_term+w_term, y:y_term, w:term.w_scroll_bar, h:h_term, dimension:'y',
-					page_size:term.m_term.rows, total_size:term.m_term.n_valid_lines-term.m_term.rows, value:value,
-					OnChange:function(value){
-						term.SetScrollValue(value)
-						UI.Refresh()
-					},
-				});
-			}
+			var id_term="cell_term_"+(focus_cell_id&-2).toString();
+			obj[id_term]=term;
+			W.Terminal(id_term,{x:x_term,y:y_term,w:w_term_area,h:h_term,is_embedded:1})
 		}
 	}
 	if(obj.activated){
@@ -1789,7 +1745,9 @@ W.Terminal=function(id,attrs){
 		}
 	}
 	W.PureRegion(id,obj);
-	UI.PushCliprect(obj.x,obj.y,obj.w,obj.h);
+	if(!obj.is_embedded){
+		UI.PushCliprect(obj.x,obj.y,obj.w,obj.h);
+	}
 	UI.RoundRect({
 		x:obj.x,y:obj.y,w:obj.w,h:obj.h,
 		color:obj.panel_style.bgcolor,
@@ -1844,7 +1802,9 @@ W.Terminal=function(id,attrs){
 	//		obj.Download("c:/users/hqm/downloads/icon1k.png","icon1k.png");
 	//	}});
 	//}
-	UI.PopCliprect();
+	if(!obj.is_embedded){
+		UI.PopCliprect();
+	}
 	//a terminal menu - standard scripts, "first command" history
 	if(obj.activated){
 		var menu_terminal=undefined;

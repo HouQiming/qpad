@@ -107,27 +107,29 @@ v2
 =====í¯¿í¿¿=====
 # TODO LIST
 console output filtering
-	general terminal interaction - when to enable?
+	general terminal interaction - is_in_alternate_buffer
 		ctrl+v / ctrl+f
-		detect vi / ... - alt buffer
-		menu option
+		detect vi / less / ... - alt buffer
+		global option: terminal_hotkeys
 	interface?
-		RenderAsWidget
 		topright search bar, gather the lines in an alternative buffer
+			could support async search
 		or an editor mode
 			need fast error / warning filtering though
-make sure we properly distinguish errors from warnings
+		--
+		in-terminal reverse search with less-like interface
+			with async search
 check/uncheck boxes in a sticker wall... or md in general
 	could use that specific unicode char
 	\u2610
 	or - / *
 		only in notes / stickers
 	markdown - / * completion
-(test) enter reparse shouldn't happen in stickers
 drag failure on gaming machine
 online update
 	could depend on node.js
 sticker desync
+	CTRL+K?
 	it was a 1st-op bad ccnt mapping
 	after a CTRL+SHIFT+G
 		disable those in stickers

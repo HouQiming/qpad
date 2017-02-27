@@ -846,11 +846,11 @@ UI.RegisterOutputParser('(.*?):([0-9]+)[.][.]([0-9]+): (.*)',4,function(matches)
 })
 
 //unix cc
-UI.RegisterOutputParser('(.*?[^0-9]):([0-9]+):(([0-9]+):)? ((error)|(warning): )?(.*)',8,function(matches){
+UI.RegisterOutputParser('(.*?[^0-9]):([0-9]+):(([0-9]+):)? (((error)|(warning)): )?(.*)',9,function(matches){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
-	var message=matches[8]
-	var category=(matches[5]?matches[5].toLowerCase():"error")
+	var message=matches[9]
+	var category=(matches[6]?matches[6].toLowerCase():"error")
 	//for(var i=0;i<matches.length;i++){
 	//	print(i,matches[i])
 	//}

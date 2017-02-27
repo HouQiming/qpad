@@ -8461,6 +8461,7 @@ W.OptionsPage=function(id,attrs){
 				{name:UI._('Move forward old tabs when manually opened'),stable_name:'explicit_open_mtf'},
 				{name:UI._('Automatically close stale tabs'),stable_name:'close_stale'},
 				{name:UI._('Auto-switch notebooks'),stable_name:'notebook_autoswitch'},
+				{name:UI._('Enable hotkeys in terminals'),stable_name:'terminal_hotkeys'},
 			];
 			plugin_items["Tools"]=[];
 			if(UI.InstallQPad){

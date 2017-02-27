@@ -112,7 +112,7 @@ class Terminal{
 	originMode=false
 	insertMode=false
 	wraparoundMode=true // defaults: xterm - true, vt100 - false
-	has_normal=0
+	is_in_alternate_buffer=0
 	//normal=null
 
 	// charset
@@ -2127,7 +2127,7 @@ class Terminal{
 		//this.refresh(0, this.rows - 1);
 	
 		//this.normal=typeof(this.normal).null;
-		this.has_normal=0
+		this.is_in_alternate_buffer=0
 	
 		this.geometry[0]=this.cols
 		this.geometry[1]=this.rows
@@ -3195,7 +3195,7 @@ class Terminal{
 						this.cursorHidden=false;
 						break;
 					case 47,1047,1049: // alt screen buffer
-						if (!this.has_normal) {
+						if (!this.is_in_alternate_buffer) {
 							auto normal={
 								lines: this.lines,
 								line_end_states: this.line_end_states,
@@ -3214,7 +3214,7 @@ class Terminal{
 							};
 							this.reset();
 							this.normal=normal;
-							this.has_normal=1
+							this.is_in_alternate_buffer=1
 						}
 						break;
 				}
@@ -3375,7 +3375,7 @@ class Terminal{
 						this.cursorHidden=true;
 						break;
 					case 47,1047,1049: // normal screen buffer - clearing it first
-						if (this.has_normal) {
+						if (this.is_in_alternate_buffer) {
 							this.lines=this.normal.lines;
 							this.line_end_states=this.normal.line_end_states;
 							this.ybase=this.normal.ybase;
@@ -3386,7 +3386,7 @@ class Terminal{
 							this.scrollTop=this.normal.scrollTop;
 							this.scrollBottom=this.normal.scrollBottom;
 							this.tabs=this.normal.tabs;
-							this.has_normal=0
+							this.is_in_alternate_buffer=0
 							// if (params == 1049) {
 							//   this.x=this.savedX;
 							//   this.y=this.savedY;
@@ -4028,6 +4028,7 @@ class Terminal{
 		proto.ExportProperty(this,"m_current_path")
 		proto.ExportProperty(this,"writable")
 		proto.ExportProperty(this,"last_ssh_command")
+		proto.ExportProperty(this,"is_in_alternate_buffer")
 		proto.ExportMethod(this,"destroy",JS_destroy)
 		proto.ExportMethod(this,"write",JS_write)
 		proto.ExportMethod(this,"send",JS_send)
