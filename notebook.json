@@ -107,18 +107,7 @@ v2
 =====í¯¿í¿¿=====
 # TODO LIST
 console output filtering
-	general terminal interaction - is_in_alternate_buffer
-		ctrl+v / ctrl+f
-		detect vi / less / ... - alt buffer
-		global option: terminal_hotkeys
-	interface?
-		topright search bar, gather the lines in an alternative buffer
-			could support async search
-		or an editor mode
-			need fast error / warning filtering though
-		--
-		in-terminal reverse search with less-like interface
-			with async search
+	just a search bar with prev / next
 check/uncheck boxes in a sticker wall... or md in general
 	could use that specific unicode char
 	\u2610

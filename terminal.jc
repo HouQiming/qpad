@@ -113,6 +113,7 @@ class Terminal{
 	insertMode=false
 	wraparoundMode=true // defaults: xterm - true, vt100 - false
 	is_in_alternate_buffer=0
+	enable_quick_edit=0
 	//normal=null
 
 	// charset
@@ -1639,6 +1640,94 @@ class Terminal{
 		auto ctrlKey=!!(keymod&KMOD_CTRL)
 		auto metaKey=!!(keymod&KMOD_WIN)
 		auto keyCode=ev["keysym"].as(int)
+		if this.selecting&&this.sel_x0==this.sel_x1&&this.sel_y0==this.sel_y1&&!this.mouse_selecting:
+			this.selecting=0
+		if this.selecting||this.enable_quick_edit:
+			//selection mode hotkeys
+			auto ytop=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
+			auto ybottom=(this.ybase+this.rows-1)%this.scrollback;
+			if ctrlKey&&!shiftKey&&!altKey&&!metaKey&&keyCode==97:
+				//CTRL+A
+				this.selecting=2
+				this.sel_x0=0
+				this.sel_y0=ytop
+				this.sel_x1=this.cols
+				this.sel_y1=ybottom
+				return 1
+			if shiftKey&&(keyCode==SDLK_DOWN||keyCode==SDLK_UP||keyCode==SDLK_LEFT||keyCode==SDLK_RIGHT||keyCode==SDLK_HOME||keyCode==SDLK_END):
+				if !this.selecting:
+					this.sel_x0=this.x
+					this.sel_y0=this.y
+					this.sel_x1=this.x
+					this.sel_y1=this.y
+				this.selecting=2
+				switch keyCode{
+				case SDLK_UP:
+					if this.sel_y1!=ytop:this.sel_y1--
+					break
+				case SDLK_DOWN:
+					if this.sel_y1!=ybottom:this.sel_y1++
+					break
+				case SDLK_LEFT:
+					if altKey||ctrlKey:
+						pchar_line=this.sel_y1*this.cols
+						for pass=0:1
+							for(;;)
+								if this.sel_x1<=0:
+									if this.sel_y1==ytop:break
+									auto y0next=this.sel_y1-1
+									if y0next<0:
+										y0next+=this.scrollback
+									if uptr(y0next)>=uptr(this.line_end_states.n)||this.line_end_states[y0next]==0:
+										break
+									this.sel_x1=this.cols
+									this.sel_y1=y0next
+									pchar_line=this.sel_y1*this.cols
+								addr=(pchar_line+this.sel_x1-1)*3
+								if uptr(addr)>=uptr(this.lines.n)||((!this.lines[addr+2]||this.lines[addr+1]==' '||this.lines[addr+1]=='\t')==pass):
+									break
+								this.sel_x1--
+					else 
+						if this.sel_x1>0:
+							this.sel_x1--
+					break
+				case SDLK_RIGHT:
+					if altKey||ctrlKey:
+						pchar_line=this.sel_y1*this.cols
+						for pass=1:-1:0
+							for(;;)
+								this.sel_x1++
+								if this.sel_x1>=this.cols:
+									this.sel_x1=this.cols
+									if this.sel_y1==ybottom:break
+									if uptr(this.sel_y1)>=uptr(this.line_end_states.n)||this.line_end_states[this.sel_y1]==0:
+										break
+									this.sel_y1=this.sel_y1+1
+									if this.sel_y1>=this.scrollback:
+										this.sel_y1-=this.scrollback
+								addr=(pchar_line+this.sel_x1)*3
+								if uptr(addr)>=uptr(this.lines.n)||(!this.lines[addr+2]||this.lines[addr+1]==' '||this.lines[addr+1]=='\t')==pass:
+									break
+					else 
+						if this.sel_x1<this.cols:
+							this.sel_x1++
+					break
+				case SDLK_HOME:
+					if altKey||ctrlKey:
+						this.sel_x1=0
+						this.sel_y1=ytop
+					else
+						this.sel_x1=0
+					break
+				case SDLK_END:
+					if altKey||ctrlKey:
+						this.sel_x1=this.cols
+						this.sel_y1=ybottom
+					else
+						this.sel_x1=this.cols
+					break
+				}
+				return 1
 		if this.selecting>0:
 			if !keymod&&(keyCode==13||keyCode==1073741982)||ctrlKey&&!altKey&&!shiftKey&&!metaKey&&keyCode==99:
 				//return / ctrl+c - copy text and cancel sel
@@ -1775,7 +1864,7 @@ class Terminal{
 				result.key="\x1b";
 				result.cancel=true;
 				break;
-			case 1073741904:
+			case SDLK_LEFT:
 				// left-arrow
 				if (modifiers) {
 					result.key=FormatAsText("\x1b[1;",modifiers + 1, 'D');
@@ -1791,7 +1880,7 @@ class Terminal{
 					result.key="\x1b[D";
 				}
 				break;
-			case 1073741903:
+			case SDLK_RIGHT:
 				// right-arrow
 				if (modifiers) {
 					result.key=FormatAsText("\x1b[1;", modifiers + 1, 'C');
@@ -1807,7 +1896,7 @@ class Terminal{
 					result.key="\x1b[C";
 				}
 				break;
-			case 1073741906:
+			case SDLK_UP:
 				// up-arrow
 				if (modifiers) {
 					result.key=FormatAsText("\x1b[1;", modifiers + 1, 'A');
@@ -1822,7 +1911,7 @@ class Terminal{
 					result.key="\x1b[A";
 				}
 				break;
-			case 1073741905:
+			case SDLK_DOWN:
 				// down-arrow
 				if (modifiers) {
 					result.key=FormatAsText("\x1b[1;", modifiers + 1, 'B');
@@ -4047,6 +4136,7 @@ class Terminal{
 		proto.ExportProperty(this,"writable")
 		proto.ExportProperty(this,"last_ssh_command")
 		proto.ExportProperty(this,"is_in_alternate_buffer")
+		proto.ExportProperty(this,"enable_quick_edit")
 		proto.ExportMethod(this,"destroy",JS_destroy)
 		proto.ExportMethod(this,"write",JS_write)
 		proto.ExportMethod(this,"send",JS_send)
@@ -4061,6 +4151,7 @@ class Terminal{
 	x_rendered=0.f
 	y_rendered=0.f
 	selecting=0
+	mouse_selecting=0
 	sel_x0=0
 	sel_y0=0
 	sel_x1=0
@@ -4403,7 +4494,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					x_cur+=adv_tot
 				////////////////////
 				//render the cursor
-				if !term.cursorHidden&&term.has_focus:
+				if !term.cursorHidden&&term.has_focus&&!term.selecting:
 					wnd_obj=JS_UI["context_window"].as(JSObject)
 					fg=(term.curAttr >> 9) & 0x1ff;
 					JS_UI.CallMethod(int,"SetCaret",wnd_obj,
@@ -4576,6 +4667,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				else
 					//drag
 					term.selecting=1
+					term.mouse_selecting=1
 					term.sel_x0=xi
 					term.sel_y0=yi_global
 					term.sel_x1=xi
@@ -4592,7 +4684,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			return 0
 		}
 		js_term["OnMouseMove"]=function(JSContext JS){
-			if term.selecting==1:
+			if term.selecting==1&&term.mouse_selecting:
 				(xi,yi_global)=MouseToTermPos(JS)
 				term.sel_x1=xi
 				term.sel_y1=yi_global
@@ -4600,13 +4692,14 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			return 0
 		}
 		js_term["OnMouseUp"]=function(JSContext JS){
-			if term.selecting==1:
+			if term.mouse_selecting:
 				(xi,yi_global)=MouseToTermPos(JS)
 				term.sel_x1=xi
 				term.sel_y1=yi_global
 				term.selecting=2
 				if term.sel_x0==term.sel_x1&&term.sel_y0==term.sel_y1:
 					term.selecting=0
+				term.mouse_selecting=0
 				js_this=JS.GetThis()
 				JS_UI.CallMethod(int,"ReleaseMouse",js_this)
 				JS_UI.CallMethod(int,"Refresh")
@@ -4676,6 +4769,12 @@ KMOD_SHIFT=(KMOD_LSHIFT|KMOD_RSHIFT)
 KMOD_ALT=(KMOD_LALT|KMOD_RALT)
 KMOD_GUI=(KMOD_LGUI|KMOD_RGUI)
 KMOD_WIN=KMOD_GUI
+SDLK_DOWN=1073741905
+SDLK_UP=1073741906
+SDLK_LEFT=1073741904
+SDLK_RIGHT=1073741903
+SDLK_HOME=1073741898
+SDLK_END=1073741901
 
 String_fromCharCode=inline(a){
 	auto ret=new string

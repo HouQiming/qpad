@@ -1822,6 +1822,7 @@ W.Terminal=function(id,attrs){
 		UI.PopCliprect();
 	}
 	//a terminal menu - standard scripts, "first command" history
+	obj.m_term.enable_quick_edit=(!obj.m_term.is_in_alternate_buffer&&UI.TestOption('terminal_hotkeys'));
 	if(obj.activated||UI.HasFocus(obj)){
 		var menu_terminal=undefined;
 		menu_terminal=UI.BigMenu("Ter&minal");
@@ -1837,7 +1838,7 @@ W.Terminal=function(id,attrs){
 				obj.m_term.send(s_script);
 				UI.Refresh()
 			}})
-		if(!obj.m_term.is_in_alternate_buffer&&UI.TestOption('terminal_hotkeys')){
+		if(obj.m_term.enable_quick_edit){
 			//console.log('do menu ',id,obj.m_term.is_in_alternate_buffer,Math.random())
 			menu_terminal.AddNormalItem({text:"&Paste",icon:"粘",context_menu_group:"edit",enable_hotkey:1,key:"CTRL+V",action:function(){
 				//console.log('call Paste')
