@@ -1054,9 +1054,6 @@ var RenderLayout=function(layout,obj,y_base){
 						for(var i=0;i<tab.backup_regions.length;i++){
 							W.RestoreRegion(tab.backup_regions[i])
 						}
-						if(tab.SetPersistentHotkeys){
-							tab.SetPersistentHotkeys();
-						}
 						if(!bk_focus_is_a_region&&UI.context_focus_is_a_region&&obj.current_tab_id!=tab.__global_tab_id&&UI.nd_focus){
 							obj.just_created_a_tab=0;
 							obj.current_tab_id=tab.__global_tab_id;
@@ -1086,9 +1083,6 @@ var RenderLayout=function(layout,obj,y_base){
 							var bk_focus_is_a_region=UI.context_focus_is_a_region;
 							var bk_tentative_focus=UI.context_tentative_focus;
 							tab.body.call(tab)
-							if(tab.SetPersistentHotkeys){
-								tab.SetPersistentHotkeys();
-							}
 							if(!bk_focus_is_a_region&&UI.context_focus_is_a_region&&obj.current_tab_id!=tab.__global_tab_id&&UI.nd_focus){
 								obj.just_created_a_tab=0;
 								obj.current_tab_id=tab.__global_tab_id;
@@ -1264,7 +1258,11 @@ W.TabbedDocument=function(id,attrs){
 	SortTabsByArea(layout,obj);
 	UI.Begin(obj)
 		for(var i=0;i<items.length;i++){
-			items[i].__global_tab_id=i;
+			var tab_i=items[i]
+			tab_i.__global_tab_id=i;
+			if(tab_i.SetPersistentHotkeys){
+				tab_i.SetPersistentHotkeys();
+			}
 		}
 		var tabid=(obj.current_tab_id||0);
 		var n=items.length

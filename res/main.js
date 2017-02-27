@@ -806,6 +806,8 @@ UI.Application=function(id,attrs){
 			//	})
 			//}else{
 			UI.m_invalid_util_tabs=[];
+			UI.m_frontmost_notebook=UI.GetFrontMostNotebookTab();
+			UI.m_frontmost_notebook=(UI.m_frontmost_notebook&&UI.m_frontmost_notebook.main_widget);
 			//UI.TimingEvent("before W.TabbedDocument")
 			W.TabbedDocument("document_area",{
 				'anchor':'parent','anchor_align':"left",'anchor_valign':"fill",
@@ -960,6 +962,10 @@ UI.Application=function(id,attrs){
 			UI.debugDumpFragmentation()
 		}});
 	}
+	//console.log('========');
+	//for(var i=0;i<UI.context_hotkeys.length;i++){
+	//	console.log(UI.context_hotkeys[i].key);
+	//}
 	if(UI.m_need_metadata_save){
 		UI.ReallySaveMetaData();
 		UI.m_need_metadata_save=0;

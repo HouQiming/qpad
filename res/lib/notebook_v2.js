@@ -476,6 +476,19 @@ var ClearCompilerError=function(err){
 	err.is_removed=1;
 }
 
+UI.GetFrontMostNotebookTab=function(){
+	var tab_frontmost=undefined;
+	for(var i=0;i<UI.g_all_document_windows.length;i++){
+		var item_i=UI.g_all_document_windows[i];
+		if(item_i.document_type!=='notebook'){continue;}
+		if(!tab_frontmost||(tab_frontmost.z_order||0)<(item_i.z_order||0)){
+			tab_frontmost=item_i;
+		}
+		item_i.__global_tab_id=i;
+	}
+	return tab_frontmost;
+};
+
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 var g_v2_separator='\n=====\uDBFF\uDFFF=====\n',g_v2_separator_re=new RegExp(g_v2_separator,'g');
 W.notebook_prototype={
@@ -1144,6 +1157,7 @@ W.notebook_prototype={
 		this.cell_list=undefined;
 	},
 	SetPersistentHotkeys:function(){
+		if(this!==UI.m_frontmost_notebook&&!this.activated){return;}
 		if(!this.m_cells){return;}
 		for(var i=0;i<this.m_cells.length;i++){
 			var cell_i=this.m_cells[i];
@@ -1179,6 +1193,8 @@ W.NotebookView=function(id,attrs){
 	}
 	var buttons=[];
 	if(obj.m_cells){
+		var has_hotkeys=1;
+		if(obj!==UI.m_frontmost_notebook&&!obj.activated){has_hotkeys=0;}
 		for(var i=0;i<obj.m_cells.length;i++){
 			var cell_i=obj.m_cells[i];
 			var s_btn_name=(cell_i.m_button_name||"\u2022 untitled")
@@ -1213,7 +1229,7 @@ W.NotebookView=function(id,attrs){
 				m_cell_id:i,
 				text:s_btn_name,
 				hotkey:cell_i.m_hotkey,
-				text_hotkey:cell_i.m_hotkey&&UI.LocalizeKeyName(UI.TranslateHotkey(cell_i.m_hotkey))||cell_i.m_project_hotkey&&UI.LocalizeKeyName(UI.TranslateHotkey(cell_i.m_project_hotkey)),
+				text_hotkey:has_hotkeys&&(cell_i.m_hotkey&&UI.LocalizeKeyName(UI.TranslateHotkey(cell_i.m_hotkey))||cell_i.m_project_hotkey&&UI.LocalizeKeyName(UI.TranslateHotkey(cell_i.m_project_hotkey))),
 				h:obj.panel_style.h_button,
 				progress:progress,
 				progress_mode:progress_mode,
@@ -1806,7 +1822,7 @@ W.Terminal=function(id,attrs){
 		UI.PopCliprect();
 	}
 	//a terminal menu - standard scripts, "first command" history
-	if(obj.activated){
+	if(obj.activated||UI.HasFocus(obj)){
 		var menu_terminal=undefined;
 		menu_terminal=UI.BigMenu("Ter&minal");
 		menu_terminal.AddNormalItem({
@@ -1821,6 +1837,16 @@ W.Terminal=function(id,attrs){
 				obj.m_term.send(s_script);
 				UI.Refresh()
 			}})
+		if(!obj.m_term.is_in_alternate_buffer&&UI.TestOption('terminal_hotkeys')){
+			//console.log('do menu ',id,obj.m_term.is_in_alternate_buffer,Math.random())
+			menu_terminal.AddNormalItem({text:"&Paste",icon:"粘",context_menu_group:"edit",enable_hotkey:1,key:"CTRL+V",action:function(){
+				//console.log('call Paste')
+				if(UI.SDL_HasClipboardText()){
+					obj.m_term.paste();
+				}
+				UI.Refresh();
+			}.bind(this)})
+		}
 		var s_ssh_command=(obj.ssh_command||obj.m_term.last_ssh_command);
 		if(s_ssh_command&&UI.DetectMSYSTools()){
 			menu_terminal.AddNormalItem({
@@ -1881,9 +1907,11 @@ UI.OpenTerminalTab=function(options){
 				'ssh_command':options.ssh_command,
 				'activated':this==UI.top.app.document_area.active_tab,
 				'default_focus':1,
+				//'will_get_focus':!had_body,
 			});
 			if(!had_body){
 				UI.SetFocus(body);
+				//UI.InvalidateCurrentFrame();
 			}
 			if(body.terminated&&options.auto_close){
 				UI.m_invalid_util_tabs.push(this.__global_tab_id);
@@ -1917,6 +1945,7 @@ UI.OpenTerminalTab=function(options){
 			return 1;
 		},
 		NeedRendering:function(){
+			if(this==UI.top.app.document_area.active_tab){return 1;}
 			if(this.main_widget){
 				return this.main_widget.NeedUpdate();
 			}else{

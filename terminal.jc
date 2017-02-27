@@ -1606,6 +1606,19 @@ class Terminal{
 		this.selecting=0
 	}
 	
+	paste=function(){
+		s=SDL.detail.SDL_GetClipboardText()
+		if s:
+			lg=System.OS_API.strlen(s)
+			text=new string
+			text.BindToPointer(s,lg)
+			if Platform.IS_WINDOWS:
+				text=text.Replace(["\r",""])
+			this.onTextInput(text)
+			text.discard()
+			SDL.detail.SDL_free(s)
+	}
+	
 	/**
 	* Handle a keydown event
 	* Key Resources:
@@ -1963,6 +1976,7 @@ class Terminal{
 				// a-z and space
 				if (ctrlKey && !shiftKey && !altKey && !metaKey) {
 					if (keyCode >= 97 && keyCode <= 122) {
+						//Writeln('term ctrl+',char(keyCode))
 						result.key=String_fromCharCode(keyCode - 96);
 					} else if (keyCode == 32) {
 						// NUL
@@ -4018,6 +4032,10 @@ class Terminal{
 		tick_now=System.Time.tick64()
 		return JS.Return(System.Time.TicksToSeconds(max(this.bell_tick-tick_now,0LL))/VISUAL_BELL_DURATION)
 	}
+	JS_Paste=function(JSContext JS){
+		this.paste()
+		return 0
+	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"cols")
 		proto.ExportProperty(this,"rows")
@@ -4036,6 +4054,7 @@ class Terminal{
 		proto.ExportMethod(this,"setRemoteLoadingCallback",JS_setRemoteLoadingCallback)
 		proto.ExportMethod(this,"setRemoteSavingCallback",JS_setRemoteSavingCallback)
 		proto.ExportMethod(this,"isInBell",JS_isInBell)
+		proto.ExportMethod(this,"paste",JS_Paste)
 	}
 	
 	/////////////
@@ -4184,7 +4203,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					if DEBUG_DUMP:
 						Writeln(s.Replace(["\r","\\r","\e","\\e"]))
 					term.write(s)
-					if !term.is_remote_editing&&term.x>=2&&term.x<term.cols:
+					if !term.is_remote_editing&&term.x>=2&&term.x<term.cols&&term.lines:
 						//detect bash prompt
 						auto row=(term.ybase+term.y)%term.scrollback
 						auto addr=(row*term.cols+term.x)*3;
@@ -4568,16 +4587,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 				if term.selecting:
 					term.confirmCopy(JS)
 				else
-					s=SDL.detail.SDL_GetClipboardText()
-					if s:
-						lg=System.OS_API.strlen(s)
-						text=new string
-						text.BindToPointer(s,lg)
-						if Platform.IS_WINDOWS:
-							text=text.Replace(["\r",""])
-						term.onTextInput(text)
-						text.discard()
-						SDL.detail.SDL_free(s)
+					term.paste()
 			JS_UI.CallMethod(int,"Refresh")
 			return 0
 		}
