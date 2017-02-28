@@ -157,47 +157,69 @@ UI.CustomTheme=function(){
 		check_button:{
 			transition_dt:0.1,
 			round:0,border_width:2,padding:12,
-			icon_color:L?0xff444444:0xffffffff,
-			text_color:L?0xff444444:0xffffffff,
+			//icon_color:L?0xff444444:0xffffffff,
+			//text_color:L?0xffaaaaaa:0xff777777,
+			text_color:L?0x7f444444:0x7fffffff,
 			$:(L?{//light
 				out:{
 					border_color:C&0x00ffffff,color:0x00ffffff,
+					text_color:L?0x7f444444:0x7fffffff,
 				},
 				over:{
 					border_color:C,color:0x00ffffff,
+					text_color:L?0x7f444444:0x7fffffff,
 				},
 				down:{
 					border_color:C_dark,color:0x00ffffff,
+					text_color:L?0x7f444444:0x7fffffff,
 				},
 				////////////////////
 				checked_out:{
-					border_color:C&0x00ffffff,color:C_sel,
+					border_color:C&0x00ffffff,color:0x00ffffff,
+					text_color:L?0xff444444:0xffffffff,
 				},
 				checked_over:{
-					border_color:C,color:C_sel,
+					border_color:C,color:0x00ffffff,
+					text_color:L?0xff444444:0xffffffff,
 				},
 				checked_down:{
-					border_color:C_dark,color:C_sel,
+					border_color:C_dark,color:0x00ffffff,
+					text_color:L?0xff444444:0xffffffff,
 				},
+				//checked_out:{
+				//	border_color:C&0x00ffffff,color:C_sel,
+				//},
+				//checked_over:{
+				//	border_color:C,color:C_sel,
+				//},
+				//checked_down:{
+				//	border_color:C_dark,color:C_sel,
+				//},
 			}:{//dark
 				out:{
 					border_color:0x00e8e8e8,color:C&0x00ffffff,
+					text_color:L?0x7f444444:0x7fffffff,
 				},
 				over:{
 					border_color:0xffe8e8e8,color:C&0x00ffffff,
+					text_color:L?0x7f444444:0x7fffffff,
 				},
 				down:{
 					border_color:0xffcccccc,color:C&0x00ffffff,
+					text_color:L?0x7f444444:0x7fffffff,
 				},
 				////////////////////
 				checked_out:{
-					border_color:0x00e8e8e8,color:C_raw,
+					border_color:0x00e8e8e8,color:C&0x00ffffff,
+					text_color:L?0xff444444:0xffffffff,
 				},
 				checked_over:{
-					border_color:0xffe8e8e8,color:C_raw,
+					border_color:0xffe8e8e8,color:C&0x00ffffff,
+					text_color:L?0xff444444:0xffffffff,
 				},
 				checked_down:{
-					border_color:0xffcccccc,color:C_raw,
+					border_color:0xffcccccc,color:C&0x00ffffff,
+					text_color:L?0xff444444:0xffffffff,
 				},
 			})
 		},
@@ -783,6 +805,21 @@ UI.CustomTheme=function(){
 				shadow_color:C_shadow,
 				bell_color:L?0xff1c1aa3:0xff5555ff,
 				bell_border_width:4,
+				/////////////////
+				transition_dt:0.1,
+				find_bar_padding:4,
+				find_bar_bgcolor:L?0xaae8e8e8:0xaa333333,
+				find_bar_border:L?0xffe8e8e8:0xff333333,
+				find_bar_blur:4,
+				find_bar_hint_color:L?0x7f000000:0x7fe8e8e8,
+				find_bar_button_size_scale:1.1,
+				find_bar_editor_style:{
+					color:L?0xff000000:0xffe8e8e8,
+					bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
+					caret_width:UI.IS_MOBILE?1:2,
+					caret_color:L?0xff000000:0xffe8e8e8,
+					caret_flicker:500,
+				},
 			},
 		},
 		tip_window:{

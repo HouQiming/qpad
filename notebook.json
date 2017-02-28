@@ -106,8 +106,7 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-console output filtering
-	just a search bar with prev / next
+(test) bug: don't open *remote as binary
 check/uncheck boxes in a sticker wall... or md in general
 	could use that specific unicode char
 	\u2610

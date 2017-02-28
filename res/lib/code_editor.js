@@ -610,7 +610,9 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(!this.ed){return;}
 		if(!this.m_file_name){return;}
 		this.ed.m_file_index=UI.ED_ForceReparse(this);
+		//console.log('ED_ForceReparse',this.m_file_name,!!this.ed.m_file_index);
 		this.m_diff_from_parse=this.ed.CreateDiffTracker();
+		CallParseMore()
 	},
 	ParseFile:function(){
 		if(this.m_is_preview){return;}
@@ -5588,6 +5590,7 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,tooltips,fprev,fall,fnext
 UI.ED_GetFileLanguage=function(fn){
 	var s_ext=UI.GetFileNameExtension(fn)
 	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
+	if(fn=="*remote"){loaded_metadata={};}
 	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
 	return Language.GetDescObjectByName(language_id)
 }
@@ -6332,7 +6335,7 @@ W.CodeEditor=function(id,attrs){
 				is_preview:1,file_name:obj.file_name,
 			})
 		}else{
-			if(obj.show_find_bar&&doc&&doc.notebook_owner){
+			if(obj.show_find_bar&&doc&&(doc.notebook_owner||doc.m_sticker_wall_owner)){
 				obj.show_find_bar&=~UI.SEARCH_FLAG_GLOBAL;
 			}
 			if(obj.show_find_bar){
@@ -6859,7 +6862,35 @@ W.CodeEditor=function(id,attrs){
 						}})
 					W.Hotkey("",{key:"ALT+E",action:function(){btn_regexp.OnClick();}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
-					var btn_fold=W.Button("find_button_fold",{style:UI.default_styles.check_button,
+					var btn_code=W.Button("find_button_code",{style:UI.default_styles.check_button,
+						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
+						font:UI.icon_font,text:"プ",tooltip:UI._("Code only - ALT+D"),
+						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_CODE_ONLY?1:0),
+						OnChange:function(value){
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_CODE_ONLY)|(value?UI.SEARCH_FLAG_CODE_ONLY:0)
+							obj.DestroyReplacingContext();
+							var ctx=obj.m_current_find_context;
+							if(ctx){ctx.RestoreSel();}
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
+							UI.Refresh()
+						}})
+					W.Hotkey("",{key:"ALT+D",action:function(){btn_code.OnClick()}})
+					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+					var btn_hidden=W.Button("find_button_hidden",{style:UI.default_styles.check_button,
+						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
+						font:UI.icon_font,text:"藏",tooltip:UI._("Search hidden text - ALT+T"),
+						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_HIDDEN?1:0),
+						OnChange:function(value){
+							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_HIDDEN)|(value?UI.SEARCH_FLAG_HIDDEN:0)
+							obj.DestroyReplacingContext();
+							var ctx=obj.m_current_find_context;
+							if(ctx){ctx.RestoreSel();}
+							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
+							UI.Refresh()
+						}})
+					W.Hotkey("",{key:"ALT+T",action:function(){btn_hidden.OnClick()}})
+					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
+					var btn_fold=W.Button("find_button_fold",{style:UI.default_styles.check_button,value:1,
 						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
 						font:UI.icon_font,text:"叠",tooltip:UI._("Convert to wildcard - ALT+LEFT"),
 						OnClick:function(value){
@@ -6910,36 +6941,8 @@ W.CodeEditor=function(id,attrs){
 						}})
 					W.Hotkey("",{key:"ALT+LEFT",action:function(){btn_fold.OnClick()}})
 					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
-					var btn_code=W.Button("find_button_code",{style:UI.default_styles.check_button,
-						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"プ",tooltip:UI._("Code only - ALT+D"),
-						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_CODE_ONLY?1:0),
-						OnChange:function(value){
-							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_CODE_ONLY)|(value?UI.SEARCH_FLAG_CODE_ONLY:0)
-							obj.DestroyReplacingContext();
-							var ctx=obj.m_current_find_context;
-							if(ctx){ctx.RestoreSel();}
-							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
-							UI.Refresh()
-						}})
-					W.Hotkey("",{key:"ALT+D",action:function(){btn_code.OnClick()}})
-					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
-					var btn_hidden=W.Button("find_button_hidden",{style:UI.default_styles.check_button,
-						x:x_button_right,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5,w:obj.find_bar_button_size,h:obj.find_bar_button_size,
-						font:UI.icon_font,text:"藏",tooltip:UI._("Search hidden text - ALT+T"),
-						value:(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_HIDDEN?1:0),
-						OnChange:function(value){
-							UI.m_ui_metadata["<find_state>"].m_find_flags=(UI.m_ui_metadata["<find_state>"].m_find_flags&~UI.SEARCH_FLAG_HIDDEN)|(value?UI.SEARCH_FLAG_HIDDEN:0)
-							obj.DestroyReplacingContext();
-							var ctx=obj.m_current_find_context;
-							if(ctx){ctx.RestoreSel();}
-							obj.ResetFindingContext(obj.find_bar_edit.ed.GetText(),UI.m_ui_metadata["<find_state>"].m_find_flags)
-							UI.Refresh()
-						}})
-					W.Hotkey("",{key:"ALT+T",action:function(){btn_hidden.OnClick()}})
-					x_button_right+=obj.find_bar_padding+obj.find_bar_button_size;
 				}
-				W.Button("find_button_close",{style:UI.default_styles.check_button,
+				W.Button("find_button_close",{style:UI.default_styles.check_button,value:1,
 					x:x_button_right+2,y:rect_bar.y+(rect_bar.h-obj.find_bar_button_size)*0.5+2,w:obj.find_bar_button_size-4,h:obj.find_bar_button_size-4,
 					font:UI.icon_font_20,text:"✕",tooltip:UI._("Close - ESC"),
 					OnClick:function(){

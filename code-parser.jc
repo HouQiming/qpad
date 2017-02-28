@@ -3070,10 +3070,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		g_c_like_parse_queue.push(getid(fn))
 		return 0
 	}
-	ParseOneFile=inline(JS,fn,timestamp,getData){
+	ParseOneFile=inline(JS,fn,options,timestamp,getData){
 		auto idfn=getid(fn)
 		//n0_parsemore=g_c_like_parse_queue.n
-		options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
 		//n1_parsemore=g_c_like_parse_queue.n
 		sparser=options["parser"].or("text")
 		if sparser=="none":
@@ -3112,11 +3111,18 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		fidx=doc["ed"]["m_file_index"].as(CFileIndex)
 		ed=doc["ed"].as(CEditableText)
 		fn=doc["m_file_name"].as(string)
-		timestamp=0uLL
-		foreach fnx,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
-			timestamp=fi.latest_time()
-			break
-		ret=ParseOneFile(JS,fn,timestamp,inline(fn){
+		if fn=="*remote":
+			fn=(fn+doc["m_fn_remote"].or(""))
+			timestamp=1uLL
+		else
+			timestamp=0uLL
+			foreach fnx,fi in System.IO.EnumFiles(fn,System.IO.ENUM_FILE)
+				timestamp=fi.latest_time()
+				break
+		options=doc["plugin_language_desc"].as(JSObject)
+		if !options:
+			options=JS.New()
+		ret=ParseOneFile(JS,fn,options,timestamp,inline(fn){
 			return ed.GetText(0LL,ed.GetTextSize())
 		})
 		return JS.Return(ret)
@@ -3137,7 +3143,8 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				jsret["file_index"]=prev_kdf.fidx
 				return JS.Return(jsret)
 			//call JS to get the language desc
-			ret=ParseOneFile(JS,fn,timestamp,inline(fn){
+			options=JS.GetGlobal()["UI"].CallMethod(JSObject,"ED_ParseMore_callback",fn)
+			ret=ParseOneFile(JS,fn,options,timestamp,inline(fn){
 				if fn.n&&fn[0]=='*':
 					sdata=sbox.UIReadAll(fn[1:])
 				else

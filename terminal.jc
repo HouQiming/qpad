@@ -3,6 +3,7 @@ import "gui2d.jc"
 import "s-d-l.jc"
 import "javascript.jc"
 import "pipe-waiter.jc"
+import "code-editor.jc"
 import System.Algorithm.*
 import System.Math.*
 import System.Console.*
@@ -53,6 +54,9 @@ auto VISUAL_BELL_DURATION=0.5
 false=0
 true=1
 MAX_PARSABLE_LINE=1024
+SEARCH_FLAG_CASE_SENSITIVE=1
+SEARCH_FLAG_WHOLE_WORD=2
+SEARCH_FLAG_REGEXP=4
 class Terminal{
 	//self.cancel=Terminal.cancel;
 	colors= g_colors
@@ -1656,10 +1660,10 @@ class Terminal{
 				return 1
 			if shiftKey&&(keyCode==SDLK_DOWN||keyCode==SDLK_UP||keyCode==SDLK_LEFT||keyCode==SDLK_RIGHT||keyCode==SDLK_HOME||keyCode==SDLK_END):
 				if !this.selecting:
-					this.sel_x0=this.x
-					this.sel_y0=this.y
 					this.sel_x1=this.x
-					this.sel_y1=this.y
+					this.sel_y1=(this.ybase+this.y)%this.scrollback
+					this.sel_x0=this.sel_x1
+					this.sel_y0=this.sel_y1
 				this.selecting=2
 				switch keyCode{
 				case SDLK_UP:
@@ -1720,11 +1724,17 @@ class Terminal{
 						this.sel_x1=0
 					break
 				case SDLK_END:
+					pchar_line=this.sel_y1*this.cols
+					cols_end=this.sel_x1
+					for j=cols_end:this.cols-1
+						addr=(pchar_line+j)*3
+						if uptr(addr)<uptr(this.lines.n)&&this.lines[addr+2]:
+							cols_end=j+1
 					if altKey||ctrlKey:
-						this.sel_x1=this.cols
+						this.sel_x1=cols_end
 						this.sel_y1=ybottom
 					else
-						this.sel_x1=this.cols
+						this.sel_x1=cols_end
 					break
 				}
 				return 1
@@ -4121,9 +4131,165 @@ class Terminal{
 		tick_now=System.Time.tick64()
 		return JS.Return(System.Time.TicksToSeconds(max(this.bell_tick-tick_now,0LL))/VISUAL_BELL_DURATION)
 	}
+	JS_ringBell=function(JSContext JS){
+		bell()
+		return 0
+	}
 	JS_Paste=function(JSContext JS){
 		this.paste()
 		return 0
+	}
+	JS_findNext=function(JSContext JS){
+		auto dir=JS.Param(0).as(int)
+		auto sfind=JS.Param(1).as(string)
+		auto find_flags=JS.Param(2).as(int)
+		auto ytop=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
+		auto ybottom=(this.ybase+this.rows-1)%this.scrollback;
+		auto x=this.sel_x1
+		auto y=this.sel_y1
+		if !this.selecting:
+			x=this.x
+			y=(this.ybase+this.y)%this.scrollback
+		auto addr=(y*this.cols+x)*3
+		auto utf8_buf=new int[4]
+		auto p_utf8_buf=0
+		auto x0=x
+		auto y0=y;
+		nextCell=inline(){
+			if dir<0:
+				if x>0:
+					x--
+					addr-=3
+				else if y!=ytop:
+					y--
+					if y<0:y+=this.scrollback
+					x=this.cols-1
+					addr=(y*this.cols+x)*3
+				else
+					addr=-1
+			else
+				if x<this.cols-1:
+					x++
+					addr+=3
+				else if y!=ybottom:
+					y++
+					if y>=this.scrollback:y=0
+					x=0
+					addr=(y*this.cols+x)*3
+				else
+					addr=-1
+		}
+		nextChar=inline(){
+			if !p_utf8_buf:
+				auto chi=-1
+				for(;;)
+					if dir>0:
+						if addr<0||addr>=this.lines.n:
+							addr=-1
+							chi=0
+							break
+						if this.lines[addr+2]:
+							chi=this.lines[addr+1]
+					nextCell()
+					if dir<0:
+						if addr<0:
+							chi=0
+							break
+						if this.lines[addr+2]:
+							chi=this.lines[addr+1]
+							break
+					else
+						if chi>=0:
+							break
+				if chi<128:
+					utf8_buf[0]=char(chi)
+					p_utf8_buf=1
+				else if chi>=128:
+					utf8_buf[1]=(char((chi>>6)+0xc0))
+					utf8_buf[0]=(char(0x80+(chi&63)))
+					p_utf8_buf=2
+				else if chi>=2048:
+					utf8_buf[2]=(char(((chi>>12)&0xf)+0xe0))
+					utf8_buf[1]=(char(0x80+((chi>>6)&63)))
+					utf8_buf[0]=(char(0x80+(chi&63)))
+					p_utf8_buf=3
+				else
+					utf8_buf[3]=(char(((chi>>18)&0xf)+0xf0))
+					utf8_buf[2]=(char(0x80+((chi>>12)&63)))
+					utf8_buf[1]=(char(0x80+((chi>>6)&63)))
+					utf8_buf[0]=(char(0x80+(chi&63)))
+					p_utf8_buf=4
+			return utf8_buf[--p_utf8_buf]
+		}
+		if find_flags&SEARCH_FLAG_REGEXP:
+			assert(0)
+		else
+			if dir<0:
+				sfind=[ch for ch in sfind.ReverseOrder()]
+			if find_flags&SEARCH_FLAG_CASE_SENSITIVE:
+				sfind2=sfind
+			else
+				sfind2=sfind.ToLower()
+				sfind=sfind.ToUpper()
+			auto lg=sfind.n
+			fnext=CodeEditor.KmpBuildTable(sfind,find_flags&SEARCH_FLAG_CASE_SENSITIVE)
+			auto w=0
+			for(;;)
+				if addr<0&&!p_utf8_buf:
+					return 0
+				ch=nextChar()
+				for(;;)
+					if ch==sfind[w]:break
+					if ch==sfind2[w]:break
+					w=fnext[w]
+					if w<0:break
+				w++
+				if !w:
+					x0=x
+					y0=y
+				if w>=lg:
+					//got match
+					if find_flags&SEARCH_FLAG_WHOLE_WORD:
+						auto x_bk=x
+						auto y_bk=y
+						auto addr_bk=addr
+						auto dir_bk=dir
+						if TextBox.isWordChar(nextChar()):
+							x=x_bk
+							y=y_bk
+							addr=addr_bk
+							dir=dir_bk
+							w=0
+							continue
+						x=x0
+						y=y0
+						addr=(y*this.cols+x)*3
+						dir=-dir
+						if TextBox.isWordChar(nextChar()):
+							x=x_bk
+							y=y_bk
+							addr=addr_bk
+							dir=dir_bk
+							w=0
+							continue
+						x=x_bk
+						y=y_bk
+						addr=addr_bk
+						dir=dir_bk
+					this.selecting=2
+					this.sel_x0=x0
+					this.sel_y0=y0
+					this.sel_x1=x
+					this.sel_y1=y
+					break
+		auto y_normalized=(this.sel_y1-ytop+this.scrollback)%this.scrollback
+		auto ydisp_normalized=(this.ydisp-ytop+this.scrollback)%this.scrollback
+		auto ygoal_min=max(y_normalized-(this.rows-1),0)
+		auto ygoal_max=y_normalized
+		if ydisp_normalized<ygoal_min||ydisp_normalized>ygoal_max:
+			ydisp_normalized=((ygoal_min+ygoal_max)>>1)
+		this.ydisp=(ydisp_normalized+ytop)%this.scrollback
+		return JS.Return(1)
 	}
 	__JS_prototype=function(JSObject proto){
 		proto.ExportProperty(this,"cols")
@@ -4144,7 +4310,9 @@ class Terminal{
 		proto.ExportMethod(this,"setRemoteLoadingCallback",JS_setRemoteLoadingCallback)
 		proto.ExportMethod(this,"setRemoteSavingCallback",JS_setRemoteSavingCallback)
 		proto.ExportMethod(this,"isInBell",JS_isInBell)
+		proto.ExportMethod(this,"ringBell",JS_ringBell)
 		proto.ExportMethod(this,"paste",JS_Paste)
+		proto.ExportMethod(this,"findNext",JS_findNext)
 	}
 	
 	/////////////
@@ -4478,7 +4646,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 						}
 			////////////////////
 			//render the IME composing text
-			y_cur_term=term.y+(term.ybase-term.ydisp+term.scrollback)%term.scrollback
+			y_cur_term=(term.y+term.ybase-term.ydisp+term.scrollback)%term.scrollback
 			if y_cur_term<term.rows&&y_cur_term>=0:
 				x_cur=x+float(term.x)*w_char
 				y_cur=y+float(y_cur_term)*h_char
@@ -4492,14 +4660,26 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 						g_renderer.DrawChar(fnt_scaled,x_cur+adv_tot,y_cur,colors[fg]&0x7fffffff,ch)
 						adv_tot+=dx
 					x_cur+=adv_tot
+			if term.selecting:
+				y_cur_term=(term.sel_y1-term.ydisp+term.scrollback)%term.scrollback
+			if y_cur_term<term.rows&&y_cur_term>=0:
 				////////////////////
 				//render the cursor
-				if !term.cursorHidden&&term.has_focus&&!term.selecting:
-					wnd_obj=JS_UI["context_window"].as(JSObject)
-					fg=(term.curAttr >> 9) & 0x1ff;
-					JS_UI.CallMethod(int,"SetCaret",wnd_obj,
-						x_cur,y_cur+y_underline-h_char*0.1,
-						w_char,h_char*0.2,colors[fg],500)
+				if !term.cursorHidden&&term.has_focus:
+					if term.selecting:
+						x_cur=x+float(term.sel_x1)*w_char
+						y_cur=y+float(y_cur_term)*h_char
+						wnd_obj=JS_UI["context_window"].as(JSObject)
+						fg=(term.curAttr >> 9) & 0x1ff;
+						JS_UI.CallMethod(int,"SetCaret",wnd_obj,
+							x_cur,y_cur,
+							w_char,h_char,colors[fg]&0x7fffffff,500)
+					else
+						wnd_obj=JS_UI["context_window"].as(JSObject)
+						fg=(term.curAttr >> 9) & 0x1ff;
+						JS_UI.CallMethod(int,"SetCaret",wnd_obj,
+							x_cur,y_cur+y_underline-h_char*0.1f,
+							w_char,h_char*0.2f,colors[fg],500)
 			return 0
 		}
 		js_term["OnKeyDown"]=function(JSContext JS){

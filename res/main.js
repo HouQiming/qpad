@@ -428,7 +428,7 @@ UI.g_app_inited=0;
 UI.m_cmdline_opens=[];
 var CreateMenus=function(){
 	var doc_area=UI.top.app.document_area;
-	var enable_ctrl_keys=!(UI.nd_focus&&UI.nd_focus.m_term);
+	var enable_ctrl_keys=!(UI.nd_focus&&UI.nd_focus.m_term&&(UI.nd_focus.m_term.is_in_alternate_buffer||!UI.TestOption('terminal_hotkeys')));
 	var menu_file=UI.BigMenu("&File")
 	menu_file.AddNormalItem({text:"&New",icon:'新',key:"CTRL+N",enable_hotkey:enable_ctrl_keys,action:function(){
 		var active_document=UI.top.app.document_area.active_tab
