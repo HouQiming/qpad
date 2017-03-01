@@ -665,6 +665,7 @@ W.notebook_prototype={
 		doc_in.scroll_x=0;doc_in.scroll_y=0;
 		if(cell_i.m_text_in){doc_in.ed.Edit([0,0,cell_i.m_text_in],1);}
 		doc_in.saved_point=doc_in.ed.GetUndoQueueLength();
+		doc_in.m_is_help_page_preview=cell_i.m_is_help_page_preview;
 		cell_i.m_text_in=doc_in;
 		//////
 		//var doc_out=UI.CreateEmptyCodeEditor();
@@ -934,6 +935,11 @@ W.notebook_prototype={
 			}
 		}
 		this.ClearCellOutput(id)
+		if(cell_i.m_language=="Markdown"){
+			doc.m_is_help_page_preview=!doc.m_is_help_page_preview;
+			UI.Refresh();
+			return 0;
+		}
 		if(cell_i.m_language=="Javascript"){
 			var s_code=cell_i.m_text_in.ed.GetText();
 			if(s_code.indexOf('[text transformation]')>=0){
@@ -1147,6 +1153,7 @@ W.notebook_prototype={
 		doc_in.scroll_x=0;doc_in.scroll_y=0;
 		if(s_text){doc_in.ed.Edit([0,0,s_text],1);}
 		doc_in.saved_point=(need_save?-1:doc_in.ed.GetUndoQueueLength());
+		doc_in.m_is_help_page_preview=cell_i.m_is_help_page_preview;
 		cell_i.m_text_in=doc_in;
 		this.need_save|=65536;
 		UI.SetFocus(doc_in)
@@ -1331,6 +1338,10 @@ W.NotebookView=function(id,attrs){
 		var doc=cur_cell.m_text_in;
 		if(doc){
 			//var h_doc=Math.min(MeasureEditorSize(doc,obj.w),obj.h);
+			if(cur_cell.m_is_help_page_preview!==doc.m_is_help_page_preview){
+				cur_cell.m_is_help_page_preview=doc.m_is_help_page_preview;
+				obj.need_save|=65536;
+			}
 			W.CodeEditor("cell_"+focus_cell_id.toString(),{
 				disable_minimap:1,
 				doc:doc,
@@ -1550,6 +1561,28 @@ UI.BringUpNotebookTab=function(file_name,mode){
 	}
 	return null;
 };
+UI.GetNotebookTabName=function(fn){
+	if(UI.GetFileNameExtension(fn)=='qpad_notebook'){
+		return UI.GetMainFileName(fn);
+	}else{
+		return UI.GetMainFileName(UI.GetPathFromFilename(fn));
+	}
+};
+var g_update_version=undefined;
+UI.GetDefaultNotebookName=function(default_type){
+	if(default_type==2){
+		if(!g_update_version){
+			g_update_version=(IO.ReadAll(IO.GetStoragePath()+"/update_version.txt")||UI.g_core_version);
+		}
+		if(g_update_version==UI.g_core_version){
+			return UI._("Your QPad is up to date - Update");
+		}else{
+			return UI.Format("Version @1 is available - Update", g_update_version);
+		}
+	}else{
+		return UI._("Default Notebook");
+	}
+}
 UI.OpenNoteBookTab=function(file_name,is_quiet){
 	var layout=UI.m_ui_metadata["<layout>"];
 	layout.m_is_maximized=0;
@@ -1558,6 +1591,13 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 	if(obj_ret){return obj_ret;}
 	var spath=UI.GetPathFromFilename(file_name);
 	var is_default=(spath==IO.NormalizeFileName(IO.GetStoragePath()));
+	if(is_default){
+		if(UI.GetMainFileName(file_name)=="update"){
+			is_default=2;
+		}else{
+			is_default=1;
+		}
+	}
 	UI.top.app.quit_on_zero_tab=0;
 	var bk_current_tab_id=undefined;
 	if(is_quiet){
@@ -1566,7 +1606,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 	var ret=UI.NewTab({
 		file_name:file_name,
 		is_default:is_default,
-		title:is_default?UI._("Default Notebook"):UI.Format("@1 - Notebook",UI.GetMainFileName(UI.GetPathFromFilename(file_name)),"Notebook"),
+		title:is_default?UI.GetDefaultNotebookName(is_default):UI.Format("@1 - Notebook",UI.GetNotebookTabName(file_name),"Notebook"),
 		tooltip:file_name,
 		document_type:"notebook",
 		area_name:"v_tools",
@@ -1588,7 +1628,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 		UpdateTitle:function(){
 			if(this.main_widget){
 				var body=this.main_widget;
-				var s_name=this.is_default?UI._("Default Notebook"):UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
+				var s_name=this.is_default?UI.GetDefaultNotebookName(this.is_default):UI.GetNotebookTabName((this.file_name));
 				var is_running=0;
 				var s_progress=undefined;
 				for(var i=0;i<body.m_cells.length;i++){
@@ -1612,7 +1652,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 						this.title=UI.Format("@1 (running)",s_name)+((this.need_save&3)?'*':'');
 					}
 				}else{
-					this.title=(this.is_default?UI._("Default Notebook"):UI.Format("@1 - Notebook",s_name))+((this.need_save&3)?'*':'');
+					this.title=(this.is_default?UI.GetDefaultNotebookName(this.is_default):UI.Format("@1 - Notebook",s_name))+((this.need_save&3)?'*':'');
 				}
 				this.tooltip=this.file_name;
 			}
@@ -1637,7 +1677,7 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 				this.need_save=65536;
 			}
 			this.UpdateTitle();
-			//var s_name=UI.GetMainFileName(UI.GetPathFromFilename(this.file_name));
+			//var s_name=UI.GetNotebookTabName((this.file_name));
 			//var is_running=0;
 			//for(var i=0;i<body.m_cells.length;i++){
 			//	if(body.m_cells[i].m_proc){
@@ -1962,7 +2002,7 @@ W.Terminal=function(id,attrs){
 				}
 				UI.Refresh();
 			}.bind(this)})
-			menu_terminal.AddNormalItem({text:"Find",icon:"s",enable_hotkey:1,key:"CTRL+F",action:function(){
+			menu_terminal.AddNormalItem({text:"Find...",icon:"s",enable_hotkey:1,key:"CTRL+F",action:function(){
 				//console.log('call Paste')
 				obj.m_show_find=1;
 				UI.Refresh();

@@ -95,18 +95,42 @@ v2
    "m_hotkey": "CTRL+ALT+2"
   },
   {
-   "m_language": "Markdown",
+   "m_language": "Unix Shell Script",
    "m_cell_id": 4,
+   "m_button_name": "Update debug",
+   "m_hotkey": "CTRL+ALT+3",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0
+  },
+  {
+   "m_language": "Unix Shell Script",
+   "m_cell_id": 5,
+   "m_button_name": "Make update (dev)",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0
+  },
+  {
+   "m_language": "Markdown",
+   "m_cell_id": 6,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 10
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-(test) bug: don't open *remote as binary
+online update
+	set up a server first
+		github.io + CN mirror
+		multiple distribution channels
+			dev
+			stable
+	tweetnacl credit
+sticker desync
+	CTRL+K?
+regexp search in terminals
 check/uncheck boxes in a sticker wall... or md in general
 	could use that specific unicode char
 	\u2610
@@ -114,13 +138,6 @@ check/uncheck boxes in a sticker wall... or md in general
 		only in notes / stickers
 	markdown - / * completion
 drag failure on gaming machine
-online update
-	could depend on node.js
-sticker desync
-	CTRL+K?
-	it was a 1st-op bad ccnt mapping
-	after a CTRL+SHIFT+G
-		disable those in stickers
 sticker code:
 	shift-sell
 	connecting the same name in different stickers
@@ -237,6 +254,7 @@ rem build script for 'qpad.jc'
 rem [hotkey: CTRL+ALT+1]
 rem [button: Release]
 cd /d c:/tp/qpad
+git diff-index --quiet HEAD || ( echo Please commit your changes first && exit )
 git log --pretty=format:%%H -n 1 > res/misc/commit.txt
 jc -brelease -awin64 qpad.jc
 jc -brelease -awin32 qpad.jc
@@ -263,6 +281,70 @@ grep -ERoh UI\._\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\)\\\) * >> ../build
 grep -ERoh UI\.Format\\\(\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\), * >> ../build/translation.txt
 grep -ERoh tooltip:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
 grep -ERoh ,name:\(\([\"][^\"]+[\"]\)\|\([\'][^\']+[\']\)\) * >> ../build/translation.txt
+
+=====í¯¿í¿¿=====
+#!/bin/sh
+#[interactive]
+#[button: Update debug]
+#[hotkey: CTRL+ALT+3]
+VERSION_CODE=`egrep -m 1 "g_core_version" res/main.js | egrep -o "[0-9][0-9.a-zA-Z]*"`
+VERSION_NOTES=`egrep -m 1 "Version ([0-9.a-zA-Z]+)" build/update.qpad_notebook | egrep -o "[0-9][0-9.a-zA-Z]*"`
+if [ "${VERSION_CODE}" != "${VERSION_NOTES}" ]; then
+	printf "Error: version mismatch\n  VERSION_CODE = ${VERSION_CODE}\n  VERSION_NOTES = ${VERSION_NOTES}\n"
+	exit
+fi
+echo '=== Buiding qpad'
+jc --readable_c_code -awin64 qpad.jc || exit
+UPLOAD_NAME="qpad_${VERSION_CODE}_win64.xz"
+if [ "bin/win64/qpad.exe" -nt "update_server/public/${UPLOAD_NAME}" ]; then
+	echo '=== Compressing package'
+	xz -c bin/win64/qpad.exe > "update_server/public/${UPLOAD_NAME}"
+fi
+MAIN_PACKAGE_HASH=`sha512sum update_server/public/${UPLOAD_NAME} | cut -d ' ' -f 1`
+echo "=== Updating test server"
+cat build/update.qpad_notebook | sed "s/__HASH__/${MAIN_PACKAGE_HASH}/" | gzip > update_signing/u_unsigned.gz
+node update_signing/signit.js update_signing/u_unsigned.gz update_server/public/u_dev
+cp update_server/public/u_dev update_server/public/u_stable
+rsync -rtzzuvq update_server/* a@192.168.111.51:~/update_server/
+ssh -n -f a@192.168.111.51 'killall server.js; cd update_server; chmod +x server.js;nohup ./server.js > /dev/null 2>&1  &'
+rm ~/.qpad_debug/update*
+echo "=== Done"
+
+=====í¯¿í¿¿=====
+#!/bin/sh
+#[interactive]
+#[button: Make update (dev)]
+#####################
+VERSION_CODE=`egrep -m 1 "g_core_version" res/main.js | egrep -o "[0-9][0-9.a-zA-Z]*"`
+VERSION_NOTES=`egrep -m 1 "Version ([0-9.a-zA-Z]+)" build/update.qpad_notebook | egrep -o "[0-9][0-9.a-zA-Z]*"`
+if [ "${VERSION_CODE}" != "${VERSION_NOTES}" ]; then
+	printf "Error: version mismatch\n  VERSION_CODE = ${VERSION_CODE}\n  VERSION_NOTES = ${VERSION_NOTES}\n"
+	exit
+fi
+git diff-index --quiet HEAD
+GIT_RET=$?
+if [ GIT_RET != 0 ]; then
+	printf "Please commit your changes first\n"
+	exit
+fi
+####################
+echo '=== Buiding qpad'
+git log --pretty=format:%%H -n 1 > res/misc/commit.txt
+jc -brelease -awin64 qpad.jc
+UPLOAD_NAME="qpad_${VERSION_CODE}_win64.xz"
+if [ "bin/win64/qpad.exe" -nt "update_server/public/${UPLOAD_NAME}" ]; then
+	echo '=== Compressing package'
+	xz -c bin/win64/qpad.exe > "update_server/public/${UPLOAD_NAME}"
+fi
+MAIN_PACKAGE_HASH=`sha512sum update_server/public/${UPLOAD_NAME} | cut -d ' ' -f 1`
+echo "=== Updating test server"
+cat build/update.qpad_notebook | sed "s/__HASH__/${MAIN_PACKAGE_HASH}/" | gzip > update_signing/u_unsigned.gz
+node update_signing/signit.js update_signing/u_unsigned.gz update_server/public/u_dev
+cp update_server/public/u_dev update_server/public/u_stable
+rsync -rtzzuvq update_server/* a@192.168.111.51:~/update_server/
+ssh -n -f a@192.168.111.51 'killall server.js; cd update_server; chmod +x server.js;nohup ./server.js > /dev/null 2>&1  &'
+rm ~/.qpad_debug/update*
+echo "=== Done"
 
 =====í¯¿í¿¿=====
 Search result

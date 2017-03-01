@@ -116,6 +116,7 @@ if Platform.ARCH=="web":
 	
 
 c_system=__c_function(int,"system","stdlib.h")
+crypto_sign_open=__c_function(int,"crypto_sign_open","tweetnacl/tweetnacl.h","c_files","tweetnacl/tweetnacl.c")
 
 auto genString(string s0)
 	s=new string
@@ -700,6 +701,21 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			cbclose.Call(int)
 		})
 		return JS.Return(new CProcessWrapper(){proc:pproc})
+	}
+	qpad_public_key=sbox.UIReadAll('res/misc/qpad_public.bin').ConvertToAsBinary(u8)
+	jsio["VerifyAndReadUpdateNotes"]=function(JSContext JS){
+		fn=JS.Param(0).or(new string)
+		if !fn:return 0
+		ret0=System.IO.ReadAll(fn)
+		if !ret0||ret0.n<64:return 0
+		ret=ret0.ConvertToAsBinary(u8)
+		ret_opened=new char[ret.n]
+		lg_ret=u64(i64(ret_opened.n))
+		ret_code=crypto_sign_open(ret_opened,&lg_ret,ret,u64(ret.n),qpad_public_key)
+		if ret_code!=0:return 0
+		ret_opened.n=iptr(i64(lg_ret))
+		deflate_data=ret_opened[10:ret_opened.n-8-1].ConvertToAsBinary(char)
+		return JS.Return(Gui2D.detail.inflate(deflate_data))
 	}
 	/////////////
 	Duktape=JS.GetGlobal()["Duktape"].as(JSObject)

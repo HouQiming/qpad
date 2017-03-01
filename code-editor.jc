@@ -4423,6 +4423,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		auto js_styles=JS.Param(1).as(JSObject)
 		auto fsearchImage=JS.Param(2).as(JSObject)
 		auto w_linef=JS.Param(3).as(float)
+		auto is_md_preview=JS.Param(4).as(int)
 		auto STYLE_ID_NORMAL=0
 		auto STYLE_ID_EMPH=1
 		auto STYLE_ID_BOLD=2
@@ -4547,7 +4548,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				is_after_caption=0
 			if sline.StartsWith("#"):
 				if sret.n&&sret.back()!='\n':sret.push('\n')
-				if sret.n<2||sret[sret.n-2]!='\n':sret.push('\n')
+				if sret.n>=2&&sret[sret.n-2]!='\n':sret.push('\n')
 				//heading
 				level=0L
 				for j=1:sline.n-2
@@ -4563,12 +4564,13 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				//	//center it
 				//	sret.PushUnicode(COMMAND_RUBBER_SPACE)
 				sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_HEADINGS+min(int(level)-1,STYLE_ID_N_HEADINGS))
-				for j=1:level-1
-					if j>1L:sret.push('.')
-					SWrite(sret,heading_seq[j])
-				if level>1L:
-					sret.push(' ')
-					sret.push(' ')
+				if !is_md_preview:
+					for j=1:level-1
+						if j>1L:sret.push('.')
+						SWrite(sret,heading_seq[j])
+					if level>1L:
+						sret.push(' ')
+						sret.push(' ')
 				sret.push(sline[(sline[level]==' '?level+1:level):sline.n-2])
 				//if level==1L:
 				//	//center it
@@ -4577,8 +4579,27 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				continue
 			if sline.StartsWith("\t")||sline.StartsWith("    "):
 				//inactive code-like
-				sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_CODE)
-				sret.push(sline)
+				if sret.n&&sret.back()!='\n':sret.push('\n')
+				for i=0:sline.n-1
+					if sline[i]==' ':
+						sret.PushUnicode(0xa0)
+					else if sline[i]=='\t':
+						sret.PushUnicode(0xa0)
+						sret.PushUnicode(0xa0)
+						sret.PushUnicode(0xa0)
+						sret.PushUnicode(0xa0)
+					else
+						sline_content=sline[i:]
+						if sline_content.StartsWith("* ")||sline_content.StartsWith("- ")||sline_content.StartsWith("+ "):
+							sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_LIST)
+							sret.PushUnicode(0x2022)
+							sret.PushUnicode(0x00a0)
+							sret.PushUnicode(COMMAND_INDENT_HERE)
+							FormatNormalText(sline_content[2:],STYLE_ID_LIST)
+						else
+							sret.PushUnicode(COMMAND_SET_STYLE+STYLE_ID_CODE)
+							sret.push(sline_content)
+						break
 				continue
 			if sline.StartsWith("* ")||sline.StartsWith("- ")||sline.StartsWith("+ "):
 				//lists
@@ -4712,7 +4733,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				sret.push('\n')
 				is_after_caption=0
 			else
-				if !sret.n||sret.back()=='\n':
+				if (!sret.n||sret.back()=='\n')&&!is_md_preview:
 					//detect action descriptions - ops
 					//use bgcolor to highlight this line later
 					obj_op=fparseop.Call(JSObject,sline)

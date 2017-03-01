@@ -6308,12 +6308,34 @@ W.CodeEditor=function(id,attrs){
 				right_overlay_drawn=1;
 			}
 		}
-		if(doc&&doc.m_is_help_page_preview){
-			W.HelpPage('help_page',{
+		if(doc&&doc.m_is_help_page_preview==-1&&!UI.HasFocus(doc)){
+			doc.m_is_help_page_preview=1;
+		}
+		if(doc&&(doc.m_is_help_page_preview==1)){
+			var attrs={
 				x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,
 				is_file_view:1,
-				m_file_name:doc.m_file_name
-			});
+				is_md_preview:1,
+				color:obj.bgcolor,
+				OnClick:function(event){
+					doc.m_is_help_page_preview=-1;
+					UI.SetFocus(doc);
+					UI.Refresh();
+				},
+				//m_file_name:doc.m_file_name
+			};
+			if(!obj.help_page){
+				attrs.text=(doc.ed?doc.ed.GetText():"");
+			}
+			W.HelpPage('help_page',attrs);
+			//W.Region('click_to_edit',{
+			//	x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,
+			//	OnClick:function(event){
+			//		doc.m_is_help_page_preview=0;
+			//		UI.SetFocus(doc);
+			//		UI.Refresh();
+			//	},
+			//});
 		}else if(doc&&obj.m_edit_lock){
 			obj.__children.push(doc)
 			UI.Begin(doc)
@@ -7911,6 +7933,8 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 		var s_ext=UI.GetFileNameExtension(fname);
 		if(s_ext=="stickerwall"||s_ext=="wall"){
 			obj_tab=UI.OpenStickerWallTab(fname);
+		}else if(s_ext=="qpad_notebook"){
+			obj_tab=UI.OpenNoteBookTab(fname);
 		}else{
 			var lang=UI.ED_GetFileLanguage(fname);
 			//console.log(fname,lang.is_binary,!UI.m_ui_metadata[fname],UI.m_ui_metadata[fname].m_language_id,UI.ED_DetectBinaryFile(fname))
@@ -8465,7 +8489,12 @@ W.OptionsPage=function(id,attrs){
 				{name:UI._('Automatically close stale tabs'),stable_name:'close_stale'},
 				{name:UI._('Auto-switch notebooks'),stable_name:'notebook_autoswitch'},
 				{name:UI._('Enable hotkeys in terminals'),stable_name:'terminal_hotkeys'},
+				{name:UI._('Receive development updates'),stable_name:'dev_updates'},
 			];
+			if(!UI.DetectMSYSTools()){
+				plugin_items["Controls"].push(
+					{license_line:UI._("Install MSYS2 to enable terminal tabs and auto-update"),text_color_license:UI.default_styles.feature_item.text_color_error})
+			}
 			plugin_items["Tools"]=[];
 			if(UI.InstallQPad){
 				plugin_items["Tools"].push({special:'install_button',h_special:8})
@@ -8507,8 +8536,12 @@ W.OptionsPage=function(id,attrs){
 				{license_line:"SDL: Copyright (C) 1997-2014 Sam Lantinga <slouken@libsdl.org>"},
 				{license_line:"duktape: Copyright (c) 2013-2015 by Duktape authors"},
 				{license_line:"Hunspell: Copyright (c) N\u00e9meth L\u00e1szl\u00f3"},
-				{license_line:"Native File Dialog by Michael Labbe mike@frogtoss.com"},
+				{license_line:"tweetnacl: Copyright (c) 2015 Dominic Tarr"},
 				{license_line:"xterm.js: Copyright (c) 2014-2016, SourceLair Private Company"},
+				{license_line:"Native File Dialog by Michael Labbe mike@frogtoss.com"},
+				{license_line:"C language implementation of Google Diff, Match, and Patch library"},
+				{license_line:"\u00a0\u00a0\u00a0\u00a0Original library is Copyright (c) 2006 Google Inc."},
+				{license_line:"\u00a0\u00a0\u00a0\u00a0C port Copyright (c) Russell Belfer <rb@github.com>"},
 			];
 			plugin_items["Font Licenses"]=[
 				{license_line:"Open Sans: Digitized data copyright © 2010-2011, Google Corporation"},

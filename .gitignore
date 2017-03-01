@@ -12,3 +12,6 @@ dist.mobileprovision
 build/translation.json
 build/translation.txt
 res/misc/commit.txt
+update_server/public/
+update_signing/qpad_secret.bin
+update_signing/u_unsigned.gz

@@ -4673,7 +4673,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 						fg=(term.curAttr >> 9) & 0x1ff;
 						JS_UI.CallMethod(int,"SetCaret",wnd_obj,
 							x_cur,y_cur,
-							w_char,h_char,colors[fg]&0x7fffffff,500)
+							w_char*0.5,h_char,colors[fg]&0x7fffffff,500)
 					else
 						wnd_obj=JS_UI["context_window"].as(JSObject)
 						fg=(term.curAttr >> 9) & 0x1ff;

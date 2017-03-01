@@ -1,0 +1,73 @@
+v2
+{
+ "cells": [
+  {
+   "m_language": "Markdown",
+   "m_cell_id": 0,
+   "m_button_name": "Release Notes",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "m_is_help_page_preview": -1
+  },
+  {
+   "m_language": "Markdown",
+   "m_cell_id": 1,
+   "m_button_name": "更新历史",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0,
+   "m_is_help_page_preview": 1
+  },
+  {
+   "m_language": "Unix Shell Script",
+   "m_cell_id": 2,
+   "m_button_name": "Update now!",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0
+  }
+ ],
+ "m_last_focus_cell_id": 4
+}
+=====������=====
+# Release Notes
+
+Version 3.0.1
+	- Supported online update
+	- Supported markdown preview in notebook cells
+	- Editing hotkeys are now enabled by default in terminals
+	- Added a search bar to terminals
+
+=====������=====
+# 更新历史
+
+3.0.1版
+	- 支持了在线升级
+	- 支持了在脚本簿里预览Markdown
+	- 终端窗口里支持了编辑快捷键
+	- 终端窗口里支持了搜索
+
+=====������=====
+#!/bin/sh
+# Run this script to update qpad
+# [button: Update now!]
+# [interactive]
+MIRROR='__MIRROR__'
+ARCH='__ARCH__'
+VERSION='__VERSION__'
+QPADEXE='__QPADEXE__'
+HASH='__HASH__'
+printf "=== Downloading the package\n"
+wget -O update_package.xz -c "${MIRROR}/qpad_${VERSION}_${ARCH}.xz" || exit
+printf "=== Verifying the package\n"
+HASH_DOWNLOADED=`sha512sum update_package.xz | cut -d ' ' -f 1`
+if [ "${HASH_DOWNLOADED}" != "${HASH}" ]; then
+	echo "The downloaded package has been corrupted, please try again"
+	rm -f update_package.xz
+	exit
+fi
+rm -f update_package
+xz -d update_package.xz || ( rm -f update_package.xz ; exit )
+printf "=== Applying the package\n"
+mv "${QPADEXE}" "${QPADEXE}.old" || exit
+mv update_package "${QPADEXE}" || exit
+printf "=== Successfully updated to ${VERSION}\n"
+printf "=== Please close this notebook and restart qpad\n"

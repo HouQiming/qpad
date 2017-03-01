@@ -1282,6 +1282,7 @@ UI.CustomTheme=function(){
 			text_color:L?0xff000000:0xffe8e8e8,
 			icon_color:L?0xff000000:0xffe8e8e8,
 			text_color_license:L?0xff7f7f7f:0xffaaaaaa,
+			text_color_error:L?0xff1c1aa3:0xff5555ff,
 			caption_font:UI.Font(UI.font_name,28),
 			caption_icon_font:UI.Font(UI.icon_font_name,28),
 			caption_color:L?0xffffffff:0xffaaaaaa,

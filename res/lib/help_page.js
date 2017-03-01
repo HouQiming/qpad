@@ -253,7 +253,7 @@ W.HelpPage=function(id,attrs){
 				}
 				return fn;
 			}
-			obj.help_ctx=UI.ED_ProcessHelp(obj.text,obj.styles,fsearchImage,w_main_area);
+			obj.help_ctx=UI.ED_ProcessHelp(obj.text,obj.styles,fsearchImage,w_main_area,obj.is_md_preview);
 			obj.help_ctx.prt=UI.ED_FormatRichText(
 				Language.GetHyphenator(UI.m_ui_language),
 				obj.help_ctx.m_text,4,w_main_area,obj.styles,obj.help_ctx.m_objs);
@@ -326,14 +326,14 @@ W.HelpPage=function(id,attrs){
 		//coulddo: pre-format the code to a predefined style - after beautifier
 		//the main part
 		UI.ED_RenderRichText(obj.help_ctx.prt,obj.help_ctx.m_text,obj.x+obj.padding,obj.y+h_find_bar-obj.scroll_y,obj.help_ctx.m_objs)
-		//if(obj.scroll_y>0){
-		UI.RoundRect({
-			x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_find_bar-obj.top_hint_shadow_size, 
-			w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
-			round:obj.top_hint_shadow_size,
-			border_width:-obj.top_hint_shadow_size,
-			color:obj.top_hint_shadow_color})
-		//}
+		if(obj.scroll_y>0){
+			UI.RoundRect({
+				x:obj.x-obj.top_hint_shadow_size, y:obj.y+h_find_bar-obj.top_hint_shadow_size, 
+				w:obj.w+2*obj.top_hint_shadow_size, h:obj.top_hint_shadow_size*2,
+				round:obj.top_hint_shadow_size,
+				border_width:-obj.top_hint_shadow_size,
+				color:obj.top_hint_shadow_color})
+		}
 		UI.PopCliprect()
 	}
 	UI.End()

@@ -12,8 +12,14 @@ var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
 var MAX_STALE_TIME=3600*24;
 
-UI.g_version="3.0.0 ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
+UI.g_core_version="3.0.1";
+UI.g_version=UI.g_core_version+" ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
+if(UI.Platform.BUILD=="debug"){
+	UI.g_update_mirrors=["http://192.168.111.51:3000"];
+}else{
+	UI.g_update_mirrors=["https://houqiming.github.io/qpad/update","http://120.25.59.132:3000"];
+}
 
 if(UI.TestOption('software_srgb')){
 	//UI.SetSRGBEnabling(0);
@@ -46,8 +52,11 @@ UI.ChooseScalingFactor({designated_screen_size:UI.IS_MOBILE?720:1080})
 UI.SetFontSharpening(1);
 UI.wheel_message_mode="over";
 (function(){
+	if(typeof(UI.m_ui_metadata.zoom)=="number"&&!UI.m_ui_metadata["<zoom>"]){
+		UI.m_ui_metadata["<zoom>"]=UI.m_ui_metadata.zoom;
+	}
 	UI.pixels_per_unit_base=UI.pixels_per_unit
-	UI.pixels_per_unit*=(UI.m_ui_metadata.zoom||1)
+	UI.pixels_per_unit*=(UI.m_ui_metadata["<zoom>"]||1)
 	UI.ResetRenderer(UI.pixels_per_unit);
 })();
 //UI.SetFontSharpening(0)
@@ -148,7 +157,7 @@ var ZOOM_RATE=1.0625
 UI.UpdateZoom=function(){
 	UI.ResetRenderer(UI.pixels_per_unit);
 	UI.Refresh()
-	UI.m_ui_metadata.zoom=(UI.pixels_per_unit/UI.pixels_per_unit_base)
+	UI.m_ui_metadata["<zoom>"]=(UI.pixels_per_unit/UI.pixels_per_unit_base)
 }
 UI.ZoomRelative=function(rate){
 	UI.pixels_per_unit*=rate;
@@ -1066,6 +1075,80 @@ UI.OnIdle=function(){
 	//}
 };
 
+var CheckUpdate=function(){
+	if(!UI.DetectMSYSTools()){return;}
+	var t=Date.now();
+	var update_ctx=UI.m_ui_metadata["<update>"];
+	if(!update_ctx){
+		update_ctx={
+			//we want an initial check if this is the first run
+			time_checked:t-86400*1000*30,
+			mirror_id:0,
+		};
+		UI.m_ui_metadata["<update>"]=update_ctx;
+	}
+	if(t-update_ctx.time_checked<86400*1000&&UI.Platform.BUILD!="debug"){
+		//we already checked within 24 hours, don't re-check this often
+		return;
+	}
+	/////////////////////////
+	update_ctx.time_checked=t;
+	if(!(update_ctx.mirror_id<UI.g_update_mirrors.length)){
+		update_ctx.mirror_id=0;
+	}
+	var s_storage_path=IO.GetStoragePath();
+	var s_cur_mirror=UI.g_update_mirrors[update_ctx.mirror_id];
+	IO.DeleteFile(s_storage_path+"/update.bin");
+	var s_notes_url=(UI.TestOption('dev_updates',0)?"/u_dev":"/u_stable");
+	IO.RunToolRedirected(["wget","-O","update.bin",s_cur_mirror+s_notes_url],s_storage_path,0,function(s){},function(){try{
+		var s_update_notebook=IO.VerifyAndReadUpdateNotes(s_storage_path+"/update.bin");
+		if(!s_update_notebook){return;}
+		var s_prev_update=IO.ReadAll(s_storage_path+"/update.prev");
+		if(s_prev_update===s_update_notebook){return;}
+		IO.CreateFile(s_storage_path+"/update.prev",s_update_notebook);
+		var match_version=s_update_notebook.match(/Version ([0-9.a-zA-Z]+)/);
+		///////////////////////
+		s_update_notebook=s_update_notebook.replace(/__[A-Z]+__/g,function(smatch){
+			return {
+				__MIRROR__:s_cur_mirror,
+				__ARCH__:UI.Platform.ARCH,
+				__VERSION__:UI.g_core_version,
+				__QPADEXE__:IO.m_my_name,
+			}[smatch]||smatch;
+		});
+		IO.CreateFile(s_storage_path+"/update.qpad_notebook",s_update_notebook);
+		IO.CreateFile(s_storage_path+"/update_version.txt",match_version&&match_version[1]||"");
+		if(match_version&&match_version[1]===UI.g_core_version&&!s_prev_update){
+			//it's the first run, and our current version number matches our release note
+			if(UI.Platform.BUILD=="debug"){
+				console.log("first update check, won't show the notebook in a release build")
+			}else{
+				return;
+			}
+		}
+		IO.DeleteFile(s_storage_path+"/update_download.xz");
+		var obj_notebook_tab=UI.OpenNoteBookTab(s_storage_path+"/update.qpad_notebook","quiet");
+		if(!obj_notebook_tab.main_widget){
+			obj_notebook_tab.NeedMainWidget();
+		}
+		var obj_notebook=obj_notebook_tab.main_widget;
+		var cell_id=obj_notebook.GetSpecificCell(UI._("# Release Notes"),"Markdown",0)
+		if(cell_id>=0){
+			//output / input focus
+			obj_notebook.GotoSubCell(cell_id*2);
+			//var cell_i=(obj_notebook.m_cells&&obj_notebook.m_cells[cell_id]);
+			//if(cell_i&&cell_i.m_text_in){
+			//	UI.SetFocus(cell_i.m_text_in);
+			//}
+		}
+		update_ctx.mirror_id++;
+		UI.SaveMetaData();
+		UI.RefreshAllTabs();
+	}catch(err){
+		console.log(err.stack);
+	}});
+};
+	
 (function(){
 	//if(UI.StartupBenchmark){
 	//	console.log("--- entering main")
@@ -1111,6 +1194,7 @@ UI.OnIdle=function(){
 		IO.CreateFile(fn_hack_pipe,IO.GetPID().toString())
 	}
 	UI.m_cmdline_opens=argv;
+	CheckUpdate();
 	UI.Run();
 	if(IO.IsFirstInstance){
 		IO.DeleteFile(fn_hack_pipe)

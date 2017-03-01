@@ -367,6 +367,15 @@
 			"Maximize tab":"最大化",
 			"Run notebook cell '@1'":"运行脚本'@1'",
 			"Use in an editor":"用于编辑其他窗口里的文字",
+			"Paste":"粘贴",
+			"Find...":"查找……",
+			"Enable hotkeys in terminals":"在终端窗口里启用编辑热键",
+			"Receive development updates":"接收开发版更新",
+			"Version @1 is available - Update":"版本@1已经出了 - 自动升级",
+			"Your QPad is up to date - Update":"已经是最新版了 - 自动升级",
+			"Install MSYS2 to enable terminal tabs and auto-update":"安装MSYS2才能启用终端窗口和自动升级",
+			"# Release Notes":"# 更新历史",
+			"[button: Update now!]":"[button: 马上升级！]",
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw
