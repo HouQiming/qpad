@@ -128,11 +128,13 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+auto re-width wrapped notebook cells
+terminal
+	resizing support?
 build for mac
 	verify:
 		update
 global search highlight clean up
-auto re-width wrapped notebook cells
 sticker desync
 	CTRL+K?
 regexp search in terminals

@@ -44,7 +44,7 @@ DEBUG_DUMP=0
 /**
 * States
 */
-auto normal_state=0, escaped=1, csi=2, osc=3, charset_state=4, dcs=5, ignore=6;
+auto normal_state=0, escaped=1, csi=2, osc=3, charset_state=4, dcs=5, ignore=6, ignoreone=7;
 auto VISUAL_BELL_DURATION=0.5
 
 /**
@@ -748,8 +748,7 @@ class Terminal{
 							//this.charset=null;
 							this.setgLevel(0);
 							this.setgCharset(0, g_charsets.US);
-							this.state=normal_state;
-							i++;
+							this.state=ignoreone;
 							break;
 	
 						// ESC (,),*,+,-,. Designate G0-G2 Character Set.
@@ -841,8 +840,7 @@ class Terminal{
 	
 						// ESC # 3 DEC line height/width
 						case '#':
-							this.state=normal_state;
-							i++;
+							this.state=ignoreone;
 							break;
 	
 						// ESC H Tab Set (HTS is 0x88).
@@ -874,6 +872,7 @@ class Terminal{
 					break;
 	
 				case charset_state:
+					this.state=normal_state;
 					switch (code) {
 						case '0': // DEC Special Character and Line Drawing Set.
 							cs=g_charsets.SCLD;
@@ -919,7 +918,7 @@ class Terminal{
 							break;
 						case '/': // ISOLatin (actually /A)
 							cs=g_charsets.ISOLatin;
-							i++;
+							this.state=ignoreone;
 							break;
 						default: // Default
 							cs=g_charsets.US;
@@ -927,7 +926,6 @@ class Terminal{
 					}
 					this.setgCharset(this.gcharset, cs);
 					this.gcharset=0;
-					this.state=normal_state;
 					break;
 	
 				case osc:
@@ -935,7 +933,9 @@ class Terminal{
 					// OSC Ps ; Pt BEL
 					//   Set Text Parameters.
 					if (code == '\x1b' || code == '\x07') {
-						if (code == '\x1b') i++;
+						this.state=normal_state;
+						if code == '\x1b'
+							this.state=ignoreone;
 	
 						//this.params.push(this.currentParam);
 						if !this.params.n:
@@ -1005,7 +1005,6 @@ class Terminal{
 									//this.download_file=System.IO.CreateFile(fn_local)
 									this.params.clear();
 									this.currentParam=0;
-									this.state=normal_state;
 									return
 								break;
 							case 9001:
@@ -1018,7 +1017,6 @@ class Terminal{
 	
 						this.params.clear();
 						this.currentParam=0;
-						this.state=normal_state;
 					} else {
 						if (!this.params.n) {
 							if (code >= '0' && code <= '9') {
@@ -1473,8 +1471,10 @@ class Terminal{
 	
 				case dcs:
 					if (code == '\x1b' || code == '\x07') {
-						if (code == '\x1b') i++;
-	
+						this.state=normal_state;
+						if code == '\x1b':
+							this.state=ignoreone;
+						
 						if(!this.prefix||!this.prefix.n)
 							// User-Defined Keys (DECUDK).
 						else if(this.prefix=='$q')
@@ -1510,7 +1510,6 @@ class Terminal{
 	
 						this.currentStringParam.clear();
 						this.prefix.clear();
-						this.state=normal_state;
 					} else if (!this.currentStringParam.n) {
 						if (!this.prefix && code != '$' && code != '+') {
 							this.currentStringParam.PushUnicode(code);
@@ -1527,10 +1526,15 @@ class Terminal{
 				case ignore:
 					// For PM and APC.
 					if (code == '\x1b' || code == '\x07') {
-						if (code == '\x1b') i++;
-						this.state=normal_state;
+						if code == '\x1b':
+							this.state=ignoreone;
+						else
+							this.state=normal_state;
 					}
 					break;
+				case ignoreone:
+					this.state=normal_state;
+					break
 			}
 		}
 	

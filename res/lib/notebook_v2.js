@@ -1808,7 +1808,6 @@ W.Terminal=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"terminal",W.terminal_prototype);
 	UI.Begin(obj)
 	if(!obj.m_term){
-		console.log(IO.ShellCmd(obj.args));//todo
 		if(!UI.InitTerminal(obj,obj.cols,obj.rows,obj.args,obj.spath,function(){
 			this.terminated=1;
 			UI.Refresh();
