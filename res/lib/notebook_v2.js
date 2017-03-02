@@ -489,6 +489,14 @@ UI.GetFrontMostNotebookTab=function(){
 	return tab_frontmost;
 };
 
+UI.MakeScriptCommand=function(cols,rows,args){
+	if(UI.Platform.ARCH=="mac"){
+		return ["script","-q","/dev/null","sh","-c","export TERM=xterm;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args)];
+	}else{
+		return ["script","--return","-qfc","export TERM=xterm;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
+	}
+};
+
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 var g_v2_separator='\n=====\uDBFF\uDFFF=====\n',g_v2_separator_re=new RegExp(g_v2_separator,'g');
 W.notebook_prototype={
@@ -1032,7 +1040,7 @@ W.notebook_prototype={
 			var cols=132;
 			var rows=24;
 			if(UI.DetectMSYSTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty cols "+cols+";stty rows "+rows+";"+IO.ShellCmd(args),"/dev/null"];
+				args=UI.MakeScriptCommand(cols,rows,args);
 			}
 			UI.OpenTerminalTab({
 				args:args,
@@ -1065,7 +1073,7 @@ W.notebook_prototype={
 		if(s_code.indexOf('[interactive]')>=0){
 			//terminal
 			if(UI.DetectMSYSTools()){
-				args=["script","--return","-qfc","export TERM=xterm;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
+				args=UI.MakeScriptCommand(cols,rows,args);
 				interactive_ified=1;
 			}
 		}
@@ -1800,6 +1808,7 @@ W.Terminal=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"terminal",W.terminal_prototype);
 	UI.Begin(obj)
 	if(!obj.m_term){
+		console.log(IO.ShellCmd(obj.args));//todo
 		if(!UI.InitTerminal(obj,obj.cols,obj.rows,obj.args,obj.spath,function(){
 			this.terminated=1;
 			UI.Refresh();

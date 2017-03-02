@@ -425,7 +425,7 @@ var OpenShell=function(){
 var OpenShellTerm=function(){
 	UI.UpdateNewDocumentSearchPath();
 	UI.OpenTerminalTab({
-		args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty rows 24;bash -i","/dev/null"],
+		args:UI.MakeScriptCommand(132,24,['bash','-i']),
 		spath:UI.m_new_document_search_path,
 		cols:132,
 		rows:24,
@@ -706,7 +706,7 @@ var CreateMenus=function(){
 						text:"connect_"+i.toString(),icon:"控",tooltip:'Connect',
 						action:function(s_ssh_command){
 							UI.OpenTerminalTab({
-								args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty rows 24;"+s_ssh_command,"/dev/null"],
+								args:UI.MakeScriptCommand(132,24,['sh','-c',s_ssh_command]),
 								spath:".",
 								cols:132,
 								rows:24,
@@ -941,21 +941,6 @@ UI.Application=function(id,attrs){
 		UI.SetTaskbarProgress(app.__hwnd,app.progress||0);
 	}
 	if(UI.Platform.BUILD=="debug"){
-		//W.Hotkey("",{key:"SHIFT+CTRL+X",action:function(){
-		//	//UI.OpenTerminalTab(["bash","-i"],".");
-		//	UI.OpenTerminalTab({
-		//		//args:["script","--return","-qfc","export TERM=xterm;stty cols 132;stty line 30;bash -i","/dev/null"],
-		//		args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;bash -i","/dev/null"],
-		//		//args:["bad_command"],
-		//		//args:["powershell"],
-		//		//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;winpty cmd","/dev/null"],
-		//		//args:["script","--return","-qfc","export TERM=xterm;stty -onlcr;ssh a@192.168.111.51","/dev/null"],
-		//		spath:".",
-		//		//cols:"132",
-		//		//rows:"30",
-		//		auto_close:1,
-		//	});
-		//}});
 		//detect memory leaks
 		W.Hotkey("",{key:"SHIFT+CTRL+L",action:function(){
 			UI.BeforeGC()

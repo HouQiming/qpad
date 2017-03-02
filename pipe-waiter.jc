@@ -16,9 +16,8 @@ SetPipeDataCallback=function(pipe0,fcallback0,fcallback_close0){
 		handle=pipe.hf
 		if !handle:return
 	else
+		if pipe.hf<0:return
 		handle=__pointer(iptr(pipe.hf))
-		handle=pipe.hf
-		if handle<0:return
 	ref_holder=CCallbackHolder.NULL
 	data_cb=function(__pointer first_byte){
 		auto s=[char(iptr(first_byte))]

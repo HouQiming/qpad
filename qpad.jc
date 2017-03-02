@@ -707,7 +707,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 		fn=JS.Param(0).or(new string)
 		if !fn:return 0
 		ret0=System.IO.ReadAll(fn)
-		if !ret0||ret0.n<64:return 0
+		if !ret0||ret0.n<64+18:return 0
 		ret=ret0.ConvertToAsBinary(u8)
 		ret_opened=new char[ret.n]
 		lg_ret=u64(i64(ret_opened.n))

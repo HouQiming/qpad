@@ -19,7 +19,8 @@ v2
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
-   "out_m_enable_wrapping": 0
+   "out_m_enable_wrapping": 0,
+   "m_is_help_page_preview": false
   },
   {
    "m_language": "Windows BAT",
@@ -67,8 +68,7 @@ v2
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "out_m_current_wrap_width": 512,
-   "out_m_enable_wrapping": 0,
-   "m_hotkey": "CTRL+ALT+1"
+   "out_m_enable_wrapping": 0
   },
   {
    "m_language": "Unix Shell Script",
@@ -110,24 +110,29 @@ v2
    "in_m_enable_wrapping": 0
   },
   {
-   "m_language": "Markdown",
+   "m_language": "Windows BAT",
    "m_cell_id": 6,
+   "m_button_name": "Upload update",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0
+  },
+  {
+   "m_language": "Markdown",
+   "m_cell_id": 7,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 10
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-online update
-	set up a server first
-		github.io + CN mirror
-		multiple distribution channels
-			dev
-			stable
-	tweetnacl credit
+build for mac
+	verify:
+		update
+global search highlight clean up
+auto re-width wrapped notebook cells
 sticker desync
 	CTRL+K?
 regexp search in terminals
@@ -154,9 +159,7 @@ code templates? not sticker's job...
 		keyword-based example code
 		doxygen-like param comments
 		baked help database
-global search highlight clean up
 memory leak
-build for mac
 file view class list
 	searchable classes
 style enforcement
@@ -251,10 +254,9 @@ jc --readable_c_code -awin64 qpad.jc --run
 =====í¯¿í¿¿=====
 @echo off
 rem build script for 'qpad.jc'
-rem [hotkey: CTRL+ALT+1]
 rem [button: Release]
 cd /d c:/tp/qpad
-git diff-index --quiet HEAD || ( echo Please commit your changes first && exit )
+rem git diff-index --quiet HEAD || ( echo Please commit your changes first && exit )
 git log --pretty=format:%%H -n 1 > res/misc/commit.txt
 jc -brelease -awin64 qpad.jc
 jc -brelease -awin32 qpad.jc
@@ -321,30 +323,35 @@ if [ "${VERSION_CODE}" != "${VERSION_NOTES}" ]; then
 	printf "Error: version mismatch\n  VERSION_CODE = ${VERSION_CODE}\n  VERSION_NOTES = ${VERSION_NOTES}\n"
 	exit
 fi
-git diff-index --quiet HEAD
-GIT_RET=$?
-if [ GIT_RET != 0 ]; then
+GIT_RESULT=`git diff-index HEAD | grep -v notebook.json`
+if [ "${GIT_RESULT}" != "" ]; then
 	printf "Please commit your changes first\n"
 	exit
 fi
+git log --pretty=format:%%H -n 1 > res/misc/commit.txt
 ####################
 echo '=== Buiding qpad'
-git log --pretty=format:%%H -n 1 > res/misc/commit.txt
 jc -brelease -awin64 qpad.jc
 UPLOAD_NAME="qpad_${VERSION_CODE}_win64.xz"
-if [ "bin/win64/qpad.exe" -nt "update_server/public/${UPLOAD_NAME}" ]; then
+#UPLOAD_DIR="update_server/public"
+UPLOAD_DIR="../qpadsite/update"
+if [ "bin/win64_release/qpad.exe" -nt "${UPLOAD_DIR}/${UPLOAD_NAME}" ]; then
 	echo '=== Compressing package'
-	xz -c bin/win64/qpad.exe > "update_server/public/${UPLOAD_NAME}"
+	xz -c bin/win64_release/qpad.exe > "${UPLOAD_DIR}/${UPLOAD_NAME}"
 fi
-MAIN_PACKAGE_HASH=`sha512sum update_server/public/${UPLOAD_NAME} | cut -d ' ' -f 1`
-echo "=== Updating test server"
+MAIN_PACKAGE_HASH=`sha512sum ${UPLOAD_DIR}/${UPLOAD_NAME} | cut -d ' ' -f 1`
+echo "=== Updating ${UPLOAD_DIR}"
 cat build/update.qpad_notebook | sed "s/__HASH__/${MAIN_PACKAGE_HASH}/" | gzip > update_signing/u_unsigned.gz
-node update_signing/signit.js update_signing/u_unsigned.gz update_server/public/u_dev
-cp update_server/public/u_dev update_server/public/u_stable
-rsync -rtzzuvq update_server/* a@192.168.111.51:~/update_server/
-ssh -n -f a@192.168.111.51 'killall server.js; cd update_server; chmod +x server.js;nohup ./server.js > /dev/null 2>&1  &'
-rm ~/.qpad_debug/update*
+node update_signing/signit.js update_signing/u_unsigned.gz "${UPLOAD_DIR}/u_dev"
 echo "=== Done"
+
+=====í¯¿í¿¿=====
+@echo off
+rem [interactive]
+rem [button: Upload update]
+cd ..\qpadsite
+rsync -rtzzuvq update/* root@120.25.59.132:~/qpad_update/public/
+git push origin gh-pages
 
 =====í¯¿í¿¿=====
 Search result
