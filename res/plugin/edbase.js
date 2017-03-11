@@ -105,7 +105,7 @@ var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.P
 
 Language.Register({
 	name:"C/C++/C#",parser:"C",
-	extensions:["c","cxx","cpp","cc","h","hpp","mm","cs","qinfo"],
+	extensions:["c","cxx","cpp","cc","h","hpp","hxx","mm","cs","qinfo"],
 	auto_curly_words:{'if':1,'for':1,'while':1,'switch':1,'do':1,'try':1,'class':2,'struct':2,'union':2,'namespace':2},
 	has_pointer_ops:1,
 	file_icon_color:0xff9a3d6a,

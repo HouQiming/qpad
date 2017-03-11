@@ -128,15 +128,16 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-auto re-width wrapped notebook cells
-terminal
-	resizing support?
-build for mac
-	verify:
-		update
+(test) recovery from persistent error:
+	after a fixed # of not-rendered frames
+	window title system
+reparse after diff-reload
 global search highlight clean up
+Mac ALT+F+D
 sticker desync
-	CTRL+K?
+	close / reopen while unsaved... won't be able to replay from those ranges only
+		alternative method for range enforcing?
+update: stable channel
 regexp search in terminals
 check/uncheck boxes in a sticker wall... or md in general
 	could use that specific unicode char
@@ -146,6 +147,7 @@ check/uncheck boxes in a sticker wall... or md in general
 	markdown - / * completion
 drag failure on gaming machine
 sticker code:
+	edge + go-along-edge hotkey
 	shift-sell
 	connecting the same name in different stickers
 		manually provide add-templates as local comments? co-call by name then co-replace params
@@ -245,9 +247,14 @@ explicit diff visualization
 [interactive] in windows bat
 	fails on Qin Hao's machine
 auto-resize tab terminals
+it's possible to auto-identify repetitive patterns
+	DP state: the set of matched frontiers
+	DP goal: maximize weighted area
+	DP transition: add a new token after the 0th frontier. The token is chosen from the original code
 
 =====í¯¿í¿¿=====
 @echo off
+rem [interactive]
 rem build script for the project
 rem [button: Debug]
 set LANG=zh_CN.utf8

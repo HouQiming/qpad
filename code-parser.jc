@@ -2232,6 +2232,8 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 						tok2=fetchTokenSafe(i_plus_2)
 						if (tok2&TOK_TYPE_MASK)==TOK_STRING:
 							s_require=cite_raw(iptr(toks[i_plus_2].epos0),iptr(toks[i_plus_2].epos1))
+							idfn_require=getid(s_require)
+							searchDepFile(idfn_require,int(i_plus_2),0)
 							idfn_require=getid(s_require+".js")
 							searchDepFile(idfn_require,int(i_plus_2),0)
 							idfn_require=getid("js_module@"+s_require)

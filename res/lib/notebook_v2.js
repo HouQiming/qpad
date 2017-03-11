@@ -1350,6 +1350,12 @@ W.NotebookView=function(id,attrs){
 				cur_cell.m_is_help_page_preview=doc.m_is_help_page_preview;
 				obj.need_save|=65536;
 			}
+			var w_wrap_std=w_editor-UI.default_styles.code_editor.w_scroll_bar-4;
+			if(doc.m_enable_wrapping&&doc.m_current_wrap_width!=w_wrap_std){
+				doc.m_current_wrap_width=w_wrap_std;
+				var renderer=doc.GetRenderer();
+				renderer.ResetWrapping(w_wrap_std,doc)
+			}
 			W.CodeEditor("cell_"+focus_cell_id.toString(),{
 				disable_minimap:1,
 				doc:doc,

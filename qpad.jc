@@ -776,6 +776,7 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 			System.IO.CreateFileWithContent(s_storage_path+"/example.cpp",sbox.UIReadAll("res/misc/example.cpp"))
 	}
 	Gui2D.g_log_file=s_storage_path+"/log.txt"
+	jsio["g_log_file"]=Gui2D.g_log_file
 	//for fn in sbox.m_ui_zip.AllFileNames()
 	//	Writeln(fn)
 	//Writeln('main: ',sbox.UIReadAll("res/main.js"))
@@ -787,4 +788,4 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	//if Platform.IS_WINDOWS&&System.IO.FileExists(System.Env.GetExecutablePath()+"/opengl32.dll"):
 	//	//LLVMPipe tends to crash
 	//	ExitProcess(1)
-})()
+})();

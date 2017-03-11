@@ -7,7 +7,7 @@ v2
    "m_button_name": "Release Notes",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "m_is_help_page_preview": -1
+   "m_is_help_page_preview": 1
   },
   {
    "m_language": "Markdown",
@@ -15,20 +15,23 @@ v2
    "m_button_name": "æ›´æ–°å†å²",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "m_is_help_page_preview": 1
+   "m_is_help_page_preview": -1
   },
   {
    "m_language": "Unix Shell Script",
    "m_cell_id": 2,
    "m_button_name": "Update now!",
-   "in_m_current_wrap_width": 512,
+   "in_m_current_wrap_width": 2058.073024204799,
    "in_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 2
 }
 =====í¯¿í¿¿=====
 # Release Notes
+
+Version 3.0.2
+	- Minor bug fixes
 
 Version 3.0.1
 	- Supported online update
@@ -38,6 +41,9 @@ Version 3.0.1
 
 =====í¯¿í¿¿=====
 # æ›´æ–°å†å²
+
+3.0.2ç‰ˆ
+	- ä¿®äº†ä¸€äº›å°bug
 
 3.0.1ç‰ˆ
 	- æ”¯æŒäº†åœ¨çº¿å‡çº§

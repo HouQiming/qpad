@@ -12,7 +12,7 @@ var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
 var MAX_STALE_TIME=3600*24;
 
-UI.g_core_version="3.0.1";
+UI.g_core_version="3.0.2";
 UI.g_version=UI.g_core_version+" ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
 if(UI.Platform.BUILD=="debug"){
@@ -768,14 +768,37 @@ var CreateMenus=function(){
 	doc_area=undefined;
 };
 
+var N_FAILED_FRAMES_THRESHOLD=60;
+var g_failed_renderings=0;
+var g_marquee_message=undefined;
+var g_marquee_counter=0;
+var ErrorMarquee=function(){
+	if(!g_marquee_message){
+		g_marquee_message=UI.Format("Corrupted config file detected, please delete '@1' and try again... ",IO.g_log_file).split('');
+	}
+	var ret=g_marquee_message.join('');
+	if(g_marquee_message.length>40){
+		ret=g_marquee_message.slice(0,40).join('');
+		var a=g_marquee_message.shift();
+		g_marquee_message.push(a);
+	}
+	return ret;
+};
 UI.Application=function(id,attrs){
+	if(g_failed_renderings>N_FAILED_FRAMES_THRESHOLD&&!UI.m_metadata_corrupted){
+		//rename the metadata json
+		UI.m_metadata_corrupted=1;
+		IO.DeleteFile(IO.GetStoragePath()+("/metadata.json"))
+		UI.SafeSave(IO.GetStoragePath()+("/metadata_backup_"+Date.now()+".json"),JSON.stringify(UI.m_ui_metadata));
+	}
+	g_failed_renderings++;
 	//UI.TimingEvent("UI.Application")
 	attrs=UI.Keep(id,attrs);
 	UI.Begin(attrs);
 		///////////////////
 		//UI.TimingEvent("before W.Window")
 		var app=UI.Begin(W.Window('app',{
-				title:'QPad Text Editor',w:1280,h:720,
+				title:UI._('QPad Text Editor'),w:1280,h:720,
 				bgcolor:UI.default_styles.tabbed_document.color,
 				icon:"res/misc/icon_win.png",
 				flags:(UI.Platform.ARCH=="web"?0:(UI.IS_MOBILE?UI.SDL_WINDOW_FULLSCREEN:UI.SDL_WINDOW_MAXIMIZED))|UI.SDL_WINDOW_RESIZABLE,
@@ -964,6 +987,7 @@ UI.Application=function(id,attrs){
 		UI.ReallySaveMetaData();
 		UI.m_need_metadata_save=0;
 	}
+	g_failed_renderings=0;
 };
 
 if(UI.Platform.ARCH=="mac"){
@@ -1036,6 +1060,7 @@ UI.HandleError=function(error){
 		return;
 	}
 	IO.ReportError([(new Date()).toUTCString()," commit ",UI.g_commit," ",s_error,"\n"].join(""));
+	UI.Refresh();
 	if(UI.Platform.BUILD=="debug"){
 		throw error;
 	}	
@@ -1062,6 +1087,7 @@ UI.OnIdle=function(){
 
 var CheckUpdate=function(){
 	if(!UI.DetectMSYSTools()){return;}
+	if(UI.Platform.ARCH!='win32'&&UI.Platform.ARCH!='win64'){return;}
 	var t=Date.now();
 	var update_ctx=UI.m_ui_metadata["<update>"];
 	if(!update_ctx){
@@ -1073,7 +1099,7 @@ var CheckUpdate=function(){
 		UI.m_ui_metadata["<update>"]=update_ctx;
 	}
 	if(t-update_ctx.time_checked<86400*1000&&UI.Platform.BUILD!="debug"){
-		//we already checked within 24 hours, don't re-check this often
+		//we already checked within 24 hours, don't re-check this too often
 		return;
 	}
 	/////////////////////////
