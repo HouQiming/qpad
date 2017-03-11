@@ -1123,7 +1123,7 @@ var CheckUpdate=function(){
 			return {
 				__MIRROR__:s_cur_mirror,
 				__ARCH__:UI.Platform.ARCH,
-				__VERSION__:UI.g_core_version,
+				__VERSION__:match_version&&match_version[1]||"latest",
 				__QPADEXE__:IO.m_my_name,
 			}[smatch]||smatch;
 		});

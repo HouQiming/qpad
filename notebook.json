@@ -117,14 +117,21 @@ v2
    "in_m_enable_wrapping": 0
   },
   {
-   "m_language": "Markdown",
+   "m_language": "Windows BAT",
    "m_cell_id": 7,
+   "m_button_name": "dev -> stable",
+   "in_m_current_wrap_width": 512,
+   "in_m_enable_wrapping": 0
+  },
+  {
+   "m_language": "Markdown",
+   "m_cell_id": 8,
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 12
 }
 =====í¯¿í¿¿=====
 # TODO LIST
@@ -337,7 +344,7 @@ if [ "${GIT_RESULT}" != "" ]; then
 	printf "Please commit your changes first\n"
 	exit
 fi
-git log --pretty=format:%%H -n 1 > res/misc/commit.txt
+git log --pretty=format:%H -n 1 > res/misc/commit.txt
 ####################
 echo '=== Buiding qpad'
 jc -brelease -awin64 qpad.jc
@@ -361,6 +368,13 @@ rem [button: Upload update]
 cd ..\qpadsite
 rsync -rtzzuvq update/* root@120.25.59.132:~/qpad_update/public/
 git push origin gh-pages
+
+=====í¯¿í¿¿=====
+@echo off
+rem [interactive]
+rem [button: dev -> stable]
+cd ..\qpadsite\update
+copy u_dev u_stable
 
 =====í¯¿í¿¿=====
 Search result
