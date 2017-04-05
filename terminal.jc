@@ -16,7 +16,7 @@ Qiming HOU 1/1/2017:
 	abandoned the mouse stuff in favor of quickedit-like operations
 */
 module detail{
-DEBUG_DUMP=1
+DEBUG_DUMP=0
 
 /**
 * xterm.js: xterm, in the browser
