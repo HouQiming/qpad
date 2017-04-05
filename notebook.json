@@ -131,14 +131,10 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 12
+ "m_last_focus_cell_id": 5
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-(test) recovery from persistent error:
-	after a fixed # of not-rendered frames
-	window title system
-reparse after diff-reload
 global search highlight clean up
 Mac ALT+F+D
 sticker desync

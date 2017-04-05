@@ -70,10 +70,11 @@ else
 __generate_json("icon_win","iconwin.ico")
 //__generate_json("include_js","build/make_new_docs.js")
 //__generate_json("linux_cc","clang")
-__generate_json("linux_cc","gcc-5")
+//__generate_json("linux_cc","gcc-5")
 if Platform.IS_LINUX:
 	__generate_json("ssh_remote_target","~/qpad")
-	__generate_json("ssh_server","houqiming@192.168.85.106")
+	__generate_json("ssh_server","hqm@192.168.111.145")
+	__generate_json("extra_resource_dirs","cjk_fonts")
 //if Platform.IS_UNIX&&Platform.BUILD!="debug":
 //	__generate_json("ldflags","-s")
 if Platform.IS_WINDOWS:

@@ -921,44 +921,74 @@ UI.RegisterOutputParser('[ \t]*File[ \t]*"([^"]+)",[ \t]*line[ \t]*([0-9]+).*',2
 		category:"error",
 		message:"Python stack dump",line0:linea-1,
 	}
-	return err
+	return err;
 });
 
-//node.js
-UI.RegisterOutputParser('[ \t]*at[ \t]*.*[ \t]*\\((.*):([0-9]+):([0-9]+)\\).*',3,function(matches){
+//node.js syntax error dump
+UI.RegisterOutputParser('([^ \t].*\.[A-Za-z0-9]+):([0-9]+)',2,function(matches,context){
+	var name=matches[1];
+	var linea=parseInt(matches[2])
+	context.m_node_js_tentative_syntax_error={
+		file_name:name,
+		category:"error",
+		message:"node.js syntax error",
+		line0:linea-1,
+	}
+	return undefine;
+});
+
+//node.js syntax error - initial line
+UI.RegisterOutputParser('.*SyntaxError: (.*)',1,function(matches,context){
+	context.m_node_js_previous_error=matches[1];
+	if(context.m_node_js_tentative_syntax_error){
+		var err=context.m_node_js_tentative_syntax_error;
+		err.message=matches[1];
+		return err;
+	}
+	return undefine;
+});
+
+//node.js error.stack - initial line
+UI.RegisterOutputParser('.*Error: (.*)',1,function(matches,context){
+	context.m_node_js_previous_error=matches[1];
+	return undefine;
+});
+
+//node.js "at" lines
+UI.RegisterOutputParser('[ \t]*at[ \t]*.*[ \t]*\\((.*):([0-9]+):([0-9]+)\\).*',3,function(matches,context){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	//var cola=parseInt(matches[3])
 	var err={
 		file_name:name,
 		category:"error",
-		message:"node.js stack dump",
+		message:context.m_node_js_previous_error?context.m_node_js_previous_error+" (node.js stack dump)":"node.js stack dump",
 		line0:linea-1,
 	}
 	return err
 });
 
-UI.RegisterOutputParser('[ \t]*at[ \t]*(.*):([0-9]+):([0-9]+)',3,function(matches){
+UI.RegisterOutputParser('[ \t]*at[ \t]*(.*):([0-9]+):([0-9]+)',3,function(matches,context){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	//var cola=parseInt(matches[3])
 	var err={
 		file_name:name,
 		category:"error",
-		message:"node.js stack dump",
+		message:context.m_node_js_previous_error?context.m_node_js_previous_error+" (node.js stack dump)":"node.js stack dump",
 		line0:linea-1,
 	}
 	return err
 });
 
-UI.RegisterOutputParser('[ \t]*at[ \t]*[^ ]* \\((.*):([0-9]+)\\)[ a-zA-Z]*',2,function(matches){
+UI.RegisterOutputParser('[ \t]*at[ \t]*[^ ]* \\((.*):([0-9]+)\\)[ a-zA-Z]*',2,function(matches,context){
 	var name=matches[1]
 	var linea=parseInt(matches[2])
 	//var cola=parseInt(matches[3])
 	var err={
 		file_name:name.indexOf('.')>=0?name:(name+'.js'),
 		category:"error",
-		message:"duktape stack dump",
+		message:context.m_node_js_previous_error?context.m_node_js_previous_error+" (duktape stack dump)":"duktape stack dump",
 		line0:linea-1,
 	}
 	return err

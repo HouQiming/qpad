@@ -16,7 +16,7 @@ Qiming HOU 1/1/2017:
 	abandoned the mouse stuff in favor of quickedit-like operations
 */
 module detail{
-DEBUG_DUMP=0
+DEBUG_DUMP=1
 
 /**
 * xterm.js: xterm, in the browser
@@ -436,7 +436,7 @@ class Terminal{
 					for i=0:this.cols-1
 						auto addr=(row*this.cols+i)*3
 						if addr+2<this.lines.n&&this.lines[addr+2]:
-							this.lines[addr+0]|=g_flags.UNDERLINE<<18
+							this.lines[addr+0]|=g_flags.COMPILER_ERROR<<18
 					if row==row0:break
 					row++
 					if row>=this.scrollback:
@@ -993,6 +993,8 @@ class Terminal{
 								break;
 							case 9000:
 								//remote edit
+								if DEBUG_DUMP:
+									Writeln('<command 9000>')
 								if this.currentStringParam.n:
 									this.is_remote_editing=1
 									this.download_buf=new string
@@ -1008,6 +1010,8 @@ class Terminal{
 									return
 								break;
 							case 9001:
+								if DEBUG_DUMP:
+									Writeln('<command 9001>')
 								//qpad detection - wipe the "no qpad" message
 								this.eraseLeft(this.x, this.y)
 								this.x=0
@@ -1742,6 +1746,9 @@ class Terminal{
 					break
 				}
 				return 1
+		auto thirdLevelKey = (
+				(Platform.IS_APPLE && altKey && !ctrlKey && !metaKey) ||
+				(Platform.IS_WINDOWS && altKey && ctrlKey && !metaKey));
 		if this.selecting>0:
 			if !keymod&&(keyCode==13||keyCode==1073741982)||ctrlKey&&!altKey&&!shiftKey&&!metaKey&&keyCode==99:
 				//return / ctrl+c - copy text and cancel sel
@@ -1749,14 +1756,18 @@ class Terminal{
 				this.confirmCopy(JS)
 				return 1
 			if keyCode==27:
-				//esc, cancel sel
+				//esc, cancel sel, do nothing
 				this.selecting=0
 				return 1
-			return 0
+			if (thirdLevelKey && (!keyCode || keyCode > 47)) {
+				return 0;
+			}
+			if (!result.key) {
+				return 0;
+			}
+			//valid non-hotkey - cancel sel, send the key
+			this.selecting=0
 	
-		auto thirdLevelKey = (
-				(Platform.IS_APPLE && altKey && !ctrlKey && !metaKey) ||
-				(Platform.IS_WINDOWS && altKey && ctrlKey && !metaKey));
 		// Don't invoke for arrows, pageDown, home, backspace, etc. (on non-keypress events)
 		if (thirdLevelKey && (!keyCode || keyCode > 47)) {
 			return 0;
@@ -2156,14 +2167,14 @@ class Terminal{
 	};
 	
 	onTextInput=function(text){
-		//selection won't matter here - it can't possibly be a hotkey, just send it
-		//if this.selecting>0:
 		//when downloading, though, we have to buffer it
 		if this.is_remote_editing:
 			if !this.input_during_download:
 				this.input_during_download=new string
 			this.input_during_download.push(text)
 		else
+			//selection won't matter here - it can't possibly be a hotkey, just cancel selection and send it
+			this.selecting=0
 			this.handler(text)
 	}
 	
@@ -4307,6 +4318,7 @@ class Terminal{
 		proto.ExportProperty(this,"last_ssh_command")
 		proto.ExportProperty(this,"is_in_alternate_buffer")
 		proto.ExportProperty(this,"enable_quick_edit")
+		proto.ExportProperty(this,"custom_parsing_context")
 		proto.ExportMethod(this,"destroy",JS_destroy)
 		proto.ExportMethod(this,"write",JS_write)
 		proto.ExportMethod(this,"send",JS_send)
@@ -4331,6 +4343,7 @@ class Terminal{
 	got_enter_from_input=0
 	last_ssh_command=string.NULL
 	compiler_errors=JSObject.NULL
+	custom_parsing_context=JSObject.NULL
 	m_current_path=string.NULL
 	proc=System.Processes.CProcess.NULL
 	auto __done__()
@@ -4441,6 +4454,7 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 		term.JS=JS
 		term.input_pipe_queue=new string
 		term.proc=proc
+		term.custom_parsing_context=JS.New()
 		if proc&&proc.pipe_2nd:
 			PipeWaiter.SetPipeDataCallback(proc.pipe_2nd,function(string s){
 				if term.is_remote_editing:
@@ -4645,9 +4659,8 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 							}else{
 								g_renderer.DrawChar(fnt_scaled,x_ch,y_ch,colors[fg],ch)
 							}
-						if (flags & g_flags.UNDERLINE) {
+						if (flags & (g_flags.UNDERLINE|g_flags.COMPILER_ERROR))
 							g_renderer.DrawRectangle(x_ch,y_ch+y_underline,w_char*float(ch_width),h_underline, colors[fg])
-						}
 			////////////////////
 			//render the IME composing text
 			y_cur_term=(term.y+term.ybase-term.ydisp+term.scrollback)%term.scrollback
@@ -4931,7 +4944,8 @@ g_flags={
 	UNDERLINE: 2,
 	BLINK: 4,
 	INVERSE: 8,
-	INVISIBLE: 16
+	INVISIBLE: 16,
+	COMPILER_ERROR: 32
 };
 
 KMOD_NONE = 0x0000

@@ -25,10 +25,16 @@ v2
    "in_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 0
 }
 =====������=====
 # Release Notes
+
+Version 3.0.3
+	- Remote editing support on Mac
+	- Remote editing bug fixes (need to reinstall the feature)
+	- Improved the terminal output parser for node.js error dumps
+	- Minor terminal improvements
 
 Version 3.0.2
 	- Minor bug fixes
@@ -41,6 +47,12 @@ Version 3.0.1
 
 =====������=====
 # 更新历史
+
+3.0.3版
+	- 支持了Mac平台的远程编辑
+	- 修了一些远程编辑的bug （需要重新安装远程编辑功能）
+	- 改进了终端窗口中对node.js错误信息的处理
+	- 对终端窗口进行了一些小改进
 
 3.0.2版
 	- 修了一些小bug

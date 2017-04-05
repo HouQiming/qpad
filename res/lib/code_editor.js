@@ -3064,6 +3064,10 @@ var CheckEditorExternalChange=function(obj){
 				obj.doc.ResetSaveDiff()
 				obj.doc.m_loaded_time=IO.GetFileTimestamp(obj.doc.m_file_name);
 				obj.doc.saved_point=obj.doc.ed.GetUndoQueueLength();
+				if(obj.doc.ed.GetTextSize()<UI.AUTO_REPARSE_MAX_SIZE){
+					obj.doc.ForceReparse();
+					CallParseMore();
+				}
 			}else{
 				obj.Reload();
 			}

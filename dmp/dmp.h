@@ -272,5 +272,5 @@ extern const char *dmp_strstr(
 extern void dmp_build_texts_from_diff(
 	char **t1, uint32_t *l1, char **t2, uint32_t *l2, const dmp_diff *diff);
 
-extern int dmp_diff_to_i64_list(const dmp_diff *diff,long long* ret);
+extern int dmp_diff_to_i64_list(const dmp_diff *diff,int64_t* ret);
 #endif

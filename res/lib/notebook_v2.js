@@ -172,7 +172,7 @@ UI.RegisterOutputParser=function(s_regex_string,n_brackets,fmatch_to_err){
 };
 
 var MAX_PARSABLE_LINE=1024;
-UI.ParseCompilerOutput=function(sline){
+UI.ParseCompilerOutput=function(term,sline){
 	if(Duktape.__byte_length(sline)>MAX_PARSABLE_LINE){return undefined;}
 	if(!g_processed_output_parser){
 		//create the grand regexp
@@ -201,7 +201,7 @@ UI.ParseCompilerOutput=function(sline){
 	for(var i=0;i<match_places.length;i+=2){
 		var p_tester=match_places[i];
 		if(big_match[p_tester]){
-			return g_output_parsers[i>>1].f(big_match.slice(match_places[i],match_places[i+1]))
+			return g_output_parsers[i>>1].f(big_match.slice(match_places[i],match_places[i+1]),term.custom_parsing_context)
 		}
 	}
 	return undefined;
@@ -2156,7 +2156,7 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 		}
 		term.got_enter_from_input=0
 	}
-	var err=UI.ParseCompilerOutput(sline);
+	var err=UI.ParseCompilerOutput(term,sline);
 	if(err){
 		var fn_raw=err.file_name;
 		//if(!(fn_raw.search(g_regexp_abspath)>=0)&&!IO.FileExists(fn_raw)){
@@ -2169,6 +2169,7 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 			}
 			err.file_name=IO.NormalizeFileName((fn_search_found||((term.m_current_path||'.')+'/'+err.file_name)));
 		}
+		if(err.file_name){err.file_name=IO.NormalizeFileName(err.file_name);}
 		if(is_clicked){
 			//do not create a new highlight for the error, but noisily focus it
 			err.is_quiet=1;

@@ -12,7 +12,7 @@ var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
 var MAX_STALE_TIME=3600*24;
 
-UI.g_core_version="3.0.2";
+UI.g_core_version="3.0.3";
 UI.g_version=UI.g_core_version+" ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
 if(UI.Platform.BUILD=="debug"){

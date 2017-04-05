@@ -1,56 +1,62 @@
-grep -q '=== qpad interfacing script ===' ~/.profile || cat >>~/.profile <<'EOF'
-# === qpad interfacing script ===
+sed 's/@/dd count=1 bs=/;s/?/C=`wc -c "$1"|egrep -o [0-9]+`/;s/P/printf/' >~/.qpad.sh <<'EOF'
 qpad(){
 local T
 local D
 local S
 local C
 if [ "$1" = "" ];then
-echo "usage: qpad <file>"
+P 'usage: qpad <file>\n'
 return
 fi
 if ! [ -f "$1" ];then
 if [ -e "$1" ];then
-echo "I can only edit normal files"
+P 'invalid file\n'
 return
 fi
 touch "$1"
 fi
 T=`stty -g`
 stty raw -echo
-printf 'not in qpad, press enter to quit\033]9001;\007'
-D=`dd count=1 bs=1 2>/dev/null`
+P 'not in qpad, press enter to quit\033]9001;\007'
+D=`@1 2>/dev/null`
 if [ "$D" != '#' ];then
-printf '\n'
+P '\n'
 stty "$T"
 return
 fi
-printf '\033]0;(qpad running)\007\033]9000;%s\007' "$1"
-wc -c "$1"
+?
+P "\033]0;(qpad running)\007\033]9000;%s\007$C\n" "$1"
 cat "$1"
 while true;do
-D=`dd count=1 bs=1 2>/dev/null`
+D=`@1 2>/dev/null`
 if [ "$D" = 's' ];then
-cp "$1" "$1.bak"
+mv "$1" "$1.bak"
 S=""
 while true;do
-C=`dd count=1 bs=1 2>/dev/null`
+C=`@1 2>/dev/null`
 if [ "$C" = ';' ];then
 break
 fi
 S="$S$C"
 done
-dd count=1 bs=$S >"$1" 2>/dev/null
-echo -n s
+@$S >"$1" 2>/dev/null
+?
+D=`expr $S - $C`
+while [ "$D" != 0 ];do
+@$D >>"$1" 2>/dev/null
+?
+D=`expr $S - $C`
+done
+P 's'
+D='s'
 fi
 if [ "$D" = 'q' ];then
 break
 fi
 done
-printf '\033]0;Terminal\007'
+P '\033]0;Terminal\007'
 stty "$T"
 }
-# Remote editing script installed to ~/.profile
-# Type 'qpad <file>' to edit it remotely
 EOF
-source ~/.profile
+grep -q ~/.qpad.sh ~/.profile || printf "source ~/.qpad.sh\n" >>~/.profile
+source ~/.qpad.sh
