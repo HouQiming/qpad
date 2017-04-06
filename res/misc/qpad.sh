@@ -60,3 +60,4 @@ stty "$T"
 EOF
 grep -q ~/.qpad.sh ~/.profile || printf "source ~/.qpad.sh\n" >>~/.profile
 source ~/.qpad.sh
+# Try qpad <file>

@@ -7,7 +7,7 @@ v2
    "m_button_name": "Release Notes",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "m_is_help_page_preview": 1
+   "m_is_help_page_preview": -1
   },
   {
    "m_language": "Markdown",
@@ -33,6 +33,7 @@ v2
 Version 3.0.3
 	- Remote editing support on Mac
 	- Remote editing bug fixes (need to reinstall the feature)
+	- Added "Install SSH public key" to the terminal menu
 	- Improved the terminal output parser for node.js error dumps
 	- Minor terminal improvements
 
@@ -51,6 +52,7 @@ Version 3.0.1
 3.0.3版
 	- 支持了Mac平台的远程编辑
 	- 修了一些远程编辑的bug （需要重新安装远程编辑功能）
+	- 终端菜单里支持了安装SSH证书
 	- 改进了终端窗口中对node.js错误信息的处理
 	- 对终端窗口进行了一些小改进
 

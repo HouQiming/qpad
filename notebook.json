@@ -131,11 +131,10 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-global search highlight clean up
 Mac ALT+F+D
 sticker desync
 	close / reopen while unsaved... won't be able to replay from those ranges only

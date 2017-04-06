@@ -1796,6 +1796,12 @@ UI.OpenNoteBookTab=function(file_name,is_quiet){
 
 ///////////////////////////////////
 //terminal
+var g_ssh_pubkey=IO.ReadAll(IO.ProcessUnixFileName("~/.ssh/id_rsa.pub"));
+(function(){
+	if(!g_ssh_pubkey){
+		g_ssh_pubkey=IO.ReadAll(IO.ProcessUnixFileName("~/.ssh/id_dsa.pub"));
+	}
+})();
 W.terminal_prototype={
 	FindNext:function(dir){
 		if(this.m_term){
@@ -2007,6 +2013,15 @@ W.Terminal=function(id,attrs){
 				obj.m_term.send(s_script);
 				UI.Refresh()
 			}})
+		if(g_ssh_pubkey){
+			menu_terminal.AddNormalItem({
+				text:"Install SSH public key",
+				icon:"多",
+				action:function(){
+					obj.m_term.send(["mkdir -p ~/.ssh;cat >> ~/.ssh/authorized_keys <<'EOF'\n",g_ssh_pubkey,'EOF\n'].join(''));
+					UI.Refresh()
+				}})
+		}
 		if(obj.m_term.enable_quick_edit){
 			//console.log('do menu ',id,obj.m_term.is_in_alternate_buffer,Math.random())
 			menu_terminal.AddNormalItem({text:"Paste",icon:"粘",context_menu_group:"edit",enable_hotkey:!obj.m_show_find,key:"CTRL+V",action:function(){

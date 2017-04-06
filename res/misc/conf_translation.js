@@ -321,6 +321,7 @@
 			"EXTERNAL CHANGES LOADED!\n - Use Edit-Undo to revert\n - Make more changes to dismiss this":"刚刚加载了外部做出的修改！\n- 要想撤销这些修改，请选择“编辑-撤销”\n- 如欲消除此通知，接着往下编辑就好",
 			"Set cell mode":"设置脚本运行模式",
 			"Install remote editing feature":"安装远程编辑功能",
+			"Install SSH public key":"安装SSH公钥",
 			"Waiting for response...":"正在等待远程终端响应……",
 			"Uploading to the terminal...":"正在上传到远程终端……",
 			"THE TERMINAL HAS BEEN CLOSED!\nCan't upload anymore. Save your changes under another name before it's lost.":"远程终端已被关闭！\n已经不能再上传了。如果想要保留编辑内容，请另存一个文件。",
