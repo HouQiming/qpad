@@ -4527,6 +4527,9 @@ var FormatFileSize=function(size){
 }
 
 UI.FormatRelativeTime=function(then,now){
+	if(!then||!now){
+		return UI._("time unavailable");
+	}
 	if(now[0]==then[0]){
 		if(now[1]==then[1]){
 			if(now[2]==then[2]){

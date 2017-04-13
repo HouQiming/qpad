@@ -2205,6 +2205,7 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 
 var ReallyDetectMSYSTools=function(){
 	if(UI.IS_MOBILE){return 0;}
+	if(UI.Platform.ARCH=="web"){return 0;}
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		var paths=IO.ProcessUnixFileName("%PATH%").split(/[; \t]/);
 		var got_script=0;

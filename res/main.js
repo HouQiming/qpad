@@ -408,24 +408,25 @@ var OpenShell=function(){
 		//IO.CreateFile(fn_sh,'#!/bin/sh\ncd \''+UI.m_new_document_search_path+'\'\nrm -- "$0"\nexec "$SHELL"\n')
 		//IO.Shell([s_terminal,"-e","/bin/sh "+fn_sh,"&"])
 		IO.RunProcess([s_terminal],UI.m_new_document_search_path)
-	}else{
+	}else  if(UI.Platform.ARCH=="mac"){
 		//mac
 		//http://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
-		IO.Shell(["osascript",
-			"-e",'tell application "Terminal" to activate'])
-		IO.Shell(["osascript",
-			"-e",'tell application "System Events" to delay 0.1'])
-		IO.Shell(["osascript",
-			"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
-		IO.Shell(["osascript",
-			"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
+		//IO.Shell(["osascript",
+		//	"-e",'tell application "Terminal" to activate'])
+		//IO.Shell(["osascript",
+		//	"-e",'tell application "System Events" to delay 0.1'])
+		//IO.Shell(["osascript",
+		//	"-e",'tell application "System Events" to tell process "Terminal" to keystroke "t" using command down'])
+		//IO.Shell(["osascript",
+		//	"-e",'tell application "Terminal" to do script "cd '+UI.m_new_document_search_path+'" in selected tab of the front window'])
+		OpenShellTerm();
 	}
 };
 
 var OpenShellTerm=function(){
 	UI.UpdateNewDocumentSearchPath();
 	UI.OpenTerminalTab({
-		args:UI.MakeScriptCommand(132,24,['bash','-i']),
+		args:UI.MakeScriptCommand(132,24,UI.Platform.ARCH=="mac"?['bash','--rcfile','/etc/bashrc','-i']:['bash','-i']),
 		spath:UI.m_new_document_search_path,
 		cols:132,
 		rows:24,

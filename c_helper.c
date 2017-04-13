@@ -9,22 +9,26 @@
 #include <string.h>
 
 int UnixMatchFileAttributes(char* fntar,char* fnsrc){
-	struct stat sb;
-	memset(&sb,0,sizeof(sb));
-	if(stat(fntar,&sb)!=0){return 0;}
-	if(chmod(fnsrc,sb.st_mode&(S_ISUID|S_ISGID|S_ISVTX|S_IRWXU|S_IRWXG|S_IRWXO))!=0){return 0;}
-	if(chown(fnsrc,sb.st_uid,sb.st_gid)!=0){return 0;}
+	#ifndef WEB
+		struct stat sb;
+		memset(&sb,0,sizeof(sb));
+		if(stat(fntar,&sb)!=0){return 0;}
+		if(chmod(fnsrc,sb.st_mode&(S_ISUID|S_ISGID|S_ISVTX|S_IRWXU|S_IRWXG|S_IRWXO))!=0){return 0;}
+		if(chown(fnsrc,sb.st_uid,sb.st_gid)!=0){return 0;}
+	#endif
 	return 1;
 }
 
 int UnixIsFirstInstance(){
-	int pid_file = open("/var/run/qpad.pid", O_CREAT | O_RDWR, 0666);
-	int rc = flock(pid_file, LOCK_EX | LOCK_NB);
-	if(rc) {
-	    if(EWOULDBLOCK == errno){
-	        return 0;
-	    }
-	}
+	#ifndef WEB
+		int pid_file = open("/var/run/qpad.pid", O_CREAT | O_RDWR, 0666);
+		int rc = flock(pid_file, LOCK_EX | LOCK_NB);
+		if(rc) {
+		    if(EWOULDBLOCK == errno){
+		        return 0;
+		    }
+		}
+	#endif
 	return 1;
 }
 

@@ -135,6 +135,7 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+good external link, update site download to the updating version
 Mac ALT+F+D
 sticker desync
 	close / reopen while unsaved... won't be able to replay from those ranges only
@@ -361,6 +362,8 @@ echo "=== Done"
 rem [interactive]
 rem [button: Upload update]
 cd ..\qpadsite
+git add update/*
+git commit -a -m "update release"
 rsync -rtzzuvq update/* root@120.25.59.132:~/qpad_update/public/
 git push origin gh-pages
 
