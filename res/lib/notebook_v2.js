@@ -1817,6 +1817,9 @@ W.terminal_prototype={
 	},
 };
 W.Terminal=function(id,attrs){
+	if(UI.default_styles.terminal.__proto__!==W.terminal_prototype){
+		UI.default_styles.terminal.__proto__=W.terminal_prototype;
+	}
 	var obj=UI.StdWidget(id,attrs,"terminal",W.terminal_prototype);
 	UI.Begin(obj)
 	if(!obj.m_term){

@@ -135,10 +135,6 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-notebook consoles
-	ctrl+f
-	beep
-when \" straddles block boundary?
 (test) preserve attributes during remote edit
 console bad shift+ctrl+right at line wrap
 slow rendering with large amount of text folded:
