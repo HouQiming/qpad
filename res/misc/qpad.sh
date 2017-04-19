@@ -30,7 +30,7 @@ cat "$1"
 while true;do
 D=`@1 2>/dev/null`
 if [ "$D" = 's' ];then
-mv "$1" "$1.bak"
+cp "$1" "$1.bak"
 S=""
 while true;do
 C=`@1 2>/dev/null`

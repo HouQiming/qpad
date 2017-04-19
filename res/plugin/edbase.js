@@ -304,7 +304,7 @@ Language.Register({
 		var tok_curly_bracket1=lang.DefineToken("}");
 		var kwset=lang.DefineKeywordSet("color_symbol");
 		var keywords={
-			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined','yield','await'],
+			'keyword':['break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceof','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','undefined','yield','await'],
 			'type':['typeof','var','let','void','boolean','byte','int','short','char','double','long','float'],
 		};
 		for(var k in keywords){
@@ -397,7 +397,7 @@ Language.Register({
 		kwset=lang.DefineKeywordSet("color_symbol2");
 		kwset.DefineKeywords("color_keyword",[
 			'script',
-			'break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceOf','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','window','document'])
+			'break','export','return','case','for','switch','comment','function','this','continue','if','default','import','delete','in','do','label','while','else','new','with','abstract','implements','protected','instanceof','public','interface','static','synchronized','false','native','throws','final','null','transient','package','true','goto','private','catch','enum','throw','class','extends','try','const','finally','debugger','super','window','document'])
 		kwset.DefineKeywords("color_type",['typeof','var','let','void','boolean','byte','int','short','char','double','long','float'])
 		kwset.DefineWordColor("color2")
 		kwset.DefineWordType("color_number","0-9")
@@ -800,6 +800,10 @@ Language.Register({
 		kwset.DefineWordColor("color")
 		kwset.DefineWordType("color_number","0-9")
 		lang.SetKeyDeclsBaseColor("color")
+		lang.DefineToken("\\\\")
+		lang.DefineToken("\\'")
+		lang.DefineToken('\\"')
+		lang.DefineToken('\\\n')
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_string0,bid_string1,bid_string2,bid_string3])
 			if(lang.isInside(bid_comment)||lang.isInside(bid_string0)||lang.isInside(bid_string1)||lang.isInside(bid_string2)||lang.isInside(bid_string3)){
@@ -1051,6 +1055,16 @@ UI.RegisterHelpHook(function(items,ssearch){
 	}
 })
 
+//stackoverflow
+UI.RegisterHelpHook(function(items,ssearch){
+	if(!ssearch){return;}
+	var tab_frontmost=UI.GetFrontMostEditorTab();
+	var fn=(tab_frontmost&&tab_frontmost.main_widget&&tab_frontmost.main_widget.file_name);
+	var lang=(fn&&UI.ED_GetFileLanguage(fn));
+	if(!lang){return;}
+	if(lang.parser!=="C"){return;}
+	SearchEngineHook(items,ssearch,'s',UI._("Search stackoverflow for “@1”"),"https://stackoverflow.com/search?q=文");
+})
 
 //general Googling - put it in the end
 UI.RegisterHelpHook(function(items,ssearch){

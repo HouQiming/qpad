@@ -1902,7 +1902,9 @@ class CColorer_programmer
 					if st<0:
 						tok_id=~st
 						ptok=I-int(token_lengths[tok_id])
-						if ptok>=0:
+						//if ptok>=0:
+						if I-1>=0:
+							//the token belongs to us as long as its LAST character is in our block
 							//flip the token id to sort high priority tokens first
 							ret.push((ptok<<16)+(0xffff^tok_id))
 						p_ops++
@@ -1945,7 +1947,7 @@ class CColorer_programmer
 			inc_value=0
 			min_value=0
 			st=ld.m_id_from_key_state[((ld.m_all_key_states[sti]&and_mask)^xor_mask)&key_mask]//*ld.m_n_tokens
-			I_next=0
+			I_next=-0x3fffffff
 			foreach tok_I in tokens
 				I=tok_I>>16
 				tok=(tok_I&0xffff)
@@ -2025,7 +2027,7 @@ class CColorer_programmer
 		testEvent(-s_context.n-1,0)
 		n_tokens=ld.m_n_tokens
 		tokens=GetTokenList(s_context,s,s.n)
-		I_next=0
+		I_next=-0x3fffffff
 		foreach tok_I in tokens
 			I=tok_I>>16
 			tok=(tok_I&0xffff)
@@ -2094,7 +2096,7 @@ class CColorer_programmer
 			is_valid=i8(cur_delta<=0LL)
 			n_tokens=ld.m_n_tokens
 			tokens=GetTokenList(s_context,s,s.n)
-			I_next=0
+			I_next=-0x3fffffff
 			//foreach tok,I in EnumTokens(s_context,s)
 			foreach tok_I in tokens
 				I=tok_I>>16
