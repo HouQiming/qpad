@@ -1601,7 +1601,7 @@ class Terminal{
 				auto addr=(row*this.cols+i)*3
 				if addr+2<this.lines.n&&this.lines[addr+2]:
 					stext.PushUnicode(this.lines[addr+1])
-			if row<this.line_end_states.n&&this.line_end_states[row]==0:
+			if j!=sel_y1&&row<this.line_end_states.n&&this.line_end_states[row]==0:
 				has_newline=1
 				for i=sel_x1_j:this.cols-1
 					auto addr=(row*this.cols+i)*3
@@ -1718,6 +1718,7 @@ class Terminal{
 									this.sel_y1=this.sel_y1+1
 									if this.sel_y1>=this.scrollback:
 										this.sel_y1-=this.scrollback
+									pchar_line=this.sel_y1*this.cols
 								addr=(pchar_line+this.sel_x1)*3
 								if uptr(addr)>=uptr(this.lines.n)||(!this.lines[addr+2]||this.lines[addr+1]==' '||this.lines[addr+1]=='\t')==pass:
 									break
