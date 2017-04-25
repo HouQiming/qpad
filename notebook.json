@@ -131,12 +131,10 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 2
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-full-tab mode for notebook terminal
-	when running, the hotkey merely calls up the terminal
 node integration / ...
 	could allow us to integrate a SSH client...
 	or make us modular

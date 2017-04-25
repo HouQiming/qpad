@@ -499,6 +499,20 @@ UI.MakeScriptCommand=function(cols,rows,args){
 
 var g_regexp_abspath=new RegExp("^(([a-zA-Z]:/)|(/)|[~])");
 var g_v2_separator='\n=====\uDBFF\uDFFF=====\n',g_v2_separator_re=new RegExp(g_v2_separator,'g');
+var ClearCellOutputByCell=function(cell_i){
+	if(cell_i.m_output_terminal&&cell_i.m_output_terminal.m_term){
+		if(cell_i.m_output_terminal.m_term.compiler_errors){
+			for(var i=0;i<cell_i.m_output_terminal.m_term.compiler_errors.length;i++){
+				ClearCompilerError(cell_i.m_output_terminal.m_term.compiler_errors[i]);
+			}
+			UI.RefreshAllTabs();
+		}
+		cell_i.m_output_terminal.m_term.destroy();
+		cell_i.m_output_terminal.m_term=undefined;
+		cell_i.m_output_terminal=undefined;
+	}
+	cell_i.m_proc=undefined;
+};
 W.notebook_prototype={
 	Save:function(){
 		var docs=[];
@@ -905,24 +919,16 @@ W.notebook_prototype={
 	},
 	ClearCellOutput:function(id){
 		var cell_i=this.m_cells[id];
-		if(cell_i.m_output_terminal&&cell_i.m_output_terminal.m_term){
-			if(cell_i.m_output_terminal.m_term.compiler_errors){
-				for(var i=0;i<cell_i.m_output_terminal.m_term.compiler_errors.length;i++){
-					ClearCompilerError(cell_i.m_output_terminal.m_term.compiler_errors[i]);
-				}
-				UI.RefreshAllTabs();
-			}
-			cell_i.m_output_terminal.m_term.destroy();
-			cell_i.m_output_terminal.m_term=undefined;
-			cell_i.m_output_terminal=undefined;
-		}
-		cell_i.m_proc=undefined;
+		ClearCellOutputByCell(cell_i);
 	},
 	RunCell:function(id){
 		var cell_i=this.m_cells[id];
 		var doc=cell_i.m_text_in;
 		if(cell_i.m_proc){
-			if(doc&&doc.owner){
+			if(cell_i.m_output_terminal&&cell_i.m_output_terminal.is_full_tab){
+				UI.SetFocus(cell_i.m_output_terminal);
+				return "focus";
+			}else if(doc&&doc.owner){
 				var noti_new={
 					id:"cancel_notification",icon:'警',
 					text:'This cell is already running. Repeat your action to cancel it and re-run.',
@@ -1060,7 +1066,10 @@ W.notebook_prototype={
 		var cols=80;
 		var rows=25;
 		var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
-		if(this.w>this.h){
+		if(s_code.indexOf('[full tab]')>=0){
+			cols=Math.max(Math.floor(this.w/this.panel_style.scale/dims.w/8)*8,8);
+			rows=Math.max(Math.ceil(this.h/this.panel_style.scale/dims.h),2);
+		}else if(this.w>this.h){
 			cols=Math.max(Math.floor(this.w/this.panel_style.scale/dims.w*0.5/8)*8,8);
 			rows=Math.max(Math.ceil(this.h/this.panel_style.scale/dims.h),2);
 		}else{
@@ -1070,7 +1079,7 @@ W.notebook_prototype={
 		cols=(cols||80);
 		rows=(rows||25);
 		var interactive_ified=0;
-		if(s_code.indexOf('[interactive]')>=0){
+		if(s_code.indexOf('[interactive]')>=0||s_code.indexOf('[full tab]')>=0){
 			//terminal
 			if(UI.DetectMSYSTools()){
 				args=UI.MakeScriptCommand(cols,rows,args);
@@ -1099,6 +1108,7 @@ W.notebook_prototype={
 			if(UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
 				UI.ShowCompletionNotification();
 			}
+			ClearCellOutputByCell(cell_i);
 		}.bind(proc);
 		if(UI.InitTerminal(proc,proc.cols,proc.rows,args,spath,fonfinalize)){
 			//do nothing
@@ -1109,11 +1119,15 @@ W.notebook_prototype={
 		cell_i.m_output_terminal=proc;
 		cell_i.m_proc=proc;
 		proc.interactive_ified=interactive_ified;
+		proc.is_full_tab=(s_code.indexOf('[full tab]')>=0);
 		proc.m_unknown_progress=0;
 		proc.m_t_unknown_progress=UI.m_frame_tick;
 		proc.m_term.m_current_path=spath;
 		//console.log('proc.m_term.m_current_path=',spath);
 		this.m_last_focus_cell_id=id*2+0;
+		if(proc.is_full_tab){
+			UI.SetFocus(proc);
+		}
 		UI.Refresh()
 		return 0;
 	},
@@ -1215,7 +1229,7 @@ W.NotebookView=function(id,attrs){
 			var s_btn_name=(cell_i.m_button_name||"\u2022 untitled")
 			var progress=undefined;
 			var progress_mode=undefined;
-			if(cell_i.m_proc){
+			if(cell_i.m_proc&&!(cell_i.m_output_terminal&&cell_i.m_output_terminal.is_full_tab)){
 				progress=cell_i.m_proc.m_term.progress_value;
 				if(!(progress>=0)){progress=undefined;}
 				progress_mode='normal';
@@ -1320,7 +1334,7 @@ W.NotebookView=function(id,attrs){
 			var w_term=term.m_term.cols*dims.w;
 			var h_term=term.m_term.rows*dims.h;
 			var value=term.GetScrollValue();
-			var scale=Math.max(Math.min(Math.min((obj.w-(value>=0?term.w_scroll_bar:0)+2)/w_term,obj.h/h_term),1),0.1);
+			var scale=Math.max(Math.min(Math.min((obj.w-(value>=0?term.w_scroll_bar:0)-2)/w_term,obj.h/h_term),1),0.1);
 			term.font=UI.ScaleFont(UI.default_styles.terminal.font,scale);
 			w_term*=scale;
 			h_term*=scale;
@@ -1331,16 +1345,20 @@ W.NotebookView=function(id,attrs){
 			term.y=y_term;
 			term.w=w_term_area;
 			term.h=h_term;
-			if(obj.w-w_term_area>obj.h-h_term){
-				w_editor=obj.w-w_term_area-term.panel_style.border_width;
-				//UI.RoundRect({x:x_term,y:obj.y,w:w_term_area,h:obj.h,color:C_bg,border_width:0});
-				y_term=obj.y+(obj.h-h_term)*0.5;
-				term_side="x";
+			if(cur_cell.m_output_terminal.is_full_tab){
+				//do nothing
 			}else{
-				h_editor=obj.h-h_term-term.panel_style.border_width;
-				//UI.RoundRect({x:obj.x,y:y_term,w:obj.w,h:h_term,color:C_bg,border_width:0});
-				x_term=obj.x+(obj.w-w_term_area)*0.5;
-				term_side="y";
+				if(obj.w-w_term_area>obj.h-h_term){
+					w_editor=obj.w-w_term_area-term.panel_style.border_width;
+					//UI.RoundRect({x:x_term,y:obj.y,w:w_term_area,h:obj.h,color:C_bg,border_width:0});
+					y_term=obj.y+(obj.h-h_term)*0.5;
+					term_side="x";
+				}else{
+					h_editor=obj.h-h_term-term.panel_style.border_width;
+					//UI.RoundRect({x:obj.x,y:y_term,w:obj.w,h:h_term,color:C_bg,border_width:0});
+					x_term=obj.x+(obj.w-w_term_area)*0.5;
+					term_side="y";
+				}
 			}
 		}
 		var doc=cur_cell.m_text_in;
@@ -1356,12 +1374,19 @@ W.NotebookView=function(id,attrs){
 				var renderer=doc.GetRenderer();
 				renderer.ResetWrapping(w_wrap_std,doc)
 			}
-			W.CodeEditor("cell_"+focus_cell_id.toString(),{
-				disable_minimap:1,
-				doc:doc,
-				read_only:doc.read_only,
-				x:obj.x,y:obj.y,w:w_editor,h:h_editor,
-			});
+			if(cur_cell.m_output_terminal&&cur_cell.m_output_terminal.is_full_tab){
+				var obj_cell_i=obj["cell_"+focus_cell_id.toString()];
+				if(obj_cell_i){
+					obj.__children.push(obj_cell_i);
+				}
+			}else{
+				W.CodeEditor("cell_"+focus_cell_id.toString(),{
+					disable_minimap:1,
+					doc:doc,
+					read_only:doc.read_only,
+					x:obj.x,y:obj.y,w:w_editor,h:h_editor,
+				});
+			}
 			//UI.PushCliprect(obj.x,obj.y+h_doc,obj.w,obj.panel_style.shadow_size);
 			//UI.RoundRect({
 			//	x:obj.x-obj.panel_style.shadow_size,y:obj.y+h_doc-obj.panel_style.shadow_size,
@@ -1382,7 +1407,11 @@ W.NotebookView=function(id,attrs){
 		if(cur_cell.m_output_terminal){
 			var id_term="cell_term_"+(focus_cell_id&-2).toString();
 			obj[id_term]=term;
-			W.Terminal(id_term,{x:x_term,y:y_term,w:w_term_area,h:h_term,is_embedded:1})
+			if(term.is_full_tab){
+				W.Terminal(id_term,{x:obj.x,y:obj.y,w:obj.w,h:obj.h,is_embedded:2})
+			}else{
+				W.Terminal(id_term,{x:x_term,y:y_term,w:w_term_area,h:h_term,is_embedded:1})
+			}
 		}
 	}
 	if(obj.activated){
@@ -1459,6 +1488,8 @@ W.NotebookView=function(id,attrs){
 					SetCellRunTag(cur_cell.m_text_in,"[new window]");
 				}},{text:"new_term",icon:"格",tooltip:'New tab',action:function(){
 					SetCellRunTag(cur_cell.m_text_in,"[new term]");
+				}},{text:"full_tab",icon:"大",tooltip:'Full-tab terminal',action:function(){
+					SetCellRunTag(cur_cell.m_text_in,"[full tab]");
 				}},{text:"local_term",icon:"Ｖ",tooltip:'Interactive terminal',action:function(){
 					SetCellRunTag(cur_cell.m_text_in,"[interactive]");
 				}},{text:"dumb_term",icon:"控",tooltip:'Simple terminal',action:function(){
@@ -1854,23 +1885,37 @@ W.Terminal=function(id,attrs){
 	w_term_area*=scale;
 	var x_term=obj.x+(obj.w-w_term_area)*0.5;
 	var y_term=obj.y+(obj.h-h_term)*0.5;
-	UI.RoundRect({
-		x:x_term-obj.panel_style.shadow_size,y:y_term-obj.panel_style.shadow_size,
-		w:w_term_area+obj.panel_style.shadow_size*2,h:h_term+obj.panel_style.shadow_size*2,
-		color:obj.panel_style.shadow_color,
-		border_width:-obj.panel_style.shadow_size,
-		round:obj.panel_style.shadow_size,
-	});
+	if(obj.is_embedded!==2){
+		UI.RoundRect({
+			x:x_term-obj.panel_style.shadow_size,y:y_term-obj.panel_style.shadow_size,
+			w:w_term_area+obj.panel_style.shadow_size*2,h:h_term+obj.panel_style.shadow_size*2,
+			color:obj.panel_style.shadow_color,
+			border_width:-obj.panel_style.shadow_size,
+			round:obj.panel_style.shadow_size,
+		});
+	}
 	var in_bell=obj.m_term.isInBell();
 	var C_bell=UI.lerp_rgba(obj.panel_style.bell_color&0xffffff,obj.panel_style.bell_color,Math.min(Math.max(in_bell,0.0),1.0));
-	UI.RoundRect({
-		x:x_term-obj.panel_style.border_width,y:y_term-obj.panel_style.border_width,
-		w:w_term_area+obj.panel_style.border_width*2,h:h_term+obj.panel_style.border_width*2,
-		color:obj.panel_style.border_color,
-		round:obj.panel_style.border_width,
-		border_color:C_bell,
-		border_width:in_bell?obj.panel_style.bell_border_width:0,
-	});
+	if(obj.is_embedded===2){
+		if(in_bell){
+			UI.RoundRect({
+				x:x_term,y:y_term,
+				w:w_term,h:h_term,
+				round:obj.panel_style.border_width,
+				border_color:C_bell,
+				border_width:in_bell?obj.panel_style.bell_border_width*2:0,
+			});
+		}
+	}else{
+		UI.RoundRect({
+			x:x_term-obj.panel_style.border_width,y:y_term-obj.panel_style.border_width,
+			w:w_term_area+obj.panel_style.border_width*2,h:h_term+obj.panel_style.border_width*2,
+			color:obj.panel_style.border_color,
+			round:obj.panel_style.border_width,
+			border_color:C_bell,
+			border_width:in_bell?obj.panel_style.bell_border_width:0,
+		});
+	}
 	if(in_bell){
 		UI.AutoRefresh();
 	}
