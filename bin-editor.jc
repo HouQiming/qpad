@@ -417,6 +417,22 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 	}
 	JS_UI["BIN_BufToString"]=function(JSContext JS){
 		buf=JS.Param(0).as(u8[])
+		if buf.n<65536:
+			is_bad=0
+			mask=(1<<13)+(1<<10)+(1<<9)
+			foreach ch in buf
+				chi=int(u32(ch))
+				if (chi>=32||(mask&(1<<chi)))&&chi!=127&&chi<254:
+					//printable
+				else
+					is_bad=1
+					break
+			if !is_bad:
+				s=buf[0:].ConvertToAsBinary(char)
+				if s==Unicode32ToUtf8(Utf8ToUnicode32(s)):
+					//it's valid utf8
+					s2=JS["JSON"].CallMethod(string,"stringify",s)
+					return JS.Return(s2)
 		ret=new string
 		ret.push('[')
 		foreach ch in buf

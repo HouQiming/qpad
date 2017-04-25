@@ -50,12 +50,12 @@ You can add comments like `//@qpadvar kv A variable used for important things` i
 
 #@本@ Notebook Tricks
 
-You can write `[button: Cell Name]` in a notebook cell to give it a name (replace the `Cell Name` part). The text can be put in a batch file or shell script comment.
+Right click in the text part of a notebook cell to delete / clone cells.
 
-You can write `[new window]` in a notebook cell to make it run in a new window.
+You can also open the “Notebook” menu when a notebook cell has focus.
 
-#@プ@ Searching for Headers
+#@プ@ Making QPad Find Headers
 
-When QPad fails to locate some symbol in a dependent file automatically (e.g. when `MessageBox` appears black even though you did `#include <windows.h>`), just open the dependent file (e.g. `windows.h`) manually. QPad would learn to search that location the next time.
+When QPad fails to locate some symbol in a dependent file automatically (e.g. when `MessageBox` appears black even though you did `#include <windows.h>`), just open the dependent file (e.g. `windows.h`) manually. QPad would learn to search that location the next time. On Windows, this is limited to the `C:` disk only.
 
-Yuo can also add a comment like `//@qpad import "xxxx.h"` to tell QPad to treat as a `"xxxx.h"` dependency of the current file.
+You can also add a comment like `//@qpad import "xxxx.h"` to tell QPad that `"xxxx.h"` is a dependency of the current file.

@@ -48,14 +48,14 @@
 
 可以在程序中添加`//@qpadvar kv A variable used for important things`这样的注释。这样当光标移动到和注释同一层的地方之后，QPad会自动给出此类内容的贴士。
 
-#@本@ Notebook Tricks
+#@本@ 脚本簿技巧
 
-You can write `[button: Cell Name]` in a notebook cell to give it a name (replace the `Cell Name` part). The text can be put in a batch file or shell script comment.
+在脚本簿里面点右键可以删除或复制脚本。
 
-You can write `[new window]` in a notebook cell to make it run in a new window.
+光标在脚本簿里面的时候也可以使用“脚本簿”菜单。
 
-#@プ@ Searching for Headers
+#@プ@ 告诉QPad头文件在哪儿
 
-When QPad fails to locate some symbol in a dependent file automatically (e.g. when `MessageBox` appears black even though you did `#include <windows.h>`), just open the dependent file (e.g. `windows.h`) manually. QPad would learn to search that location the next time.
+如果QPad没能自动找到头文件（比如在`#include <windows.h>`的文件里`MessageBox`还是黑的），只要手动把这个文件（这里是`windows.h`）打开一遍，QPad就会记住文件的位置。不过在Windows上这仅限于C盘。
 
-Yuo can also add a comment like `//@qpad import "xxxx.h"` to tell QPad to treat as a `"xxxx.h"` dependency of the current file.
+也可以通过`//@qpad import "xxxx.h"`这样的注释告诉QPad，在编辑当前文件时也要记着解析`"xxxx.h"`。

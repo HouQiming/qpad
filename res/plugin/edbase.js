@@ -1139,7 +1139,7 @@ UI.RegisterEditorPlugin(function(){
 				s_script=s_button+s_script;
 			}
 			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-				s_mark="@echo off\nrem build script for "+s_name_in_script+"\nchcp 65001\n";
+				s_mark="@echo off\nrem build script for "+s_name_in_script+"\nchcp 65001 > NUL\n";
 				s_language="Windows BAT";
 			}else{
 				s_mark="#!/bin/sh\n#build script for "+s_name_in_script+"\n";
@@ -1175,7 +1175,7 @@ UI.RegisterEditorPlugin(function(){
 				s_name_in_script='the project'
 			}
 			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-				s_mark="@echo off\nrem build script for "+s_name_in_script+"\nchcp 65001\n";
+				s_mark="@echo off\nrem build script for "+s_name_in_script+"\nchcp 65001 > NUL\n";
 				s_language="Windows BAT";
 			}else{
 				s_mark="#!/bin/sh\n#build script for "+s_name_in_script+"\n";

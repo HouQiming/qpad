@@ -1714,6 +1714,7 @@ class Terminal{
 									if this.sel_y1==ybottom:break
 									if uptr(this.sel_y1)>=uptr(this.line_end_states.n)||this.line_end_states[this.sel_y1]==0:
 										break
+									this.sel_x1=0
 									this.sel_y1=this.sel_y1+1
 									if this.sel_y1>=this.scrollback:
 										this.sel_y1-=this.scrollback

@@ -716,6 +716,12 @@ var CreateMenus=function(){
 							});
 						}.bind(null,pinned_terms[i])
 					},{
+						text:"copy_ip_"+i.toString(),icon:"拷",tooltip:'Copy command',
+						action:function(s_ssh_command){
+							UI.SDL_SetClipboardText(s_ssh_command);
+							UI.Refresh();
+						}.bind(null,pinned_terms[i]),
+					},{
 						text:"move_up_"+i.toString(),icon:"上",tooltip:'Move up',
 						action:function(s_ssh_command){
 							var pinned_terms=UI.m_ui_metadata["<pinned_terminals>"];

@@ -7,7 +7,7 @@ v2
    "m_button_name": "Release Notes",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "m_is_help_page_preview": 1
+   "m_is_help_page_preview": -1
   },
   {
    "m_language": "Markdown",
@@ -29,6 +29,10 @@ v2
 }
 =====í¯¿í¿¿=====
 # Release Notes
+
+Version 3.0.4
+	- Copying UTF-8 text in binary files now generates a string rather than an array
+	- Added "Copy command" to the terminal menu
 
 Version 3.0.3
 	- Remote editing support on Mac
