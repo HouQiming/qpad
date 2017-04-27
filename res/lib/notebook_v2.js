@@ -491,9 +491,9 @@ UI.GetFrontMostNotebookTab=function(){
 
 UI.MakeScriptCommand=function(cols,rows,args){
 	if(UI.Platform.ARCH=="mac"){
-		return ["script","-q","/dev/null","sh","-c","export TERM=xterm;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args)];
+		return ["script","-q","/dev/null","sh","-c","export TERM=xterm;printf \"\\033]9002;%s\\007\" `tty`;stty cols "+cols.toString()+" rows "+rows.toString()+";"+IO.ShellCmd(args)];
 	}else{
-		return ["script","--return","-qfc","export TERM=xterm;stty cols "+cols.toString()+";stty rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
+		return ["script","--return","-qfc","export TERM=xterm;printf \"\\033]9002;%s\\007\" `tty`;stty cols "+cols.toString()+" rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
 	}
 };
 
@@ -926,7 +926,9 @@ W.notebook_prototype={
 		var doc=cell_i.m_text_in;
 		if(cell_i.m_proc){
 			if(cell_i.m_output_terminal&&cell_i.m_output_terminal.is_full_tab){
+				this.m_last_focus_cell_id=id*2;
 				UI.SetFocus(cell_i.m_output_terminal);
+				UI.Refresh();
 				return "focus";
 			}else if(doc&&doc.owner){
 				var noti_new={
@@ -1108,7 +1110,9 @@ W.notebook_prototype={
 			if(UI.TestOption("completion_notification")&&UI.ShowCompletionNotification){
 				UI.ShowCompletionNotification();
 			}
-			ClearCellOutputByCell(cell_i);
+			if(this.is_full_tab){
+				ClearCellOutputByCell(cell_i);
+			}
 		}.bind(proc);
 		if(UI.InitTerminal(proc,proc.cols,proc.rows,args,spath,fonfinalize)){
 			//do nothing
@@ -1406,7 +1410,7 @@ W.NotebookView=function(id,attrs){
 		//actually render the terminal
 		if(cur_cell.m_output_terminal){
 			var id_term="cell_term_"+(focus_cell_id&-2).toString();
-			obj[id_term]=term;
+			obj[id_term]=cur_cell.m_output_terminal;
 			if(term.is_full_tab){
 				W.Terminal(id_term,{x:obj.x,y:obj.y,w:obj.w,h:obj.h,is_embedded:2})
 			}else{
@@ -1488,7 +1492,7 @@ W.NotebookView=function(id,attrs){
 					SetCellRunTag(cur_cell.m_text_in,"[new window]");
 				}},{text:"new_term",icon:"格",tooltip:'New tab',action:function(){
 					SetCellRunTag(cur_cell.m_text_in,"[new term]");
-				}},{text:"full_tab",icon:"大",tooltip:'Full-tab terminal',action:function(){
+				}},{text:"full_tab",icon:"最",tooltip:'Full-tab terminal',action:function(){
 					SetCellRunTag(cur_cell.m_text_in,"[full tab]");
 				}},{text:"local_term",icon:"Ｖ",tooltip:'Interactive terminal',action:function(){
 					SetCellRunTag(cur_cell.m_text_in,"[interactive]");
@@ -1568,7 +1572,7 @@ var SetCellRunTag=function(doc,s_text){
 		cmt_holder=lang.GetCommentStrings(doc.ed.GetStateAt(doc.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
 	}
 	var s_check=doc.ed.GetText(0,Math.min(doc.ed.GetTextSize(),4096));
-	var match=s_check.match(/(\[new window\])|(\[new term\])|(\[interactive\])|(\[simple\])/);
+	var match=s_check.match(/(\[new window\])|(\[new term\])|(\[interactive\])|(\[simple\])|(\[full tab\])/);
 	var ccnt=0,sz=0;
 	if(match){
 		ccnt=Duktape.__byte_length(s_check.substr(0,match.index))
@@ -1865,13 +1869,31 @@ W.Terminal=function(id,attrs){
 			//}
 		}
 	}
+	////////////////////
+	//auto-resize the terminal
+	var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
+	var cols=Math.max(Math.ceil((obj.w-obj.w_scroll_bar-8)/dims.w/8)*8,8);
+	var rows=Math.max(Math.floor((obj.h-8)/dims.h),2);
+	if(Math.abs(cols-obj.m_term.cols)<=8){
+		//try to keep cols unchanged
+		cols=obj.m_term.cols;
+	}
+	if(obj.m_term.m_tty_name&&rows&&cols){
+		//auto-resize
+		obj.Resize(rows,cols);
+		IO.RunProcess(['stty','--file',obj.m_term.m_tty_name,'cols',cols.toString(),'rows',rows.toString()],".",0);
+	}
 	W.PureRegion(id,obj);
 	if(!obj.is_embedded){
 		UI.PushCliprect(obj.x,obj.y,obj.w,obj.h);
 	}
+	//UI.RoundRect({
+	//	x:obj.x,y:obj.y,w:obj.w,h:obj.h,
+	//	color:obj.is_embedded===2?obj.panel_style.border_color:obj.panel_style.bgcolor,
+	//})
 	UI.RoundRect({
 		x:obj.x,y:obj.y,w:obj.w,h:obj.h,
-		color:obj.panel_style.bgcolor,
+		color:obj.panel_style.border_color,
 	})
 	var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
 	var w_term=obj.m_term.cols*dims.w;
@@ -1885,18 +1907,16 @@ W.Terminal=function(id,attrs){
 	w_term_area*=scale;
 	var x_term=obj.x+(obj.w-w_term_area)*0.5;
 	var y_term=obj.y+(obj.h-h_term)*0.5;
-	if(obj.is_embedded!==2){
-		UI.RoundRect({
-			x:x_term-obj.panel_style.shadow_size,y:y_term-obj.panel_style.shadow_size,
-			w:w_term_area+obj.panel_style.shadow_size*2,h:h_term+obj.panel_style.shadow_size*2,
-			color:obj.panel_style.shadow_color,
-			border_width:-obj.panel_style.shadow_size,
-			round:obj.panel_style.shadow_size,
-		});
-	}
-	var in_bell=obj.m_term.isInBell();
-	var C_bell=UI.lerp_rgba(obj.panel_style.bell_color&0xffffff,obj.panel_style.bell_color,Math.min(Math.max(in_bell,0.0),1.0));
-	if(obj.is_embedded===2){
+	//if(obj.is_embedded!==2){
+	//	UI.RoundRect({
+	//		x:x_term-obj.panel_style.shadow_size,y:y_term-obj.panel_style.shadow_size,
+	//		w:w_term_area+obj.panel_style.shadow_size*2,h:h_term+obj.panel_style.shadow_size*2,
+	//		color:obj.panel_style.shadow_color,
+	//		border_width:-obj.panel_style.shadow_size,
+	//		round:obj.panel_style.shadow_size,
+	//	});
+	//}
+	/*if(obj.is_embedded===2){
 		if(in_bell){
 			UI.RoundRect({
 				x:x_term,y:y_term,
@@ -1915,10 +1935,7 @@ W.Terminal=function(id,attrs){
 			border_color:C_bell,
 			border_width:in_bell?obj.panel_style.bell_border_width:0,
 		});
-	}
-	if(in_bell){
-		UI.AutoRefresh();
-	}
+	}*/
 	UI.PushCliprect(x_term,y_term,w_term_area,h_term);
 	obj.Render(x_term,y_term,w_term,h_term);
 	/////////////
@@ -2041,6 +2058,19 @@ W.Terminal=function(id,attrs){
 	//		obj.Download("c:/users/hqm/downloads/icon1k.png","icon1k.png");
 	//	}});
 	//}
+	var in_bell=obj.m_term.isInBell();
+	var C_bell=UI.lerp_rgba(obj.panel_style.bell_color&0xffffff,obj.panel_style.bell_color,Math.min(Math.max(in_bell,0.0),1.0));
+	if(in_bell){
+		UI.RoundRect({
+			x:obj.x,y:obj.y,
+			w:obj.w,h:obj.h,
+			round:obj.panel_style.border_width,
+			color:0,
+			border_color:C_bell,
+			border_width:obj.panel_style.bell_border_width*2,
+		});
+		UI.AutoRefresh();
+	}
 	if(!obj.is_embedded){
 		UI.PopCliprect();
 	}

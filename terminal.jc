@@ -64,7 +64,7 @@ class Terminal{
 	convertEol= true
 	termName= 'xterm'
 	//termName= 'linux'
-	geometry= [80, 25]
+	//geometry= [80, 25]
 	cursorBlink= false
 	//visualBell= false
 	popOnBell= false
@@ -204,8 +204,8 @@ class Terminal{
 		this.cols=param_cols
 		this.rows=param_rows
 		assert(param_cols>=2)
-		this.geometry[0]=param_cols
-		this.geometry[1]=param_rows
+		//this.geometry[0]=param_cols
+		//this.geometry[1]=param_rows
 		/**
 		* An array of all lines in the entire buffer, including the prompt. The lines are array of
 		* characters which are 3-length arrays where [0] is an attribute and [1] is the character.
@@ -1012,10 +1012,17 @@ class Terminal{
 							case 9001:
 								if DEBUG_DUMP:
 									Writeln('<command 9001>')
-								//qpad detection - wipe the "no qpad" message
+								//qpad detection - wipe the "no qpad" message and send a "#" keystroke
 								this.eraseLeft(this.x, this.y)
 								this.x=0
 								this.send("#")
+								break;
+							case 9002:
+								//terminal name callback
+								if DEBUG_DUMP:
+									Writeln('<command 9002>')
+								if this.currentStringParam.n:
+									this.m_tty_name=new(this.currentStringParam)
 								break;
 						}
 	
@@ -1749,8 +1756,8 @@ class Terminal{
 				}
 				return 1
 		auto thirdLevelKey = (
-				(Platform.IS_APPLE && altKey && !ctrlKey && !metaKey) ||
-				(Platform.IS_WINDOWS && altKey && ctrlKey && !metaKey));
+			(Platform.IS_APPLE && altKey && !ctrlKey && !metaKey) ||
+			(Platform.IS_WINDOWS && altKey && ctrlKey && !metaKey));
 		if this.selecting>0:
 			if !keymod&&(keyCode==13||keyCode==1073741982)||ctrlKey&&!altKey&&!shiftKey&&!metaKey&&keyCode==99:
 				//return / ctrl+c - copy text and cancel sel
@@ -1899,7 +1906,8 @@ class Terminal{
 					// http://unix.stackexchange.com/a/108106
 					// macOS uses different escape sequences than linux
 					if (result.key == '\x1b[1;3D') {
-						result.key=(Platform.IS_APPLE) ? '\x1bb' : '\x1b[1;5D';
+						//result.key=(Platform.IS_APPLE) ? '\x1bb' : '\x1b[1;5D';
+						result.key='\x1bb';
 					}
 				} else if (this.applicationCursor) {
 					result.key="\x1bOD";
@@ -1915,7 +1923,8 @@ class Terminal{
 					// http://unix.stackexchange.com/a/108106
 					// macOS uses different escape sequences than linux
 					if (result.key == '\x1b[1;3C') {
-						result.key=(Platform.IS_APPLE) ? '\x1bf' : '\x1b[1;5C';
+						//result.key=(Platform.IS_APPLE) ? '\x1bf' : '\x1b[1;5C';
+						result.key='\x1bf';
 					}
 				} else if (this.applicationCursor) {
 					result.key="\x1bOC";
@@ -2210,6 +2219,9 @@ class Terminal{
 		if (x < 2) x=2;
 		if (y < 1) y=1;
 	
+		is_alt_buffer=this.is_in_alternate_buffer;
+		if is_alt_buffer: {this.LeaveAlternateBuffer()}
+		
 		new_lines=new int[this.n_valid_lines*x*3]
 		ncpy=min(this.cols,x)*(3*sizeof(int))
 		for i=0:this.n_valid_lines-1
@@ -2219,10 +2231,11 @@ class Terminal{
 				ncpy)
 		this.lines.discard()
 		this.lines=new_lines
-		this.setupStops(j);
 		this.cols=x;
+		this.setupStops(j);
 	
 		// resize rows - add blank lines
+		//Writeln(this.rows,' ',this.ydisp,' ',this.scrollback,' ',this.n_valid_lines)//todo
 		j=this.rows;
 		if (j < y) {
 			while (j++ < y) {
@@ -2232,13 +2245,18 @@ class Terminal{
 			}
 		} else { // (j > y)
 			while (j-- > y) {
+				if this.ybase+y>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
+				if this.ydisp+y>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
+				if this.y<=0:break
 				this.ybase++;
 				if this.ybase>=this.scrollback:this.ybase=0
 				this.ydisp++;
 				if this.ydisp>=this.scrollback:this.ydisp=0
+				this.y--
 			}
 		}
 		this.rows=y;
+		//Writeln(this.rows,' ',this.ydisp,' ',this.scrollback,' ',this.n_valid_lines)
 	
 		// Make sure that the cursor stays on screen
 		// how to handle the this.y<0 case?
@@ -2257,10 +2275,12 @@ class Terminal{
 		//this.refresh(0, this.rows - 1);
 	
 		//this.normal=typeof(this.normal).null;
-		this.is_in_alternate_buffer=0
+		//this.is_in_alternate_buffer=0
 	
-		this.geometry[0]=this.cols
-		this.geometry[1]=this.rows
+		//this.geometry[0]=this.cols
+		//this.geometry[1]=this.rows
+		
+		if is_alt_buffer: {this.EnterAlternateBuffer()}
 		//this.emit('resize', {terminal: this, cols: x, rows: y});
 	};
 	
@@ -3325,32 +3345,57 @@ class Terminal{
 						this.cursorHidden=false;
 						break;
 					case 47,1047,1049: // alt screen buffer
-						if (!this.is_in_alternate_buffer) {
-							auto normal={
-								lines: this.lines,
-								line_end_states: this.line_end_states,
-								ybase: this.ybase,
-								ydisp: this.ydisp,
-								n_valid_lines: this.n_valid_lines,
-								x: this.x,
-								y: this.y,
-								scrollTop: this.scrollTop,
-								scrollBottom: this.scrollBottom,
-								tabs: this.tabs,
-								// XXX save charset(s) here?
-								// charset: this.charset,
-								// glevel: this.glevel,
-								// charsets: this.charsets
-							};
-							this.reset();
-							this.normal=normal;
-							this.is_in_alternate_buffer=1
-						}
+						EnterAlternateBuffer()
 						break;
 				}
 			}
 		}
 	};
+	
+	EnterAlternateBuffer=function(){
+		if (!this.is_in_alternate_buffer) {
+			auto normal={
+				lines: this.lines,
+				line_end_states: this.line_end_states,
+				ybase: this.ybase,
+				ydisp: this.ydisp,
+				n_valid_lines: this.n_valid_lines,
+				x: this.x,
+				y: this.y,
+				scrollTop: this.scrollTop,
+				scrollBottom: this.scrollBottom,
+				tabs: this.tabs,
+				// XXX save charset(s) here?
+				// charset: this.charset,
+				// glevel: this.glevel,
+				// charsets: this.charsets
+			};
+			this.reset();
+			this.normal=normal;
+			this.is_in_alternate_buffer=1
+		}
+	}
+	
+	LeaveAlternateBuffer=function(){
+		if (this.is_in_alternate_buffer) {
+			this.lines=this.normal.lines;
+			this.line_end_states=this.normal.line_end_states;
+			this.ybase=this.normal.ybase;
+			this.ydisp=this.normal.ydisp;
+			this.n_valid_lines=this.normal.n_valid_lines
+			this.x=this.normal.x;
+			this.y=this.normal.y;
+			this.scrollTop=this.normal.scrollTop;
+			this.scrollBottom=this.normal.scrollBottom;
+			this.tabs=this.normal.tabs;
+			this.is_in_alternate_buffer=0
+			// if (params == 1049) {
+			//   this.x=this.savedX;
+			//   this.y=this.savedY;
+			// }
+			//this.refresh(0, this.rows - 1);
+		}
+	}
 	
 	/**
 	* CSI Pm l  Reset Mode (RM).
@@ -3505,24 +3550,7 @@ class Terminal{
 						this.cursorHidden=true;
 						break;
 					case 47,1047,1049: // normal screen buffer - clearing it first
-						if (this.is_in_alternate_buffer) {
-							this.lines=this.normal.lines;
-							this.line_end_states=this.normal.line_end_states;
-							this.ybase=this.normal.ybase;
-							this.ydisp=this.normal.ydisp;
-							this.n_valid_lines=this.normal.n_valid_lines
-							this.x=this.normal.x;
-							this.y=this.normal.y;
-							this.scrollTop=this.normal.scrollTop;
-							this.scrollBottom=this.normal.scrollBottom;
-							this.tabs=this.normal.tabs;
-							this.is_in_alternate_buffer=0
-							// if (params == 1049) {
-							//   this.x=this.savedX;
-							//   this.y=this.savedY;
-							// }
-							//this.refresh(0, this.rows - 1);
-						}
+						LeaveAlternateBuffer()
 						break;
 				}
 			}
@@ -4321,6 +4349,7 @@ class Terminal{
 		proto.ExportProperty(this,"is_in_alternate_buffer")
 		proto.ExportProperty(this,"enable_quick_edit")
 		proto.ExportProperty(this,"custom_parsing_context")
+		proto.ExportProperty(this,"m_tty_name")
 		proto.ExportMethod(this,"destroy",JS_destroy)
 		proto.ExportMethod(this,"write",JS_write)
 		proto.ExportMethod(this,"send",JS_send)
@@ -4348,6 +4377,7 @@ class Terminal{
 	custom_parsing_context=JSObject.NULL
 	m_current_path=string.NULL
 	proc=System.Processes.CProcess.NULL
+	m_tty_name=string.NULL
 	auto __done__()
 		this.destroy();
 	//w_rendered=0.f
@@ -4699,6 +4729,12 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 						JS_UI.CallMethod(int,"SetCaret",wnd_obj,
 							x_cur,y_cur+y_underline-h_char*0.1f,
 							w_char,h_char*0.2f,colors[fg],500)
+			return 0
+		}
+		js_term["Resize"]=function(JSContext JS){
+			rows=JS.Param(0).as(int)
+			cols=JS.Param(1).as(int)
+			term.resize(cols,rows);
 			return 0
 		}
 		js_term["OnKeyDown"]=function(JSContext JS){

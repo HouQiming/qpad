@@ -85,7 +85,7 @@ if Platform.IS_WINDOWS:
 	if Platform.BUILD!="debug":
 		__generate_json("subsystem","windows")
 		__generate_json("c_files","jc_winmain.c")
-	__generate_json("vc_versions","11")
+	//__generate_json("vc_versions","11")
 //if Platform.ARCH=="win32":
 //	//use VC2008 for XP support
 //	__generate_json("vc_versions","9")
