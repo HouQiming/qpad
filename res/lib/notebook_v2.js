@@ -491,9 +491,9 @@ UI.GetFrontMostNotebookTab=function(){
 
 UI.MakeScriptCommand=function(cols,rows,args){
 	if(UI.Platform.ARCH=="mac"){
-		return ["script","-q","/dev/null","sh","-c","export TERM=xterm;printf \"\\033]9002;%s\\007\" `tty`;stty cols "+cols.toString()+" rows "+rows.toString()+";"+IO.ShellCmd(args)];
+		return ["script","-q","/dev/null","sh","-c","export TERM=xterm;stty cols "+cols.toString()+" rows "+rows.toString()+";printf \"\\033]9002;%s\\007\" `tty`;"+IO.ShellCmd(args)];
 	}else{
-		return ["script","--return","-qfc","export TERM=xterm;printf \"\\033]9002;%s\\007\" `tty`;stty cols "+cols.toString()+" rows "+rows.toString()+";"+IO.ShellCmd(args),"/dev/null"];
+		return ["script","--return","-qfc","export TERM=xterm;stty cols "+cols.toString()+" rows "+rows.toString()+";printf \"\\033]9002;%s\\007\" `tty`;"+IO.ShellCmd(args),"/dev/null"];
 	}
 };
 
@@ -1335,16 +1335,16 @@ W.NotebookView=function(id,attrs){
 		if(cur_cell.m_output_terminal){
 			var term=cur_cell.m_output_terminal;
 			var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
-			var w_term=term.m_term.cols*dims.w;
-			var h_term=term.m_term.rows*dims.h;
-			var value=term.GetScrollValue();
-			var scale=Math.max(Math.min(Math.min((obj.w-(value>=0?term.w_scroll_bar:0)-2)/w_term,obj.h/h_term),1),0.1);
-			term.font=UI.ScaleFont(UI.default_styles.terminal.font,scale);
-			w_term*=scale;
-			h_term*=scale;
-			var w_term_area=w_term+(value>=0?term.w_scroll_bar:0)+2;
-			var x_term=obj.x+obj.w-w_term_area;
-			var y_term=obj.y+obj.h-h_term;
+			//var w_term=term.m_term.cols*dims.w;
+			//var h_term=term.m_term.rows*dims.h;
+			//var value=term.GetScrollValue();
+			//var scale=Math.max(Math.min(Math.min((obj.w-(value>=0?term.w_scroll_bar:0)-2)/w_term,obj.h/h_term),1),0.1);
+			//term.font=UI.ScaleFont(UI.default_styles.terminal.font,scale);
+			//w_term*=scale;
+			//h_term*=scale;
+			//var w_term_area=w_term+(value>=0?term.w_scroll_bar:0)+2;
+			var w_term_area=obj.w;
+			var h_term=obj.h;
 			term.x=x_term;
 			term.y=y_term;
 			term.w=w_term_area;
@@ -1352,18 +1352,22 @@ W.NotebookView=function(id,attrs){
 			if(cur_cell.m_output_terminal.is_full_tab){
 				//do nothing
 			}else{
-				if(obj.w-w_term_area>obj.h-h_term){
+				if(obj.w>obj.h){
+					w_term_area*=0.5;
 					w_editor=obj.w-w_term_area-term.panel_style.border_width;
 					//UI.RoundRect({x:x_term,y:obj.y,w:w_term_area,h:obj.h,color:C_bg,border_width:0});
-					y_term=obj.y+(obj.h-h_term)*0.5;
+					//y_term=obj.y+(obj.h-h_term)*0.5;
 					term_side="x";
 				}else{
+					h_term*=0.5;
 					h_editor=obj.h-h_term-term.panel_style.border_width;
 					//UI.RoundRect({x:obj.x,y:y_term,w:obj.w,h:h_term,color:C_bg,border_width:0});
-					x_term=obj.x+(obj.w-w_term_area)*0.5;
+					//x_term=obj.x+(obj.w-w_term_area)*0.5;
 					term_side="y";
 				}
 			}
+			var x_term=obj.x+obj.w-w_term_area;
+			var y_term=obj.y+obj.h-h_term;
 		}
 		var doc=cur_cell.m_text_in;
 		if(doc){
@@ -1878,10 +1882,13 @@ W.Terminal=function(id,attrs){
 		//try to keep cols unchanged
 		cols=obj.m_term.cols;
 	}
-	if(obj.m_term.m_tty_name&&rows&&cols){
+	if(rows&&cols&&(rows!==obj.m_term.rows||cols!==obj.m_term.cols||obj.m_term.m_tty_name&&!obj.m_tty_resized)){
 		//auto-resize
 		obj.Resize(rows,cols);
-		IO.RunProcess(['stty','--file',obj.m_term.m_tty_name,'cols',cols.toString(),'rows',rows.toString()],".",0);
+		if(obj.m_term.m_tty_name){
+			obj.m_tty_resized=1;
+			IO.RunProcess(['stty','--file',obj.m_term.m_tty_name,'cols',cols.toString(),'rows',rows.toString()],".",0);
+		}
 	}
 	W.PureRegion(id,obj);
 	if(!obj.is_embedded){
@@ -1906,7 +1913,7 @@ W.Terminal=function(id,attrs){
 	h_term*=scale;
 	w_term_area*=scale;
 	var x_term=obj.x+(obj.w-w_term_area)*0.5;
-	var y_term=obj.y+(obj.h-h_term)*0.5;
+	var y_term=obj.y;//+(obj.h-h_term)*0.5;
 	//if(obj.is_embedded!==2){
 	//	UI.RoundRect({
 	//		x:x_term-obj.panel_style.shadow_size,y:y_term-obj.panel_style.shadow_size,

@@ -2205,48 +2205,47 @@ class Terminal{
 	/**
 	* Resizes the terminal
 	*
-	* @param {number} x The number of columns to resize to.
-	* @param {number} y The number of rows to resize to.
+	* @param {number} cols_new The number of columns to resize to.
+	* @param {number} rows_new The number of rows to resize to.
 	*/
-	resize=function(x0, y0) {
-		auto x=x0;
-		auto y=y0
+	resize=function(cols_new0, rows_new0) {
+		cols_new=cols_new0
+		rows_new=rows_new0
 		auto line, el, i, j, ch, addToY;
-		if (x == this.cols && y == this.rows) {
+		if (cols_new == this.cols && rows_new == this.rows) {
 			return;
 		}
 	
-		if (x < 2) x=2;
-		if (y < 1) y=1;
+		if (cols_new < 8) cols_new=8;
+		if (rows_new < 2) rows_new=2;
 	
 		is_alt_buffer=this.is_in_alternate_buffer;
 		if is_alt_buffer: {this.LeaveAlternateBuffer()}
 		
-		new_lines=new int[this.n_valid_lines*x*3]
-		ncpy=min(this.cols,x)*(3*sizeof(int))
+		new_lines=new int[this.n_valid_lines*cols_new*3]
+		ncpy=min(this.cols,cols_new)*(3*sizeof(int))
 		for i=0:this.n_valid_lines-1
 			__basic_api.memcpy(
-				__pointer(new_lines.d+i*x*(3*sizeof(int))),
+				__pointer(new_lines.d+i*cols_new*(3*sizeof(int))),
 				__pointer(this.lines.d+i*this.cols*(3*sizeof(int))),
 				ncpy)
 		this.lines.discard()
 		this.lines=new_lines
-		this.cols=x;
+		this.cols=cols_new;
 		this.setupStops(j);
 	
 		// resize rows - add blank lines
 		//Writeln(this.rows,' ',this.ydisp,' ',this.scrollback,' ',this.n_valid_lines)//todo
 		j=this.rows;
-		if (j < y) {
-			while (j++ < y) {
-				// y is rows, not this.y
+		if (j < rows_new) {
+			while (j++ < rows_new) {
 				row_clear=(this.ybase+j)%this.scrollback
 				this.clearWithAttr(row_clear*this.cols,this.defAttr,this.cols)
 			}
-		} else { // (j > y)
-			while (j-- > y) {
-				if this.ybase+y>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
-				if this.ydisp+y>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
+		} else {
+			while (j-- > rows_new && this.y>=rows_new) {
+				if this.ybase+rows_new>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
+				if this.ydisp+rows_new>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
 				if this.y<=0:break
 				this.ybase++;
 				if this.ybase>=this.scrollback:this.ybase=0
@@ -2255,22 +2254,22 @@ class Terminal{
 				this.y--
 			}
 		}
-		this.rows=y;
+		this.rows=rows_new;
 		//Writeln(this.rows,' ',this.ydisp,' ',this.scrollback,' ',this.n_valid_lines)
 	
 		// Make sure that the cursor stays on screen
 		// how to handle the this.y<0 case?
 		if this.y<0:
 			this.y=0
-		if (this.y >= y) {
-			this.y=y - 1;
+		if (this.y >= rows_new) {
+			this.y=rows_new - 1;
 		}
-		if (this.x >= x) {
-			this.x=x - 1;
+		if (this.x >= cols_new) {
+			this.x=cols_new - 1;
 		}
 	
 		this.scrollTop=0;
-		this.scrollBottom=y - 1;
+		this.scrollBottom=rows_new - 1;
 	
 		//this.refresh(0, this.rows - 1);
 	

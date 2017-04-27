@@ -15,7 +15,7 @@ v2
    "m_button_name": "更新历史",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "m_is_help_page_preview": -1
+   "m_is_help_page_preview": 1
   },
   {
    "m_language": "Unix Shell Script",

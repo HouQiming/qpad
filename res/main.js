@@ -12,7 +12,7 @@ var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
 var MAX_STALE_TIME=3600*24;
 
-UI.g_core_version="3.0.3";
+UI.g_core_version="3.0.4";
 UI.g_version=UI.g_core_version+" ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
 if(UI.Platform.BUILD=="debug"){
@@ -599,12 +599,6 @@ var CreateMenus=function(){
 		})
 		menu_tools.AddNormalItem({text:"Move related tabs to front",tab_menu_group:'tools',
 			enable_hotkey:0,action:function(){UI.top.app.document_area.ArrangeTabs();}})
-		var is_maximized=(UI.m_ui_metadata["<layout>"]&&UI.m_ui_metadata["<layout>"].m_is_maximized);
-		menu_tools.AddNormalItem({text:is_maximized?UI._("Restore tab size"):UI._("Maximize tab"),
-		key:"F11",enable_hotkey:1,icon:is_maximized?'还':'最',action:function(){
-			UI.top.app.document_area.ToggleMaximizeMode();
-			UI.Refresh()
-		}})
 		menu_tools.AddNormalItem({text:"Open shell here (&D)...",tab_menu_group:'tools',icon:'控',enable_hotkey:0,action:OpenShell})
 		if(UI.ShowInFolder){
 			menu_tools.AddNormalItem({text:"Show in folder...",tab_menu_group:'tools',icon:'开',enable_hotkey:0,
@@ -675,6 +669,13 @@ var CreateMenus=function(){
 		}
 	}
 	menu_tools.AddSeparator()
+	var is_maximized=(UI.m_ui_metadata["<layout>"]&&UI.m_ui_metadata["<layout>"].m_is_maximized);
+	menu_tools.AddNormalItem({text:is_maximized?UI._("Restore tab size"):UI._("Maximize tab"),
+		key:"F11",enable_hotkey:1,icon:is_maximized?'还':'最',action:function(){
+			UI.top.app.document_area.ToggleMaximizeMode();
+			UI.Refresh()
+		}
+	})
 	if(enable_ctrl_keys){
 		W.Hotkey("",{key:"CTRL+-",action:function(){UI.ZoomRelative(1/ZOOM_RATE)}});
 		W.Hotkey("",{key:"CTRL+0",action:function(){UI.ZoomReset()}});
