@@ -449,6 +449,10 @@ var CreateMenus=function(){
 		UI.NewCodeEditorTab();
 		UI.Refresh()
 	}})
+	menu_file.AddNormalItem({text:"New window",icon:"窗",key:"SHIFT+CTRL+N",enable_hotkey:enable_ctrl_keys,action:function(){
+		IO.RunProcess([IO.m_my_name,"--new-instance"],UI.m_new_document_search_path);
+		UI.Refresh()
+	}})
 	menu_file.AddNormalItem({text:"New sticker wall",icon:'T',action:function(){
 		var active_document=UI.top.app.document_area.active_tab
 		if(active_document&&active_document.main_widget&&active_document.main_widget.m_is_special_document){
@@ -1167,7 +1171,7 @@ var CheckUpdate=function(){
 		console.log(err.stack);
 	}});
 };
-	
+
 (function(){
 	//if(UI.StartupBenchmark){
 	//	console.log("--- entering main")
@@ -1187,9 +1191,14 @@ var CheckUpdate=function(){
 		}
 		return;
 	}
+	if(argv.length>=1&&argv[0]=='--new-instance'){
+		//load metadata, don't restore, don't save
+		UI.m_disable_metadata_save=1;
+		UI.m_ui_metadata["<workspace_v2>"]=undefined;
+	}
 	//instance check
 	//this is not safe. it could race. shouldn't happen too often though
-	//we try to open new instances when it races
+	//we try to open a new instance when it races
 	//temp file with pid + temp file check during OnFocus
 	if(IO.IsFirstInstance){
 		var is_first=IO.IsFirstInstance("qpad3_single_instance");

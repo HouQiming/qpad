@@ -25,7 +25,7 @@ v2
    "in_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 2
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # Release Notes
@@ -33,8 +33,9 @@ v2
 Version 3.0.4
 	- Terminals can now be resized
 	- Copying UTF-8 text in binary files now generates a string rather than an array
+	- One can now open a new QPad window from the file menu
 	- Added "Copy command" to the terminal menu
-	- Added a "full tab" mode to notebook cells
+	- Added a "Full tab" mode to notebook cells
 
 Version 3.0.3
 	- Remote editing support on Mac

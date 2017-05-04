@@ -131,15 +131,19 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+zoom-aware rows computation 
+content-preserving resize
+dragging subwindows: top-level buttons
+virtual cursor:
+	drag empty lines to the current indent
+whole word behavior
+	anything other than alpha-alpha should be OK
 notebook rendering failure
 	need to find out the trigger
-slow rendering with large amount of text folded:
-	c:\tp\deodor\data\test0.json
-(test) good external link, update site download to the updating version
 sticker desync
 	close / reopen while unsaved... won't be able to replay from those ranges only
 		alternative method for range enforcing?

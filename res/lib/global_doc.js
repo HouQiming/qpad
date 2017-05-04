@@ -95,6 +95,7 @@ UI.SafeSave=function(fn,data){
 UI.m_need_metadata_save=0;
 UI.m_metadata_corrupted=0;
 UI.ReallySaveMetaData=function(){
+	if(UI.m_disable_metadata_save){return;}
 	if(UI.enable_timing){
 		UI.TimingEvent('ReallySaveMetaData');
 	}

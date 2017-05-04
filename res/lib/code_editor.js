@@ -7969,6 +7969,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 
 UI.OpenForCommandLine=function(cmdline_opens){
 	for(var i=0;i<cmdline_opens.length;i++){
+		if(cmdline_opens[i]==='--new-instance'){continue;}
 		if(i+2<cmdline_opens.length&&cmdline_opens[i+1]=='--seek'){
 			var line=Math.max(parseInt(cmdline_opens[i+2])-1,0);
 			UI.OpenEditorWindow(cmdline_opens[i],function(){
