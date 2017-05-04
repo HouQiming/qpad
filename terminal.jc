@@ -16,7 +16,7 @@ Qiming HOU 1/1/2017:
 	abandoned the mouse stuff in favor of quickedit-like operations
 */
 module detail{
-DEBUG_DUMP=1//todo
+DEBUG_DUMP=0
 
 /**
 * xterm.js: xterm, in the browser
@@ -483,12 +483,12 @@ class Terminal{
 						ch=((int(u32(u8(data[i])))&0xf)<<12)+((int(u32(u8(data[i+1])))&63)<<6)+(int(u32(u8(data[i+2])))&63)
 						if u32(ch-0xd800)<0x800u:
 							//1st surrogate, we need to *chop it anyway*
-							lg=0
+							break
 					//otherwise, don't chop it
-					pchop+=lg
+					pchop=data.n
 				break
 			else
-				pchop=i+1
+				pchop=data.n
 				break
 		if pchop<data.n:
 			this.s_lingering=new(data[pchop:])
@@ -4604,7 +4604,22 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 								break
 				else
 					if DEBUG_DUMP:
-						Writeln(s.Replace(["\r","\\r","\e","\\e"]))
+						s_dump=new string
+						for ch in s
+							chi=int(u32(u8(ch)))
+							if chi=='\r':
+								s_dump.push('\\r')
+							else if chi=='\e':
+								s_dump.push('\\e')
+							else if chi=='\n':
+								s_dump.push(ch)
+							else if chi<32||chi>=127:
+								s_dump.push('\\x')
+								s_dump.push(formatNumber(chi,{align:2,base:16}))
+							else
+								s_dump.push(ch)
+						Write(s_dump)
+						System.IO.stdout().Flush()
 					term.write(s)
 					if !term.is_remote_editing&&term.x>=2&&term.x<term.cols&&term.lines:
 						//detect bash prompt
