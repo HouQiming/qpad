@@ -2774,7 +2774,7 @@ auto SearchRegexp(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string sr
 		if !match_is_invalid&&(flags&SEARCH_FLAG_WHOLE_WORD):
 			(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
 			(ch0x,ch1x)=ed.GetUtf8CharNeighborhood(ccnt1)
-			if isWordChar(ch0)==isWordChar(ch1)||isWordChar(ch0x)==isWordChar(ch1x):
+			if isWordChar(ch0)&&isWordChar(ch1)||isWordChar(ch0x)&&isWordChar(ch1x):
 				match_is_invalid=1
 		if !match_is_invalid:
 			(ch0,ch1)=ed.GetCharNeighborhood(ccnt0)
@@ -3075,7 +3075,7 @@ auto SearchFuzzy(JSContext JS,CEditableText ed,i64 ccnt_end,const dir,string s,i
 			//word boundary test
 			if flags&SEARCH_FLAG_WHOLE_WORD:
 				(nch0,nch1)=ed.GetUtf8CharNeighborhood(ccnt)
-				if isWordChar(nch0)==isWordChar(nch1):continue
+				if isWordChar(nch0)&&isWordChar(nch1):continue
 			lgmatch=s.n+dlg
 			//Writeln(ccnt-lgmatch,' ',ccnt_stop_at)
 			//if ccnt+1-lgmatch>=ccnt_stop_at:
@@ -3882,9 +3882,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					ReportMatch=function(i64 ccnt0,i64 ccnt1){
 						if flags&SEARCH_FLAG_WHOLE_WORD:
 							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
-							if isWordChar(ch0)==isWordChar(ch1):return 0
+							if isWordChar(ch0)&&isWordChar(ch1):return 0
 							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
-							if isWordChar(ch0)==isWordChar(ch1):return 0
+							if isWordChar(ch0)&&isWordChar(ch1):return 0
 						auto s_replacement=rjob.m_s_replace
 						//make an attempt to preserve case
 						if ccnt1-ccnt0<MAX_CASE_ASSESSABLE:
@@ -3899,9 +3899,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 					ReportMatch=function(i64 ccnt0,i64 ccnt1){
 						if flags&SEARCH_FLAG_WHOLE_WORD:
 							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
-							if isWordChar(ch0)==isWordChar(ch1):return 0
+							if isWordChar(ch0)&&isWordChar(ch1):return 0
 							(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
-							if isWordChar(ch0)==isWordChar(ch1):return 0
+							if isWordChar(ch0)&&isWordChar(ch1):return 0
 						ops.push(TEditop(){ccnt:ccnt0,sz:ccnt1-ccnt0,s:rjob.m_s_replace})
 						return rjob.m_match_cost
 					}
@@ -3915,9 +3915,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				ReportMatch=function(i64 ccnt0,i64 ccnt1){
 					if flags&SEARCH_FLAG_WHOLE_WORD:
 						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt0)
-						if isWordChar(ch0)==isWordChar(ch1):return 0
+						if isWordChar(ch0)&&isWordChar(ch1):return 0
 						(ch0,ch1)=ed.GetUtf8CharNeighborhood(ccnt1)
-						if isWordChar(ch0)==isWordChar(ch1):return 0
+						if isWordChar(ch0)&&isWordChar(ch1):return 0
 					return js_callback.Call(int,ccnt0,ccnt1)
 				}
 		if flags&SEARCH_FLAG_REGEXP:
