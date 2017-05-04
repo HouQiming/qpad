@@ -135,8 +135,8 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-zoom-aware rows computation 
-content-preserving resize
+(test) content-preserving resize
+CJK in term
 dragging subwindows: top-level buttons
 virtual cursor:
 	drag empty lines to the current indent

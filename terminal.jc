@@ -16,7 +16,7 @@ Qiming HOU 1/1/2017:
 	abandoned the mouse stuff in favor of quickedit-like operations
 */
 module detail{
-DEBUG_DUMP=0
+DEBUG_DUMP=1//todo
 
 /**
 * xterm.js: xterm, in the browser
@@ -2222,15 +2222,108 @@ class Terminal{
 		is_alt_buffer=this.is_in_alternate_buffer;
 		if is_alt_buffer: {this.LeaveAlternateBuffer()}
 		
-		new_lines=new int[this.n_valid_lines*cols_new*3]
-		ncpy=min(this.cols,cols_new)*(3*sizeof(int))
-		for i=0:this.n_valid_lines-1
-			__basic_api.memcpy(
-				__pointer(new_lines.d+i*cols_new*(3*sizeof(int))),
-				__pointer(this.lines.d+i*this.cols*(3*sizeof(int))),
-				ncpy)
-		this.lines.discard()
-		this.lines=new_lines
+		if cols_new!=this.cols:
+			//content-preserving resize
+			auto ytop=(this.n_valid_lines<this.scrollback?0:(this.ybase+this.rows)%this.scrollback)
+			auto new_lines=new int[]
+			auto new_line_end_states=new int[]
+			auto old_lines=this.lines
+			auto n_lines_new=0,y_new=0,x_new=0,addr_new=0
+			newLine=inline(y){
+				if y>=n_lines_new:
+					n_lines_new=min(y+1,this.scrollback)
+					new_lines.resize(n_lines_new*cols_new*3)
+					new_line_end_states.resize(n_lines_new)
+				else
+					__basic_api.memset(__pointer(new_lines.d+y*cols_new*(3*sizeof(int))),0,cols_new*(3*sizeof(int)))
+					new_line_end_states[y]=0
+			}
+			auto y_final_valid=0
+			auto y_new_valid=y_new
+			auto x_new_valid=x_new
+			auto y_cursor=(this.ybase+this.y)%this.scrollback
+			auto y_cursor_new=this.y
+			auto x_cursor_new=this.x
+			auto x3=this.x*3
+			auto i=ytop
+			auto lastline_state=0
+			newLine(0)
+			tran_y=new int[this.n_valid_lines]
+			for i2=0:this.n_valid_lines-1
+				auto addr=i*this.cols*3
+				tran_y[i]=y_new
+				for j=0:3:this.cols*3-1
+					if i==y_cursor&&j==x3:
+						y_cursor_new=y_new
+						x_cursor_new=x_new
+					if old_lines[addr+j+2]:
+						if y_new_valid!=y_new:
+							for(j2=y_new_valid;j2!=y_new;)
+								if j2!=y_new_valid:newLine(j2)
+								new_line_end_states[j2]=1
+								j2++
+								if j2>=this.scrollback:
+									j2=0
+							newLine(y_new)
+							addr_new=y_new*cols_new*3
+						new_lines[addr_new+x_new*3+0]=old_lines[addr+j+0]
+						new_lines[addr_new+x_new*3+1]=old_lines[addr+j+1]
+						new_lines[addr_new+x_new*3+2]=old_lines[addr+j+2]
+						y_new_valid=y_new
+						x_new_valid=x_new
+					if ++x_new>=cols_new:
+						x_new=0
+						y_new++
+						if y_new>=this.scrollback:
+							y_new=0
+				if i==y_cursor&&x3==this.cols*3:
+					y_cursor_new=y_new
+					x_cursor_new=x_new
+				lastline_state=this.line_end_states[i]
+				if this.line_end_states[i]==0:
+					x_new=0
+					y_new=y_new_valid+1
+					if y_new>=this.scrollback:
+						y_new=0
+					y_new_valid=y_new
+					x_new_valid=x_new
+					if i2!=this.n_valid_lines-1:
+						newLine(y_new)
+					addr_new=y_new*cols_new*3
+				else
+					//do nothing, continue wrapping
+				i++
+				if i>=this.scrollback:i=0
+			//new_lines=new int[this.n_valid_lines*cols_new*3]
+			//ncpy=min(this.cols,cols_new)*(3*sizeof(int))
+			//for i=0:this.n_valid_lines-1
+			//	__basic_api.memcpy(
+			//		__pointer(new_lines.d+i*cols_new*(3*sizeof(int))),
+			//		__pointer(this.lines.d+i*this.cols*(3*sizeof(int))),
+			//		ncpy)
+			if lastline_state!=0:
+				y_new_valid++
+			this.lines.discard()
+			this.line_end_states.discard()
+			this.lines=new_lines
+			this.line_end_states=new_line_end_states
+			this.n_valid_lines=n_lines_new
+			if n_lines_new>=this.scrollback:
+				this.ybase=(y_cursor_new+1+this.scrollback-this.rows)%this.scrollback
+				this.y=this.rows-1
+			else
+				if this.ybase<tran_y.n:
+					this.ybase=tran_y[this.ybase]
+				this.ybase=min(max(this.ybase,y_cursor_new-this.rows+1),y_cursor_new)
+				this.ybase=max(this.ybase,0)
+				this.y=y_cursor_new-this.ybase
+			if this.ydisp<tran_y.n:
+				this.ydisp=tran_y[this.ydisp]
+			//if this.y<tran_y.n:
+			//	this.y=tran_y[this.y]
+			//if this.y<0:this.y=0
+			//if this.y>=this.rows:this.y=this.rows-1
+			this.x=x_cursor_new
 		this.cols=cols_new;
 		this.setupStops(j);
 	
@@ -2238,12 +2331,13 @@ class Terminal{
 		//Writeln(this.rows,' ',this.ydisp,' ',this.scrollback,' ',this.n_valid_lines)//todo
 		j=this.rows;
 		if (j < rows_new) {
-			while (j++ < rows_new) {
+			while (j < rows_new) {
 				row_clear=(this.ybase+j)%this.scrollback
 				this.clearWithAttr(row_clear*this.cols,this.defAttr,this.cols)
+				j++
 			}
 		} else {
-			while (j-- > rows_new && this.y>=rows_new) {
+			while (j > rows_new && this.y>=rows_new) {
 				if this.ybase+rows_new>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
 				if this.ydisp+rows_new>this.n_valid_lines&&this.n_valid_lines<this.scrollback:break;
 				if this.y<=0:break
@@ -2252,6 +2346,7 @@ class Terminal{
 				this.ydisp++;
 				if this.ydisp>=this.scrollback:this.ydisp=0
 				this.y--
+				j--
 			}
 		}
 		this.rows=rows_new;

@@ -612,6 +612,11 @@ var CreateMenus=function(){
 		menu_tools.AddNormalItem({text:"O&pen a similar tab",tab_menu_group:'tools',enable_hotkey:0,action:function(fn){
 			UI.NewCodeEditorTab(fn);
 		}.bind(null,obj_real_active_tab.file_name)})
+		menu_tools.AddNormalItem({text:"Pop-out to new window",tab_menu_group:'tools',enable_hotkey:0,action:function(fn){
+			IO.RunProcess([IO.m_my_name,"--new-instance",fn],UI.m_new_document_search_path);
+			UI.top.app.document_area.CloseTab();
+			UI.Refresh()
+		}.bind(null,obj_real_active_tab.file_name)})
 		menu_tools.AddSeparator()
 	}
 	if(obj_active_tab&&obj_active_tab.file_name&&obj_active_tab.file_name[0]!='<'){

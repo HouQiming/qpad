@@ -15,7 +15,7 @@ v2
    "m_button_name": "更新历史",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "m_is_help_page_preview": 1
+   "m_is_help_page_preview": -1
   },
   {
    "m_language": "Unix Shell Script",
@@ -25,7 +25,7 @@ v2
    "in_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 2
 }
 =====������=====
 # Release Notes
@@ -59,6 +59,7 @@ Version 3.0.1
 3.0.4版
 	- 支持了改变终端大小
 	- 现在在二进制编辑中复制UTF-8文本会改为生成JS字符串而非数组
+	- 在文件菜单中增加了打开新QPad窗口的功能
 	- 在终端菜单里加入了“复制命令”
 	- 在脚本簿里增加了一个“占满窗格”的运行选项
 

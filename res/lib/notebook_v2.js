@@ -1876,12 +1876,12 @@ W.Terminal=function(id,attrs){
 	////////////////////
 	//auto-resize the terminal
 	var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
-	var cols=Math.max(Math.ceil((obj.w-obj.w_scroll_bar-8)/dims.w/8)*8,8);
-	var rows=Math.max(Math.floor((obj.h-8)/dims.h),2);
+	var cols=Math.max(Math.ceil((obj.w-obj.w_scroll_bar)/dims.w/8)*8,8);
 	if(Math.abs(cols-obj.m_term.cols)<=8){
 		//try to keep cols unchanged
 		cols=obj.m_term.cols;
 	}
+	var rows=Math.max(Math.floor(Math.max((cols*dims.w+obj.w_scroll_bar)/obj.w,1)*obj.h/dims.h),2);
 	if(rows&&cols&&(rows!==obj.m_term.rows||cols!==obj.m_term.cols||obj.m_term.m_tty_name&&!obj.m_tty_resized)){
 		//auto-resize
 		obj.Resize(rows,cols);
@@ -1902,7 +1902,6 @@ W.Terminal=function(id,attrs){
 		x:obj.x,y:obj.y,w:obj.w,h:obj.h,
 		color:obj.panel_style.border_color,
 	})
-	var dims=UI.MeasureText(UI.default_styles.terminal.font,' ');
 	var w_term=obj.m_term.cols*dims.w;
 	var h_term=obj.m_term.rows*dims.h;
 	var value=obj.GetScrollValue();
