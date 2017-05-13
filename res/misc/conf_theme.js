@@ -1,10 +1,10 @@
 // You have to restart QPad for changes to take effect
 if(UI.Platform.ARCH=="mac"){
-	UI.font_name="LucidaGrande,res/fonts/opensans.ttf"
-	UI.eng_font_name="res/fonts/opensans.ttf,!"
+	UI.font_name="LucidaGrande,res/fonts/opensans.ttf*0.875"
+	UI.eng_font_name="res/fonts/opensans.ttf*0.875,!"
 }else{
-	UI.font_name="res/fonts/opensans.ttf"
-	UI.eng_font_name="res/fonts/opensans.ttf,!"
+	UI.font_name="res/fonts/opensans.ttf*0.875"
+	UI.eng_font_name="res/fonts/opensans.ttf*0.875,!"
 }
 
 UI.Theme_Minimalistic(0xff2ca033);

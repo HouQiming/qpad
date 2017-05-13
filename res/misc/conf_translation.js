@@ -415,9 +415,9 @@
 	//////////////////////
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		if(UI.m_ui_language=="ja_jp"){
-			UI.fallback_font_names=["meiryo.ttc","msgothic.ttc","arialuni.ttf"]
+			UI.fallback_font_names=["meiryo.ttc","msgothic.ttc","arialuni.ttf","seguisym.ttf"]
 		}else{
-			UI.fallback_font_names=["msyh.ttc","msyh.ttf","simhei.ttf","arialuni.ttf"]
+			UI.fallback_font_names=["msyh.ttc","msyh.ttf","simhei.ttf","arialuni.ttf","seguisym.ttf"]
 		}
 	}else if(UI.Platform.ARCH=="mac"){
 		UI.fallback_font_names=["STHeiti Medium.ttc","LastResort.ttf"]

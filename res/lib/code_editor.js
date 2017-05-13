@@ -8553,6 +8553,7 @@ W.OptionsPage=function(id,attrs){
 			];
 			plugin_items["Font Licenses"]=[
 				{license_line:"Open Sans: Digitized data copyright © 2010-2011, Google Corporation"},
+				{license_line:"Open Sans Emoji: https://github.com/MorbZ/OpenSansEmoji"},
 				{license_line:"Inconsolata: Copyright (c) 2006-2012, Raph Levien (Raph.Levien@gmail.com)"},
 				{license_line:"    Copyright (c) 2011-2012, Cyreal (cyreal.org)",h_special:-12},
 				{license_line:"Computer Modern: Copyright (c) Authors of original metafont fonts"},
