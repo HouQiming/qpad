@@ -381,6 +381,9 @@
 			"Copy command":"复制命令",
 			"# Release Notes":"# 更新历史",
 			"[button: Update now!]":"[button: 马上升级！]",
+			"Show in &folder...":"在文件夹中显示(&F)……",
+			"Open ter&minal here...":"在这里打开终端(&M)……",
+			"Pop-out to new window":"弹出到新窗口",
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw

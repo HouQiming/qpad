@@ -1,4 +1,4 @@
-sed 's/@/dd count=1 bs=/;s/?/C=`wc -c "$1"|egrep -o [0-9]+|head -n 1`/;s/P/printf/' >~/.qpad.sh <<'EOF'
+sed 's/@/dd count=1 bs=/;s/?/C=`\wc -c "$1"|egrep -o [0-9]+|head -n 1`/;s/P/printf/' >~/.qpad.sh <<'EOF'
 qpad(){
 local T
 local D
@@ -30,7 +30,7 @@ cat "$1"
 while true;do
 D=`@1 2>/dev/null`
 if [ "$D" = 's' ];then
-cp "$1" "$1.bak"
+\cp "$1" "$1.bak"
 S=""
 while true;do
 C=`@1 2>/dev/null`

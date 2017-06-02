@@ -938,7 +938,7 @@ UI.RegisterOutputParser('([^ \t].*\.[A-Za-z0-9]+):([0-9]+)',2,function(matches,c
 		message:"node.js syntax error",
 		line0:linea-1,
 	}
-	return undefine;
+	return undefined;
 });
 
 //node.js syntax error - initial line
@@ -949,13 +949,13 @@ UI.RegisterOutputParser('.*SyntaxError: (.*)',1,function(matches,context){
 		err.message=matches[1];
 		return err;
 	}
-	return undefine;
+	return undefined;
 });
 
 //node.js error.stack - initial line
 UI.RegisterOutputParser('.*Error: (.*)',1,function(matches,context){
 	context.m_node_js_previous_error=matches[1];
-	return undefine;
+	return undefined;
 });
 
 //node.js "at" lines

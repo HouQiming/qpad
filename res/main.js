@@ -12,7 +12,7 @@ var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
 var MAX_STALE_TIME=3600*24;
 
-UI.g_core_version="3.0.4";
+UI.g_core_version="3.0.5";
 UI.g_version=UI.g_core_version+" ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
 if(UI.Platform.BUILD=="debug"){
@@ -423,15 +423,19 @@ var OpenShell=function(){
 	}
 };
 
-var OpenShellTerm=function(){
-	UI.UpdateNewDocumentSearchPath();
+UI.OpenShellTerminalInPath=function(spath){
 	UI.OpenTerminalTab({
 		args:UI.MakeScriptCommand(132,24,UI.Platform.ARCH=="mac"?['bash','--rcfile','/etc/bashrc','-i']:['bash','-i']),
-		spath:UI.m_new_document_search_path,
+		spath:spath,
 		cols:132,
 		rows:24,
 		auto_close:1,
 	});
+}
+
+var OpenShellTerm=function(){
+	UI.UpdateNewDocumentSearchPath();
+	UI.OpenShellTerminalInPath(UI.m_new_document_search_path);
 };
 
 UI.g_app_inited=0;

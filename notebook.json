@@ -135,10 +135,20 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-re-tune font sizes after the opensansemoji adoption
+qpad.sh on tinycore - override overwrite prompts
+filelist right-click: open terminal, show in explorer
 move to node.js
 	V8 version of javascript.jc
 	event loop integration
+	--
+	enables embedded sshfs, ssh client, update download, ...
+	vm-dev: isolate projects in containers, editor / file browser over ssh
+		per-container backup (snapshot)
+		per-container devtools
+	--
+	move one component at a time
+		text buffer
+		renderer
 ============
 dragging subwindows: top-level buttons
 virtual cursor:
@@ -269,7 +279,7 @@ rem [interactive]
 rem build script for the project
 rem [button: Debug]
 chcp 65001 >NUL
-rem set LANG=zh_CN.utf8
+set LANG=zh_CN.utf8
 jc --readable_c_code -awin64 qpad.jc --run
 
 =====í¯¿í¿¿=====

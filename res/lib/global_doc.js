@@ -201,6 +201,7 @@ UI.BumpHistory=function(file_name){
 		}
 	}
 	hist.push(file_name)
+	//console.log('UI.BumpHistory',file_name);
 	UI.g_all_paths_ever_mentioned=undefined;
 	UI.SaveMetaData();
 }

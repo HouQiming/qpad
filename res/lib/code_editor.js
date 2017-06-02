@@ -1916,7 +1916,9 @@ var PrepareAPEM=function(){
 					if(check_drive&&(fn.length<2||!valid_drives[fn_path[0]]||fn_path[1]!=':')){
 						continue;
 					}
-					UI.g_all_paths_ever_mentioned.push(fn_path);
+					if(IO.DirExists(fn_path)){
+						UI.g_all_paths_ever_mentioned.push(fn_path);
+					}
 				}
 			}
 		}
@@ -4647,6 +4649,30 @@ var FileItem_prototype={
 			fbar.CallOnChange()
 		}
 	},
+	OnRightClick:function(event){
+		if(this.name_to_find){return;}
+		UI.OpenUtilTab('file_browser');
+		//generate the menu right here, using current-frame menu entries
+		var menu_context=new W.CFancyMenuDesc();
+		menu_context.AddNormalItem({text:"&Copy path",enable_hotkey:0,
+			action:function(fn){
+				var s=IO.NormalizeFileName(fn,1);
+				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+					s=s.replace(/[/]/g,'\\');
+				}
+				UI.SDL_SetClipboardText(s)
+			}.bind(undefined,this.name)
+		})
+		menu_context.AddNormalItem({text:"Show in &folder...",icon:'开',enable_hotkey:0,
+			action:UI.ShowInFolder.bind(undefined,this.name)
+		});
+		menu_context.AddNormalItem({text:"Open ter&minal here...",icon:'控',enable_hotkey:0,
+			action:UI.OpenShellTerminalInPath.bind(undefined,this.is_dir?this.name:UI.GetPathFromFilename(this.name))
+		});
+		this.owner.file_list.m_menu_context={x:event.x,y:event.y,menu:menu_context,is_first:1};
+		menu_context=undefined;
+		UI.Refresh()
+	},
 };
 W.FileItem=function(id,attrs){
 	var obj=UI.StdWidget(id,attrs,"none",UI.default_styles.file_item);
@@ -4901,6 +4927,7 @@ W.FileItem=function(id,attrs){
 				}
 			}
 		}
+		//context menu
 	UI.End()
 	return obj
 }
@@ -5370,13 +5397,21 @@ W.FileBrowserPage=function(id,attrs){
 		OnDemandSort:obj.m_is_fs_view?W.FileItemOnDemandSort:undefined,
 		OnDemand:W.FileItemOnDemand,
 		OnFocus:function(){
+			if(obj.context_menu){
+				obj.context_menu.HideMenu();
+				obj.context_menu=undefined;
+			}
 			UI.SetFocus(obj.find_bar_edit);
 			UI.Refresh();
 		},
 		OnChange:function(value){
 			//if(this.value==value){return;}
 			W.ListView_prototype.OnChange.call(this,value)
-			this.OpenPreview(value,"explicit")
+			if(obj.context_menu){
+				obj.context_menu.HideMenu();
+				obj.context_menu=undefined;
+			}
+			//this.OpenPreview(value,"explicit")
 		},
 		OpenPreview:function(value,is_explicit){
 			var editor_widget=obj.editor_widget
@@ -5410,6 +5445,27 @@ W.FileBrowserPage=function(id,attrs){
 			object_type:W.FileItem,
 			owner:obj,
 		},items:files})
+	if(obj.file_list.m_menu_context){
+		//draw the list context menu
+		var is_first=obj.file_list.m_menu_context.is_first;
+		var obj_submenu=W.FancyMenu("context_menu",{
+			x:obj.file_list.m_menu_context.x, y:obj.file_list.m_menu_context.y,
+			desc:obj.file_list.m_menu_context.menu,
+			HideMenu:function(){obj.file_list.m_menu_context=undefined;},
+		})
+		if(is_first){
+			UI.SetFocus(obj_submenu);
+			var y_bounded=Math.max(Math.min(obj_submenu.y,obj.file_list.y+obj.file_list.h-obj_submenu.h),obj.file_list.y);
+			if(y_bounded!=obj_submenu.y){
+				obj.file_list.m_menu_context.y=y_bounded;
+				UI.InvalidateCurrentFrame();
+				UI.Refresh();
+			}
+			obj.file_list.m_menu_context.is_first=0;
+		}
+	}else{
+		obj.file_list.context_menu=undefined;
+	}
 	if(first_time){
 		obj.file_list.OpenPreview(0,"explicit")
 	}
@@ -5687,13 +5743,14 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 
 UI.SearchIncludeFile=function(fn_base,fn_include){
 	var fn_found=UI.g_deep_search_cache[fn_include];
-	if(fn_found==undefined){
+	if(fn_found===undefined){
 		fn_found=UI.SearchIncludeFileShallow(fn_base,fn_include);
-		if(!fn_found||fn_found=='<deep>'||fn_found=='<dangling>'){
+		if(!fn_found||fn_found==='<deep>'||fn_found==='<dangling>'){
 			//all paths ever mentioned
 			PrepareAPEM();
-			fn_found=null;
+			fn_found=0;
 			var paths=UI.g_all_paths_ever_mentioned;
+			//console.log(fn_include,UI.g_deep_search_cache[fn_include]===undefined,paths.length);
 			for(var i=0;i<paths.length;i++){
 				var fn=paths[i]+'/'+fn_include;
 				if(IO.FileExists(fn)){
@@ -5701,12 +5758,11 @@ UI.SearchIncludeFile=function(fn_base,fn_include){
 					break;
 				}
 			}
+			//console.log('done',fn_found===undefined);
 		}
-		if(fn_found!=undefined){
-			UI.g_deep_search_cache[fn_include]=fn_found;
-		}
+		UI.g_deep_search_cache[fn_include]=fn_found;
 	}
-	return fn_found;
+	return (fn_found===0?undefined:fn_found);
 };
 
 var MAX_PARSABLE_FCALL=4096
@@ -7333,6 +7389,12 @@ W.CodeEditor=function(id,attrs){
 			}
 			if(!got_gotodef_notification){
 				obj.DismissNotification("definition_id")
+			}
+			if(doc.m_menu_context&&!doc.m_menu_context.is_first){
+				if(UI.HasFocus(obj.doc)){
+					//hack for context menu bug
+					doc.m_menu_context=undefined;
+				}
 			}
 			if(doc.m_menu_context){
 				UI.TopMostWidget(function(){

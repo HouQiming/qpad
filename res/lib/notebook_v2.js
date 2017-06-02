@@ -1131,6 +1131,8 @@ W.notebook_prototype={
 		this.m_last_focus_cell_id=id*2+0;
 		if(proc.is_full_tab){
 			UI.SetFocus(proc);
+			UI.Refresh()
+			return 'focus';
 		}
 		UI.Refresh()
 		return 0;
@@ -2244,7 +2246,7 @@ UI.OpenTerminalTab=function(options){
 	return ret;
 };
 
-UI.ParseTerminalOutput=function(term,sline,is_clicked){
+UI.ParseTerminalOutput=function(term,sline,is_clicked){try{
 	if(term.got_enter_from_input){
 		if(term.compiler_errors){
 			for(var i=0;i<term.compiler_errors.length;i++){
@@ -2285,7 +2287,10 @@ UI.ParseTerminalOutput=function(term,sline,is_clicked){
 	}else{
 		return 0;
 	}
-};
+}catch(err){
+	console.log(err.stack);
+	return 0;
+}};
 
 var ReallyDetectMSYSTools=function(){
 	if(UI.IS_MOBILE){return 0;}

@@ -2239,7 +2239,7 @@ W.FancyMenu=function(id,attrs){
 	UI.StdAnchoring(id,obj);
 	UI.RoundRect({x:obj.x,y:obj.y,w:obj.w+obj.shadow_size,h:obj.h+obj.shadow_size,
 		color:obj.shadow_color,
-		border_width:-obj.shadow_size,round:obj.shadow_size})
+		border_width:-obj.shadow_size,round:obj.shadow_size});
 	UI.RoundRect(obj)
 	var bk_tentative_focus=UI.context_tentative_focus;
 	W.PureRegion(id,obj);
