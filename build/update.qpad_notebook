@@ -32,6 +32,8 @@ v2
 
 Version 3.0.5
 	- Supported Unicode emoji
+	- Added a context menu to the file browser
+	- Fixed remote editing on Tinycore Linux
 
 Version 3.0.4
 	- Terminals can now be resized
@@ -61,6 +63,8 @@ Version 3.0.1
 
 3.0.5版
 	- 支持了Unicode颜文字的显示
+	- 在文件菜单里支持了右键
+	- 修正了Tinycore Linux上的远程编辑支持问题
 
 3.0.4版
 	- 支持了改变终端大小
