@@ -8618,6 +8618,7 @@ W.OptionsPage=function(id,attrs){
 				{license_line:"Open Sans Emoji: https://github.com/MorbZ/OpenSansEmoji"},
 				{license_line:"Inconsolata: Copyright (c) 2006-2012, Raph Levien (Raph.Levien@gmail.com)"},
 				{license_line:"    Copyright (c) 2011-2012, Cyreal (cyreal.org)",h_special:-12},
+				{license_line:"Fantasque Sans Mono: Copyright (c) 2013-2016, Jany Belluz (jany.belluz@hotmail.fr)"},
 				{license_line:"Computer Modern: Copyright (c) Authors of original metafont fonts"},
 				{license_line:"    Copyright (c) 2003-2009, Andrey V. Panov (panov@canopus.iacp.dvo.ru)",h_special:-12},
 			];

@@ -422,8 +422,8 @@ UI.CustomTheme=function(){
 		},
 		code_editor:{
 			editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",26),
-				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",26,200),
+				font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",26),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",26,200),
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",26,0),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",26,200),
 				font_tilde:UI.Font(UI.icon_font_name,26,100),
@@ -504,7 +504,7 @@ UI.CustomTheme=function(){
 			fold_button_style:{
 				transition_dt:0.1,
 				round:0,border_width:2,padding:0,
-				font:UI.Font("res/fonts/inconsolata.ttf,!",20,-50),
+				font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf,!",20,-50),
 				icon_text_valign:'center',
 				$:(L?{//light
 					out:{
@@ -569,9 +569,9 @@ UI.CustomTheme=function(){
 			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
 			find_bar_button_size:28,
 			find_bar_editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",20),
 				tex_font:UI.Font("res/fonts/cmunrm.ttf",20,0),
-				font_emboldened:UI.Font("res/fonts/inconsolata.ttf",20,200),
+				font_emboldened:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",20,200),
 				tex_font_emboldened:UI.Font("res/fonts/cmunrm.ttf",20,200),
 				font_tilde:UI.Font(UI.icon_font_name,20,100),
 				color:L?0xff000000:0xffbfdfdf,
@@ -631,8 +631,8 @@ UI.CustomTheme=function(){
 				{font:UI.Font("res/fonts/cmunti.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//emph
 				{font:UI.Font("res/fonts/cmunrb.ttf",18,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
 				{
-					font:UI.Font("res/fonts/inconsolata.ttf",16,0),
-					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",16,150),
+					font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",16,0),
+					font_emboldened:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",16,150),
 					paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa
 				},//code
 				{font:UI.Font("res/fonts/cmunrm.ttf",18,0),paragraph_space:20,color:L?0xff7f7f7f:0xffaaaaaa},//list
@@ -791,7 +791,8 @@ UI.CustomTheme=function(){
 			},
 		},
 		terminal:{
-			font:UI.Font("res/fonts/inconsolata.ttf",20,-50),
+			font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",20,-50),
+			font_box_drawing:UI.Font("res/fonts/fantasquesansmono-regular.ttf,!",20,0),
 			embolden:200,
 			cols:80,
 			rows:25,
@@ -830,7 +831,7 @@ UI.CustomTheme=function(){
 				h:64,
 				transition_dt:0.1,
 				round:0,
-				font:UI.Font("res/fonts/inconsolata.ttf,!",48),border_width:2,padding:8,
+				font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf,!",48),border_width:2,padding:8,
 				$:{
 					out:{
 						border_color:0x00444444,color:0,
@@ -855,7 +856,7 @@ UI.CustomTheme=function(){
 				//caption
 				{font:UI.Font(UI.font_name,48,-100),line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
 				//code
-				{font:UI.Font("res/fonts/inconsolata.ttf,!",24),line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
+				{font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf,!",24),line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
 				//icon
 				{font:UI.Font(UI.icon_font_name,36),raise_height:-6,line_space:4,paragraph_space:24,color:L?0xff444444:0xffcccccc},
 				//small icon
@@ -879,7 +880,7 @@ UI.CustomTheme=function(){
 			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
 			find_bar_button_size:28,
 			find_bar_editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",20),
 				color:L?0xff000000:0xffe8e8e8,
 				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				caret_width:UI.IS_MOBILE?1:2,
@@ -911,7 +912,7 @@ UI.CustomTheme=function(){
 			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
 			find_bar_button_size:28,
 			find_bar_editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",20),
 				color:L?0xff000000:0xffe8e8e8,
 				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				caret_width:UI.IS_MOBILE?1:2,
@@ -934,8 +935,8 @@ UI.CustomTheme=function(){
 				{font:UI.Font("res/fonts/cmunti.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//emph
 				{font:UI.Font("res/fonts/cmunrb.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//bold
 				{
-					font:UI.Font("res/fonts/inconsolata.ttf",21,0),
-					font_emboldened:UI.Font("res/fonts/inconsolata.ttf",21,150),
+					font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",21,0),
+					font_emboldened:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",21,150),
 					paragraph_space:20,color:L?0xff000000:0xffe8e8e8
 				},//code
 				{font:UI.Font("res/fonts/cmunrm.ttf",24,0),paragraph_space:20,color:L?0xff000000:0xffe8e8e8},//list
@@ -957,9 +958,9 @@ UI.CustomTheme=function(){
 			sel_name_color:L?0xffffffff:0xffe8e8e8,
 		},
 		binary_editor:{
-			font:UI.Font("res/fonts/inconsolata.ttf",24),
-			font_edit:UI.Font("res/fonts/inconsolata.ttf",16),
-			font_goto:UI.Font("res/fonts/inconsolata.ttf",16),
+			font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",24),
+			font_edit:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",16),
+			font_goto:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",16),
 			mouse_wheel_speed:4,
 			color_cur_line_highlight:L?0xaaffffff:0x55666666,
 			edit_padding:8,
@@ -971,8 +972,8 @@ UI.CustomTheme=function(){
 			edit_shadow_size:8,
 			edit_rect_color:L?0xaa8adfb2:0xaaaaaa55,
 			edit_rect_blur:8,
-			line_number_font:UI.Font("res/fonts/inconsolata.ttf",14,200),
-			line_number_font_small:UI.Font("res/fonts/inconsolata.ttf",8,200),
+			line_number_font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",14,200),
+			line_number_font_small:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",8,200),
 			line_number_bgcolor:L?0xffd0d0d0:0xff333333,
 			line_number_color:L?0xff7f7f7f:0xff6a8264,
 			line_number_color_focus:L?0xff000000:0xff8DAC85,
@@ -995,12 +996,12 @@ UI.CustomTheme=function(){
 			sxs_bgcolor:L?0xffffffff:0xff444444,
 			font_panel:UI.Font(UI.font_name,24),
 			font_panel_icon:UI.Font(UI.icon_font_name,22),
-			font_panel_fixed:UI.Font("res/fonts/inconsolata.ttf",22),
+			font_panel_fixed:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",22),
 			text_color_panel:L?0xff000000:0xffe8e8e8,
 			//w_panel:232,
 			w_edit:128,
 			h_notification_area:32,
-			find_bar_font:UI.Font("res/fonts/inconsolata.ttf",20),
+			find_bar_font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",20),
 			notification_bgcolor:L?0xffffffff:0xff000000,
 			notification_icon_font:UI.Font(UI.icon_font_name,20,0),
 			notification_text_color:L?0xff000000:0xffe8e8e8,
@@ -1437,7 +1438,7 @@ UI.CustomTheme=function(){
 			find_bar_hint_font:UI.Font(UI.font_name,20,-50),
 			find_bar_button_size:28,
 			find_bar_editor_style:{
-				font:UI.Font("res/fonts/inconsolata.ttf",20),
+				font:UI.Font("res/fonts/inconsolata.ttf,res/fonts/fantasquesansmono-regular.ttf",20),
 				color:L?0xff000000:0xffe8e8e8,
 				bgcolor_selection:L?(C&0x55ffffff):(C_raw&0x55ffffff),
 				caret_width:UI.IS_MOBILE?1:2,

@@ -131,12 +131,10 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-qpad.sh on tinycore - override overwrite prompts
-filelist right-click: open terminal, show in explorer
 move to node.js
 	V8 version of javascript.jc
 	event loop integration

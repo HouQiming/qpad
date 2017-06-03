@@ -4693,10 +4693,15 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 			if g_renderer.m_srgb_supported:
 				fnt_scaled.SmartEmbolden(term.colors[256])
 				fnt_bold_scaled.SmartEmbolden(term.colors[256])
+			fnt_box=JS.GetThis()["font_box_drawing"].as(Gui2D.detail.TFont)
+			fnt_box.h*=g_renderer.m_pixels_per_unit
 			//////////////
 			//resize the terminal? not yet
 			w_char=g_renderer.GetCharacterAdvance(fnt_scaled,int(' '))
 			h_char=g_renderer.GetCharacterHeight(fnt_scaled)
+			fnt_box.h*=h_char/g_renderer.GetCharacterHeight(fnt_box)
+			fnt_box_bold=fnt_scaled
+			fnt_box_bold.embolden+=embolden
 			//cols=max(int(floor(w/w_char)),2)
 			//rows=min(max(int(floor(h/h_char)),1),term.scrollback)
 			//term.resize(cols,rows)
@@ -4795,11 +4800,18 @@ Gui2D.registerUIExtension(function(JSObject JS_UI,Gui2D.CUISandbox sbox,int is_r
 					g_renderer.DrawRectangle(x_ch,y_ch,w_char*float(ch_width),h_char,colors[bg])
 					if !(flags & g_flags.INVISIBLE):
 						if ch!=32&&ch!=9&&ch!=0:
-							if (flags & g_flags.BOLD) {
-								g_renderer.DrawChar(fnt_bold_scaled,x_ch,y_ch,colors[fg],ch)
-							}else{
-								g_renderer.DrawChar(fnt_scaled,x_ch,y_ch,colors[fg],ch)
-							}
+							if ch>=0x2500&&ch<=0x25a0:
+								if (flags & g_flags.BOLD) {
+									g_renderer.DrawChar(fnt_box_bold,x_ch,y_ch,colors[fg],ch)
+								}else{
+									g_renderer.DrawChar(fnt_box,x_ch,y_ch,colors[fg],ch)
+								}
+							else
+								if (flags & g_flags.BOLD) {
+									g_renderer.DrawChar(fnt_bold_scaled,x_ch,y_ch,colors[fg],ch)
+								}else{
+									g_renderer.DrawChar(fnt_scaled,x_ch,y_ch,colors[fg],ch)
+								}
 						if (flags & (g_flags.UNDERLINE|g_flags.COMPILER_ERROR))
 							g_renderer.DrawRectangle(x_ch,y_ch+y_underline,w_char*float(ch_width),h_underline, colors[fg])
 			////////////////////
