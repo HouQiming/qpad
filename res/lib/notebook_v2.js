@@ -628,7 +628,8 @@ W.notebook_prototype={
 			})
 			//button list update
 			this.AddEventHandler('change',function(){
-				var s_check=this.ed.GetText(0,Math.min(this.ed.GetTextSize(),4096));
+				var lg_check=Math.min(this.ed.GetTextSize(),4096);
+				var s_check=this.ed.GetText(0,this.SnapToValidLocation(lg_check,1));
 				var obj_notebook=this.notebook_owner;
 				var cell_id=this.m_cell_id;
 				if(obj_notebook.m_cells[cell_id]){

@@ -335,7 +335,7 @@ W.BinaryEditor_prototype={
 		this.OnMouseMove(event,rgid);
 		this.is_dragging=undefined;
 	},
-	OnMouseWheel:function(event){
+	OnMouseWheel:function(event,rgid){
 		this.m_scroll-=this.m_w_bytes*event.y*this.mouse_wheel_speed;
 		this.ValidateScroll();
 		UI.Refresh()
@@ -555,6 +555,7 @@ W.SlaveRegion_prototype={
 	OnMouseDown:function(event){UI.CaptureMouse(this);this.owner.OnMouseDown(event,this.__id);},
 	OnMouseMove:function(event){this.owner.OnMouseMove(event,this.__id);},
 	OnMouseUp:function(event){this.owner.OnMouseUp(event,this.__id);UI.ReleaseMouse(this);},
+	OnMouseWheel:function(event){this.owner.OnMouseWheel(event,this.__id);},
 };
 
 var g_types=['b','i','u','f'];

@@ -131,10 +131,13 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 2
+ "m_last_focus_cell_id": 4
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+update mac / site
+dark / light switch when theme.json exists
+	replace that button with "you have theme"
 move to node.js
 	V8 version of javascript.jc
 	event loop integration

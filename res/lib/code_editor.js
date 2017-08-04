@@ -8255,7 +8255,7 @@ UI.RegisterEditorPlugin(function(){
 				this.owner.doc=UI.OpenCodeEditorDocument(this.owner.file_name,this.owner.m_is_preview,name);
 				this.owner.doc.Init();
 				if(s_text_bak){
-					this.owner.doc.ed.HookedEdit([0,0,s_text_bak]);
+					this.owner.doc.HookedEdit([0,0,s_text_bak]);
 				}
 				this.owner.doc.m_linked_terminal=bak_m_linked_terminal;
 				this.owner.doc.m_fn_remote=bak_m_fn_remote;
