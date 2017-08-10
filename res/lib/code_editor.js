@@ -8535,8 +8535,12 @@ W.OptionsPage=function(id,attrs){
 			/////////////////
 			//special stuff
 			var plugin_items={};
-			plugin_items["Display"]=[
+			var theme_json_in_effect=IO.FileExists(IO.GetStoragePath()+"/theme.json");
+			plugin_items["Display"]=(theme_json_in_effect?[
+				{special:'customize',h_special:4,text:UI._("Customize the theme"),file:"theme.json"}
+			]:[
 				{special:'theme_button',h_special:4},
+			]).concat([
 				{special:'tab_width',h_special:4},
 				{name:'Use English (need to restart)',stable_name:'force_english'},//DO NOT TRANSLATE THIS!
 				{name:UI._('Highlight the current line'),stable_name:'show_line_highlight'},
@@ -8550,7 +8554,7 @@ W.OptionsPage=function(id,attrs){
 				{name:UI._('Auto-hide minimap'),stable_name:'auto_hide_minimap'},
 				{name:UI._('Auto-hide the "Files" tab'),stable_name:'auto_hide_filetab'},
 				{name:UI._('Place function info at the cursor'),stable_name:'function_info_at_the_cursor'},
-			];
+			]);
 			plugin_items["Controls"]=[
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
 				{name:UI._('Make @1 stop at both sides').replace("@1",UI.Platform.ARCH=="mac"?"\u2325\u2190/\u2325\u2192":"CTRL+\u2190/\u2192"),stable_name:'precise_ctrl_lr_stop'},
@@ -8588,8 +8592,14 @@ W.OptionsPage=function(id,attrs){
 			}
 			plugin_items["Display"].push(
 				{name:UI._('Create FBO for linear rendering'),stable_name:'software_srgb'},
-				{name:UI._('Enable smart repainting'),stable_name:'enable_smart_tab_repainting'},
-				{special:'customize',h_special:4,text:UI._("Customize the theme"),file:"theme.json"},
+				{name:UI._('Enable smart repainting'),stable_name:'enable_smart_tab_repainting'}
+			);
+			if(!theme_json_in_effect){
+				plugin_items["Display"].push(
+					{special:'customize',h_special:4,text:UI._("Customize the theme"),file:"theme.json"}
+				);
+			}
+			plugin_items["Display"].push(
 				{special:'customize',h_special:4,text:UI._("Customize the translation script"),file:"conf_translation.js"}
 			);
 			/////////////////

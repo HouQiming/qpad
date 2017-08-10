@@ -131,13 +131,11 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
-update mac / site
-dark / light switch when theme.json exists
-	replace that button with "you have theme"
+update mac / site, again
 move to node.js
 	V8 version of javascript.jc
 	event loop integration
@@ -280,7 +278,7 @@ rem [interactive]
 rem build script for the project
 rem [button: Debug]
 chcp 65001 >NUL
-set LANG=zh_CN.utf8
+rem set LANG=zh_CN.utf8
 jc --readable_c_code -awin64 qpad.jc --run
 
 =====í¯¿í¿¿=====
