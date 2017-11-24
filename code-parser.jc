@@ -2611,7 +2611,7 @@ auto parseAsCLike(JSContext JS,int idfn_base,string sdata,JSObject options)
 					tok1=0
 					for i=0:MAX_POSTDECL_GARBAGE-1
 						tok1=fetchTokenSafe(ptok1)
-						if (tok1&TOK_TYPE_MASK)==TOK_ID:
+						if (tok1&TOK_TYPE_MASK)==TOK_ID||tok1==':':
 							ptok1=PNextToken(ptok1)
 						else
 							break

@@ -712,7 +712,7 @@ W.notebook_prototype={
 		if(fn_notes){
 			this.m_loaded_time=IO.GetFileTimestamp(fn_notes);
 			try{
-				var s_file_data=IO.ReadAll(fn_notes);
+				var s_file_data=IO.ReadAll(fn_notes).replace(/\r/g,'');
 				if(s_file_data.length>3&&s_file_data.substr(0,3)=='v2\n'){
 					//format v2 - g_v2_separator
 					var parts=s_file_data.substr(3).split(g_v2_separator);

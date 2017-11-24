@@ -2167,6 +2167,9 @@ var find_item_region_prototype={
 //UI.g_is_in_global_search=0;
 var find_context_prototype={
 	CreateHighlight:function(doc,ccnt0,ccnt1){
+		//if(ccnt0===683){
+		//	console.log(doc.m_file_name,ccnt0,ccnt1,(new Error('...')).stack);
+		//}
 		var locator_0=doc.ed.CreateLocator(ccnt0,-1);locator_0.undo_tracked=0;
 		var locator_1=doc.ed.CreateLocator(ccnt1,-1);locator_1.undo_tracked=0;
 		var hlobj=doc.ed.CreateHighlight(locator_0,locator_1,-1)
@@ -2466,7 +2469,7 @@ var find_context_prototype={
 		//var FORWARD_BUDGET=262144;
 		var FORWARD_BUDGET=1048576;
 		for(;;){
-			//repeate forward search for small files in global mode
+			//repeat forward search for small files in global mode
 			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
 				if(this.m_repo_path&&!this.m_repo_files){
 					var repo=g_repo_list[this.m_repo_path]
@@ -2905,6 +2908,7 @@ var find_context_prototype={
 			//	doc=obj_tab.main_widget.doc;
 			//	doc.SetSelection(sel[0],sel[1]);
 			//}
+			this.Cancel();
 		}
 		//if(this.m_sel_backups){
 		//	this.m_sel_backups[doc.m_file_name]=undefined;

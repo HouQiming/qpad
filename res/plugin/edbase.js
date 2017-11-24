@@ -1584,7 +1584,20 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_pos=this.sel1.ccnt;
 		var lineno=this.GetLC(ccnt_pos)[0]
 		var ccnt_lh=this.SeekLC(lineno,0)
-		if(ccnt_pos!=this.ed.MoveToBoundary(ccnt_lh,1,"space")){return 1}
+		var ccnt_after_indent=this.ed.MoveToBoundary(ccnt_lh,1,"space");
+		var is_markdown=0;
+		if(this.plugin_language_desc&&this.plugin_language_desc.name==='Markdown'){
+			var ch=this.ed.GetUtf8CharNeighborhood(ccnt_after_indent+1)
+			if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]==0x20&&ccnt_pos===this.ed.MoveToBoundary(ccnt_after_indent+1,1,"space")){
+				//delete the '- '
+				this.HookedEdit([ccnt_after_indent,ccnt_pos-ccnt_after_indent,null])
+				this.CallOnChange()
+				this.CallOnSelectionChange()
+				UI.Refresh()
+				return 0;
+			}
+		}
+		if(ccnt_pos!=ccnt_after_indent){return 1}
 		if(this.ed.GetUtf8CharNeighborhood(ccnt_pos)[0]!=32){return 1;}//only do this for space indent
 		var ccnt_indent=this.FindOuterIndentation(ccnt_pos);
 		var ccnt_indent_lh=this.ed.MoveToBoundary(ccnt_indent,-1,"space")
@@ -1633,6 +1646,28 @@ UI.RegisterEditorPlugin(function(){
 		this.AddEventHandler(C,f_key_test.bind(this,C))
 	}
 }).prototype.desc={category:"Editing",name:"Advanced auto-indent",stable_name:"adv_auto_indent"};
+
+UI.RegisterEditorPlugin(function(){
+	//bracket-related auto-indent
+	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(!this.plugin_language_desc||this.plugin_language_desc.name!=='Markdown'){return;}
+	this.AddEventHandler('RETURN RETURN2',function(){
+		var ed=this.ed;
+		var ccnt=this.GetSelection()[0]
+		var ccnt_ehome=Math.min(this.GetEnhancedHome(ccnt),ccnt)
+		var ccnt_lhome=this.SeekLC(this.GetLC(ccnt_ehome)[0],0)
+		var ch=ed.GetUtf8CharNeighborhood(ccnt_ehome+1)
+		// - or * followed by space
+		if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]==0x20){
+			ccnt_ehome+=2;
+			this.OnTextInput({"text":"\n"+this.ed.GetText(ccnt_lhome,ccnt_ehome-ccnt_lhome),"is_paste":1})
+			return 0;
+		}else{
+			return 1;
+		}
+		return 1;
+	})
+}).prototype.desc={category:"Editing",name:"Markdown auto-indent",stable_name:"adv_auto_indent"};
 
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
