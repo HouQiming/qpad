@@ -384,6 +384,8 @@
 			"Show in &folder...":"在文件夹中显示(&F)……",
 			"Open ter&minal here...":"在这里打开终端(&M)……",
 			"Pop-out to new window":"弹出到新窗口",
+			"Close all tabs to the right":"关闭右面的所有窗格",
+			"Markdown auto-list":"Markdown列表项自动补减号",
 		},
 	};
 	g_translations["zh_tw"]=g_translations["zh_cn"];//coulddo: do zh_tw

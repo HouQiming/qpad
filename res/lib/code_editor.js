@@ -2874,6 +2874,10 @@ var find_context_prototype={
 		var l=l0;
 		var r=(this.m_merged_y_windows_forward.length>>2)-1
 		var id=this.m_current_point
+		if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)&&!l&&l<r){
+			l0=1;
+			l=1;
+		}
 		while(l<=r){
 			var m=(l+r)>>1
 			var fitem=this.GetFindItem(m)
@@ -2901,14 +2905,15 @@ var find_context_prototype={
 		var sel=doc.GetSelection();
 		renderer.ShowRange(doc.ed,sel[0],sel[1]);
 		if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
-			UI.OpenEditorWindow(doc.m_file_name);
+			UI.OpenEditorWindow(doc.m_file_name,function(){
+				this.Cancel();
+			}.bind(this));
 			//var obj_tab=UI.OpenEditorWindow(doc.m_file_name);
 			//if(obj_tab&&obj_tab.main_widget&&obj_tab.main_widget.doc){
 			//	var sel=doc.GetSelection();
 			//	doc=obj_tab.main_widget.doc;
 			//	doc.SetSelection(sel[0],sel[1]);
 			//}
-			this.Cancel();
 		}
 		//if(this.m_sel_backups){
 		//	this.m_sel_backups[doc.m_file_name]=undefined;

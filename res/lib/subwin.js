@@ -263,6 +263,27 @@ W.TabbedDocument_prototype={
 		}
 		UI.Refresh();
 	},
+	CloseAllToTheRight:function(){
+		var tab=this.items[this.current_tab_id];
+		for(;;){
+			var did=0;
+			var to_the_right=0;
+			for(var i=0;i<this.items.length;i++){
+				var tab_i=this.items[i];
+				if(tab_i===tab){
+					to_the_right=1;
+					continue;
+				}
+				if(!to_the_right||tab_i.area_name!==tab.area_name){continue;}
+				if(tab_i.in_save_dialog){continue;}
+				this.CloseTab(i);
+				did=1;
+				break;
+			}
+			if(!did){break;}
+		}
+		UI.Refresh();
+	},
 	//bring up a tab *without* focusing it
 	BringUpTab:function(tabid){
 		var tab0=this.items[tabid];

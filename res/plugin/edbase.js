@@ -1658,7 +1658,7 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_lhome=this.SeekLC(this.GetLC(ccnt_ehome)[0],0)
 		var ch=ed.GetUtf8CharNeighborhood(ccnt_ehome+1)
 		// - or * followed by space
-		if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]==0x20){
+		if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]==0x20&&ccnt_ehome+2<=ccnt){
 			ccnt_ehome+=2;
 			this.OnTextInput({"text":"\n"+this.ed.GetText(ccnt_lhome,ccnt_ehome-ccnt_lhome),"is_paste":1})
 			return 0;
@@ -1667,7 +1667,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		return 1;
 	})
-}).prototype.desc={category:"Editing",name:"Markdown auto-indent",stable_name:"adv_auto_indent"};
+}).prototype.desc={category:"Editing",name:"Markdown auto-list",stable_name:"adv_auto_indent"};
 
 UI.RegisterEditorPlugin(function(){
 	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
@@ -3424,16 +3424,15 @@ UI.RegisterEditorPlugin(function(){
 							if(ch==0x5C&&i<n-1&&s0[i+1]=='u'){
 								//enter \u mode
 								ch=parseInt(s0.substr(i+2,4),16)
-								sret.push(String.fromCharCode(ch))
-								//var surrogate_high=0;
-								//if(ch>=0xd800&&ch<=0xdc00){
-								//	surrogate_high=(ch&0x3ff)
-								//}else{
-								//	if(ch>=0xdc00&&ch<=0xe000){
-								//		ch=(surrogate_high<<10)+(ch&0x3ff)+0x10000
-								//		surrogate_high=0
-								//	}
-								//}
+								if(ch>=0xd800&&ch<=0xdc00){
+									surrogate_high=(ch&0x3ff)
+								}else{
+									if(ch>=0xdc00&&ch<=0xe000){
+										ch=(surrogate_high<<10)+(ch&0x3ff)+0x10000
+										surrogate_high=0
+										sret.push(String.fromCharCode(ch))
+									}
+								}
 								i=i+5
 								continue
 							}

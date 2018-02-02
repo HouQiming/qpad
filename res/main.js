@@ -526,6 +526,13 @@ var CreateMenus=function(){
 					UI.top.app.document_area.CloseAll(1)
 				}
 			});
+			menu_file.AddNormalItem({
+				text:"Close all tabs to the right",
+				tab_menu_group:"close",
+				action:function(){
+					UI.top.app.document_area.CloseAllToTheRight()
+				}
+			});
 		}
 	}
 	var obj_active_tab=UI.GetFrontMostEditorTab();
