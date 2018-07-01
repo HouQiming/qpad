@@ -139,6 +139,7 @@ UI.SafeSave=function(fn,data){
 	var ed=UI.CreateEditor({font:UI.Font(UI.font_name,20,0)});
 	ed.Edit([0,0,data]);
 	var ctx=UI.EDSaver_Open(ed,fn)
+	if(!ctx){return 0;}
 	for(;;){
 		var ret=UI.EDSaver_Write(ctx,ed)
 		if(ret=="done"){

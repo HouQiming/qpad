@@ -320,6 +320,7 @@ if(UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"){
 			"Terminal=false\n",
 			"Exec=/usr/bin/qpad\n",
 			"Icon=/usr/share/qpad/icon.svg\n",
+			"Path=~/\n",
 			"Comment=QPad Text Editor\n",
 			"NoDisplay=false\n",
 			"Categories=Development;IDE\n",

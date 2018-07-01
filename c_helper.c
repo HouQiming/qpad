@@ -22,7 +22,9 @@ int UnixMatchFileAttributes(char* fntar,char* fnsrc){
 int UnixIsFirstInstance(){
 	#ifndef WEB
 		int pid_file = open("/var/run/qpad.pid", O_CREAT | O_RDWR, 0666);
-		int rc = flock(pid_file, LOCK_EX | LOCK_NB);
+		int rc;
+		if(pid_file==-1){return 1;}
+		rc = flock(pid_file, LOCK_EX | LOCK_NB);
 		if(rc) {
 		    if(EWOULDBLOCK == errno){
 		        return 0;
