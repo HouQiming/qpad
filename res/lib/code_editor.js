@@ -1941,6 +1941,7 @@ var CallParseMore=function(){
 		var tick0=Duktape.__ui_get_tick();
 		var is_done=0;
 		var terminate_now=0;
+		//console.log('--- fcallmore');
 		for(;;){
 			while(UI.g_include_jobs.length>0){
 				//if(!(UI.g_include_jobs.length&127)){
@@ -1950,8 +1951,10 @@ var CallParseMore=function(){
 				}
 				//}
 				var ijob=UI.g_include_jobs.pop();
-				var fn_found=UI.SearchIncludeFileShallow(ijob.fn_base,ijob.fn_include);
-				//console.log(ijob.fn_include,JSON.stringify(fn_found));
+				//var tick0=Duktape.__ui_get_tick()
+				var fn_found=UI.SearchIncludeFileShallow(ijob.fn_base,ijob.fn_include,ijob.is_deferred===2);
+				//var tick1=Duktape.__ui_get_tick()
+				//console.log('>include',ijob.fn_base,ijob.fn_include,Duktape.__ui_seconds_between_ticks(tick0,tick1));
 				if(!fn_found){
 					continue;
 				}
@@ -1960,7 +1963,7 @@ var CallParseMore=function(){
 					continue;
 				}
 				if(fn_found=="<deep>"){
-					if(ijob.is_deferred!=2){
+					if(ijob.is_deferred!==2){
 						//is_deferred==2: h to c
 						UI.g_deep_include_jobs.push(ijob);
 					}
@@ -1976,6 +1979,7 @@ var CallParseMore=function(){
 			while(UI.g_deep_include_jobs.length>0&&!terminate_now){
 				//standard include paths
 				var ijob=UI.g_deep_include_jobs.pop();
+				//console.log('>deep',ijob.fn_base,ijob.fn_include);
 				var fn_found=undefined;
 				var options=ijob.options;
 				if(options.include_paths){
@@ -2031,6 +2035,7 @@ var CallParseMore=function(){
 			//}
 			//tick0=Duktape.__ui_get_tick();
 			if(ret){
+				//console.log('>parse',ret.file_name);
 				var doc_arr=UI.g_editor_from_file[ret.file_name];
 				if(doc_arr){
 					doc_arr.forEach(function(doc){
@@ -2051,7 +2056,7 @@ var CallParseMore=function(){
 				is_done=1;
 				break;
 			}
-			var tick1=Duktape.__ui_get_tick()
+			//var tick1=Duktape.__ui_get_tick()
 			//print(Duktape.__ui_seconds_between_ticks(tick0,tick1))
 			//if(UI.TestEventInPollJob())
 			terminate_now|=!!(Duktape.__ui_seconds_between_ticks(tick0,tick1)>PARSING_SECONDS_PER_FRAME||UI.TestEventInPollJob());
@@ -5688,12 +5693,12 @@ UI.ED_ParseMore_callback=function(fn){
 	//return {options:ret,fn_h_to_c:fn_h_to_c};
 }
 
-UI.SearchIncludeFileShallow=function(fn_base,fn_include){
+UI.SearchIncludeFileShallow=function(fn_base,fn_include,is_local_only){
 	//console.log('UI.SearchIncludeFile',fn_base,fn_include);
 	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
 		fn_include=fn_include.toLowerCase().replace(/\\/g,"/")
 	}
-	if(fn_include.indexOf('js_module@')==0){
+	if(fn_include.indexOf('js_module@')==0&&!is_local_only){
 		fn_include=fn_include.substr(10);
 		//npm module search
 		var spath_repo=DetectRepository(fn_base)
@@ -5716,10 +5721,14 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 		return '';
 	}
 	var fn_include_length=fn_include.length;
-	//base path
+	//base path / a few levels up
 	var spath=UI.GetPathFromFilename(fn_base)
-	var fn=(spath+"/"+fn_include);
-	if(IO.FileExists(fn)){return fn;}
+	while(spath&&spath!=='.'){
+		var fn=(spath+"/"+fn_include);
+		if(IO.FileExists(fn)){return fn;}
+		if(is_local_only){return '<deep>';}
+		spath=UI.GetPathFromFilename(spath);
+	}
 	//git
 	//DetectRepository(fn_base)
 	//var spath_repo=g_repo_from_file[fn_base]
@@ -5731,19 +5740,28 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include){
 			return '<dangling>';
 		}
 		if(repo){
-			var files=repo.files;
-			for(var i=0;i<files.length;i++){
-				var fn_i=files[i]
-				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-					fn_i=fn_i.toLowerCase().replace(/\\/g,"/")
+			if(!repo.reverse_index){
+				repo.reverse_index={};
+				var files=repo.files;
+				for(var i=0;i<files.length;i++){
+					var fn_i=files[i];
+					if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+						fn_i=fn_i.toLowerCase().replace(/\\/g,"/")
+					}
+					var fn_original_i=fn_i;
+					for(;;){
+						repo.reverse_index[fn_i]=fn_original_i;
+						var pslash=fn_i.indexOf('/');
+						if(pslash<0){
+							break;
+						}
+						fn_i=fn_i.substr(pslash+1);
+					}
 				}
-				if(fn_i.length<fn_include_length){continue;}
-				//if(fn_include=='src/cnn.cpp'){
-				//	console.log(fn_i,fn_base,fn_include);
-				//}
-				if(fn_i.substr(fn_i.length-fn_include_length)==fn_include&&IO.FileExists(fn_i)){
-					return fn_i
-				}
+			}
+			var fn_i=repo.reverse_index[fn_include];
+			if(fn_i&&IO.FileExists(fn_i)){
+				return fn_i;
 			}
 		}
 	}

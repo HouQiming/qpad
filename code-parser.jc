@@ -1688,7 +1688,7 @@ auto QueryQIStateAt(CEditableText ed,i64 ccnt0,i64 ccnt1,JSObject options)
 							s_brief:FormatAsText("Constant for **",getIdString(param_i.GetID()),"** ",ai.y==g_id_1?"":getIdString(ai.y)),
 						})
 	else
-		objs=[d for d,k in obj_types]
+		objs=[d for d in obj_types]
 		tids=new int[][int]
 		gflags=new int[int]
 		for obj,I in objs

@@ -1556,7 +1556,9 @@ class CLayouter_programmer
 		m_hidden_ranges.n=n2;
 		//they must be x-addressible
 		m_hidden_ranges_prepared=1
-		raw_ccnts=[loc.ccnt*2LL+i64(I&1) foreach loc,I in m_hidden_ranges]
+		raw_ccnts=new i64[]
+		foreach loc,I in m_hidden_ranges
+			raw_ccnts.push(loc.ccnt*2LL+i64(I&1))
 		ccnts=new i64[]
 		raw_ccnts.Sort()
 		//sort and merge
@@ -1808,7 +1810,11 @@ class CLayouter_programmer
 		id=JS.Param(0).as(iptr)
 		if uptr(id)<uptr(m_ceos.n):
 			m_ceos[id].obj.CallMethod(int,"OnDestroy")
-		m_ceos=[ceo for ceo,I in m_ceos if I!=id]
+		m_ceos0=m_ceos
+		m_ceos=new CCodeEmbededObject[]
+		for ceo,I in m_ceos
+			if I!=id:
+				m_ceos.push(ceo)
 		m_ceos_sorted=0
 		m_hidden_ranges_prepared=0
 		return 0
@@ -4199,7 +4205,9 @@ registerUIExtension(function(JSObject JS_UI,CUISandbox sbox,int is_real){
 				utf8_utf32_map[I]=pu
 				pu++
 			utf8_utf32_map[stext.n]=pu
-			auto ret=[double(I>=2?utf8_utf32_map[p]:p) foreach p,I in match]
+			ret=new double[]
+			foreach p,I in match
+				ret.push(double(I>=2?utf8_utf32_map[p]:p))
 			ret[0]+=double(ccnt0)
 			ret[1]+=double(ccnt0)
 			return JS.Return(ret)

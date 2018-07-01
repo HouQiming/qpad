@@ -130,11 +130,12 @@ UI.IncrementTabSwitchCount=function(counts,fn,delta0){
 	counts["$"]=n_tot;
 	var n=(counts[fn]||0)
 	counts[fn]=n+delta;
-	if(n_tot>UI.MAX_TAB_SWITCH_COUNT*1024){
+	if(n_tot>UI.MAX_TAB_SWITCH_COUNT*2){
+		scale=(UI.MAX_TAB_SWITCH_COUNT/n_tot);
 		n_tot=0
 		for(var key in counts){
 			if(key=="$"){continue;}
-			counts[key]=Math.max((counts[key]/1024)|0,1);
+			counts[key]=Math.max((counts[key]*scale)|0,1);
 			n_tot+=counts[key];
 		}
 		counts["$"]=n_tot;

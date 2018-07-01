@@ -15,7 +15,7 @@ v2
    "m_button_name": "更新历史",
    "in_m_current_wrap_width": 512,
    "in_m_enable_wrapping": 0,
-   "m_is_help_page_preview": 1
+   "m_is_help_page_preview": -1
   },
   {
    "m_language": "Unix Shell Script",
@@ -25,10 +25,19 @@ v2
    "in_m_enable_wrapping": 0
   }
  ],
- "m_last_focus_cell_id": 4
+ "m_last_focus_cell_id": 2
 }
 =====������=====
 # Release Notes
+
+Version 3.0.8
+	- Improved header searching performance in big git repos (e.g. the Linux kernel)
+
+Version 3.0.7
+	- Improved rendering performance
+	- Added periodic optimization of file history data
+	- File history data saving is now less frequent
+	- Fixed Unicode Emoji convertion from \u
 
 Version 3.0.6
 	- Fixed wheel scrolling in binary files
@@ -64,6 +73,15 @@ Version 3.0.1
 
 =====������=====
 # 更新历史
+
+3.0.8版
+	- 改进了在大git工程里查找头文件的速度
+
+3.0.7版
+	- 改善了渲染速度
+	- 定期优化文件历史数据
+	- 降低了文件历史数据保存频率
+	- 修复了Unicode表情符和\u之间的转换问题
 
 3.0.6版
 	- 修复了二进制编辑器中的滚轮支持

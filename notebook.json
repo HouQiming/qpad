@@ -131,19 +131,17 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 0
+ "m_last_focus_cell_id": 4
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+Win + Space problem
+SSH server move up / move down
+more hints for replace UI - put the buttons next to the top-right bar?
+hidden notebook hotkey
+RegisterApplicationRestart 
+press home key in markdown list
 shared variables between multiple cells - multi-file notebook
-some kind of "html5 terminal" for interface - the remote workflow
-	DOM / css ops
-	basic window manager
-		each window is a "pty"
-	app stream multiplexing
-	or GL-remoting
-	keep it basic for extensibility and future-proofing
-		the numerous failed webtops
 infinite history console
 	compact into string with state metachar when a line gets scrolled out
 console - view alternate buffer
@@ -299,7 +297,7 @@ jc --readable_c_code -awin64 qpad.jc --run
 @echo off
 rem build script for 'qpad.jc'
 rem [button: Release]
-cd /d c:/tp/qpad
+chcp 65001 > NUL
 rem git diff-index --quiet HEAD || ( echo Please commit your changes first && exit )
 git log --pretty=format:%%H -n 1 > res/misc/commit.txt
 jc -brelease -awin64 qpad.jc

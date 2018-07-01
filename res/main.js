@@ -12,7 +12,7 @@ var Language=require("res/lib/langdef");
 //if something was never viewed after 24 active editing hours, close it
 var MAX_STALE_TIME=3600*24;
 
-UI.g_core_version="3.0.6";
+UI.g_core_version="3.0.8";
 UI.g_version=UI.g_core_version+" ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
 UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
 if(UI.Platform.BUILD=="debug"){
@@ -812,6 +812,15 @@ var ErrorMarquee=function(){
 	}
 	return ret;
 };
+
+var g_is_saving_metadata=0;
+var DelayedMetaDataSave=function(){
+	g_is_saving_metadata=0;
+	if(UI.m_need_metadata_save){
+		UI.ReallySaveMetaData();
+		UI.m_need_metadata_save=0;
+	}
+}
 UI.Application=function(id,attrs){
 	if(g_failed_renderings>N_FAILED_FRAMES_THRESHOLD&&!UI.m_metadata_corrupted){
 		//rename the metadata json
@@ -1012,8 +1021,10 @@ UI.Application=function(id,attrs){
 	//	console.log(UI.context_hotkeys[i].key);
 	//}
 	if(UI.m_need_metadata_save){
-		UI.ReallySaveMetaData();
-		UI.m_need_metadata_save=0;
+		if(!g_is_saving_metadata){
+			g_is_saving_metadata=1;
+			UI.setTimeout(DelayedMetaDataSave,1000);
+		}
 	}
 	g_failed_renderings=0;
 };

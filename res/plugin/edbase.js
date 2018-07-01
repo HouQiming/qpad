@@ -3431,6 +3431,8 @@ UI.RegisterEditorPlugin(function(){
 										ch=(surrogate_high<<10)+(ch&0x3ff)+0x10000
 										surrogate_high=0
 										sret.push(String.fromCharCode(ch))
+									}else{
+										sret.push(String.fromCharCode(ch))
 									}
 								}
 								i=i+5

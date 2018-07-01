@@ -4,6 +4,7 @@ var UI=require("gui2d/ui");
 var g_regexp_chopdir=new RegExp("(.*)[/\\\\]([^/\\\\]*)");
 var g_regexp_chopext=new RegExp("(.*)\\.([^./\\\\]*)");
 var g_style_core_properties=["name","font_face","font_size","font_embolden","flags","color","relative_line_space","relative_paragraph_space"];
+UI.MAX_HISTORY_ENTRIES=1024;
 
 UI.RemovePath=function(fname){
 	var ret=fname.match(g_regexp_chopdir);
@@ -70,6 +71,66 @@ UI.m_ui_metadata={};
 		}catch(e){
 			//ignore invalid json
 			UI.m_ui_metadata={};
+		}
+	}
+	//////////////////
+	var hist=UI.m_ui_metadata["<history>"]
+	if(hist&&hist.length>=UI.MAX_HISTORY_ENTRIES*2){
+		try{
+			//compact the history
+			var hist_new=[];
+			for(var i=0;i<hist.length;i++){
+				if(IO.FileExists(hist[i])){
+					hist_new.push(hist[i]);
+				}
+			}
+			if(hist_new.length>=UI.MAX_HISTORY_ENTRIES){
+				hist_new=hist_new.slice(hist_new.length-UI.MAX_HISTORY_ENTRIES);
+			}
+			var new_files=Object.create(null);
+			for(var i=0;i<hist_new.length;i++){
+				new_files[hist_new[i]]=1;
+			}
+			///////////////////
+			//compact history
+			UI.m_ui_metadata["<history>"]=hist_new;
+			for(var i=0;i<hist.length;i++){
+				if(!new_files[hist[i]]){
+					UI.m_ui_metadata[hist[i]]=undefined;
+				}
+			}
+			for(var i=0;i<hist_new.length;i++){
+				var metadata=UI.m_ui_metadata[hist_new[i]];
+				if(metadata&&metadata.m_tabswitch_count){
+					var new_count=Object.create(null);
+					var total=0;
+					for(var fn_theirs in metadata.m_tabswitch_count){
+						if(fn_theirs!=='$'&&new_files[fn_theirs]){
+							var c=metadata.m_tabswitch_count[fn_theirs];
+							new_count[fn_theirs]=c;
+							total+=c;
+						}
+					}
+					var scale=32/total;
+					var total=0;
+					for(var fn_theirs in new_count){
+						var c=(new_count[fn_theirs]*scale|0);
+						new_count[fn_theirs]=(c||undefined);
+						total+=c;
+					}
+					new_count['$']=total;
+					metadata.m_tabswitch_count=new_count;
+				}
+			}
+		}catch(err){
+			//if it failed, we restore the metadata
+			console.log(err.stack);
+			try{
+				UI.m_ui_metadata=JSON.parse(s_json);
+			}catch(e){
+				//ignore invalid json
+				UI.m_ui_metadata={};
+			}
 		}
 	}
 })();
@@ -190,7 +251,7 @@ UI.BumpHistory=function(file_name){
 		hist=[]
 		UI.m_ui_metadata["<history>"]=hist;
 	}
-	for(var i=0;i<hist.length;i++){
+	for(var i=hist.length-1;i>=0;i--){
 		if(hist[i]==file_name){
 			for(var j=i;j<hist.length;j++){
 				hist[j]=hist[j+1];
