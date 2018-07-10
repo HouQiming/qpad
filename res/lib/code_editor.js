@@ -47,6 +47,906 @@ UI.RegisterSpecialFile=function(fn,obj){
 }
 
 ///////////////////////////////////////////////////////
+//QPad's fork of the editor base class
+//we just overwrite it
+UI.HL_DISPLAY_MODE_RECT=0
+UI.HL_DISPLAY_MODE_RECTEX=1
+UI.HL_DISPLAY_MODE_EMBOLDEN=2
+UI.HL_DISPLAY_MODE_TILDE=3
+var g_regexp_newline=new RegExp("\n","g")
+var g_regexp_dos2unix=new RegExp("\r\n","g")
+var g_sticky_key_translations={
+	//////////////////
+	//movement
+	[UI.SDLK_w]:'UP',
+	[UI.SDLK_s]:'DOWN',
+	[UI.SDLK_a]:'LEFT',
+	[UI.SDLK_d]:'RIGHT',
+	//////
+	[UI.SDLK_t]:'PGUP',
+	[UI.SDLK_g]:'PGDN',
+	[UI.SDLK_f]:'HOME',
+	[UI.SDLK_h]:'END',
+	//////
+	[UI.SDLK_i]:'ALT+UP',
+	[UI.SDLK_k]:'ALT+DOWN',
+	[UI.SDLK_j]:'CTRL+LEFT',
+	[UI.SDLK_l]:'CTRL+RIGHT',
+	//////////////////
+	//edit
+	[UI.SDLK_z]:'CTRL+Z',
+	[UI.SDLK_x]:'CTRL+X',
+	[UI.SDLK_c]:'CTRL+C',
+	[UI.SDLK_v]:'CTRL+V',
+	[UI.SDLK_y]:'CTRL+Y',
+	//////////////////
+	//history
+	[UI.SDLK_n]:'CTRL+ALT+-',
+	[UI.SDLK_m]:'CTRL+ALT+=',
+	//////////////////
+	//bookmark
+	[UI.SDLK_0]:'CTRL+0',
+	[UI.SDLK_1]:'CTRL+1',
+	[UI.SDLK_2]:'CTRL+2',
+	[UI.SDLK_3]:'CTRL+3',
+	[UI.SDLK_4]:'CTRL+4',
+	[UI.SDLK_5]:'CTRL+5',
+	[UI.SDLK_6]:'CTRL+6',
+	[UI.SDLK_7]:'CTRL+7',
+	[UI.SDLK_8]:'CTRL+8',
+	[UI.SDLK_9]:'CTRL+9',
+	//misc
+	[UI.SDLK_q]:'ALT+PGUP',
+	[UI.SDLK_e]:'ALT+PGDN',
+	[UI.SDLK_o]:'CTRL+HOME',
+	[UI.SDLK_p]:'CTRL+END',
+};
+var SetHotkey=function(event,hotkey_name){
+	var names=hotkey_name.split("+");
+	event.keymod=0;
+	for(var i=0;i<names.length;i++){
+		var name_i=names[i];
+		var mod=UI['KMOD_L'+name_i];
+		if(mod){
+			event.keymod|=mod;
+		}else if(name_i.length===1){
+			var asc_code=name_i.charCodeAt(0);
+			if(asc_code>=65&&asc_code<=90){asc_code+=32;}
+			event.keysym=asc_code;
+		}else{
+			event.keysym=UI['SDLK_'+name_i];
+		}
+	}
+};
+W.Edit_prototype={
+	plugin_class:'widget',
+	//////////
+	scale:1,
+	mouse_wheel_speed:4,
+	scroll_x:0,
+	scroll_y:0,
+	x_updown:0,
+	//////////
+	mouse_cursor:"ibeam",
+	default_style_name:"edit",
+	//color:0xff000000,
+	//bgcolor_selection:0xffffe0d0,
+	caret_is_wrapped:0,
+	GetHandlerID:function(name){
+		return this.ed.m_handler_registration[name];
+	},
+	GetCharacterHeightAtCaret:function(){
+		var ccnt1=this.sel1.ccnt;
+		if(this.caret_is_wrapped>0){
+			ccnt1=this.ed.SnapToCharBoundary(ccnt1+1,1)
+		}
+		return this.ed.GetCharacterHeightAt(ccnt1);
+	},
+	AutoScroll:function(mode){
+		//'show' 'center' 'center_if_hidden'
+		var ccnt0=this.sel0.ccnt;
+		var ccnt1=this.sel1.ccnt;
+		var ed=this.ed;
+		var ed_caret=this.GetCaretXY();
+		var y_original=this.scroll_y;
+		var ccnt_tot=ed.GetTextSize();
+		var ytot=ed.XYFromCcnt(ccnt_tot).y+ed.GetCharacterHeightAt(ccnt_tot);
+		var wc=UI.GetCharacterAdvance(ed.GetDefaultFont(),32);
+		var hc=this.GetCharacterHeightAtCaret();
+		var page_height=this.h;
+		var h_top_hint=(this.h_top_hint||0);
+		if(mode==='bound'){
+			var x0=this.scroll_x;
+			var y0=this.scroll_y;
+			this.scroll_x=Math.max(this.scroll_x,0);
+			this.scroll_y=Math.max(Math.min(this.scroll_y,ytot-page_height),0);
+			if(this.scroll_x!==x0||this.scroll_y!==y0){
+				this.scrolling_animation=undefined;
+			}
+			return;
+		}
+		if(mode!=='show'){
+			//print(ed_caret,this.sel1.ccnt,this.ed.GetTextSize())
+			if(this.scroll_y>ed_caret.y||this.scroll_y<=ed_caret.y-page_height||mode==='center'){
+				//mode 'center_if_hidden': only center when the thing was invisible
+				this.scroll_y=ed_caret.y-(page_height-hc)/2;
+			}
+		}
+		this.scroll_y=Math.min(this.scroll_y,ed_caret.y-h_top_hint)
+		if(ed_caret.y-this.scroll_y>=page_height-hc){
+			this.scroll_y=(ed_caret.y-(page_height-hc));
+		}
+		var wwidth=this.w-wc*(this.right_side_autoscroll_margin||1);
+		if(mode!=='show'&&this.sel0.ccnt!==this.sel1.ccnt){
+			//make sure sel0 shows up
+			this.scroll_x=Math.min(this.scroll_x,Math.min(ed.XYFromCcnt(ccnt0).x,ed_caret.x))
+		}
+		this.scroll_x=Math.min(this.scroll_x,ed_caret.x);
+		if(this.scroll_x>0&&ed_caret.x<wwidth){
+			//aggressive x scroll on short lines
+			var ccnt_lend=this.SeekXY(1e17,ed_caret.y);
+			if(ed.XYFromCcnt(ccnt_lend).x<=wwidth){
+				this.scroll_x=0;
+			}
+		}
+		if(ed_caret.x-this.scroll_x>=wwidth){
+			//going over the right
+			var chneib=ed.GetUtf8CharNeighborhood(ccnt1);
+			var ch=chneib[1];
+			if(ch===13||ch===10){
+				//line end, don't do anything funny
+				this.scroll_x=ed_caret.x-wwidth;
+			}else{
+				//line middle, scroll to a more middle-ish position
+				var right_side_autoscroll_space=(this.right_side_autoscroll_space||16);
+				this.scroll_x=ed_caret.x-wwidth+Math.min(wwidth/2,right_side_autoscroll_space*wc);
+			}
+		}
+		this.scroll_x=Math.max(this.scroll_x,0);
+		this.scroll_y=Math.max(Math.min(this.scroll_y,ytot-page_height),0);
+		this.x_updown=ed_caret.x
+		if(this.disable_scrolling_x){this.scroll_x=0;}
+		if(this.disable_scrolling_y){this.scroll_y=0;}
+		//TestTrigger(KEYCODE_ANY_MOVE)
+	},
+	OnMouseWheel:function(event){
+		var ed=this.ed;
+		var ccnt_tot=ed.GetTextSize();
+		var ytot=ed.XYFromCcnt(ccnt_tot).y+ed.GetCharacterHeightAt(ccnt_tot);
+		var hc=this.GetCharacterHeightAtCaret();
+		var page_height=this.h;
+		this.scroll_y=Math.max(Math.min(this.scroll_y-hc*event.y*this.mouse_wheel_speed,ytot-page_height),0);
+		UI.Refresh()
+	},
+	SkipInvisibles:function(ccnt,side){
+		return this.ed.MoveToBoundary(ccnt,side,"invisible_boundary")
+	},
+	SnapToValidLocation:function(ccnt,side){
+		//var ed=this.ed;
+		//var ccnt_cb=ed.SnapToCharBoundary(ccnt,side);
+		////return ccnt_cb;
+		//var xy=ed.XYFromCcnt(ccnt_cb);
+		//var ccnt_vb=ed.SeekXY(xy.x,xy.y);
+		//return ccnt_vb;
+		return this.ed.MoveToBoundary(this.ed.SnapToCharBoundary(ccnt,side),-1,"invisible_boundary")
+	},
+	////////////////////////////
+	SeekLC:function(line,column){
+		var ed=this.ed;
+		return ed.Bisect(ed.m_handler_registration["line_column"],[line,column],"ll");
+	},
+	SeekLineBelowKnownPosition:function(ccnt_known,line_known,line_new){
+		var ed=this.ed;
+		return ed.Bisect(ed.m_handler_registration["line_column"],[line_new,0, line_known,ccnt_known],"llll");
+	},
+	GetLC:function(ccnt){
+		var ed=this.ed;
+		return ed.GetStateAt(ed.m_handler_registration["line_column"],ccnt,"ll");
+	},
+	GetEnhancedHome:function(ccnt){
+		var ccnt_lhome=this.SeekLC(this.GetLC(ccnt)[0],0);
+		//in case there is \r, we need to snap before it, thus the -1
+		return this.SnapToValidLocation(this.ed.MoveToBoundary(ccnt_lhome,1,"space"),-1);
+	},
+	GetEnhancedEnd:function(ccnt){
+		var ccnt_lend=this.SeekLC(this.GetLC(ccnt)[0],1e17);
+		if(ccnt_lend>ccnt&&this.ed.GetText(ccnt_lend-1,1)==="\n"){ccnt_lend--;}
+		return this.SnapToValidLocation(this.ed.MoveToBoundary(ccnt_lend,-1,"space"),-1)
+	},
+	////////////////////////////
+	GetCaretXY:function(){
+		var ed=this.ed;
+		var xy0=ed.XYFromCcnt(this.sel1.ccnt)
+		if(this.caret_is_wrapped>0){
+			//chicken-egg: no this.GetCharacterHeightAtCaret() here
+			xy0.x=0
+			xy0.y+=ed.GetCharacterHeightAt(this.sel1.ccnt);
+		}else if(this.caret_is_wrapped<0){
+			//the *other* mode
+			xy0.y-=ed.GetCharacterHeightAt(this.sel1.ccnt);
+			xy0.x=this.displayed_wrap_width
+		}
+		//print(this.caret_is_wrapped,xy0.x,xy0.y)
+		return xy0||{x:0,y:0};
+	},
+	GetIMECaretXY:function(){
+		var ed=this.ed;
+		var xy0=ed.XYFromCcnt(this.sel1.ccnt)
+		xy0.x+=ed.m_caret_offset
+		if(this.caret_is_wrapped>0){
+			//chicken-egg: no this.GetCharacterHeightAtCaret() here
+			xy0.x=0
+			xy0.y+=ed.GetCharacterHeightAt(this.sel1.ccnt);
+		}else if(this.caret_is_wrapped<0){
+			//the *other* mode
+			xy0.y-=ed.GetCharacterHeightAt(this.sel1.ccnt);
+			xy0.x=this.displayed_wrap_width
+		}
+		return xy0;
+	},
+	SeekXY:function(x,y,ignore_newline_before){
+		var ed=this.ed
+		var ccnt=ed.SeekXY(x,y)
+		//skip invisible
+		if(!ignore_newline_before){
+			var ccnt_maybe_newline=this.SkipInvisibles(ccnt,-1)
+			if(ccnt_maybe_newline>0&&ed.GetUtf8CharNeighborhood(ccnt_maybe_newline)[0]===10){
+				//it's a newline before
+				var xy=ed.XYFromCcnt(ccnt)
+				if(xy.y>y){
+					//we should have landed on the previous line
+					ccnt=ccnt_maybe_newline-1
+				}
+			}
+		}
+		var chneib=ed.GetUtf8CharNeighborhood(ccnt);
+		if(chneib[0]===13&&chneib[1]===10){
+			ccnt--;
+		}
+		if(ccnt===ed.GetTextSize()){
+			//eof special case for mousing
+			ccnt=ed.SeekXY(x,ed.XYFromCcnt(ccnt).y)
+		}
+		return ccnt
+	},
+	MoveCursorToXY:function(x,y, side){
+		var ed=this.ed;
+		this.sel1.ccnt=this.SeekXY(x,y,side>0&&this.ignore_newline_before_for_down);
+		this.caret_is_wrapped=0;
+		//print("IsAtLineWrap",this.sel1.ccnt,ed.IsAtLineWrap(this.sel1.ccnt),ed.GetUtf8CharNeighborhood(this.sel1.ccnt))
+		var lwmode=ed.IsAtLineWrap(this.sel1.ccnt)
+		if(lwmode){
+			var x0=this.GetCaretXY().x;
+			this.caret_is_wrapped=lwmode;
+			var x1=this.GetCaretXY().x;
+			this.caret_is_wrapped=(Math.abs(x1-x)<Math.abs(x0-x)?lwmode:0);
+		}
+	},
+	OnChange:function(){},
+	OnSelectionChange:function(){},
+	/////////////////
+	CallHooks:function(name){
+		var hk=this.m_event_hooks[name];
+		if(hk){
+			for(var i=hk.length-1;i>=0;i--){
+				hk[i].call(this)
+			}
+		}
+	},
+	CallOnChange:function(){
+		this.caret_is_wrapped=0;
+		this.AutoScroll('show')
+		this.CallHooks('change')
+		this.OnChange(this);
+		this.m_user_just_typed_char=0
+	},
+	CallOnSelectionChange:function(){
+		this.CallHooks('selectionChange')
+		this.OnSelectionChange(this);
+		this.m_user_just_typed_char=0
+	},
+	UserTypedChar:function(){
+		if(!this.m_user_just_typed_char){
+			this.m_user_just_typed_char=1;
+			this.CallHooks('userTypeChar');
+		}
+	},
+	/////////////////
+	AddEventHandler:function(s_key,faction){
+		UI.assert(!this.m_transient_hotkeys);
+		if(this.m_event_hooks[s_key]){
+			this.m_event_hooks[s_key].push(faction)
+		}else{
+			this.m_additional_hotkeys.push({'key':s_key,'action':faction})
+			//UI.assert(this.m_additional_hotkeys.length<1000);
+		}
+	},
+	AddTransientHotkey:function(s_key,faction){
+		this.m_transient_hotkeys.push({'key':s_key,'action':UI.HackCallback(faction)})
+	},
+	/////////////////
+	Copy:function(){
+		var ccnt0=this.sel0.ccnt;
+		var ccnt1=this.sel1.ccnt;
+		var ed=this.ed;
+		if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
+		if(ccnt0<ccnt1){
+			UI.SDL_SetClipboardText(ed.GetText(ccnt0,ccnt1-ccnt0))
+		}
+	},
+	Cut:function(){
+		var ccnt0=this.sel0.ccnt;
+		var ccnt1=this.sel1.ccnt;
+		var ed=this.ed
+		if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
+		if(ccnt0<ccnt1){
+			this.Copy();//UI.SDL_SetClipboardText(ed.GetText(ccnt0,ccnt1-ccnt0))
+			this.HookedEdit([ccnt0,ccnt1-ccnt0,null])
+			this.CallOnChange();
+			UI.Refresh();
+			return 1;
+		}
+		return 0;
+	},
+	Paste:function(){
+		var stext=UI.SDL_GetClipboardText()
+		if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
+			stext=stext.replace(g_regexp_dos2unix,"\n");
+		}
+		if(this.is_single_line){
+			stext=stext.replace(g_regexp_newline," ");
+		}
+		this.OnTextInput({"text":stext,"is_paste":1})
+	},
+	Undo:function(){
+		var ed=this.ed;
+		var ret=ed.Undo()
+		if(ret&&ret.sz>=0){
+			this.sel0.ccnt=ret.ccnt;
+			this.sel1.ccnt=ret.ccnt+ret.sz;
+			this.AutoScroll("center_if_hidden");
+		}
+		this.CallOnChange();
+		UI.Refresh();
+	},
+	Redo:function(){
+		var ed=this.ed;
+		var ret=ed.Undo("redo")
+		if(ret&&ret.sz>=0){
+			this.sel0.ccnt=ret.ccnt;
+			this.sel1.ccnt=ret.ccnt+ret.sz;
+			this.AutoScroll("center_if_hidden");
+		}
+		this.CallOnChange();
+		UI.Refresh();
+	},
+	////////////////////////////
+	HookedEdit:function(ops){if(this.read_only){return;};this.ed.Edit(ops);},
+	GetSelection:function(){
+		var ccnt0=this.sel0.ccnt;
+		var ccnt1=this.sel1.ccnt;
+		if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
+		return [ccnt0,ccnt1];
+	},
+	CreateTransientHighlight:function(attrs){
+		var ed=this.ed
+		var p0=ed.CreateLocator(0,-1);p0.undo_tracked=0;
+		var p1=ed.CreateLocator(0,-1);p1.undo_tracked=0;
+		var hl=ed.CreateHighlight(p0,p1);
+		for(var key in attrs){
+			hl[key]=attrs[key]
+		}
+		return [p0,p1,hl]
+	},
+	AddAdditionalPlugins:function(){},
+	Init:function(){
+		var ed=this.ed;
+		if(!ed){
+			//don't allow plugins to extend state_handlers for now
+			this.m_additional_hotkeys=(this.additional_hotkeys||[])
+			if(!this.m_event_hooks){this.m_event_hooks={}}
+			//userTypeChar differs from text input in that 'paste' doesn't count
+			this.m_event_hooks['userTypeChar']=[]
+			this.m_event_hooks['selectionChange']=[]
+			this.m_event_hooks['change']=[]
+			this.m_event_hooks['editorCreate']=[]
+			this.m_event_hooks['afterRender']=[]
+			this.m_event_hooks['doubleClick']=[]
+			this.m_event_hooks['tripleClick']=[]
+			var plugins=this.plugins;
+			if(plugins){
+				for(var i=0;i<plugins.length;i++){
+					plugins[i].call(this)
+				}
+			}
+			this.AddAdditionalPlugins()
+			ed=UI.CreateEditor(this);
+			if(this.text){ed.Edit([0,0,this.text],1);}
+			this.sel0=ed.CreateLocator(0,-1);this.sel0.undo_tracked=1;
+			this.sel1=ed.CreateLocator(0,-1);this.sel1.undo_tracked=1;
+			this.ed=ed;
+			this.sel_hl=ed.CreateHighlight(this.sel0,this.sel1);
+			this.sel_hl.color=this.bgcolor_selection;
+			this.sel_hl.invertible=1;
+			ed.m_caret_locator=this.sel1;
+			this.CallHooks('editorCreate')
+		}
+	},
+	OnTextEdit:function(event){
+		if(event.text.length){
+			this.ed.m_IME_overlay=event;
+		}else{
+			this.ed.m_IME_overlay=undefined;
+		}
+		UI.Refresh()
+	},
+	ProcessHotkeysInput:function(hk,event){
+		var sel0_ccnt=this.sel0.ccnt;
+		var sel1_ccnt=this.sel1.ccnt;
+		if(!hk){return 0;}
+		for(var i=hk.length-1;i>=0;i--){
+			var hki=hk[i]
+			if(event.text===hki.key){
+				if(!hki.action.call(this,hki.key)){
+					//0 for cancel
+					//if(sel0_ccnt!==this.sel0.ccnt||sel1_ccnt!==this.sel1.ccnt){
+					//	this.CallOnSelectionChange()
+					//}
+					UI.Refresh()
+					return 1
+				}
+			}
+		}
+		return 0
+	},
+	OnTextInput:function(event){
+		if(this.read_only){return;}
+		var ed=this.ed;
+		var ccnt0=this.sel0.ccnt;var sel0_ccnt=ccnt0
+		var ccnt1=this.sel1.ccnt;var sel1_ccnt=ccnt1
+		if(ccnt0>ccnt1){var tmp=ccnt1;ccnt1=ccnt0;ccnt0=tmp;}
+		var ops=[ccnt0,ccnt1-ccnt0,event.text];
+		if(event.text.length===1&&!event.is_paste){
+			//ASCII key events
+			if(this.ProcessHotkeysInput(this.m_transient_hotkeys,event)){return;}
+			if(this.ProcessHotkeysInput(this.m_additional_hotkeys,event)){return;}
+		}
+		if(event.text){
+			this.HookedEdit(ops)
+		}
+		//for hooked case, need to recompute those
+		var lg=Duktape.__byte_length(ops[2]);
+		this.sel0.ccnt=ops[0]+lg;
+		this.sel1.ccnt=ops[0]+lg;
+		this.AutoScroll("show");
+		this.CallOnChange();
+		this.UserTypedChar();
+		this.ed.m_IME_overlay=undefined;
+		UI.Refresh()
+	},
+	ProcessHotkeysKeyDown:function(hk,event){
+		var sel0_ccnt=this.sel0.ccnt;
+		var sel1_ccnt=this.sel1.ccnt;
+		var IsHotkey=UI.IsHotkey
+		if(!hk){return 0;}
+		for(var i=hk.length-1;i>=0;i--){
+			var hki=hk[i]
+			if(hki.key.length!==1&&IsHotkey(event,hki.key)){
+				if(!hki.action.call(this,hki.key,event)){
+					//return 0 for "cancel default"
+					if(sel0_ccnt!==this.sel0.ccnt||sel1_ccnt!==this.sel1.ccnt){
+						this.CallOnSelectionChange()
+					}
+					UI.Refresh()
+					return 1;
+				}
+			}
+		}
+		return 0
+	},
+	OnBlur:function(){
+		if(this.m_is_main_editor){
+			this.m_in_sticky_key=0;
+			if(this.owner){
+				this.owner.DismissNotification('sticky_key')
+			}
+		}
+	},
+	OnKeyDown:function(event){
+		//allow multiple keys
+		/*
+		mouse messages
+		*/
+		var ed=this.ed;
+		var IsHotkey=UI.IsHotkey;
+		var is_shift=event.keymod&(UI.KMOD_LSHIFT|UI.KMOD_RSHIFT);
+		var sel0=this.sel0;
+		var sel1=this.sel1;
+		var this_outer=this;
+		var sel0_ccnt=sel0.ccnt;
+		var sel1_ccnt=sel1.ccnt;
+		var epilog=UI.HackCallback(function(){
+			if(!is_shift){sel0.ccnt=sel1.ccnt;}
+			this_outer.AutoScroll("show");
+			UI.Refresh();
+		});
+		if(this.m_in_sticky_key&&!(event.keymod&(UI.KMOD_CTRL|UI.KMOD_ALT|UI.KMOD_WIN))){
+			var s_translated=g_sticky_key_translations[event.keysym];
+			if(s_translated){
+				if(event.keymod&UI.KMOD_SHIFT){
+					s_translated='SHIFT+'+s_translated;
+				}
+				if(s_translated==='SHIFT+CTRL+V'&&this.SmartPaste){
+					this.SmartPaste();
+					return;
+				}
+				SetHotkey(event,UI.TranslateHotkey(s_translated));
+			}
+		}
+		//if(UI.enable_timing){UI.TimingEvent("m_transient_hotkeys "+this.m_transient_hotkeys.length);}
+		if(this.ProcessHotkeysKeyDown(this.m_transient_hotkeys,event)){return;}
+		//if(UI.enable_timing){UI.TimingEvent("m_additional_hotkeys "+this.m_additional_hotkeys.length);}
+		if(this.ProcessHotkeysKeyDown(this.m_additional_hotkeys,event)){return;}
+		//if(UI.enable_timing){UI.TimingEvent("the rest of OnKeyDown");}
+		if(0){
+		}else if((IsHotkey(event,"F4")||UI.IS_LINUX&&IsHotkey(event,"PRINTSCREEN"))&&this.m_is_main_editor&&this.owner){
+			//sticky key
+			this.m_in_sticky_key=!this.m_in_sticky_key;
+			if(this.m_in_sticky_key){
+				UI.SDL_StopTextInput();
+				this.owner.CreateNotification({
+					id:'sticky_key',icon:'Ｖ',text:UI._('Sticky keys enabled, press F4 again to cancel')
+				})
+			}else{
+				this.owner.DismissNotification('sticky_key')
+				UI.SDL_StartTextInput();
+			}
+			epilog();
+		}else if(IsHotkey(event,"UP SHIFT+UP")){
+			var ed_caret=this.GetCaretXY();
+			var bk=this.x_updown;
+			this.MoveCursorToXY(this.x_updown,ed_caret.y-1.0, -1);
+			epilog();
+			this.x_updown=bk;
+		}else if(IsHotkey(event,"DOWN SHIFT+DOWN")){
+			var hc=this.GetCharacterHeightAtCaret();
+			var ed_caret=this.GetCaretXY();
+			var bk=this.x_updown;
+			this.MoveCursorToXY(this.x_updown,ed_caret.y+hc, 1);
+			epilog();
+			this.x_updown=bk;
+		}else if(IsHotkey(event,"LEFT SHIFT+LEFT")){
+			var ccnt=this.SkipInvisibles(sel1.ccnt,-1);
+			var lwmode=ed.IsAtLineWrap(ccnt);
+			if(this.caret_is_wrapped>0){
+				this.caret_is_wrapped=0;
+				epilog();
+			}else if(this.caret_is_wrapped>lwmode){
+				this.caret_is_wrapped=lwmode;
+				epilog();
+			}else{
+				if(this.same_line_only_left_right){
+					if(this.ed.GetUtf8CharNeighborhood(ccnt)[0]===10){
+						return;
+					}
+				}
+				if(ccnt>0){
+					sel1.ccnt=this.SnapToValidLocation(ccnt-1,-1);
+					epilog();
+				}
+				lwmode=ed.IsAtLineWrap(sel1.ccnt);
+				this.caret_is_wrapped=Math.max(lwmode,0);
+			}
+		}else if(IsHotkey(event,"RIGHT SHIFT+RIGHT")){
+			var ccnt=this.SkipInvisibles(sel1.ccnt,1);
+			var lwmode=ed.IsAtLineWrap(ccnt);
+			if(this.caret_is_wrapped<0){
+				this.caret_is_wrapped=0;
+				epilog();
+			}else if(this.caret_is_wrapped<lwmode){
+				this.caret_is_wrapped=lwmode;
+				epilog();
+			}else{
+				if(ccnt<ed.GetTextSize()){
+					sel1.ccnt=this.SnapToValidLocation(ccnt+1,1);
+					if(this.same_line_only_left_right){
+						if(this.ed.GetUtf8CharNeighborhood(sel1.ccnt)[0]===10){
+							sel1.ccnt=ccnt;
+							return;
+						}
+					}
+					epilog();
+				}
+				lwmode=ed.IsAtLineWrap(sel1.ccnt);
+				this.caret_is_wrapped=Math.min(lwmode,0);
+			}
+		}else if(IsHotkey(event,"CTRL+LEFT SHIFT+CTRL+LEFT")){
+			var ccnt=this.SkipInvisibles(sel1.ccnt,-1);
+			if(ccnt>0){
+				sel1.ccnt=this.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(ccnt-1,-1),-1,this.precise_ctrl_lr_stop?"precise_ctrl_lr_stop":"ctrl_lr_stop"),-1)
+				this.caret_is_wrapped=ed.IsAtLineWrap(sel1.ccnt);
+				epilog();
+			}
+		}else if(IsHotkey(event,"CTRL+RIGHT SHIFT+CTRL+RIGHT")){
+			var ccnt=this.SkipInvisibles(sel1.ccnt,1);
+			if(ccnt<ed.GetTextSize()){
+				sel1.ccnt=this.SnapToValidLocation(ed.MoveToBoundary(ed.SnapToCharBoundary(ccnt+1,1),1,this.precise_ctrl_lr_stop?"precise_ctrl_lr_stop":"ctrl_lr_stop"),1)
+				this.caret_is_wrapped=0;
+				epilog();
+			}
+		}else if(IsHotkey(event,"BACKSPACE")||IsHotkey(event,"SHIFT+BACKSPACE")||IsHotkey(event,"DELETE")){
+			var ccnt0=sel0.ccnt;
+			var ccnt1=sel1.ccnt;
+			var is_backspace=(!IsHotkey(event,"DELETE"));
+			var bk_m_user_just_typed_char=this.m_user_just_typed_char
+			if(ccnt0>ccnt1){var tmp=ccnt0;ccnt0=ccnt1;ccnt1=tmp;}
+			if(ccnt0===ccnt1){
+				if(is_backspace){
+					if(ccnt0>0){ccnt0=ed.SnapToCharBoundary(this.SkipInvisibles(ccnt0,-1)-1,-1);}
+				}else{
+					if(ccnt1<ed.GetTextSize()){ccnt1=ed.SnapToCharBoundary(this.SkipInvisibles(ccnt1,1)+1,1);}
+				}
+			}
+			if(ccnt0<ccnt1){
+				this.HookedEdit([ccnt0,ccnt1-ccnt0,null])
+				this.CallOnChange()
+				if(is_backspace){
+					//this.m_user_just_typed_char=bk_m_user_just_typed_char
+					if(bk_m_user_just_typed_char){
+						this.UserTypedChar();
+					}
+				}
+				UI.Refresh();
+				return;
+			}
+		}else if(IsHotkey(event,"CTRL+HOME SHIFT+CTRL+HOME")){
+			sel1.ccnt=0;
+			this.caret_is_wrapped=0;
+			epilog()
+		}else if(IsHotkey(event,"CTRL+END SHIFT+CTRL+END")){
+			sel1.ccnt=ed.GetTextSize();
+			this.caret_is_wrapped=0;
+			epilog()
+		}else if(IsHotkey(event,"CTRL+A")){
+			sel0.ccnt=0;
+			sel1.ccnt=ed.GetTextSize();
+			this.caret_is_wrapped=0;
+			UI.Refresh();
+		}else if(IsHotkey(event,"RETURN RETURN2")){
+			if(this.is_single_line){
+				this.OnEnter.call(this)
+			}else{
+				this.OnTextInput({"text":"\n"})
+			}
+		}else if(IsHotkey(event,"TAB")&&this.tab_is_char&&sel0.ccnt===sel1.ccnt){
+			this.OnTextInput({"text":"\t"})
+		}else if(IsHotkey(event,"HOME SHIFT+HOME")){
+			var ed_caret=this.GetCaretXY();
+			var ccnt_lhome=this.SeekXY(0,ed_caret.y);
+			var ccnt_rehome=this.GetEnhancedHome(ccnt_lhome)//sel1_ccnt
+			var ccnt_ehome=Math.max(ccnt_rehome,ccnt_lhome);
+			if(sel1.ccnt===ccnt_ehome&&ccnt_lhome===ccnt_ehome){
+				sel1.ccnt=ccnt_rehome;
+				this.caret_is_wrapped=0;
+			}else if(sel1.ccnt===ccnt_ehome||ccnt_lhome===ccnt_ehome){
+				sel1.ccnt=ccnt_lhome;
+				this.caret_is_wrapped=Math.max(ed.IsAtLineWrap(this.sel1.ccnt),0);
+			}else{
+				sel1.ccnt=ccnt_ehome;
+				this.caret_is_wrapped=0;
+			}
+			epilog();
+		}else if(IsHotkey(event,"END SHIFT+END")){
+			var ed_caret=this.GetCaretXY();
+			var ccnt_lend=this.SeekXY(1e17,ed_caret.y);
+			var ccnt_reend=this.GetEnhancedEnd(ccnt_lend)//sel1_ccnt
+			var ccnt_eend=Math.min(ccnt_reend,ccnt_lend);
+			if(sel1.ccnt===ccnt_eend&&ccnt_lend===ccnt_eend){
+				sel1.ccnt=ccnt_reend;
+				this.caret_is_wrapped=0;
+			}else if(sel1.ccnt===ccnt_eend||ccnt_lend===ccnt_eend){
+				sel1.ccnt=ccnt_lend;
+				this.caret_is_wrapped=Math.min(ed.IsAtLineWrap(this.sel1.ccnt),0);
+			}else{
+				sel1.ccnt=ccnt_eend;
+				this.caret_is_wrapped=0;
+			}
+			epilog();
+		}else if(IsHotkey(event,"PGUP SHIFT+PGUP")){
+			var hc=this.GetCharacterHeightAtCaret();
+			var bk=this.x_updown;
+			var ed_caret=this.GetCaretXY();
+			this.MoveCursorToXY(this.x_updown,ed_caret.y-Math.max(Math.floor(this.h/hc-(this.page_guard_lines||0)),1)*hc, -1);
+			var ed_caret2=this.GetCaretXY();
+			this.scroll_y+=ed_caret2.y-ed_caret.y
+			epilog();
+			this.x_updown=bk;
+		}else if(IsHotkey(event,"PGDN SHIFT+PGDN")){
+			var hc=this.GetCharacterHeightAtCaret();
+			var bk=this.x_updown;
+			var ed_caret=this.GetCaretXY();
+			this.MoveCursorToXY(this.x_updown,ed_caret.y+Math.max(Math.floor(this.h/hc-(this.page_guard_lines||0)),1)*hc, 1);
+			var ed_caret2=this.GetCaretXY();
+			this.scroll_y+=ed_caret2.y-ed_caret.y
+			epilog();
+			this.x_updown=bk;
+		}else if(IsHotkey(event,"CTRL+C")||IsHotkey(event,"CTRL+INSERT")){
+			this.Copy()
+		}else if(IsHotkey(event,"CTRL+X")||IsHotkey(event,"SHIFT+DELETE")){
+			if(this.Cut()){return;}
+		}else if(IsHotkey(event,"CTRL+V")||IsHotkey(event,"SHIFT+INSERT")){
+			this.Paste()
+			return;
+		}else if(IsHotkey(event,"CTRL+Z")||IsHotkey(event,"ALT+BACKSPACE")){
+			this.Undo();
+		}else if(IsHotkey(event,"SHIFT+CTRL+Z")||IsHotkey(event,"CTRL+Y")){
+			this.Redo();
+		}else{
+		}
+		if(sel0_ccnt!==sel0.ccnt||sel1_ccnt!==sel1.ccnt){
+			this.CallOnSelectionChange()
+		}
+	},
+	SetSelection:function(ccnt0,ccnt1){
+		var ccnt_tot=this.ed.GetTextSize();
+		this.sel0.ccnt=Math.min(Math.max(ccnt0,0),ccnt_tot);
+		this.sel1.ccnt=Math.min(Math.max(ccnt1,0),ccnt_tot);
+		//this.AutoScroll(mode&&this.sel0.ccnt===ccnt0&&this.sel1.ccnt===ccnt1?"center":"center_if_hidden");
+		this.AutoScroll("center_if_hidden");
+		this.caret_is_wrapped=0
+		UI.Refresh()
+		//this.CallOnSelectionChange()
+	},
+	SetCaretTo:function(ccnt){
+		this.SetSelection(ccnt,ccnt)
+	},
+	////////////////////////////
+	OnMouseDown:function(event){
+		var x0=event.x-this.x+this.scroll_x
+		var y0=event.y-this.y+this.scroll_y
+		var ccnt_clicked=this.SeekXY(x0,y0);
+		this.dragging_shift=0;
+		if(event.clicks===2){
+			//double-click
+			this.sel0.ccnt=this.SnapToValidLocation(this.ed.MoveToBoundary(this.ed.SnapToCharBoundary(Math.max(this.SkipInvisibles(ccnt_clicked,-1),0),-1),-1,"word_boundary_left"),-1)
+			this.sel1.ccnt=this.SnapToValidLocation(this.ed.MoveToBoundary(this.ed.SnapToCharBoundary(Math.min(this.SkipInvisibles(ccnt_clicked,1),this.ed.GetTextSize()),1),1,"word_boundary_right"),1)
+			this.caret_is_wrapped=Math.min(this.ed.IsAtLineWrap(this.sel1.ccnt),0);
+			this.AutoScroll('show')
+			this.CallOnSelectionChange()
+			//UI.Refresh()
+			//return
+		}else if(event.clicks>=3){
+			//triple-click
+			var line=this.GetLC(ccnt_clicked)[0]
+			this.sel0.ccnt=this.SeekLC(line,0)
+			this.sel1.ccnt=this.SeekLC(line+1,0)
+			this.caret_is_wrapped=Math.min(this.ed.IsAtLineWrap(this.sel1.ccnt),0);
+			this.AutoScroll('show')
+			this.CallOnSelectionChange()
+			//UI.Refresh()
+			//return
+		}else{
+			if(event.button===UI.SDL_BUTTON_RIGHT&&this.OnRightClick){
+				//prevent sel when right clicking selected text
+				var sel=this.GetSelection();
+				if(ccnt_clicked>=sel[0]&&ccnt_clicked<=sel[1]){
+					UI.SetFocus(this)
+					UI.Refresh()
+					return;
+				}
+			}
+			if(!UI.IsPressed("LSHIFT")&&!UI.IsPressed("RSHIFT")){
+				this.sel0.ccnt=ccnt_clicked;
+			}else{
+				this.dragging_shift=1;
+			}
+			this.sel1.ccnt=ccnt_clicked;
+			this.caret_is_wrapped=Math.min(this.ed.IsAtLineWrap(this.sel1.ccnt),0);
+			this.AutoScroll('show')
+			this.CallOnSelectionChange()
+		}
+		this.is_dragging=1
+		this.dragging_ccnt0=this.sel0.ccnt;
+		this.dragging_ccnt1=this.sel1.ccnt;
+		UI.SetFocus(this)
+		UI.CaptureMouse(this)
+		if(event.clicks>=3){
+			this.CallHooks('tripleClick')
+		}else if(event.clicks===2){
+			this.CallHooks('doubleClick')
+		}
+		UI.Refresh()
+	},
+	OnMouseMove:function(event){
+		if(!this.is_dragging){return;}
+		var x1=event.x-this.x+this.scroll_x
+		var y1=event.y-this.y+this.scroll_y
+		var ccnt=this.SeekXY(x1,y1);
+		if(!this.dragging_shift&&ccnt>=this.dragging_ccnt0&&ccnt<=this.dragging_ccnt1){
+			this.sel0.ccnt=this.dragging_ccnt0;
+			this.sel1.ccnt=this.dragging_ccnt1;
+		}else{
+			if(!this.dragging_shift){
+				if(ccnt<this.dragging_ccnt0){
+					this.sel0.ccnt=this.dragging_ccnt1;
+				}else{
+					this.sel0.ccnt=this.dragging_ccnt0;
+				}
+			}
+			this.sel1.ccnt=ccnt;
+		}
+		this.AutoScroll('show')
+		this.CallOnSelectionChange()
+		UI.Refresh()
+	},
+	OnMouseUp:function(event){
+		if(!this.is_dragging){return;}
+		UI.ReleaseMouse(this)
+		this.is_dragging=0
+		UI.Refresh()
+	},
+	RenderAsWidget:function(id,x,y,w,h){
+		this.x=x;
+		this.y=y;
+		this.w=w;
+		this.h=h;
+		W.PureRegion(id,this)
+		if(this.show_background){
+			UI.DrawBitmap(0,this.x,this.y,this.w,this.h,this.bgcolor);
+		}
+		if(!this.ed){this.Init();}
+		this.m_transient_hotkeys=[]
+		this.sel_hl.color=this.bgcolor_selection;
+		var scale=this.scale*UI.pixels_per_unit;
+		var scroll_x=this.scroll_x;
+		var scroll_y=this.scroll_y;
+		var ed=this.ed;
+		if(this.scroll_transition_dt>0){
+			UI.Begin(this)
+				var anim=W.AnimationNode("scrolling_animation",{transition_dt:this.scroll_transition_dt,
+					scroll_x:scroll_x,
+					scroll_y:scroll_y})
+			UI.End()
+			scroll_x=anim.scroll_x
+			scroll_y=anim.scroll_y
+		}
+		this.visible_scroll_x=scroll_x
+		this.visible_scroll_y=scroll_y
+		//Render takes absolute coords
+		//var bkcolor
+		//if(this.read_only){
+		//	bkcolor=this.sel_hl.color
+		//	this.sel_hl.color=0
+		//}
+		ed.Render({x:scroll_x,y:scroll_y,w:this.w/this.scale,h:this.h/this.scale, scr_x:this.x*UI.pixels_per_unit,scr_y:this.y*UI.pixels_per_unit, scale:scale, obj:this});
+		this.CallHooks('afterRender')
+		//if(this.read_only){
+		//	this.sel_hl.color=bkcolor
+		//	return this
+		//}else{
+		if(UI.HasFocus(this)){
+			var ed_caret=this.GetIMECaretXY();
+			var x_caret=this.x*UI.pixels_per_unit+(ed_caret.x-scroll_x)*scale;
+			var y_caret=this.y*UI.pixels_per_unit+(ed_caret.y-scroll_y)*scale;
+			UI.PushCliprect(this.x,this.y,this.w,this.h)
+			UI.SetCaret(UI.context_window,
+				x_caret,y_caret,
+				this.caret_width*scale,this.GetCharacterHeightAtCaret()*scale,
+				this.caret_color,this.caret_flicker);
+			UI.PopCliprect()
+		}
+	},
+};
+W.Edit=function(id,attrs,proto){
+	var obj=UI.Keep(id,attrs,proto||W.Edit_prototype);
+	UI.StdStyling(id,obj,attrs, obj.default_style_name,UI.HasFocus(obj)?"focus":"blur");
+	UI.StdAnchoring(id,obj);
+	obj.RenderAsWidget(id,obj.x,obj.y,obj.w,obj.h)
+	return obj;
+	//}
+};
+
+///////////////////////////////////////////////////////
 //the code editor
 var g_encoding_names={
 	'0':"an unknown",
@@ -61,7 +961,7 @@ W.ACContext_prototype={
 	GetDisplayItem:function(id){
 		var ret=this.m_display_items[id]
 		if(!ret){
-			//UI.assert(id==this.m_display_items.length,"panic: not doing acctx sequentially")
+			//UI.assert(id===this.m_display_items.length,"panic: not doing acctx sequentially")
 			var cc=this.m_accands.at(id);
 			//ignore weight for now: cc.weight
 			ret={
@@ -155,7 +1055,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(spell_checker){
 			this.m_spell_checker=spell_checker;
 		}
-		if(this.m_file_name&&this.m_file_name.length&&this.m_file_name[0]=='*'){
+		if(this.m_file_name&&this.m_file_name.length&&this.m_file_name[0]==='*'){
 			//special file plugins
 			var fn_special=this.m_file_name.substr(1);
 			var fplugin=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].plugin);
@@ -234,7 +1134,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 								break
 							}
 							//m_user_just_typed_char is updated after this, we can test it here for the previous state
-							if(this.m_user_just_typed_char&&ccnt0_i==match_ccnt1){
+							if(this.m_user_just_typed_char&&ccnt0_i===match_ccnt1){
 								//the user types a new copy of the needle, then continues typing
 								//it SHOULD NOT count as an auto-replace attempt
 								intersected=0;
@@ -299,6 +1199,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			})
 			this.AddEventHandler('ESC',function(){
 				this.CancelAutoCompletion()
+				if(this.m_in_sticky_key){
+					UI.SDL_StartTextInput();
+				}
+				this.m_in_sticky_key=0
 				this.m_ac_activated=0
 				this.m_user_just_typed_char=0
 				this.m_fhint_ctx=undefined;
@@ -395,13 +1299,13 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//just do a sequential search
 		bm.discard()
 		for(var i=0;i<10;i++){
-			if(bm==this.m_bookmarks[i]){
+			if(bm===this.m_bookmarks[i]){
 				this.m_bookmarks[i]=undefined;
 				return;
 			}
 		}
 		for(var i=0;i<this.m_unkeyed_bookmarks.length;i++){
-			if(bm==this.m_unkeyed_bookmarks[i]){
+			if(bm===this.m_unkeyed_bookmarks[i]){
 				this.m_unkeyed_bookmarks[i]=undefined;
 				return;
 			}
@@ -414,7 +1318,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var is_preview=this.m_is_preview
 		this.m_loaded_time=IO.GetFileTimestamp(fn)
 		if(this.owner){this.owner.DismissNotification('saving_progress');}
-		if(fn.length&&fn[0]=='*'){
+		if(fn.length&&fn[0]==='*'){
 			//built-in file
 			var fn_special=fn.substr(1);
 			var floader=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].Load);
@@ -532,7 +1436,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}else{
 			if(loaded_metadata.m_bookmarks){
 				for(var i=0;i<10;i++){
-					if(loaded_metadata.m_bookmarks[i]!='n/a'&&!this.m_bookmarks[i]){
+					if(loaded_metadata.m_bookmarks[i]!=='n/a'&&!this.m_bookmarks[i]){
 						this.m_bookmarks[i]=this.ed.CreateLocator(Math.max(Math.min(loaded_metadata.m_bookmarks[i],this.ed.GetTextSize()),0))
 					}
 				}
@@ -549,7 +1453,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		for(var i=0;i<UI.m_code_editor_persistent_members_doc.length;i++){
 			var name_i=UI.m_code_editor_persistent_members_doc[i]
 			var value_i=loaded_metadata[name_i];
-			if(value_i!=undefined){this[name_i]=value_i;}
+			if(value_i!==undefined){this[name_i]=value_i;}
 		}
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		if(loaded_metadata.m_hidden_ranges){
@@ -581,7 +1485,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		//////////////
 		//join the sync group
-		if(this.m_file_name&&this.m_file_name!="*remote"){
+		if(this.m_file_name&&this.m_file_name!=="*remote"){
 			var arr_docs=UI.g_editor_from_file[this.m_file_name];
 			var found=0;
 			if(arr_docs){
@@ -655,7 +1559,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	FindBracketSafe:function(n_brackets,ccnt,direction){
 		var ret=this.FindBracket(n_brackets,ccnt,direction)
-		if(ret==-1){
+		if(ret===-1){
 			if(direction<0){
 				return 0;
 			}else{
@@ -671,7 +1575,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var lang=this.plugin_language_desc
 		var ed=this.ed
 		var enabled_mask=lang.m_inside_mask_to_enabled_mask[ed.GetStateAt(ed.m_handler_registration["colorer"],ccnt,"ill")[0]];
-		return (enabled_mask&lang.m_bracket_enabling_mask)!=0
+		return (enabled_mask&lang.m_bracket_enabling_mask)!==0
 	},
 	///////////////////////////////
 	GetIndentLevel:function(ccnt){
@@ -693,12 +1597,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		//ccnt is at the last character of a token...
 		var lang=this.plugin_language_desc
 		if(!lang){return 1;}
-		var tokens=(side==0?lang.m_lbracket_tokens:lang.m_rbracket_tokens)
+		var tokens=(side===0?lang.m_lbracket_tokens:lang.m_rbracket_tokens)
 		if(!tokens){return 1;}
 		for(var i=0;i<tokens.length;i++){
 			var s=tokens[i]
 			var lg=Duktape.__byte_length(s)
-			if(ccnt+1-lg>0&&this.ed.GetText(ccnt+1-lg,lg)==s){
+			if(ccnt+1-lg>0&&this.ed.GetText(ccnt+1-lg,lg)===s){
 				return lg
 			}
 		}
@@ -732,8 +1636,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	///////////////////////////////
 	IsLineEndAt:function(ccnt){
 		var ch=this.ed.GetUtf8CharNeighborhood(ccnt)[1]
-		if(ch==10){return 1}
-		if(ch==13&&this.ed.GetUtf8CharNeighborhood(ccnt+1)[1]=='\n'){return 1}
+		if(ch===10){return 1}
+		if(ch===13&&this.ed.GetUtf8CharNeighborhood(ccnt+1)[1]==='\n'){return 1}
 		return 0
 	},
 	IsLeftBracket:function(s){
@@ -741,7 +1645,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var bs=lang.m_lbracket_tokens
 		if(bs){
 			for(var i=0;i<bs.length;i++){
-				if(bs[i]==s){return 1;}
+				if(bs[i]===s){return 1;}
 			}
 		}
 		return 0;
@@ -750,7 +1654,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var lang=this.plugin_language_desc
 		var bs=lang.m_rbracket_tokens
 		for(var i=0;i<bs.length;i++){
-			if(bs[i]==s){return 1;}
+			if(bs[i]===s){return 1;}
 		}
 		return 0;
 	},
@@ -759,7 +1663,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var bs=lang.m_rbracket_tokens
 		if(!bs){return 0;}
 		for(var i=0;i<bs.length;i++){
-			if(bs[i]==this.ed.GetText(ccnt,Duktape.__byte_length(bs[i]))){return 1;}
+			if(bs[i]===this.ed.GetText(ccnt,Duktape.__byte_length(bs[i]))){return 1;}
 		}
 		return 0;
 	},
@@ -775,7 +1679,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	///////////////////////////////////////
 	NeedSave:function(){
-		return (this.saved_point||0)!=this.ed.GetUndoQueueLength();
+		return (this.saved_point||0)!==this.ed.GetUndoQueueLength();
 	},
 	NeedXScrollAtWidth:function(w_content){
 		if(this.ed&&UI.TestOption("show_x_scroll_bar")&&!this.disable_x_scroll){
@@ -792,7 +1696,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	//Cut:function(){
 	//	var ccnt0=this.sel0.ccnt
 	//	var ccnt1=this.sel1.ccnt
-	//	if(ccnt0==ccnt1){
+	//	if(ccnt0===ccnt1){
 	//		var line_current=this.GetLC(ccnt1)[0]
 	//		var line_ccnts=this.SeekAllLinesBetween(line_current,line_current+2)
 	//		this.sel0.ccnt=line_ccnts[0];
@@ -872,10 +1776,10 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	TestFunctionHint:function(){
 		var fhctx=this.m_fhint_ctx;
 		var ccnt_fcall_bracket=this.FindOuterBracket(this.sel1.ccnt,-1)
-		if(!(fhctx&&fhctx.m_ccnt_fcall_bracket==ccnt_fcall_bracket)){
+		if(!(fhctx&&fhctx.m_ccnt_fcall_bracket===ccnt_fcall_bracket)){
 			//context changed, detect new fcall
 			fhctx=undefined;
-			if(ccnt_fcall_bracket>=0&&this.ed.GetUtf8CharNeighborhood(ccnt_fcall_bracket)[1]=='('.charCodeAt(0)){
+			if(ccnt_fcall_bracket>=0&&this.ed.GetUtf8CharNeighborhood(ccnt_fcall_bracket)[1]==='('.charCodeAt(0)){
 				var ccnt_fcall_word1=this.ed.MoveToBoundary(ccnt_fcall_bracket+1,-1,"word_boundary_right")
 				if(ccnt_fcall_word1>=0){
 					var ccnt_fcall_word0=this.ed.MoveToBoundary(ccnt_fcall_word1,-1,"word_boundary_left")
@@ -900,7 +1804,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			var ccnt_rbracket=this.ed.MoveToBoundary(this.sel1.ccnt,1,"space_newline")
 			//do the parsing in native code, GetStateAt then ComputeCharColorID, then do the deed
 			var is_tail=1;
-			if(this.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]!=')'.charCodeAt(0)){
+			if(this.ed.GetUtf8CharNeighborhood(ccnt_rbracket)[1]!==')'.charCodeAt(0)){
 				var ccnt_rbracket_r=this.FindOuterBracket(ccnt_rbracket,1);
 				if(ccnt_rbracket<ccnt_rbracket_r){
 					ccnt_rbracket=ccnt_rbracket_r;
@@ -917,7 +1821,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			if(!is_tail){
 				n_total_commas=UI.ED_CountCommas(this.ed,ccnt_fcall_bracket,ccnt_rbracket);
 			}
-			if(n_commas!=undefined){
+			if(n_commas!==undefined){
 				//notification
 				//var proto_acceptable=undefined;
 				var prototypes=fhctx.m_prototypes;
@@ -931,7 +1835,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 					a_proto_i.push(fhctx.m_function_id,UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+11),'(');
 					for(var j=0;j<proto_acceptable.length;j++){
 						if(j>0){a_proto_i.push(UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+11),', ');}
-						if(j==n_commas_before){
+						if(j===n_commas_before){
 							a_proto_i.push(
 								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+6),
 								proto_acceptable[j]);
@@ -972,12 +1876,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 								}
 								a_proto.push(
 									'\n',
-									UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+(j==n_commas_before?14:13)),
+									UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+(j===n_commas_before?14:13)),
 									'        ',proto_acceptable[j],
 									UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+12),
 									'  ',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_INDENT_HERE),
 									s_param_doc);
-								if(j==n_commas_before){
+								if(j===n_commas_before){
 									fhctx.m_current_param_doc=s_param_doc;
 									fhctx.m_current_param_name=proto_acceptable[j];
 								}
@@ -1009,7 +1913,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 						if(n_commas>=proto_i.length){continue;}
 						var ccnt_lcomma=this.ed.MoveToBoundary(this.sel1.ccnt,-1,"space_newline")
 						var ch_prev=String.fromCharCode(this.ed.GetUtf8CharNeighborhood(ccnt_lcomma)[0]);
-						var was_comma=(ch_prev==','||ch_prev=='(');
+						var was_comma=(ch_prev===','||ch_prev==='(');
 						var array_fhint=[]
 						for(var j=n_commas;j<proto_i.length;j++){
 							if(array_fhint.length>0||was_comma){
@@ -1044,7 +1948,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		ccnt0:,
 	*/
 	TestAutoCompletion:function(is_explicit){
-		if(this.sel0.ccnt!=this.sel1.ccnt){
+		if(this.sel0.ccnt!==this.sel1.ccnt){
 			this.m_ac_activated=0;
 			return 0;
 		}
@@ -1074,7 +1978,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			if(fhctx.m_current_param_doc){
 				var param_extras=[];
 				fhctx.m_current_param_doc.replace(/\b[A-Z0-9_]+\b/g,function(smatch){
-					if(smatch==smatch.toLowerCase()||smatch.length<2){return;}
+					if(smatch===smatch.toLowerCase()||smatch.length<2){return;}
 					param_extras.push({name:smatch,weight:65536});
 				});
 				if(param_extras){extras.push(param_extras);}
@@ -1082,7 +1986,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			if(fhctx.m_current_param_name){
 				var char0=this.ed.GetUtf8CharNeighborhood(this.ed.MoveToBoundary(this.sel1.ccnt,-1,"space"))[0];
 				var char1=this.ed.GetUtf8CharNeighborhood(this.ed.MoveToBoundary(this.sel1.ccnt,1,"space"))[1];
-				if((char0==0x2c||char0==0x28)&&(char1==0x2c||char1==0x29)){
+				if((char0===0x2c||char0===0x28)&&(char1===0x2c||char1===0x29)){
 					//, or ( and , or )
 					var full_funarg_old_ccnts=UI.ED_QueryCompletionFromArgName(this,fhctx.m_current_param_name);
 					if(full_funarg_old_ccnts){
@@ -1121,14 +2025,14 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		if(!accands){
 			var real_extras=Array.prototype.concat.apply([],extras);
-			if(this.plugin_language_desc.parser=="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)){
+			if(this.plugin_language_desc.parser==="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)){
 				this.m_ac_activated=0;
 				return 0;
 			}
 			var neib=this.ed.GetUtf8CharNeighborhood(this.sel1.ccnt);
 			//\u002e: dot
 			if(!real_extras.length){
-				if(!((UI.ED_isWordChar(neib[0])||this.plugin_language_desc.parser=="C"&&neib[0]==0x2e)&&!UI.ED_isWordChar(neib[1]))){
+				if(!((UI.ED_isWordChar(neib[0])||this.plugin_language_desc.parser==="C"&&neib[0]===0x2e)&&!UI.ED_isWordChar(neib[1]))){
 					this.m_ac_activated=0;
 					return 0;
 				}
@@ -1163,7 +2067,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		UI.Refresh()
 	},
 	TestCorrection:function(){
-		if(this.sel0.ccnt!=this.sel1.ccnt){return 0;}
+		if(this.sel0.ccnt!==this.sel1.ccnt){return 0;}
 		if(!this.plugin_language_desc.default_hyphenator_name){return 0;}
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 		var spell_ctx=renderer.HunspellSuggest(this.ed,this.sel1.ccnt)
@@ -1195,7 +2099,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var acctx=this.m_ac_context;
 		if(!acctx||!acctx.m_accands){return;}
 		var s_prefix=acctx.m_accands.s_prefix
-		if(acctx.m_is_spell_mode&&id==acctx.m_n_cands-1){
+		if(acctx.m_is_spell_mode&&id===acctx.m_n_cands-1){
 			//coulddo: remove, or just give a "user-dic-editing" option
 			var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 			renderer.HunspellAddWord(s_prefix);
@@ -1205,15 +2109,15 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			return;
 		}
 		var lg=Duktape.__byte_length(s_prefix);
-		if(id==undefined){lg=0;}
+		if(id===undefined){lg=0;}
 		var ccnt0=this.sel1.ccnt-lg
-		if(acctx.m_is_spell_mode||acctx.m_accands.ccnt0!=undefined){
+		if(acctx.m_is_spell_mode||acctx.m_accands.ccnt0!==undefined){
 			ccnt0=acctx.m_accands.ccnt0
 			if(!acctx.m_is_spell_mode){
 				lg=this.sel1.ccnt-ccnt0;
 			}
 		}
-		var sname=(id==undefined?acctx.m_accands.m_common_prefix:acctx.m_accands.at(id).name)
+		var sname=(id===undefined?acctx.m_accands.m_common_prefix:acctx.m_accands.at(id).name)
 		if(acctx.m_is_spell_mode){
 			sname=UI.ED_CopyCase(sname,sname.toLowerCase(),sname.toUpperCase(),s_prefix)
 		}
@@ -1240,7 +2144,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	},
 	//////////////////////////
 	PrepareForRendering:function(){
-		if(this.m_rendered_frame_id!=UI.m_frame_tick){
+		if(this.m_rendered_frame_id!==UI.m_frame_tick){
 			this.m_rendered_frame_id=UI.m_frame_tick;
 		}else{
 			return;
@@ -1327,7 +2231,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 			m_s_replace:"",
 			m_owner:this,
 		}
-		if(typeof(fcallback)=='string'){
+		if(typeof(fcallback)==='string'){
 			rctx.m_s_replace=fcallback;
 		}else{
 			rctx.m_s_replace_callback=fcallback;
@@ -1335,7 +2239,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(this.owner){
 			this.owner.AcquireEditLock();
 		}
-		if(flags==undefined){
+		if(flags===undefined){
 			flags=(UI.SEARCH_FLAG_CASE_SENSITIVE|UI.SEARCH_FLAG_HIDDEN|UI.SEARCH_FLAG_REGEXP);
 		}
 		var ffind_next=(function(){
@@ -1453,7 +2357,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		UI.PushCliprect(area_x,area_y,area_w,area_h)
 		for(var i=0;i<line_ccnts.length;i++){
 			if(line_ccnts[i]<0){continue;}
-			if(i&&line_ccnts[i]==line_ccnts[i-1]){break;}
+			if(i&&line_ccnts[i]===line_ccnts[i-1]){break;}
 			var s_line_number=(line0+i+1).toString();
 			var y=line_xys[i*2+1]-scroll_y+dy_line_number+area_y
 			var text_dim=(show_line_numbers?UI.MeasureText(edstyle.line_number_font,s_line_number):{w:0,h:0})
@@ -1495,7 +2399,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				})
 			}
 			if(show_line_numbers){
-				W.Text("",{x:area_x+x,y:y, font:edstyle.line_number_font,text:s_line_number,color:line0+i==line_current?edstyle.line_number_color_focus:edstyle.line_number_color})
+				W.Text("",{x:area_x+x,y:y, font:edstyle.line_number_font,text:s_line_number,color:line0+i===line_current?edstyle.line_number_color_focus:edstyle.line_number_color})
 			}
 			//folding button
 			if(line_indents&&(line_ccnts[i+1]>0||line_ccnts[i+1]<-1)){
@@ -1564,7 +2468,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		var sel=this.GetSelection();
 		var ed=this.ed;
 		//vsel-and-paste case
-		if(this.m_autoedit_context&&this.m_autoedit_mode=='explicit'){
+		if(this.m_autoedit_context&&this.m_autoedit_mode==='explicit'){
 			var renderer=this.GetRenderer();
 			var locs=this.m_autoedit_locators
 			if(locs&&!renderer.m_tentative_ops){
@@ -1580,8 +2484,8 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 				}
 				if(line_id>=0){
 					var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent,s_force_text);
-					if(sinsert==undefined){
-						sinsert=(s_force_text==undefined?UI.SDL_GetClipboardText():s_force_text);
+					if(sinsert===undefined){
+						sinsert=(s_force_text===undefined?UI.SDL_GetClipboardText():s_force_text);
 					}
 					var lines=sinsert.replace(/\r/g,'').split('\n');
 					var shack=UI.ED_RichTextCommandChar(0x108000);
@@ -1622,19 +2526,19 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		if(sel[1]>sel[0]&&ed.MoveToBoundary(sel[0],-1,"space")<sel[0]){
 			//line overwrite mode, use sel[0]
 			ccnt_corrected=sel[0];
-		}else if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]==10){
+		}else if(ed.GetUtf8CharNeighborhood(ccnt_corrected)[1]===10){
 			var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
-			if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_corrected){
+			if(ed.MoveToBoundary(ccnt_lh,1,"space")===ccnt_corrected){
 				//empty line: simply paste before this line, do nothing
 			}else{
 				//paste to the next line if called at eoln
 				ccnt_corrected++;
 				ccnt_corrected=ed.MoveToBoundary(ccnt_corrected,1,"space")
 			}
-		}else if(sel[0]==sel[1]&&sel[1]<ccnt_corrected){
+		}else if(sel[0]===sel[1]&&sel[1]<ccnt_corrected){
 			//we're inside the indent
 			//do nothing - use the indent
-		}else if(sel[0]==sel[1]&&sel[0]>ccnt_corrected){
+		}else if(sel[0]===sel[1]&&sel[0]>ccnt_corrected){
 			//we're *after* the indent
 			//do nothing - use the indent
 		}else{
@@ -1642,12 +2546,12 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 		}
 		var ccnt_lh=this.SeekLC(this.GetLC(ccnt_corrected)[0],0)
 		var s_target_indent=ed.GetText(ccnt_lh,ccnt_corrected-ccnt_lh)
-		if(s_target_indent==undefined){
+		if(s_target_indent===undefined){
 			this.Paste()
 			return;
 		}
 		var sinsert=UI.ED_GetClipboardTextSmart(s_target_indent,s_force_text)
-		if(sinsert==undefined){
+		if(sinsert===undefined){
 			this.Paste()
 			return;
 		}
@@ -1693,7 +2597,7 @@ W.CodeEditor_prototype=UI.InheritClass(W.Edit_prototype,{
 	//	}
 	//},
 	OnClick:function(event){
-		if(event.button==UI.SDL_BUTTON_RIGHT){
+		if(event.button===UI.SDL_BUTTON_RIGHT){
 			this.OnRightClick(event);
 		}
 	},
@@ -1721,7 +2625,7 @@ W.MinimapThingy_prototype={
 		UI.CaptureMouse(this)
 	},
 	OnMouseUp:function(event){
-		if(this.anchored_value==undefined){return;}
+		if(this.anchored_value===undefined){return;}
 		this.OnMouseMove(event);
 		UI.ReleaseMouse(this)
 		this.anchored_value=undefined
@@ -1729,7 +2633,7 @@ W.MinimapThingy_prototype={
 		UI.Refresh()
 	},
 	OnMouseMove:function(event){
-		if(this.anchored_value==undefined){return;}
+		if(this.anchored_value===undefined){return;}
 		this.OnChange(Math.min(Math.max(this.anchored_value+(event[this.dimension]-this.anchored_xy)/this.factor,this.value_min),this.value_max))
 	},
 }
@@ -1739,7 +2643,7 @@ UI.IsSearchFrontierCompleted=function(frontier){
 }
 
 UI.GetSearchFrontierCcnt=function(frontier){
-	if((typeof frontier)=='number'){
+	if((typeof frontier)==='number'){
 		return frontier
 	}else{
 		return frontier.ccnt
@@ -1795,7 +2699,7 @@ W.NotificationItem=function(id,attrs){
 	//shaking
 	SimulateShaking(obj);
 	///////////
-	if(!obj.m_cached_prt||obj.text!=obj.m_cached_text){
+	if(!obj.m_cached_prt||obj.text!==obj.m_cached_text){
 		obj.m_cached_prt=UI.ED_FormatRichText(
 			Language.GetHyphenator(UI.m_ui_language),
 			obj.text,4,obj.w_text,obj.styles);
@@ -1814,7 +2718,7 @@ W.NotificationItem=function(id,attrs){
 		border_width:-obj.shadow_size})
 	UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width,y:obj.y,w:obj.w,h:obj.h,
 		color:fadein(obj.color,obj.alpha),round:obj.round,border_color:fadein(obj.border_color,obj.alpha),border_width:obj.border_width})
-	if(obj.progress!=undefined){
+	if(obj.progress!==undefined){
 		//progress
 		UI.PushCliprect(obj.x+obj.x_shake+obj.border_width,obj.y,obj.w*obj.progress,obj.h)
 		UI.RoundRect({x:obj.x+obj.x_shake+obj.border_width,y:obj.y,w:obj.w,h:obj.h,
@@ -1877,7 +2781,7 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 	}
 	ctx.m_forward_search_hack=matches.slice(l*2)
 	ctx.m_backward_search_hack=matches.slice(0,l*2)
-	if(ctx.m_forward_search_hack.length==0&&ctx.m_backward_search_hack.length>0){
+	if(ctx.m_forward_search_hack.length===0&&ctx.m_backward_search_hack.length>0){
 		ctx.m_init_point_hack=-1
 	}
 	//ctx.m_forward_frontier=-1
@@ -1886,7 +2790,7 @@ var SetFindContextFinalResult=function(ctx,ccnt_center,matches){
 
 var PrepareAPEM=function(){
 	if(!UI.g_all_paths_ever_mentioned){
-		var check_drive=(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64");
+		var check_drive=(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64");
 		UI.g_deep_search_cache={};
 		if(UI.g_deep_include_jobs.length){
 			//we have to restart... if there were new paths
@@ -1901,7 +2805,7 @@ var PrepareAPEM=function(){
 				var obj_tab=UI.g_all_document_windows[i]
 				if(obj_tab.main_widget&&obj_tab.main_widget.doc){
 					var fn=obj_tab.main_widget.doc.m_file_name;
-					if(fn.length>2&&fn.length[1]==':'){
+					if(fn.length>2&&fn.length[1]===':'){
 						valid_drives[fn[0].toLowerCase()]=1;
 					}
 				}
@@ -1913,7 +2817,7 @@ var PrepareAPEM=function(){
 				var fn_path=IO.NormalizeFileName(UI.GetPathFromFilename(fn));
 				if(!arv[fn_path]){
 					arv[fn_path]=1;
-					if(check_drive&&(fn.length<2||!valid_drives[fn_path[0]]||fn_path[1]!=':')){
+					if(check_drive&&(fn.length<2||!valid_drives[fn_path[0]]||fn_path[1]!==':')){
 						continue;
 					}
 					if(IO.DirExists(fn_path)){
@@ -1958,13 +2862,13 @@ var CallParseMore=function(){
 				if(!fn_found){
 					continue;
 				}
-				if(fn_found=="<dangling>"){
+				if(fn_found==="<dangling>"){
 					UI.g_dangling_include_jobs.push(ijob);
 					continue;
 				}
-				if(fn_found=="<deep>"){
+				if(fn_found==="<deep>"){
 					if(ijob.is_deferred!==2){
-						//is_deferred==2: h to c
+						//is_deferred===2: h to c
 						UI.g_deep_include_jobs.push(ijob);
 					}
 					continue;
@@ -1996,7 +2900,7 @@ var CallParseMore=function(){
 				if(!fn_found){
 					fn_found=UI.g_deep_search_cache[ijob.fn_include];
 				}
-				if(fn_found==undefined){
+				if(fn_found===undefined){
 					//all paths ever mentioned
 					fn_found=null;
 					var paths=UI.g_all_paths_ever_mentioned;
@@ -2018,7 +2922,7 @@ var CallParseMore=function(){
 							}
 						}
 					}
-					if(fn_found!=undefined){
+					if(fn_found!==undefined){
 						UI.g_deep_search_cache[ijob.fn_include]=fn_found;
 					}
 				}
@@ -2097,7 +3001,7 @@ var fsave_code_editor=UI.HackCallback(function(){
 		return;
 	}
 	var ret=UI.EDSaver_Write(ctx,doc.ed)
-	if(ret=="done"){
+	if(ret==="done"){
 		////////////
 		//*remote won't get here
 		doc.saved_point=doc.ed.GetUndoQueueLength()
@@ -2120,7 +3024,7 @@ var fsave_code_editor=UI.HackCallback(function(){
 		this.OnSave();
 		this.DismissNotification('saving_progress')
 		UI.RefreshAllTabs()
-	}else if(ret=="continue"){
+	}else if(ret==="continue"){
 		this.CreateNotification({id:'saving_progress',icon:undefined,text:"Saving @1%...".replace('@1',(ctx.progress*100).toFixed(0)),
 			progress:ctx.progress
 		},"quiet")
@@ -2211,7 +3115,7 @@ var find_context_prototype={
 				//hint_items.push(',')
 				//hint_items.push(lc0[1]+1)
 				//hint_items.push('-')
-				//if(lc0!=lc1){
+				//if(lc0!==lc1){
 				//	hint_items.push(lc1[0]+1)
 				//	hint_items.push(',')
 				//}
@@ -2222,7 +3126,7 @@ var find_context_prototype={
 				//hint_items.push('" (found)\n')
 				hint_items.push('\n')
 				obj_notebook.WriteCellOutput(cell_id,hint_items.join(""));
-			}else if(cell_desc&&this.m_forward_matches.length==MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
+			}else if(cell_desc&&this.m_forward_matches.length===MAX_MATCHES_IN_GLOBAL_SEARCH_RESULT){
 				obj_notebook.WriteCellOutput(cell_id,"additional matches omitted\n");
 			}
 		}
@@ -2303,10 +3207,10 @@ var find_context_prototype={
 		var h_bof_eof_message_with_sep=UI.GetCharacterHeight(edstyle.find_message_font)+edstyle.find_item_separation*2;
 		var ccnt_match0=this.GetMatchCcnt(id,0)
 		var ccnt_match1=((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?ccnt_match0:this.GetMatchCcnt(id,1))
-		if(doc.sel0.ccnt!=ccnt_match0||doc.sel1.ccnt!=ccnt_match1){
+		if(doc.sel0.ccnt!==ccnt_match0||doc.sel1.ccnt!==ccnt_match1){
 			UI.SetSelectionEx(doc,ccnt_match0,ccnt_match1,(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)?"goto":"find")
 		}
-		if(this.m_last_auto_scrolled_point!=this.m_current_point){
+		if(this.m_last_auto_scrolled_point!==this.m_current_point){
 			this.m_last_auto_scrolled_point=this.m_current_point;
 			doc.AutoScroll("show")
 			this.AutoScrollFindItems()
@@ -2360,7 +3264,7 @@ var find_context_prototype={
 		var doc_curpoint=this.GetMatchDoc(id);
 		var renderer=doc_curpoint.GetRenderer();
 		if(this.m_flags&UI.SEARCH_FLAG_FUZZY){
-			if(!this.m_fuzzy_virtual_diffs||this.m_fuzzy_diff_match_id!=id){
+			if(!this.m_fuzzy_virtual_diffs||this.m_fuzzy_diff_match_id!==id){
 				//fuzzy match rendering - GetMatchCcnt, something else like m_tentative_editops but rendered the other direction
 				this.m_fuzzy_virtual_diffs=UI.ED_RawEditDistance(doc_curpoint.ed,
 					this.GetMatchCcnt(id,0),this.GetMatchCcnt(id,1),
@@ -2454,14 +3358,14 @@ var find_context_prototype={
 			this.m_merged_y_windows_forward[2]=this.m_merged_y_windows_backward[2]
 			this.m_merged_y_windows_forward[3]=this.m_merged_y_windows_backward[3]
 			this.m_y_extent_backward=current_visual_y
-			if(this.m_home_end=='home'){
+			if(this.m_home_end==='home'){
 				this.m_current_point=-(this.m_backward_matches.length/3)
 				if(UI.IsSearchFrontierCompleted(this.m_backward_frontier)){
 					this.m_home_end=undefined
 				}
 			}
-			if(this.m_home_end=='init'){
-				if(this.m_init_point_hack!=undefined){
+			if(this.m_home_end==='init'){
+				if(this.m_init_point_hack!==undefined){
 					this.m_current_point=this.m_init_point_hack
 					this.m_home_end=undefined
 				}else if(this.m_backward_matches.length>0&&(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&!this.m_needle){
@@ -2481,12 +3385,12 @@ var find_context_prototype={
 					if(!repo.is_parsing){
 						this.m_repo_files=repo.files.filter(function(fn){
 							var repos=g_repo_from_file[fn]
-							if(repos&&(repos[this.m_repo_path]=='!!'||repos[this.m_repo_path]=='??')){
+							if(repos&&(repos[this.m_repo_path]==='!!'||repos[this.m_repo_path]==='??')){
 								//do not search ignored / untracked files -- even though we show them in the project listing
 								return 0;
 							}
 							if(this.m_flags&UI.SEARCH_FLAG_GOTO_MODE){
-								return UI.ED_GetFileLanguage(fn).parser=="C";
+								return UI.ED_GetFileLanguage(fn).parser==="C";
 							}else{
 								if(UI.ED_GetFileLanguage(fn).is_binary){
 									return 0;
@@ -2588,11 +3492,11 @@ var find_context_prototype={
 					//if(ccnt_id<=ccnt_merged_anyway){continue;}
 					var y_id=match_xys[(pmatch-p0)/3*2+1];//doc_forward_search.ed.XYFromCcnt(ccnt_id).y
 					var y_id0=Math.max(y_id-hc*this.m_context_size,0),y_id1=Math.min(y_id+hc*(this.m_context_size+1),ytot)
-					if(y_id0<current_y1+eps&&(!(this.m_flags&UI.SEARCH_FLAG_GLOBAL)||this.m_forward_matches[pmatch+2]==this.m_forward_matches[pmatch+(2-3)])){
+					if(y_id0<current_y1+eps&&(!(this.m_flags&UI.SEARCH_FLAG_GLOBAL)||this.m_forward_matches[pmatch+2]===this.m_forward_matches[pmatch+(2-3)])){
 						//merge
 						current_y1=y_id1
 					}else{
-						if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)&&current_id==0){
+						if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)&&current_id===0){
 							//we don't want the zero-th thing in a global search
 						}else{
 							this.m_merged_y_windows_forward.push(current_id,current_visual_y,current_y0,current_y1-current_y0)
@@ -2611,13 +3515,13 @@ var find_context_prototype={
 				this.m_merged_y_windows_backward[2]=this.m_merged_y_windows_forward[2]
 				this.m_merged_y_windows_backward[3]=this.m_merged_y_windows_forward[3]
 				this.m_y_extent_forward=current_visual_y+current_y1-current_y0
-				if(this.m_home_end=='end'){
+				if(this.m_home_end==='end'){
 					this.m_current_point=(this.m_forward_matches.length/3)
 					if(this.IsForwardSearchCompleted()){
 						this.m_home_end=undefined
 					}
 				}
-				if(this.m_home_end=='init'){
+				if(this.m_home_end==='init'){
 					if(this.m_forward_matches.length>0&&!((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&!this.m_needle)){
 						this.m_current_point=1
 						this.m_home_end=undefined
@@ -2633,7 +3537,7 @@ var find_context_prototype={
 		}
 		var p0=this.BisectFindItems(find_scroll_y-h_safety)
 		var p1=this.BisectFindItems(find_scroll_y+find_shared_h+h_safety)
-		if(p0==-((this.m_merged_y_windows_backward.length>>2)-1)){
+		if(p0===-((this.m_merged_y_windows_backward.length>>2)-1)){
 			//BOF
 			var s_bof_message;
 			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
@@ -2662,7 +3566,7 @@ var find_context_prototype={
 			}else{
 				if(!UI.IsSearchFrontierCompleted(this.m_backward_frontier)){
 					s_bof_message=UI._("Searching @1%").replace("@1",((1-UI.GetSearchFrontierCcnt(this.m_backward_frontier)/ccnt_tot)*100).toFixed(0))
-				}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!=undefined){
+				}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!==undefined){
 					s_bof_message=UI._("Go to line @1").replace("@1",this.m_goto_line_number.toString())
 				}else{
 					s_bof_message=UI._("No more '@1' above").replace("@1",this.m_needle)
@@ -2679,7 +3583,7 @@ var find_context_prototype={
 		for(var i=p0;i<=p1;i++){
 			var find_item_i=this.GetFindItem(i)
 			var h_expand=0
-			if(i==this.m_current_merged_item){
+			if(i===this.m_current_merged_item){
 				h_expand=hc*edstyle.find_item_expand_current;
 			}
 			var nodekey="find_item_"+i.toString();
@@ -2712,11 +3616,11 @@ var find_context_prototype={
 			if(this.m_flags&UI.SEARCH_FLAG_GLOBAL){
 				var fn_display=IO.NormalizeFileName(doc_render.m_file_name,1);
 				var s_repo_path=this.m_repo_path;
-				if(doc_render.m_file_name.length>s_repo_path.length+1&&doc_render.m_file_name.substr(0,s_repo_path.length)==s_repo_path){
+				if(doc_render.m_file_name.length>s_repo_path.length+1&&doc_render.m_file_name.substr(0,s_repo_path.length)===s_repo_path){
 					fn_display=fn_display.substr(s_repo_path.length+1);
 				}
 				var text_dim=UI.MeasureText(edstyle.find_message_font,fn_display)
-				if(i==this.m_current_merged_item){
+				if(i===this.m_current_merged_item){
 					UI.RoundRect({
 						x:(w_find_items-8-text_dim.w),y:y,
 						w:text_dim.w,h:text_dim.h,
@@ -2749,7 +3653,7 @@ var find_context_prototype={
 			UI.RoundRect({color:(bgcolor&0xffffff)|(alpha<<24),x:0,y:y,w:w_find_items,h:h})
 			find_scroll_y-=h_expand*0.5;
 		}
-		if(p1==(this.m_merged_y_windows_forward.length>>2)-1){
+		if(p1===(this.m_merged_y_windows_forward.length>>2)-1){
 			//EOF
 			var s_eof_message;
 			if(!UI.IsSearchFrontierCompleted(this.m_forward_frontier)){
@@ -2761,7 +3665,7 @@ var find_context_prototype={
 				}else{
 					s_eof_message=UI._("Searching @1%").replace("@1",((UI.GetSearchFrontierCcnt(this.m_forward_frontier)/ccnt_tot)*100).toFixed(0))
 				}
-			}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!=undefined){
+			}else if((this.m_flags&UI.SEARCH_FLAG_GOTO_MODE)&&this.m_goto_line_number!==undefined){
 				s_eof_message=UI._("Go to line @1").replace("@1",this.m_goto_line_number.toString())
 			}else if((this.m_flags&UI.SEARCH_FLAG_GLOBAL)){
 				if(!this.m_repo_path){
@@ -2818,7 +3722,7 @@ var find_context_prototype={
 		return Math.max(r,l0);
 	},
 	GetMatchDoc:function(id){
-		if(id==0||!(this.m_flags&UI.SEARCH_FLAG_GLOBAL)){
+		if(id===0||!(this.m_flags&UI.SEARCH_FLAG_GLOBAL)){
 			return this.m_starting_doc;
 		}else if(id<0){
 			var ofs=(id+1)*(-3)+2
@@ -2834,8 +3738,8 @@ var find_context_prototype={
 		return undefined
 	},
 	GetMatchCcnt:function(id,side){
-		if(id==0){
-			return side==0?this.m_starting_ccnt0:this.m_starting_ccnt1;
+		if(id===0){
+			return side===0?this.m_starting_ccnt0:this.m_starting_ccnt1;
 		}else if(id<0){
 			var ofs=(id+1)*(-3)+side
 			if(ofs<this.m_backward_matches.length){
@@ -2863,7 +3767,7 @@ var find_context_prototype={
 			var doc_m=this.GetMatchDoc(m)
 			var docid_m=(this.m_doc_ordering?this.m_doc_ordering[doc_m.m_file_name]:0);
 			//print(m,docid_m,doc_m.m_file_name,docid_m,doc.m_file_name,docid)
-			if(docid_m<docid||docid_m==docid&&ccnt_m<=ccnt){
+			if(docid_m<docid||docid_m===docid&&ccnt_m<=ccnt){
 				l=m+1;
 			}else{
 				r=m-1;
@@ -2980,8 +3884,8 @@ UI.OpenNotebookCellFromEditor=function(doc,s_mark,s_language,create_if_not_found
 		obj_notebook.GotoSubCell(cell_id*2);
 		//obj_notebook.need_auto_scroll=1;
 		var cell_i=(obj_notebook.m_cells&&obj_notebook.m_cells[cell_id]);
-		if(cell_i&&is_non_quiet!="output"){
-			UI.SetFocus(is_non_quiet=="output"&&cell_i.m_output_terminal?cell_i.m_output_terminal:cell_i.m_text_in)
+		if(cell_i&&is_non_quiet!=="output"){
+			UI.SetFocus(is_non_quiet==="output"&&cell_i.m_output_terminal?cell_i.m_output_terminal:cell_i.m_text_in)
 		}
 		UI.RefreshAllTabs();
 	}
@@ -3053,7 +3957,7 @@ var CreateFindContext=function(obj,doc, sneedle,flags,ccnt0,ccnt1){
 var RELOAD_DIFF_MAX_SIZE=16<<20;
 var RELOAD_UNDOABLE_MAX_SIZE=256<<20;
 var CheckEditorExternalChange=function(obj){
-	if(obj.doc.m_loaded_time!=IO.GetFileTimestamp(obj.file_name)){
+	if(obj.doc.m_loaded_time!==IO.GetFileTimestamp(obj.file_name)){
 		if(obj.doc.ed.saving_context){return;}//saving docs are OK
 		//reload
 		if(!IO.FileExists(obj.file_name)){
@@ -3116,7 +4020,7 @@ W.CodeEditorWidget_prototype={
 	SaveMetaData:function(is_forced){
 		var doc=this.doc
 		if(this.m_is_preview||doc&&doc.ed.hfile_loading&&!is_forced){return;}
-		if(!doc||doc.notebook_owner||!IO.FileExists(this.file_name)&&!(this.file_name.length&&this.file_name[0]=='*')){return;}
+		if(!doc||doc.notebook_owner||!IO.FileExists(this.file_name)&&!(this.file_name.length&&this.file_name[0]==='*')){return;}
 		var new_metadata=(UI.m_ui_metadata[this.file_name]||{});
 		new_metadata.m_tabswitch_count=this.m_tabswitch_count;
 		new_metadata.m_bookmarks=[];
@@ -3146,7 +4050,7 @@ W.CodeEditorWidget_prototype={
 		this.SaveMetaData();
 		UI.SaveMetaData();
 		this.doc.CallHooks("save")
-		if(this.doc.plugin_language_desc!=UI.ED_GetFileLanguage(this.doc.m_file_name)){
+		if(this.doc.plugin_language_desc!==UI.ED_GetFileLanguage(this.doc.m_file_name)){
 			this.Reload()
 		}else{
 			this.doc.ParseFile()
@@ -3157,7 +4061,7 @@ W.CodeEditorWidget_prototype={
 			if(arr_ori&&arr_ori.length>1){
 				for(var i=0;i<arr_ori.length;i++){
 					var doc=arr_ori[i];
-					if(doc!=this.doc&&doc.owner&&!doc.m_sticker_wall_owner){
+					if(doc!==this.doc&&doc.owner&&!doc.m_sticker_wall_owner){
 						CheckEditorExternalChange(doc.owner);
 					}
 				}
@@ -3175,7 +4079,7 @@ W.CodeEditorWidget_prototype={
 			//already saving
 			return
 		}
-		if(fn.length&&fn[0]=='*'){
+		if(fn.length&&fn[0]==='*'){
 			var fn_special=fn.substr(1);
 			var fsaver=(UI.m_special_files[fn_special]&&UI.m_special_files[fn_special].Save);
 			if(fsaver){
@@ -3215,13 +4119,13 @@ W.CodeEditorWidget_prototype={
 	},
 	ResetFindingContext:function(sneedle,flags, force_ccnt){
 		var doc=this.doc
-		var ccnt=(force_ccnt==undefined?doc.sel1.ccnt:force_ccnt)
+		var ccnt=(force_ccnt===undefined?doc.sel1.ccnt:force_ccnt)
 		this.m_hide_find_highlight=0
 		if(this.m_current_find_context){
-			if(force_ccnt!=undefined&&
-			force_ccnt==this.m_current_find_context.m_starting_ccnt0&&
+			if(force_ccnt!==undefined&&
+			force_ccnt===this.m_current_find_context.m_starting_ccnt0&&
 			!this.m_changed_after_find&&
-			sneedle==this.m_current_find_context.m_needle&&
+			sneedle===this.m_current_find_context.m_needle&&
 			!(this.m_current_find_context.m_flags&(UI.SEARCH_FLAG_FUZZY|UI.SEARCH_FLAG_GLOBAL))){
 				return;
 			}
@@ -3241,7 +4145,7 @@ W.CodeEditorWidget_prototype={
 			ccnt=0;
 			force_ccnt=0;
 		}
-		var ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt==undefined?doc.sel0.ccnt:ccnt,force_ccnt==undefined?doc.sel1.ccnt:ccnt)
+		var ctx=CreateFindContext(this,doc,sneedle,flags,force_ccnt===undefined?doc.sel0.ccnt:ccnt,force_ccnt===undefined?doc.sel1.ccnt:ccnt)
 		ctx.SetRenderingHeight(this.h-this.h_find_bar);
 		if((flags&UI.SEARCH_FLAG_GLOBAL)&&this.m_current_find_context&&this.m_current_find_context.m_temp_documents){
 			//carry over docs to avoid re-loading
@@ -3259,7 +4163,7 @@ W.CodeEditorWidget_prototype={
 		}
 		this.DestroyFindingContext()
 		this.m_current_find_context=ctx
-		if(force_ccnt==undefined){
+		if(force_ccnt===undefined){
 			ctx.UpdateFindItemSelection();
 			//UI.InvalidateCurrentFrame();
 			UI.Refresh()
@@ -3282,7 +4186,7 @@ W.CodeEditorWidget_prototype={
 					err=e.message;
 					line_id_eval=undefined;
 				}
-				if(typeof line_id_eval=='number'){
+				if(typeof line_id_eval==='number'){
 					line_id=Math.floor(line_id_eval);
 				}else{
 					ctx.m_goto_line_error=err;
@@ -3364,7 +4268,7 @@ W.CodeEditorWidget_prototype={
 		this.m_replace_context=rctx;
 	},
 	DestroyReplacingContext:function(do_dismiss){
-		if(do_dismiss==undefined){do_dismiss=1;}
+		if(do_dismiss===undefined){do_dismiss=1;}
 		var rctx=this.m_replace_context
 		if(rctx){
 			rctx.m_locators[0].discard()
@@ -3466,7 +4370,7 @@ W.CodeEditorWidget_prototype={
 		var ns=this.m_notifications
 		for(var i=0;i<ns.length;i++){
 			var nsi=ns[i]
-			if(nsi==item){
+			if(nsi===item){
 				for(var j=i-1;j>=0;j--){
 					ns[j+1]=ns[j]
 				}
@@ -3493,8 +4397,8 @@ W.CodeEditorWidget_prototype={
 		}
 		for(var i=0;i<ns.length;i++){
 			var nsi=ns[i]
-			//(nsi.text==attrs.text&&(nsi.color==attrs.color||!attrs.color)){
-			if(nsi.id==attrs.id){
+			//(nsi.text===attrs.text&&(nsi.color===attrs.color||!attrs.color)){
+			if(nsi.id===attrs.id){
 				//bring it up and shake it - y-animated list?
 				for(var key in attrs){
 					nsi[key]=attrs[key]
@@ -3516,8 +4420,8 @@ W.CodeEditorWidget_prototype={
 	DismissNotification:function(id){
 		if(this.m_notifications){
 			var n0=this.m_notifications.length;
-			this.m_notifications=this.m_notifications.filter(function(a){return a.id!=id})
-			if(n0!=this.m_notifications.length){
+			this.m_notifications=this.m_notifications.filter(function(a){return a.id!==id})
+			if(n0!==this.m_notifications.length){
 				if(this.m_owner){
 					this.m_owner.m_is_rendering_good=0;
 				}
@@ -3528,7 +4432,7 @@ W.CodeEditorWidget_prototype={
 		if(this.m_notifications){
 			var n0=this.m_notifications.length;
 			this.m_notifications=this.m_notifications.filter(function(a){return !(a.id.search(re)>=0)})
-			if(n0!=this.m_notifications.length){
+			if(n0!==this.m_notifications.length){
 				if(this.m_owner){
 					this.m_owner.m_is_rendering_good=0;
 				}
@@ -3551,7 +4455,7 @@ W.CodeEditorWidget_prototype={
 			m_frontier:ccnt,
 			m_owner:this,
 			m_needle:custom_needle||UI.m_ui_metadata["<find_state>"].m_current_needle,
-			m_flags:custom_flags==undefined?UI.m_ui_metadata["<find_state>"].m_find_flags:custom_flags,
+			m_flags:custom_flags===undefined?UI.m_ui_metadata["<find_state>"].m_find_flags:custom_flags,
 			m_match_reported:0,
 			ReportMatch:function(ccnt0,ccnt1){
 				if(direction>0){
@@ -3574,7 +4478,7 @@ W.CodeEditorWidget_prototype={
 				if(!doc){return;}
 				this.m_frontier=UI.ED_Search(doc.ed,this.m_frontier,direction,this.m_needle,this.m_flags,1048576,this.ReportMatch.bind(this),this)
 				if(UI.IsSearchFrontierCompleted(this.m_frontier)||this.m_match_reported){
-					UI.assert(this.m_owner.m_find_next_context==this,"panic: FindNext context overwritten")
+					UI.assert(this.m_owner.m_find_next_context===this,"panic: FindNext context overwritten")
 					this.m_owner.ReleaseEditLock();
 					this.m_owner.m_find_next_context=undefined
 					UI.SetFocus(doc);
@@ -3598,14 +4502,14 @@ W.CodeEditorWidget_prototype={
 		var ccnt_sel1=doc.sel1.ccnt;
 		var ccnt_nextline=doc.SeekLC(doc.GetLC(ccnt_sel1)[0]+1,0);
 		if(is_peek){
-			if(ed.GetUtf8CharNeighborhood(ccnt_nextline)[0]==10){
+			if(ed.GetUtf8CharNeighborhood(ccnt_nextline)[0]===10){
 				//actually open a readonly doc here - should be a copy of the actual file
 				//and we should support reopening
 				//a widget with Reload calls
 				var hc=doc.ed.GetCharacterHeightAt(0);
 				var renderer=doc.GetRenderer();
 				var doc_new=undefined;
-				if(fn&&fn!=doc.m_file_name){
+				if(fn&&fn!==doc.m_file_name){
 					//read that file, it's a peek, we are assuming a small file
 					doc_new=UI.OpenCodeEditorDocument(fn);
 					doc_new.m_is_preview=0;
@@ -3624,7 +4528,7 @@ W.CodeEditorWidget_prototype={
 					Duktape.gc();
 					UI.Refresh();
 				})
-				//if(ccnt_go!=undefined){
+				//if(ccnt_go!==undefined){
 				//	doc_new.SetSelection(ccnt_go,ccnt_go);
 				//}
 				renderer.RemoveAllEmbeddedObjects();
@@ -3667,14 +4571,14 @@ W.CodeEditorWidget_prototype={
 							font:edstyle.find_message_font,color:edstyle.editor_style.color_symbol,
 							text:fn_display})
 						//obj_peek
-						if(this.has_ccnt_set==1){
+						if(this.has_ccnt_set===1){
 							//this.doc.h_top_hint=this.doc.h_top_hint_real;
 							this.doc.AutoScroll("show");
 							this.has_ccnt_set=2;
 						}
 						if(!this.has_ccnt_set){
 							//console.log(this.ccnt_go,this.doc.ed.GetTextSize());
-							if(this.ccnt_go!=undefined&&this.doc.ed&&this.ccnt_go<this.doc.ed.GetTextSize()){
+							if(this.ccnt_go!==undefined&&this.doc.ed&&this.ccnt_go<this.doc.ed.GetTextSize()){
 								this.has_ccnt_set=1;
 								this.doc.SetSelection(this.ccnt_go,this.ccnt_go);
 								this.doc.scroll_y=this.doc.ed.XYFromCcnt(this.ccnt_go).y;
@@ -3700,7 +4604,7 @@ W.CodeEditorWidget_prototype={
 			if(!fn){
 				this.doc.SetSelection(ccnt_go,ccnt_go);
 			}else{
-				UI.OpenEditorWindow(fn,ccnt_go!=undefined&&function(){
+				UI.OpenEditorWindow(fn,ccnt_go!==undefined&&function(){
 					var doc=this;
 					var ccnt=ccnt_go;
 					if(doc.m_diff_from_parse){
@@ -3738,7 +4642,7 @@ W.CodeEditorWidget_prototype={
 				if(doc.m_diff_from_parse){
 					ccnt_decl=doc.m_diff_from_parse.BaseToCurrent(ccnt_decl)
 				}
-				if(ccnt_decl!=ccnt0){
+				if(ccnt_decl!==ccnt0){
 					//UI.SetSelectionEx(doc,ccnt_decl,ccnt_decl,"go_to_definition")
 					this.OpenAsDefinition(undefined,ccnt_decl,is_peek);
 					UI.Refresh()
@@ -3756,7 +4660,7 @@ W.CodeEditorWidget_prototype={
 			ccnt=doc.m_diff_from_parse.CurrentToBase(ccnt)
 		}
 		for(var i=0;i<gkds.length;i+=2){
-			if(fn==gkds[i+0]&&ccnt==gkds[i+1]){
+			if(fn===gkds[i+0]&&ccnt===gkds[i+1]){
 				p_target=i+2
 				if(p_target>=gkds.length){
 					p_target=0;
@@ -3854,7 +4758,7 @@ var ffindbar_plugin=function(){
 		if(obj.m_current_find_context){
 			var ctx=obj.m_current_find_context
 			ctx.m_home_end=undefined;
-			if(ctx.m_current_point>-((ctx.m_backward_matches.length/3))&&!(ctx.m_current_point==1&&(ctx.m_flags&UI.SEARCH_FLAG_GLOBAL))){
+			if(ctx.m_current_point>-((ctx.m_backward_matches.length/3))&&!(ctx.m_current_point===1&&(ctx.m_flags&UI.SEARCH_FLAG_GLOBAL))){
 				ctx.m_current_point--;
 				if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
 					ctx.m_current_point--;
@@ -3963,14 +4867,14 @@ var ffindbar_plugin=function(){
 			ctx.m_find_scroll_visual_y+=dy;
 			//ctx.SeekFindItemByVisualY(ctx.m_current_visual_y+dy,0)
 			//if(dy<0){
-			//	if(point0==ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
+			//	if(point0===ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
 			//		ctx.m_current_point--;
 			//	}
 			//	if(!ctx.m_current_point&&ctx.m_current_point>-((ctx.m_backward_matches.length/3))){
 			//		ctx.m_current_point--;
 			//	}
 			//}else{
-			//	if(point0==ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
+			//	if(point0===ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
 			//		ctx.m_current_point++;
 			//	}
 			//	if(!ctx.m_current_point&&ctx.m_current_point<(ctx.m_forward_matches.length/3)){
@@ -4016,7 +4920,7 @@ var ParseGit=function(spath){
 				return;
 			}
 			var fname=IO.NormalizeFileName(spath+"/"+match[0])
-			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 				fname=fname.toLowerCase()
 			}
 			var repos=g_repo_from_file[fname]
@@ -4036,11 +4940,11 @@ var ParseGit=function(spath){
 				//	return;
 				//}
 				var s_name=match[4];
-				if(s_name&&s_name[s_name.length-1]=='/'){
+				if(s_name&&s_name[s_name.length-1]==='/'){
 					s_name=s_name.substr(0,s_name.length-1);
 				}
 				var fname=IO.NormalizeFileName(spath+"/"+s_name);
-				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 					fname=fname.toLowerCase()
 				}
 				var repos=g_repo_from_file[fname]
@@ -4070,19 +4974,19 @@ var ParseGit=function(spath){
 var g_is_repo_detected={}
 var DetectRepository=function(fname){
 	var spath=UI.GetPathFromFilename(IO.NormalizeFileName(fname))
-	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+	if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 		spath=spath.toLowerCase()
-		if(spath.length==2&&spath[1]==':'){
+		if(spath.length===2&&spath[1]===':'){
 			return undefined;
 		}
 	}
 	if(!spath){return undefined;}
 	if(g_is_repo_detected[spath]){
-		if(g_is_repo_detected[spath]=="?"){return undefined;}
+		if(g_is_repo_detected[spath]==="?"){return undefined;}
 		return g_is_repo_detected[spath];
 	}
 	///////////////////
-	if(spath!='.'&&(IO.DirExists(spath+"/.git")||IO.DirExists(spath+"/.svn"))){
+	if(spath!=='.'&&(IO.DirExists(spath+"/.git")||IO.DirExists(spath+"/.svn"))){
 		//ParseGit(spath)
 		ParseProject(spath)
 		g_is_repo_detected[spath]=spath;
@@ -4205,7 +5109,7 @@ W.FileItemOnDemand=function(){
 							break;
 						}
 						fnext.name=IO.NormalizeFileName(fnext.name);
-						if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+						if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 							fnext.name=fnext.name.toLowerCase()
 						}
 						//avoid duplicate
@@ -4218,7 +5122,7 @@ W.FileItemOnDemand=function(){
 							parent:this,
 							h:h_item})
 					}
-					ret.sort(function(a,b){return !!a.name_to_find-!!b.name_to_find||b.is_dir-a.is_dir||(a.name<b.name?-1:(a.name==b.name?0:1));})
+					ret.sort(function(a,b){return !!a.name_to_find-!!b.name_to_find||b.is_dir-a.is_dir||(a.name<b.name?-1:(a.name===b.name?0:1));})
 					this.has_expanded_items=1;
 					/////////////////
 					var ret2=[];
@@ -4226,7 +5130,7 @@ W.FileItemOnDemand=function(){
 					for(var i=0;i<ret.length;i++){
 						var item_new=ret[i];
 						var ret_new=W.FileItemOnDemand.call(item_new);
-						if((typeof(ret_new))!='string'){
+						if((typeof(ret_new))!=='string'){
 							ret2=ret2.concat(ret_new);
 							continue;
 						}
@@ -4260,7 +5164,7 @@ W.FileItemOnDemand=function(){
 		}
 		UI.g_file_listing_budget--;
 		fnext.name=IO.NormalizeFileName(fnext.name);
-		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 			fnext.name=fnext.name.toLowerCase()
 		}
 		if(UI.m_current_file_list.m_appeared_full_names[fnext.name]&&!this.is_tree_view){continue;}
@@ -4277,7 +5181,7 @@ W.FileItemOnDemand=function(){
 			h:h_item}
 		if(this.is_tree_view){
 			var ret_new=W.FileItemOnDemand.call(item_new);
-			if((typeof(ret_new))!='string'){
+			if((typeof(ret_new))!=='string'){
 				ret=ret.concat(ret_new);
 				continue;
 			}
@@ -4292,7 +5196,7 @@ W.FileItemOnDemand=function(){
 var AddGitPath=function(dir_items,dir_seq,p){
 	var s=dir_seq[p];
 	if(p>=dir_seq.length-1){
-		if(s=="*"){
+		if(s==="*"){
 			//repo-locating, return the repo-level thing
 			return dir_items;
 		}
@@ -4366,7 +5270,7 @@ var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context,find_context0){
 		}
 		return;
 	}
-	if(my_repo.m_helps==undefined){
+	if(my_repo.m_helps===undefined){
 		my_repo.m_helps=[];
 	}
 	//file-only, recursive
@@ -4384,7 +5288,7 @@ var IndexHelpFiles=function(spath,my_repo,g_repo_parsing_context,find_context0){
 			if(pnewline>=0){
 				s_preview=s_preview.substr(0,pnewline);
 			}
-			if(s_preview.length&&s_preview[0]=='#'){
+			if(s_preview.length&&s_preview[0]==='#'){
 				var pspace=s_preview.indexOf(' ');
 				if(pspace>=0){
 					s_preview=s_preview.substr(pspace+1);
@@ -4455,11 +5359,11 @@ var ParseProject=function(spath){
 }
 
 W.FileItemOnDemandSort=function(obj){
-	obj.items.sort(function(a,b){return !!a.name_to_find-!!b.name_to_find||b.is_dir-a.is_dir||(a.name<b.name?-1:(a.name==b.name?0:1));})
+	obj.items.sort(function(a,b){return !!a.name_to_find-!!b.name_to_find||b.is_dir-a.is_dir||(a.name<b.name?-1:(a.name===b.name?0:1));})
 	var s_try_to_focus=(obj.item_template.owner.m_try_to_focus);
 	if(s_try_to_focus){
 		for(var i=0;i<obj.items.length;i++){
-			if(obj.items[i].name&&obj.items[i].name==s_try_to_focus){
+			if(obj.items[i].name&&obj.items[i].name===s_try_to_focus){
 				obj.value=i;
 				obj.AutoScroll();
 				obj.item_template.owner.m_try_to_focus=undefined;
@@ -4493,7 +5397,7 @@ var GetSmartFileName=function(arv,obj_param){
 					obj.display_name=cur_name
 					break;
 				}
-				if(typeof obj0=='string'){
+				if(typeof obj0==='string'){
 					//screwed, continue
 				}else{
 					//need to re-get obj0's name
@@ -4546,13 +5450,13 @@ UI.FormatRelativeTime=function(then,now){
 	if(!then||!now){
 		return UI._("time unavailable");
 	}
-	if(now[0]==then[0]){
-		if(now[1]==then[1]){
-			if(now[2]==then[2]){
+	if(now[0]===then[0]){
+		if(now[1]===then[1]){
+			if(now[2]===then[2]){
 				//the space disables translation
 				return UI.Format( "@1:@2",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
 			}
-			//else if(now[2]==then[2]+1){
+			//else if(now[2]===then[2]+1){
 			//	return UI.Format("@1:@2 Yesterday",ZeroPad(then[3],2),ZeroPad(then[4],2,10))
 			//}
 		}
@@ -4583,7 +5487,7 @@ var OpenInPlace=function(obj,name){
 		var counts=UI.m_ui_metadata[UI.m_previous_document]
 		if(counts){counts=counts.m_tabswitch_count;}
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
-			//if(i==my_tabid){continue;}
+			//if(i===my_tabid){continue;}
 			if(!UI.g_all_document_windows[i].main_widget){continue;}
 			var counts_i=UI.g_all_document_windows[i].main_widget.m_tabswitch_count
 			if(counts_i){
@@ -4598,16 +5502,16 @@ var OpenInPlace=function(obj,name){
 	//search for existing windows
 	//my_tabid refers to the preview tab
 	/*for(var i=0;i<UI.g_all_document_windows.length;i++){
-		if(i!=my_tabid&&UI.g_all_document_windows[i].file_name==fn){
+		if(i!==my_tabid&&UI.g_all_document_windows[i].file_name===fn){
 			UI.top.app.document_area.SetTab(i)
-			if(my_tabid!=undefined){UI.top.app.document_area.CloseTab(my_tabid);}
+			if(my_tabid!==undefined){UI.top.app.document_area.CloseTab(my_tabid);}
 			return
 		}
 	}
 	if(editor_widget){
 		var lang=UI.ED_GetFileLanguage(fn);
 		if(lang.is_binary){
-			if(my_tabid!=undefined){UI.top.app.document_area.CloseTab(my_tabid);}
+			if(my_tabid!==undefined){UI.top.app.document_area.CloseTab(my_tabid);}
 			UI.NewBinaryEditorTab(fn)
 			return
 		}
@@ -4671,7 +5575,7 @@ var FileItem_prototype={
 		menu_context.AddNormalItem({text:"&Copy path",enable_hotkey:0,
 			action:function(fn){
 				var s=IO.NormalizeFileName(fn,1);
-				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 					s=s.replace(/[/]/g,'\\');
 				}
 				UI.SDL_SetClipboardText(s)
@@ -4699,17 +5603,17 @@ W.FileItem=function(id,attrs){
 		if(s_try_to_focus){
 			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
 			var is_me_focus=0;
-			if(obj.name==s_try_to_focus){
+			if(obj.name===s_try_to_focus){
 				is_me_focus=1;
 			}else if(obj.is_dir&&!git_treeview_metadata[obj.name]){
-				if(obj.name.length<s_try_to_focus&&s_try_to_focus.substr(0,obj.name.length)==obj.name){
+				if(obj.name.length<s_try_to_focus&&s_try_to_focus.substr(0,obj.name.length)===obj.name){
 					is_me_focus=1;
 				}
 			}
 			if(is_me_focus){
 				var list_items=obj.owner.file_list.items;
 				for(var j=0;j<list_items.length;j++){
-					if(list_items[j].name==obj.name){
+					if(list_items[j].name===obj.name){
 						obj.owner.file_list.OnChange(j);
 						obj.owner.m_try_to_focus=undefined;
 						UI.Refresh()
@@ -4787,19 +5691,19 @@ W.FileItem=function(id,attrs){
 				}
 				var name_color=obj.name_color;
 				//var stag=undefined;
-				//(obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!='fs_view')&&
-				if(obj.is_tree_view!=1){
+				//(obj.owner.m_file_list_repo||UI.m_ui_metadata.new_page_mode!=='fs_view')&&
+				if(obj.is_tree_view!==1){
 					var repos=g_repo_from_file[obj.name]
 					if(repos){
 						var s_git_status=undefined;
 						for(var skey in repos){
 							s_git_status=repos[skey];
-							//if(obj.is_tree_view!=1){
+							//if(obj.is_tree_view!==1){
 							//	stag=skey;
 							//}
 							break;
 						}
-						//if(UI.m_ui_metadata.new_page_mode!='fs_view'){
+						//if(UI.m_ui_metadata.new_page_mode!=='fs_view'){
 						//}else{
 						//	s_git_status=repos[obj.owner.m_file_list_repo];
 						//}
@@ -4807,23 +5711,23 @@ W.FileItem=function(id,attrs){
 						var git_icon_color=undefined;
 						if(s_git_status){
 							//detect new / modified / conflicted / ignored / untracked
-							if(s_git_status=='!!'){
+							if(s_git_status==='!!'){
 								//ignored
 								ext_color&=0x7fffffff;
 								name_color&=0x7fffffff;
-							}else if(s_git_status=='??'){
+							}else if(s_git_status==='??'){
 								//untracked
 								name_color=obj.color_git_untracked;
 								s_git_icon="问";
-							}else if(s_git_status[0]=='U'||s_git_status[1]=='U'||s_git_status=='AA'){
+							}else if(s_git_status[0]==='U'||s_git_status[1]==='U'||s_git_status==='AA'){
 								//conflicted
 								name_color=obj.color_git_conflicted;
 								s_git_icon="叹";
-							}else if(s_git_status[0]=='A'||s_git_status[1]=='A'){
+							}else if(s_git_status[0]==='A'||s_git_status[1]==='A'){
 								//new
 								name_color=obj.color_git_new;
 								s_git_icon="加";
-							}else if(s_git_status!='  '){
+							}else if(s_git_status!=='  '){
 								//modified
 								name_color=obj.color_git_modified;
 								git_icon_color=obj.color_git_conflicted;
@@ -4832,7 +5736,7 @@ W.FileItem=function(id,attrs){
 						}
 					}
 				}
-				if(sname&&sname[0]=='.'){
+				if(sname&&sname[0]==='.'){
 					ext_color&=0x7fffffff;
 					name_color&=0x7fffffff;
 				}
@@ -4852,7 +5756,7 @@ W.FileItem=function(id,attrs){
 				var dims_misc_w0=dims_misc.w;
 				/////////////////////////
 				//forget button
-				if(UI.g_is_dir_a_project[obj.name]=='permanent'){
+				if(UI.g_is_dir_a_project[obj.name]==='permanent'){
 					W.Button("forget_button",{style:obj.button_style,
 						x:16,y:0,
 						value:obj.selected,
@@ -4953,7 +5857,7 @@ var fnewpage_findbar_plugin=function(){
 		if(tab_frontmost){
 			UI.top.app.document_area.SetTab(tab_frontmost.__global_tab_id)
 			//for(var i=0;i<UI.g_all_document_windows.length;i++){
-			//	if(UI.g_all_document_windows[i]==tab_frontmost){
+			//	if(UI.g_all_document_windows[i]===tab_frontmost){
 			//		UI.top.app.document_area.SetTab(i)
 			//		break
 			//	}
@@ -4970,7 +5874,7 @@ var fnewpage_findbar_plugin=function(){
 		//if(obj.m_close_on_esc){
 		//	UI.top.app.document_area.CloseTab()
 		//	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		//		if(UI.g_all_document_windows[i].file_name==UI.m_previous_document){
+		//		if(UI.g_all_document_windows[i].file_name===UI.m_previous_document){
 		//			UI.top.app.document_area.SetTab(i)
 		//			break
 		//		}
@@ -5014,7 +5918,7 @@ var fnewpage_findbar_plugin=function(){
 			if(cur_item.is_tree_view&&cur_item.parent&&obj.file_list&&obj.file_list.items){
 				//go to parent *AND* fold
 				for(var i=0;i<obj.file_list.items.length;i++){
-					if(obj.file_list.items[i]==cur_item.parent){
+					if(obj.file_list.items[i]===cur_item.parent){
 						obj.file_list.OnChange(i);
 						UI.Refresh();
 						return;
@@ -5061,14 +5965,14 @@ var fnewpage_findbar_plugin=function(){
 		var s_search_text=(this.ed.GetText()||"")
 		var spath=s_search_text
 		var ccnt=Duktape.__byte_length(spath)
-		if(spath.length&&this.sel0.ccnt==ccnt&&this.sel1.ccnt==ccnt){
+		if(spath.length&&this.sel0.ccnt===ccnt&&this.sel1.ccnt===ccnt){
 			spath=IO.ProcessUnixFileName(spath.replace(g_regexp_backslash,"/")).replace(g_regexp_backslash,"/")
 			if(spath.search(g_regexp_abspath)>=0){
 				//do nothing: it's absolute
 			}else{
 				spath=UI.m_new_document_search_path+"/"+spath
 			}
-			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 				spath=spath.toLowerCase()
 			}
 			var find_context=IO.CreateEnumFileContext(spath+"*",3)
@@ -5080,7 +5984,7 @@ var fnewpage_findbar_plugin=function(){
 					break
 				}
 				var sname=fnext.name
-				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 					sname=sname.toLowerCase()
 				}
 				if(fnext.is_dir){
@@ -5090,7 +5994,7 @@ var fnewpage_findbar_plugin=function(){
 					s_common=sname
 				}else{
 					for(var i=0;i<s_common.length;i++){
-						if(i>=sname.length||sname[i]!=s_common[i]){
+						if(i>=sname.length||sname[i]!==s_common[i]){
 							s_common=s_common.substr(0,i)
 							break;
 						}
@@ -5120,7 +6024,7 @@ var fnewpage_findbar_plugin=function(){
 		}
 		var s=IO.NormalizeFileName(spath);
 		var s2=UI.GetPathFromFilename(UI.GetPathFromFilename(s));
-		if(s2=='.'){return 1;}
+		if(s2==='.'){return 1;}
 		var n_removed=Duktape.__byte_length(s)-Duktape.__byte_length(s2);
 		if(!(n_removed>0)){return 1;}
 		this.HookedEdit([0,ccnt_end,s2+'/'])
@@ -5151,7 +6055,7 @@ var FILE_RELEVANCE_BASE_SCORE=4
 var FILE_RELEVANCE_SCORE_DECAY=0.99;
 var g_root_items;
 (function(){
-	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+	if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 		g_root_items=[];
 		for(var i=2;i<26;i++){
 			g_root_items.push({"name":String.fromCharCode(97+i)+":","is_dir":1});
@@ -5224,7 +6128,7 @@ W.FileBrowserPage=function(id,attrs){
 		default_focus:2,
 		tab_width:UI.GetOption("tab_width",4),
 	});
-	//if(is_find_bar_new&&UI.m_ui_metadata.new_page_mode=='fs_view'){
+	//if(is_find_bar_new&&UI.m_ui_metadata.new_page_mode==='fs_view'){
 	//	//set initial path - UI.m_new_document_search_path
 	//	obj.find_bar_edit.HookedEdit([0,0,(UI.m_new_document_search_path+"/")||"./"])
 	//	var ccnt=obj.find_bar_edit.ed.GetTextSize();
@@ -5260,7 +6164,7 @@ W.FileBrowserPage=function(id,attrs){
 		var projects=(UI.m_ui_metadata["<projects>"]||[]);
 		obj.m_is_project_mode=(!s_search_text);
 		//sync current projects to a map - UI.g_transient_projects
-		//UI.m_ui_metadata.new_page_mode!='fs_view'&&
+		//UI.m_ui_metadata.new_page_mode!=='fs_view'&&
 		if(!s_search_text){
 			//empty search string, project view
 			var git_treeview_metadata=UI.m_ui_metadata["<project-treeview>"];
@@ -5340,7 +6244,7 @@ W.FileBrowserPage=function(id,attrs){
 							var repos2=g_repo_from_file[fn_switchto]
 							if(repos2){
 								for(var spath in repos2){
-									if(repos[spath]!=undefined){
+									if(repos[spath]!==undefined){
 										files[i].relevance+=FILE_RELEVANCE_REPO_SCORE
 										break;
 									}
@@ -5419,7 +6323,7 @@ W.FileBrowserPage=function(id,attrs){
 			UI.Refresh();
 		},
 		OnChange:function(value){
-			//if(this.value==value){return;}
+			//if(this.value===value){return;}
 			W.ListView_prototype.OnChange.call(this,value)
 			if(obj.context_menu){
 				obj.context_menu.HideMenu();
@@ -5434,7 +6338,7 @@ W.FileBrowserPage=function(id,attrs){
 			if(!this.items.length){return;}
 			if(!this.items[value].name||this.items[value].is_dir){return;}
 			var fn=IO.NormalizeFileName(this.items[value].name)
-			if(editor_widget.file_name==fn){return;}
+			if(editor_widget.file_name===fn){return;}
 			if(!IO.FileExists(fn)){return;}
 			if(editor_widget.m_file_name_before_preview){
 				//clear preview first
@@ -5470,7 +6374,7 @@ W.FileBrowserPage=function(id,attrs){
 		if(is_first){
 			UI.SetFocus(obj_submenu);
 			var y_bounded=Math.max(Math.min(obj_submenu.y,obj.file_list.y+obj.file_list.h-obj_submenu.h),obj.file_list.y);
-			if(y_bounded!=obj_submenu.y){
+			if(y_bounded!==obj_submenu.y){
 				obj.file_list.m_menu_context.y=y_bounded;
 				UI.InvalidateCurrentFrame();
 				UI.Refresh();
@@ -5513,7 +6417,7 @@ UI.ExplicitFileOpen=function(){
 UI.g_util_tab_openers={};
 UI.FindUtilTab=function(util_type,do_settab){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		if(UI.g_all_document_windows[i].util_type==util_type){
+		if(UI.g_all_document_windows[i].util_type===util_type){
 			if(do_settab){
 				UI.top.app.document_area.SetTab(i)
 			}
@@ -5558,7 +6462,7 @@ UI.GetFrontMostEditorTab=function(){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
 		var item_i=UI.g_all_document_windows[i];
 		var name=(item_i.area_name||"doc_default");
-		if(name.length<4||name.substr(0,4)!='doc_'){
+		if(name.length<4||name.substr(0,4)!=='doc_'){
 			continue;
 		}
 		if(!tab_frontmost||(tab_frontmost.z_order||0)<(item_i.z_order||0)){
@@ -5580,17 +6484,17 @@ UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 		var body=W.FileBrowserPage('body',{
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'editor_widget':tab_frontmost&&tab_frontmost.main_widget,
-			'activated':this==UI.top.app.document_area.active_tab,
+			'activated':this===UI.top.app.document_area.active_tab,
 			'x':0,'y':0});
 		this.util_widget=body;
-		if(UI.TestOption("auto_hide_filetab",0)&&had_body&&!(this==UI.top.app.document_area.active_tab)){
+		if(UI.TestOption("auto_hide_filetab",0)&&had_body&&!(this===UI.top.app.document_area.active_tab)){
 			UI.m_invalid_util_tabs.push(this.__global_tab_id);
 		}
 		return body;
 	},
 	NeedRendering:function(){
 		if(this.util_widget){
-			return this==UI.top.app.document_area.active_tab;
+			return this===UI.top.app.document_area.active_tab;
 		}else{
 			return 1;
 		}
@@ -5601,7 +6505,7 @@ UI.RegisterUtilType("file_browser",function(){return UI.NewTab({
 })});
 
 UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,tooltips,fprev,fall,fnext){
-	if(obj.m_prev_next_button_drawn!=UI.m_frame_tick){
+	if(obj.m_prev_next_button_drawn!==UI.m_frame_tick){
 		obj.m_prev_next_button_drawn=UI.m_frame_tick;
 	}else{
 		return;
@@ -5667,7 +6571,7 @@ UI.DrawPrevNextAllButtons=function(obj,x,y, menu,stext,tooltips,fprev,fall,fnext
 UI.ED_GetFileLanguage=function(fn){
 	var s_ext=UI.GetFileNameExtension(fn)
 	var loaded_metadata=(UI.m_ui_metadata[fn]||{})
-	if(fn=="*remote"){loaded_metadata={};}
+	if(fn==="*remote"){loaded_metadata={};}
 	var language_id=(loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
 	return Language.GetDescObjectByName(language_id)
 }
@@ -5679,12 +6583,12 @@ UI.ED_ParseMore_callback=function(fn){
 	return Language.GetDescObjectByName(language_id);
 	//var ret=Language.GetDescObjectByName(language_id)
 	//var fn_h_to_c=undefined;
-	//if(s_ext=="h"||s_ext=="hpp"){
+	//if(s_ext==="h"||s_ext==="hpp"){
 	//	var fn_main=UI.GetMainFileName(fn);
 	//	var exts=[".c",".cpp",".cxx",".cc",".C",".m",".cu"]
 	//	for(var i=0;i<exts.length;i++){
 	//		var fn_c=UI.SearchIncludeFileShallow(fn,fn_main+exts[i])
-	//		if(fn_c&&fn_c!='<dangling>'&&fn_c!='<deep>'){
+	//		if(fn_c&&fn_c!=='<dangling>'&&fn_c!=='<deep>'){
 	//			fn_h_to_c=fn_c;
 	//			break;
 	//		}
@@ -5695,10 +6599,10 @@ UI.ED_ParseMore_callback=function(fn){
 
 UI.SearchIncludeFileShallow=function(fn_base,fn_include,is_local_only){
 	//console.log('UI.SearchIncludeFile',fn_base,fn_include);
-	if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+	if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 		fn_include=fn_include.toLowerCase().replace(/\\/g,"/")
 	}
-	if(fn_include.indexOf('js_module@')==0&&!is_local_only){
+	if(fn_include.indexOf('js_module@')===0&&!is_local_only){
 		fn_include=fn_include.substr(10);
 		//npm module search
 		var spath_repo=DetectRepository(fn_base)
@@ -5709,7 +6613,7 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include,is_local_only){
 			}
 		}
 		var spath=undefined;
-		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 			spath=IO.ProcessUnixFileName("%appdata%/npm");
 		}else{
 			spath="/usr/lib";
@@ -5745,7 +6649,7 @@ UI.SearchIncludeFileShallow=function(fn_base,fn_include,is_local_only){
 				var files=repo.files;
 				for(var i=0;i<files.length;i++){
 					var fn_i=files[i];
-					if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+					if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 						fn_i=fn_i.toLowerCase().replace(/\\/g,"/")
 					}
 					var fn_original_i=fn_i;
@@ -5798,11 +6702,11 @@ var finvoke_find=function(mode,s_force_needle){
 	obj.show_find_bar=mode;
 	//obj.m_sel0_before_find=obj.doc.sel0.ccnt
 	//obj.m_sel1_before_find=obj.doc.sel1.ccnt
-	if(s_force_needle!=undefined){
+	if(s_force_needle!==undefined){
 		UI.m_ui_metadata["<find_state>"].m_current_needle=s_force_needle;
 	}else{
 		var sel=obj.doc.GetSelection()
-		if(sel[0]<sel[1]&&obj.doc.GetLC(sel[0])[0]==obj.doc.GetLC(sel[1])[0]){
+		if(sel[0]<sel[1]&&obj.doc.GetLC(sel[0])[0]===obj.doc.GetLC(sel[1])[0]){
 			UI.m_ui_metadata["<find_state>"].m_current_needle=obj.doc.ed.GetText(sel[0],sel[1]-sel[0])
 			if(UI.m_ui_metadata["<find_state>"].m_find_flags&UI.SEARCH_FLAG_REGEXP){
 				UI.m_ui_metadata["<find_state>"].m_current_needle=RegexpEscape(UI.m_ui_metadata["<find_state>"].m_current_needle)
@@ -5839,7 +6743,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 	if(doc.m_ac_context&&doc.m_ac_activated){
 		var dii=acctx.GetDisplayItem(acctx.m_selection);
 		var prt_msg_brief=acctx.m_brief_cache[dii.name];
-		if(prt_msg_brief==undefined){
+		if(prt_msg_brief===undefined){
 			var prt_msg_brief=null;
 			if(dii.brief){
 				var brief_ctx=UI.ED_ProcessHelp(dii.brief,obj.accands_styles2,null,obj.accands_w_brief);
@@ -5855,7 +6759,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 					var a_msg_brief=[];
 					var id_in_file=0;
 					for(var i=0;i<briefs.length;i++){
-						if(!i||briefs[i].file!=briefs[i-1].file){
+						if(!i||briefs[i].file!==briefs[i-1].file){
 							a_msg_brief.push(
 								UI.Format('In @1:',UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1)+UI.GetSmartTabName(briefs[i].file)+UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+0)),
 								'\n');
@@ -5863,7 +6767,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 						}
 						a_msg_brief.push('   ')
 						id_in_file++;
-						if(id_in_file>1||i+1<briefs.length&&briefs[i+1].file==briefs[i].file){
+						if(id_in_file>1||i+1<briefs.length&&briefs[i+1].file===briefs[i].file){
 							a_msg_brief.push(
 								UI.ED_RichTextCommandChar(UI.RICHTEXT_COMMAND_SET_STYLE+1),
 								id_in_file<=20?String.fromCharCode(0x245f+id_in_file):id_in_file.toString()+'.',' ',
@@ -5929,7 +6833,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 	var ac_id1=acctx.IDFromX(ac_scroll_x+w_accands)
 	for(var i=ac_id0;i<=ac_id1;i++){
 		var dii=acctx.GetDisplayItem(i)
-		var selected=(doc.m_ac_context&&doc.m_ac_activated&&i==acctx.m_selection)
+		var selected=(doc.m_ac_context&&doc.m_ac_activated&&i===acctx.m_selection)
 		var num_id=(i-acctx.m_scroll_i+11)%10
 		var w_hint_char=UI.GetCharacterAdvance(obj.accands_id_font,48+num_id)
 		var x_item=x_accands+dii.x-ac_scroll_x+obj.accands_left_padding
@@ -5956,7 +6860,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 	}
 	UI.PopCliprect()
 	//render the documentation part
-	if(prt_msg_brief&&prt_msg_brief.prt&&x_selected!=undefined){
+	if(prt_msg_brief&&prt_msg_brief.prt&&x_selected!==undefined){
 		var y_brief=y_accands+obj.h_accands+obj.accands_sel_padding;
 		var w_brief=prt_msg_brief.prt.m_w_line+obj.accands_sel_padding*4;
 		var h_brief=prt_msg_brief.prt.m_h_text+obj.accands_sel_padding*4;
@@ -5979,7 +6883,7 @@ var RenderACCands=function(obj,w_obj_area,h_obj_area){
 };
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!=="code_editor"){return;}
 	var fupdate_tab=function(){
 		if(this.m_owner){
 			this.m_owner.m_is_rendering_good=0;
@@ -6003,10 +6907,10 @@ W.CodeEditor=function(id,attrs){
 	}
 	if(obj.doc){
 		var style=UI.default_styles.code_editor.editor_style;
-		if(style.__proto__!=W.CodeEditor_prototype){
+		if(style.__proto__!==W.CodeEditor_prototype){
 			style.__proto__=W.CodeEditor_prototype;
 		}
-		if(obj.doc.__proto__!=style){
+		if(obj.doc.__proto__!==style){
 			obj.doc.__proto__=style;
 		}
 	}
@@ -6049,7 +6953,7 @@ W.CodeEditor=function(id,attrs){
 				Duktape.__ui_seconds_between_ticks(doc.m_scroll_samples[0],UI.m_frame_tick)>minimap_interval){
 					doc.m_scroll_samples.shift()
 				}
-				if(doc.m_scroll_y_old!=undefined&&doc.m_scroll_y_old!=doc.scroll_y){
+				if(doc.m_scroll_y_old!==undefined&&doc.m_scroll_y_old!==doc.scroll_y){
 					doc.m_scroll_samples.push(UI.m_frame_tick)
 				}
 				if(doc.m_scroll_samples.length>=(show_minimap_current>0?obj.auto_minimap_ending_threshold:obj.auto_minimap_starting_threshold)){
@@ -6057,7 +6961,7 @@ W.CodeEditor=function(id,attrs){
 				}else{
 					show_minimap_target=0;
 				}
-				if(show_minimap_target==1&&doc.m_scroll_samples.length>0&&!doc.m_has_refresh_timeout){
+				if(show_minimap_target===1&&doc.m_scroll_samples.length>0&&!doc.m_has_refresh_timeout){
 					doc.m_has_refresh_timeout=1;
 					UI.setTimeout(function(){
 						doc.m_has_refresh_timeout=0;
@@ -6079,7 +6983,7 @@ W.CodeEditor=function(id,attrs){
 		var all_docvars=[];
 		if(doc){
 			//scrolling and stuff
-			if(doc.h!=undefined){
+			if(doc.h!==undefined){
 				doc.AutoScroll("bound")
 			}
 			var ccnt_tot=doc.ed.GetTextSize()
@@ -6118,10 +7022,10 @@ W.CodeEditor=function(id,attrs){
 						}
 					}
 					var ccnt_push=ccnt;
-					if(doc.ed.GetUtf8CharNeighborhood(ccnt_push)[1]==0x7B){
+					if(doc.ed.GetUtf8CharNeighborhood(ccnt_push)[1]===0x7B){
 						//lonely { case
 						var ccnt_ehome=doc.ed.MoveToBoundary(ccnt_push,-1,"space");
-						if(doc.ed.GetUtf8CharNeighborhood(ccnt_ehome)[0]==10&&ccnt_ehome>0){
+						if(doc.ed.GetUtf8CharNeighborhood(ccnt_ehome)[0]===10&&ccnt_ehome>0){
 							//\n space {, guilty
 							ccnt_push=ccnt_ehome-1;
 						}
@@ -6230,7 +7134,7 @@ W.CodeEditor=function(id,attrs){
 			var ed_caret=doc.GetCaretXY();
 			//var line_ccnts=doc.SeekAllLinesBetween(line_current,line_current+2)
 			doc.cur_line_hl.color=obj.color_cur_line_highlight;
-			if(UI.TestOption("show_line_highlight")&&UI.nd_focus==doc&&!doc.read_only){
+			if(UI.TestOption("show_line_highlight")&&UI.nd_focus===doc&&!doc.read_only){
 				doc.cur_line_p0.ccnt=doc.SeekXY(0,ed_caret.y);
 				doc.cur_line_p1.ccnt=doc.SeekXY(1e17,ed_caret.y);
 			}else{
@@ -6244,7 +7148,7 @@ W.CodeEditor=function(id,attrs){
 				if(sel[1]-sel[0]<=GRACEFUL_WORD_SIZE){
 					var sel0x=doc.ed.MoveToBoundary(sel[1],-1,"word_boundary_left");
 					var sel1x=doc.ed.MoveToBoundary(sel[0],1,"word_boundary_right");
-					if(sel0x==sel[0]&&sel1x==sel[1]){
+					if(sel0x===sel[0]&&sel1x===sel[1]){
 						//sel auto highlight
 						s_autofind_needle=doc.ed.GetText(sel[0],sel[1]-sel[0])
 					}
@@ -6260,7 +7164,7 @@ W.CodeEditor=function(id,attrs){
 					//alway bound the scroll to valid ranges
 					var sx0=doc.scroll_x;
 					var sy0=doc.scroll_y;
-					if(!(sx0==doc.scroll_x&&sy0==doc.scroll_y)){
+					if(!(sx0===doc.scroll_x&&sy0===doc.scroll_y)){
 						obj.scrolling_animation=undefined;
 					}
 					var anim=W.AnimationNode("scrolling_animation",{transition_dt:doc.scroll_transition_dt,
@@ -6292,7 +7196,7 @@ W.CodeEditor=function(id,attrs){
 				if(obj.m_current_find_context&&
 				show_at_scrollbar_find_minimap&&
 				!obj.m_changed_after_find&&
-				s_autofind_needle==obj.m_current_find_context.m_needle&&
+				s_autofind_needle===obj.m_current_find_context.m_needle&&
 				!(obj.m_current_find_context.m_flags&(UI.SEARCH_FLAG_FUZZY|UI.SEARCH_FLAG_GLOBAL))){
 					if(!UI.IsSearchFrontierCompleted(obj.m_current_find_context.m_backward_frontier)&&UI.GetSearchFrontierCcnt(obj.m_current_find_context.m_backward_frontier)>rendering_ccnt0){
 						//the previous context went out of range
@@ -6391,17 +7295,17 @@ W.CodeEditor=function(id,attrs){
 				y:obj.y,
 				w:w_obj_area-w_line_numbers-w_scrolling_area,
 				h:h_obj_area});
-			if(w_right_shadow!=undefined){
+			if(w_right_shadow!==undefined){
 				//try to draw the right "overlay" early
 				var h_right_shadow=doc.h;
 				UI.RoundRect({color:obj.find_mode_bgcolor,x:obj.x+w_right_shadow,y:obj.y,w:w_obj_area-w_scrolling_area-w_right_shadow,h:obj.h})
 				right_overlay_drawn=1;
 			}
 		}
-		if(doc&&doc.m_is_help_page_preview==-1&&!UI.HasFocus(doc)){
+		if(doc&&doc.m_is_help_page_preview===-1&&!UI.HasFocus(doc)){
 			doc.m_is_help_page_preview=1;
 		}
-		if(doc&&(doc.m_is_help_page_preview==1)){
+		if(doc&&(doc.m_is_help_page_preview===1)){
 			var attrs={
 				x:obj.x,y:obj.y,w:w_obj_area,h:h_obj_area,
 				is_file_view:1,
@@ -6487,7 +7391,7 @@ W.CodeEditor=function(id,attrs){
 						if(acctx.m_accands&&acctx.m_accands.m_common_prefix){
 							doc.ed.m_other_overlay={'type':'AC','text':acctx.m_accands.m_common_prefix}
 						}
-						//else if(acctx.m_n_cands==1){
+						//else if(acctx.m_n_cands===1){
 						//	//doc.ed.m_other_overlay always shows the 1st candidate?
 						//	//need PPM weight calibration, and float weights
 						//	//can't auto-calibrate - PPM always wins
@@ -6533,13 +7437,13 @@ W.CodeEditor=function(id,attrs){
 					//}
 				}
 				//if(!doc){
-				//	if(obj.file_name=="*res/misc/example.cpp"){
+				//	if(obj.file_name==="*res/misc/example.cpp"){
 				//		UI.InvalidateCurrentFrame();
 				//	}
 				//}
 				if(!doc){
 					var lang_remote=(obj.m_fn_remote?Language.GetNameByExt(UI.GetFileNameExtension(obj.m_fn_remote)):null);
-					if(lang_remote&&lang_remote=='Binary'){
+					if(lang_remote&&lang_remote==='Binary'){
 						lang_remote=null;
 					}
 					doc=UI.OpenCodeEditorDocument(obj.file_name,obj.m_is_preview,lang_remote);
@@ -6552,7 +7456,7 @@ W.CodeEditor=function(id,attrs){
 				}
 				UI.Keep("doc",{});
 				var was_bound_elsewhere=0;
-				if(doc.owner!=obj){
+				if(doc.owner!==obj){
 					was_bound_elsewhere=1;
 					if(doc.owner&&doc.owner.m_current_find_context){
 						doc.owner.DestroyFindingContext();
@@ -6662,7 +7566,7 @@ W.CodeEditor=function(id,attrs){
 						var n_lines=lcinfo1[0]-lcinfo0[0]
 						var n_chars=lcinfo1[2]-lcinfo0[2]
 						var n_words=(lcinfo1[3]>>1)-(lcinfo0[3]>>1)
-						if(n_chars==1){
+						if(n_chars===1){
 							//unicode
 							s_status=UI.Format("U+@1",
 								ZeroPad(doc.ed.GetUtf8CharNeighborhood(sel[0])[1].toString(16).toUpperCase(),4))
@@ -6689,8 +7593,8 @@ W.CodeEditor=function(id,attrs){
 					}
 					var status_dims=UI.MeasureText(obj.status_bar_font,s_status)
 					var ytot=doc.ed.XYFromCcnt(ccnt_tot).y+doc.ed.GetCharacterHeightAt(ccnt_tot)
-					var status_x=obj.x+(w_right_shadow==undefined?w_obj_area-w_scrolling_area:w_right_shadow)-status_dims.w-obj.status_bar_padding*2;
-					var status_y=obj.y+(y_bottom_shadow==undefined?h_editor:y_bottom_shadow)+h_top_find-status_dims.h-obj.status_bar_padding*2;
+					var status_x=obj.x+(w_right_shadow===undefined?w_obj_area-w_scrolling_area:w_right_shadow)-status_dims.w-obj.status_bar_padding*2;
+					var status_y=obj.y+(y_bottom_shadow===undefined?h_editor:y_bottom_shadow)+h_top_find-status_dims.h-obj.status_bar_padding*2;
 					UI.RoundRect({
 						color:obj.status_bar_bgcolor,
 						x:status_x,y:status_y,w:status_dims.w+obj.status_bar_padding*2,h:status_dims.h+obj.status_bar_padding*2,
@@ -6718,11 +7622,11 @@ W.CodeEditor=function(id,attrs){
 				if(srep_ccnt0<=doc.sel0.ccnt&&doc.sel0.ccnt<=srep_ccnt1&&
 				srep_ccnt0<=doc.sel1.ccnt&&doc.sel1.ccnt<=srep_ccnt1){
 					doc.m_hide_prev_next_buttons=0;
-				}else if(doc.sel0.ccnt!=doc.sel1.ccnt){
+				}else if(doc.sel0.ccnt!==doc.sel1.ccnt){
 					doc.m_hide_prev_next_buttons=0;
 				}
 				obj.DismissNotification('replace_hint')
-				if(rctx.m_needle==s_replace){
+				if(rctx.m_needle===s_replace){
 					obj.DismissNotification('find_result')
 				}else{
 					if(rctx.m_ae_prg){
@@ -6817,7 +7721,7 @@ W.CodeEditor=function(id,attrs){
 				////////////////
 				//the top hint, do it after since its Render screws the spell checks
 				if(top_hint_bbs.length){
-					var w_top_hint=(w_right_shadow==undefined?w_obj_area-w_scrolling_area:w_right_shadow);
+					var w_top_hint=(w_right_shadow===undefined?w_obj_area-w_scrolling_area:w_right_shadow);
 					var y_top_hint=y_top_hint_scroll;
 					UI.RoundRect({color:obj.line_number_bgcolor,x:obj.x,y:obj.y,w:w_line_numbers,h:h_top_hint})
 					UI.RoundRect({color:obj.bgcolor,x:obj.x+w_line_numbers,y:obj.y,w:w_top_hint-w_line_numbers,h:h_top_hint})
@@ -6842,7 +7746,7 @@ W.CodeEditor=function(id,attrs){
 					renderer.m_enable_hidden=bk_m_enable_hidden;
 				}
 				if(top_hint_bbs.length||doc.visible_scroll_y>0){
-					var w_top_hint=(w_right_shadow==undefined||!top_hint_bbs.length?w_obj_area-w_scrolling_area:w_right_shadow);
+					var w_top_hint=(w_right_shadow===undefined||!top_hint_bbs.length?w_obj_area-w_scrolling_area:w_right_shadow);
 					UI.PushCliprect(obj.x,obj.y+h_top_hint,w_top_hint,h_obj_area-h_top_hint)
 					var top_hint_shadow_size=obj.top_hint_shadow_size;
 					var hc=UI.GetCharacterHeight(doc.font);
@@ -7019,7 +7923,7 @@ W.CodeEditor=function(id,attrs){
 									if(in_slash){
 										unescaped_ret.push(ch);
 										in_slash=0
-									}else if(ch=='\\'){
+									}else if(ch==='\\'){
 										in_slash=1;
 									}else{
 										unescaped_ret.push(ch);
@@ -7077,7 +7981,7 @@ W.CodeEditor=function(id,attrs){
 					same_line_only_left_right:!UI.TestOption("left_right_line_wrap"),
 					tab_width:UI.GetOption("tab_width",4),
 					OnBlur:function(nd_new){
-						if(nd_new==doc){
+						if(nd_new===doc){
 							var obj=this.find_bar_owner
 							var ctx=obj.m_current_find_context
 							if(ctx&&!ctx.m_confirmed){
@@ -7101,7 +8005,7 @@ W.CodeEditor=function(id,attrs){
 					UI.SetFocus(obj.find_bar_edit);
 					UI.InvalidateCurrentFrame();
 					UI.Refresh()
-				}else if(UI.nd_focus==doc){
+				}else if(UI.nd_focus===doc){
 					UI.SetFocus(obj.find_bar_edit);
 					UI.InvalidateCurrentFrame();
 					UI.Refresh()
@@ -7116,7 +8020,7 @@ W.CodeEditor=function(id,attrs){
 				//horizontal scrollbar
 				if(desc_x_scroll_bar){
 					var y_horizontal_scrollbar=h_obj_area-obj.w_scroll_bar;
-					if(y_bottom_shadow!=undefined){
+					if(y_bottom_shadow!==undefined){
 						y_horizontal_scrollbar=y_bottom_shadow;
 						y_bottom_shadow+=obj.w_scroll_bar;
 					}
@@ -7176,7 +8080,7 @@ W.CodeEditor=function(id,attrs){
 					UI.Refresh()
 				}})
 				//menu_edit.p_copy=menu_edit.$.length
-				if(doc.sel0.ccnt!=doc.sel1.ccnt){
+				if(doc.sel0.ccnt!==doc.sel1.ccnt){
 					menu_edit.AddNormalItem({text:"&Copy",icon:"拷",context_menu_group:"edit",enable_hotkey:0,key:"CTRL+C",action:function(){
 						doc.Copy()
 					}})
@@ -7196,9 +8100,9 @@ W.CodeEditor=function(id,attrs){
 				var acctx=doc.m_ac_context
 				if(acctx){
 					menu_edit.AddSeparator()
-					if(acctx.m_n_cands==1||acctx.m_accands.m_common_prefix){
+					if(acctx.m_n_cands===1||acctx.m_accands.m_common_prefix){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
-							doc.ConfirmAC(acctx.m_n_cands==1?0:undefined)
+							doc.ConfirmAC(acctx.m_n_cands===1?0:undefined)
 						}})
 					}else if(!doc.m_ac_activated){
 						menu_edit.AddNormalItem({text:"Auto-complete",enable_hotkey:1,key:"TAB",action:function(){
@@ -7309,7 +8213,7 @@ W.CodeEditor=function(id,attrs){
 					var y_caret=(ed_caret.y-doc.visible_scroll_y);
 					var hc=UI.GetCharacterHeight(doc.font)
 					UI.DrawPrevNextAllButtons(obj,obj.x+w_line_numbers,obj.y+y_caret+hc*0.5, menu_search,
-						"Replace",["Replace previous",doc.sel0.ccnt==doc.sel1.ccnt?"Replace all":"Replace selection","Replace next"],
+						"Replace",["Replace previous",doc.sel0.ccnt===doc.sel1.ccnt?"Replace all":"Replace selection","Replace next"],
 						function(){obj.DoReplaceFromUI(-1);},
 						function(){obj.DoReplaceFromUI( 0);},
 						function(){obj.DoReplaceFromUI( 1);})
@@ -7319,7 +8223,7 @@ W.CodeEditor=function(id,attrs){
 				menu_search.AddNormalItem({text:"Go to ... in project",enable_hotkey:1,key:"SHIFT+CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GLOBAL_GOTO)})
 				UI.ToolButton("goto",{tooltip:"Go to - CTRL+G",action:finvoke_goto.bind(obj,UI.SHOW_GOTO)})
 				var neib=doc.ed.GetUtf8CharNeighborhood(doc.sel1.ccnt);
-				if(UI.g_goto_definition_context&&obj.m_prev_next_button_drawn!=UI.m_frame_tick){
+				if(UI.g_goto_definition_context&&obj.m_prev_next_button_drawn!==UI.m_frame_tick){
 					//render the current gotodef context, and put up #/# text as notification
 					obj.m_prev_next_button_drawn=UI.m_frame_tick;
 					var ed_caret=doc.GetIMECaretXY();
@@ -7434,7 +8338,7 @@ W.CodeEditor=function(id,attrs){
 					if(is_first){
 						UI.SetFocus(obj_submenu);
 						var y_bounded=Math.max(Math.min(obj_submenu.y,obj.y+obj.h-obj_submenu.h),obj.y);
-						if(y_bounded!=obj_submenu.y){
+						if(y_bounded!==obj_submenu.y){
 							doc.m_menu_context.y=y_bounded;
 							UI.InvalidateCurrentFrame();
 							UI.Refresh();
@@ -7447,9 +8351,9 @@ W.CodeEditor=function(id,attrs){
 			}
 		}
 		if(!is_find_mode_rendering&&!(doc&&doc.m_is_help_page_preview)&&obj.show_background!==0&&!(doc&&doc.notebook_owner)){
-			if(w_right_shadow!=undefined){
+			if(w_right_shadow!==undefined){
 				var h_right_shadow=doc.h;
-				if(y_bottom_shadow!=undefined){
+				if(y_bottom_shadow!==undefined){
 					h_right_shadow=y_bottom_shadow;
 				}
 				if(!right_overlay_drawn){
@@ -7464,8 +8368,8 @@ W.CodeEditor=function(id,attrs){
 						border_width:-obj.find_item_shadow_size})
 				UI.PopCliprect()
 			}
-			if(y_bottom_shadow!=undefined){
-				if(w_right_shadow==undefined){
+			if(y_bottom_shadow!==undefined){
+				if(w_right_shadow===undefined){
 					w_right_shadow=w_obj_area;
 				}
 				if(obj.doc.notebook_owner){
@@ -7543,7 +8447,7 @@ W.CodeEditor=function(id,attrs){
 			var ctx=obj.m_current_find_context;
 			if(!obj.show_find_bar&&show_at_scrollbar_find_minimap&&ctx&&ctx.m_locators){
 				//save highlight-computed frontier and merged y ranges in ctx
-				if(ctx.m_asbfmm_last_length!=ctx.m_locators.length||ctx.m_asbfmm_h!=sbar.h){
+				if(ctx.m_asbfmm_last_length!==ctx.m_locators.length||ctx.m_asbfmm_h!==sbar.h){
 					ctx.m_asbfmm_last_length=ctx.m_locators.length;
 					ctx.m_asbfmm_h=sbar.h;
 					var findhl_xys=UI.ED_GetFindLocatorXYEnMasse(doc.ed,ctx.m_locators);
@@ -7570,7 +8474,7 @@ W.CodeEditor=function(id,attrs){
 			}
 			//diff minimap
 			if(doc.m_diff_minimap){
-				if(obj.m_diff_minimap_h_obj_area!=h_obj_area){
+				if(obj.m_diff_minimap_h_obj_area!==h_obj_area){
 					doc.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(doc.ed,doc.m_diff_from_save,h_obj_area*UI.pixels_per_unit);
 					doc.m_diff_minimap_h_obj_area=h_obj_area
 				}
@@ -7689,7 +8593,7 @@ W.CodeEditor=function(id,attrs){
 			var fhctx=doc&&doc.m_fhint_ctx;
 			var s_notification=(fhctx&&fhctx.s_notification);
 			if(s_notification){
-				if(!fhctx.m_cached_prt||s_notification!=fhctx.m_cached_text){
+				if(!fhctx.m_cached_prt||s_notification!==fhctx.m_cached_text){
 					fhctx.m_cached_prt=UI.ED_FormatRichText(
 						Language.GetHyphenator(UI.m_ui_language),
 						s_notification,4,obj.accands_w_brief,UI.default_styles.code_editor_notification.styles);
@@ -7767,10 +8671,10 @@ W.CodeEditor=function(id,attrs){
 var RemoveDocFromByFileList=function(doc,fn){
 	var arr_ori=UI.g_editor_from_file[fn];
 	if(arr_ori){
-		var arr_new=arr_ori.filter(function(doc_i){return doc_i!=doc})
+		var arr_new=arr_ori.filter(function(doc_i){return doc_i!==doc})
 		if(arr_new.length<arr_ori.length){
 			UI.g_editor_from_file[fn]=(arr_new.length?arr_new:undefined);
-			if(fn!="*remote"){
+			if(fn!=="*remote"){
 				UI.SetEditorSyncGroup(arr_new);
 			}
 			return 1;
@@ -7789,7 +8693,7 @@ var AddDocToByFileList=function(doc,fn){
 var g_new_id=0;
 var g_tab_appeared_names={arv:{},objs:{}};
 UI.GetSmartTabName=function(fn){
-	if(fn.length&&fn[0]=='*'){
+	if(fn.length&&fn[0]==='*'){
 		return UI.RemovePath(fn);
 	}
 	var obj=g_tab_appeared_names.objs[fn];
@@ -7812,7 +8716,7 @@ UI.NewCodeEditorTab=function(fname0){
 		opening_callbacks:[],
 		NeedRendering:function(){
 			if(!this.main_widget){return 1;}
-			if(this==UI.top.app.document_area.active_tab){return 1;}
+			if(this===UI.top.app.document_area.active_tab){return 1;}
 			return !this.main_widget.m_is_rendering_good;
 		},
 		UpdateTitle:function(){
@@ -7820,7 +8724,7 @@ UI.NewCodeEditorTab=function(fname0){
 			var fn_display=(doc&&doc.m_file_name||this.file_name)
 			var arr_editors=UI.g_editor_from_file[fn_display];
 			var fn_display_original=fn_display;
-			if(fn_display.length&&fn_display[0]=='*'){
+			if(fn_display.length&&fn_display[0]==='*'){
 				var special_file_desc=UI.m_special_files[fn_display.substr(1)];
 				if(special_file_desc){
 					if(special_file_desc.display_name){
@@ -7833,26 +8737,26 @@ UI.NewCodeEditorTab=function(fname0){
 				fn_display=IO.NormalizeFileName(fn_display,1);
 			}
 			this.title=UI.GetSmartTabName(fn_display);
-			if(fn_display_original!="*remote"&&arr_editors&&arr_editors.length>1){
+			if(fn_display_original!=="*remote"&&arr_editors&&arr_editors.length>1){
 				var dup_id=undefined;
 				var cur_dup_id=0;
 				for(var i=0;i<arr_editors.length;i++){
 					if(!(arr_editors[i].owner&&arr_editors[i].owner.is_a_tab)){
 						continue;
 					}
-					if(arr_editors[i]==doc){
+					if(arr_editors[i]===doc){
 						dup_id=cur_dup_id;
 						//break;
 					}
 					cur_dup_id++;
 				}
-				if(dup_id!=undefined&&cur_dup_id>1){
+				if(dup_id!==undefined&&cur_dup_id>1){
 					this.title=this.title+':'+(dup_id+1).toString();
 				}
 			}
 			this.tooltip=fn_display;
 			this.need_save=0
-			if(doc&&(doc.saved_point||0)!=doc.ed.GetUndoQueueLength()){
+			if(doc&&(doc.saved_point||0)!==doc.ed.GetUndoQueueLength()){
 				this.title=this.title+'*'
 				this.need_save=1
 			}
@@ -7927,7 +8831,7 @@ UI.NewCodeEditorTab=function(fname0){
 		},
 		SaveAs:function(){
 			if(!this.main_widget){return;}
-			if(UI.Platform.ARCH=="web"){
+			if(UI.Platform.ARCH==="web"){
 				var fn=(this.main_widget.file_name.indexOf('<')>=0?"untitled.txt":UI.RemovePath(this.main_widget.file_name));
 				var s_script=[
 					"(function(){",
@@ -7955,7 +8859,7 @@ UI.NewCodeEditorTab=function(fname0){
 				if(RemoveDocFromByFileList(doc,doc.m_file_name)){
 					AddDocToByFileList(doc,fn);
 				}
-				//if(UI.g_editor_from_file[doc.m_file_name]==doc){
+				//if(UI.g_editor_from_file[doc.m_file_name]===doc){
 				//	UI.g_editor_from_file[doc.m_file_name]=undefined;
 				//	UI.g_editor_from_file[fn]=doc;
 				//}
@@ -7988,13 +8892,13 @@ UI.NewCodeEditorTab=function(fname0){
 				}
 			}
 		},
-		//color_theme:[UI.Platform.BUILD=="debug"?0xff1f1fb4:0xffb4771f],
+		//color_theme:[UI.Platform.BUILD==="debug"?0xff1f1fb4:0xffb4771f],
 	})
 };
 
 UI.SearchForEditorTab=function(fname){
 	for(var i=0;i<UI.g_all_document_windows.length;i++){
-		if(UI.g_all_document_windows[i].file_name==fname){
+		if(UI.g_all_document_windows[i].file_name===fname){
 			return UI.g_all_document_windows[i]
 		}
 	}
@@ -8002,17 +8906,17 @@ UI.SearchForEditorTab=function(fname){
 };
 
 UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
-	if(!(fname&&fname[0]=='*')){
+	if(!(fname&&fname[0]==='*')){
 		fname=IO.NormalizeFileName(fname).replace(/[\\]/g,"/");
 		if(fname){
 			UI.BumpHistory(fname);
 			//console.log('BumpHistory',fname)
 		}
 	}
-	if(is_quiet!='restore_workspace'&&fname!='*remote'){
+	if(is_quiet!=='restore_workspace'&&fname!=='*remote'){
 		var obj_tab=undefined;
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
-			if(UI.g_all_document_windows[i].file_name==fname){
+			if(UI.g_all_document_windows[i].file_name===fname){
 				obj_tab=UI.g_all_document_windows[i]
 				if(!is_quiet){
 					UI.top.app.document_area.SetTab(i)
@@ -8027,9 +8931,9 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 			bk_current_tab_id=UI.top.app.document_area.current_tab_id;
 		}
 		var s_ext=UI.GetFileNameExtension(fname);
-		if(s_ext=="stickerwall"||s_ext=="wall"){
+		if(s_ext==="stickerwall"||s_ext==="wall"){
 			obj_tab=UI.OpenStickerWallTab(fname);
-		}else if(s_ext=="qpad_notebook"){
+		}else if(s_ext==="qpad_notebook"){
 			obj_tab=UI.OpenNoteBookTab(fname);
 		}else{
 			var lang=UI.ED_GetFileLanguage(fname);
@@ -8059,7 +8963,7 @@ UI.OpenEditorWindow=function(fname,fcallback,is_quiet){
 UI.OpenForCommandLine=function(cmdline_opens){
 	for(var i=0;i<cmdline_opens.length;i++){
 		if(cmdline_opens[i]==='--new-instance'){continue;}
-		if(i+2<cmdline_opens.length&&cmdline_opens[i+1]=='--seek'){
+		if(i+2<cmdline_opens.length&&cmdline_opens[i+1]==='--seek'){
 			var line=Math.max(parseInt(cmdline_opens[i+2])-1,0);
 			UI.OpenEditorWindow(cmdline_opens[i],function(){
 				if(!(line>=0)){
@@ -8099,9 +9003,9 @@ UI.OnApplicationSwitch=function(){
 			//coulddo: more reliable class test
 			var obj=obj_tab.main_widget
 			CheckEditorExternalChange(obj);
-		}else if(obj_tab.main_widget&&obj_tab.document_type=='notebook'){
+		}else if(obj_tab.main_widget&&obj_tab.document_type==='notebook'){
 			var obj_notebook=obj_tab.main_widget;
-			if(obj_notebook.m_loaded_time!=IO.GetFileTimestamp(obj_notebook.file_name)){
+			if(obj_notebook.m_loaded_time!==IO.GetFileTimestamp(obj_notebook.file_name)){
 				var obj_notification_receiver=obj_notebook["doc_in_0"];
 				if(!IO.FileExists(obj_notebook.file_name)){
 					//make a notification
@@ -8132,7 +9036,7 @@ UI.g_cursor_history_test_same_reason=0;
 UI.SetSelectionEx=function(doc,ccnt0,ccnt1,sreason){
 	var prev_ccnt0=doc.sel0.ccnt
 	var prev_ccnt1=doc.sel1.ccnt
-	if(prev_ccnt0!=ccnt0||prev_ccnt1!=ccnt1){
+	if(prev_ccnt0!==ccnt0||prev_ccnt1!==ccnt1){
 		UI.RecordCursorHistroy(doc,sreason)
 	}
 	doc.SetSelection(ccnt0,ccnt1)
@@ -8141,7 +9045,7 @@ UI.SetSelectionEx=function(doc,ccnt0,ccnt1,sreason){
 
 UI.RecordCursorHistroy=function(doc,sreason){
 	UI.g_cursor_history_redo=[]
-	if(UI.g_cursor_history_test_same_reason&&UI.g_cursor_history_undo.length&&UI.g_cursor_history_undo[UI.g_cursor_history_undo.length-1].sreason==sreason){
+	if(UI.g_cursor_history_test_same_reason&&UI.g_cursor_history_undo.length&&UI.g_cursor_history_undo[UI.g_cursor_history_undo.length-1].sreason===sreason){
 		//merge same-reason records
 		//UI.g_cursor_history_undo.pop()
 		return;
@@ -8156,7 +9060,7 @@ UI.RecordCursorHistroy=function(doc,sreason){
 UI.ForgetFile=function(obj_fileitem){
 	var fname=obj_fileitem.name
 	//wipe its own history
-	UI.m_ui_metadata["<history>"]=UI.m_ui_metadata["<history>"].filter(function(a){return a!=fname})
+	UI.m_ui_metadata["<history>"]=UI.m_ui_metadata["<history>"].filter(function(a){return a!==fname})
 	if(UI.m_ui_metadata[fname]){
 		delete UI.m_ui_metadata[fname]
 	}
@@ -8199,7 +9103,7 @@ UI.FillLanguageMenu=function(s_ext,language_id,f_set_language_id){
 		return a>b?1:(a<b?-1:0);
 	})
 	var default_language_id=Language.GetNameByExt(s_ext)
-	if(language_id==undefined){language_id=default_language_id;}
+	if(language_id===undefined){language_id=default_language_id;}
 	for(var i=0;i<langs.length;i++){
 		if(!got_separator&&!langs[i].name_sort_hack){
 			menu_lang.AddSeparator()
@@ -8208,15 +9112,15 @@ UI.FillLanguageMenu=function(s_ext,language_id,f_set_language_id){
 		menu_lang.AddNormalItem({
 			text:langs[i].name,
 			enable_hotkey:0,
-			key:default_language_id==langs[i].name?"\u2605":undefined,
-			icon:(language_id==langs[i].name)?"对":undefined,
+			key:default_language_id===langs[i].name?"\u2605":undefined,
+			icon:(language_id===langs[i].name)?"对":undefined,
 			action:function(name,s_ext,is_selected,is_default){
 				if(is_selected&&!is_default){
 					UI.m_ui_metadata["<language_assoc>"][s_ext]=name;
 				}
 				f_set_language_id(name)
 				UI.Refresh();
-			}.bind(undefined,langs[i].name,s_ext,language_id==langs[i].name,default_language_id==langs[i].name)})
+			}.bind(undefined,langs[i].name,s_ext,language_id===langs[i].name,default_language_id===langs[i].name)})
 	}
 }
 
@@ -8250,10 +9154,10 @@ Language.Register({
 
 //language selection
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
 		UI.FillLanguageMenu(UI.GetFileNameExtension(this.m_file_name),this.m_language_id,(function(name){
-			if(name==this.m_language_id){return;}
+			if(name===this.m_language_id){return;}
 			this.m_language_id=name;
 			if(this.notebook_owner){
 				var desc=Language.GetDescObjectByName(name);
@@ -8262,7 +9166,7 @@ UI.RegisterEditorPlugin(function(){
 				return;
 			}
 			//try to reload
-			if(this.owner.file_name=="*remote"&&Language.GetDescObjectByName(name).is_binary){
+			if(this.owner.file_name==="*remote"&&Language.GetDescObjectByName(name).is_binary){
 				this.owner.CreateNotification({id:'language_reload_warning',text:"Remote editing of binary files is not supported yet"})
 				return;
 			}
@@ -8270,7 +9174,7 @@ UI.RegisterEditorPlugin(function(){
 				this.owner.CreateNotification({id:'language_reload_warning',text:"You cannot switch language while loading or saving a file"})
 				return;
 			}
-			if(this.owner.file_name.indexOf('<')>=0&&!Language.GetDescObjectByName(name).is_binary||this.owner.file_name=="*remote"){
+			if(this.owner.file_name.indexOf('<')>=0&&!Language.GetDescObjectByName(name).is_binary||this.owner.file_name==="*remote"){
 				//new file / remote file
 				this.owner.DismissNotification('language_reload_warning');
 				var bak_m_linked_terminal=this.m_linked_terminal;
@@ -8286,7 +9190,7 @@ UI.RegisterEditorPlugin(function(){
 				}
 				this.owner.doc.m_linked_terminal=bak_m_linked_terminal;
 				this.owner.doc.m_fn_remote=bak_m_fn_remote;
-			}else if((this.saved_point||0)!=this.ed.GetUndoQueueLength()||this.ed.saving_context){
+			}else if((this.saved_point||0)!==this.ed.GetUndoQueueLength()||this.ed.saving_context){
 				//make a notification
 				this.owner.CreateNotification({id:'language_reload_warning',text:"Save the file for the language change to take effect"})
 				this.saved_point=-1;
@@ -8308,7 +9212,7 @@ UI.RegisterEditorPlugin(function(){
 });
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('userTypeChar',function(){
 		if(this.m_ac_activated){
 			if(this.TestAutoCompletion("explicit")){
@@ -8341,7 +9245,7 @@ UI.RegisterEditorPlugin(function(){
 }).prototype.desc={category:"Editing",name:"Auto-completion",stable_name:"auto_completion"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	//doesn't make sense to disable this right now
 	this.AddEventHandler('change',function(){
 		var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
@@ -8366,7 +9270,7 @@ UI.RegisterEditorPlugin(function(){
 })//.prototype.desc={category:"Editing",name:"Auto-completion",stable_name:"auto_completion"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('userTypeChar',function(){
 		this.TestFunctionHint()
 	})
@@ -8376,11 +9280,11 @@ UI.CustomizeConfigScript=function(fn){
 	var fn_full=IO.GetStoragePath()+"/"+fn;
 	if(!IO.FileExists(fn)){
 		var s_content=undefined;
-		if(fn=='theme.json'){
+		if(fn==='theme.json'){
 			var a_content=[];
 			a_content.push('{\n');
 			for(var k in UI.g_core_theme_template){
-				a_content.push('\t"',k,'":',k=='is_light'?UI.g_core_theme_template[k]:JSON.stringify(UI.g_core_theme_template[k].toString(16)),',\n');
+				a_content.push('\t"',k,'":',k==='is_light'?UI.g_core_theme_template[k]:JSON.stringify(UI.g_core_theme_template[k].toString(16)),',\n');
 			}
 			a_content.pop();
 			a_content.push('\n}\n');
@@ -8391,7 +9295,7 @@ UI.CustomizeConfigScript=function(fn){
 		IO.CreateFile(fn_full,s_content);
 	}
 	UI.OpenEditorWindow(fn_full,function(){
-		if(fn=='theme.json'){
+		if(fn==='theme.json'){
 			//coulddo: "reset to default" in right-click menu - delete the file and re-generate it
 			this.m_event_hooks['save']=[function(){
 				UI.ApplyTheme(UI.CustomTheme());
@@ -8449,7 +9353,7 @@ W.FeatureItem=function(id,attrs){
 		}
 		if(obj.name){
 			var is_enabled=options[obj.stable_name];
-			if(is_enabled==undefined){is_enabled=1;}
+			if(is_enabled===undefined){is_enabled=1;}
 			W.Text("",{x:obj.x+16,y:obj.y+obj.h-27,font:obj.icon_fontb,text:is_enabled?"■":"□",color:obj.icon_color})
 			W.Text("",{x:obj.x+40,y:obj.y+obj.h-32,font:obj.font,text:obj.name,color:obj.text_color})
 			W.Region("checkbox_"+obj.stable_name,{
@@ -8468,7 +9372,7 @@ W.FeatureItem=function(id,attrs){
 		}else if(obj.license_line){
 			W.Text("",{x:obj.x+16,y:obj.y+obj.h-32,font:obj.font,text:obj.license_line,color:obj.text_color_license})
 		}else if(obj.special){
-			if(obj.special=='install_button'){
+			if(obj.special==='install_button'){
 				var s_text=UI._("Install shell menu integration")
 				var dims=UI.MeasureText(obj.font,s_text);
 				W.Button("install_button",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",
@@ -8481,7 +9385,7 @@ W.FeatureItem=function(id,attrs){
 				})
 				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"盾",color:obj.install_button.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.install_button.text_color})
-			}else if(obj.special=='theme_button'){
+			}else if(obj.special==='theme_button'){
 				var s_text=UI._("Dark theme / light theme")
 				var dims=UI.MeasureText(obj.font,s_text);
 				W.Button("dark_light_theme",{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",
@@ -8500,7 +9404,7 @@ W.FeatureItem=function(id,attrs){
 				})
 				W.Text("",{x:obj.x+16,y:obj.y+obj.h-29,font:obj.icon_font,text:"半",color:obj.dark_light_theme.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.dark_light_theme.text_color})
-			}else if(obj.special=='tab_width'){
+			}else if(obj.special==='tab_width'){
 				var s_text_0=UI.GetOption("tab_width",4).toString();
 				var s_text=UI._("Adjust tab width")
 				var dims0=UI.MeasureText(obj.font_small,s_text_0);
@@ -8522,7 +9426,7 @@ W.FeatureItem=function(id,attrs){
 				})
 				W.Text("",{x:obj.x+16+(20-dims0.w)*0.5,y:obj.y+obj.h-34+(28-dims0.h)*0.5,font:obj.font_small,text:s_text_0,color:obj.tab_width_btn.text_color})
 				W.Text("",{x:obj.x+40,y:obj.y+obj.h-34,font:obj.font,text:s_text,color:obj.tab_width_btn.text_color})
-			}else if(obj.special=='customize'){
+			}else if(obj.special==='customize'){
 				var s_text=obj.text;
 				var dims=UI.MeasureText(obj.font,s_text);
 				var btn=W.Button("customize_"+obj.file,{x:obj.x+12,y:obj.y+obj.h-34,w:dims.w+28+8,h:32,text:"",
@@ -8584,7 +9488,7 @@ W.OptionsPage=function(id,attrs){
 			]);
 			plugin_items["Controls"]=[
 				{special:'customize',h_special:4,text:UI._("Customize the key mapping script"),file:"conf_keymap.js"},
-				{name:UI._('Make @1 stop at both sides').replace("@1",UI.Platform.ARCH=="mac"?"\u2325\u2190/\u2325\u2192":"CTRL+\u2190/\u2192"),stable_name:'precise_ctrl_lr_stop'},
+				{name:UI._('Make @1 stop at both sides').replace("@1",UI.Platform.ARCH==="mac"?"\u2325\u2190/\u2325\u2192":"CTRL+\u2190/\u2192"),stable_name:'precise_ctrl_lr_stop'},
 				{name:UI._('Allow \u2190/\u2192 to cross lines'),stable_name:'left_right_line_wrap'},
 				{name:UI._('Move forward old tabs when manually opened'),stable_name:'explicit_open_mtf'},
 				{name:UI._('Automatically close stale tabs'),stable_name:'close_stale'},
@@ -8659,7 +9563,7 @@ W.OptionsPage=function(id,attrs){
 				{license_line:"Computer Modern: Copyright (c) Authors of original metafont fonts"},
 				{license_line:"    Copyright (c) 2003-2009, Andrey V. Panov (panov@canopus.iacp.dvo.ru)",h_special:-12},
 			];
-			if(UI.Platform.ARCH=="ios"||UI.Platform.ARCH=="web"){
+			if(UI.Platform.ARCH==="ios"||UI.Platform.ARCH==="web"){
 				plugin_items["Font Licenses"].push(
 					{license_line:"Droid Sans: Digitized data copyright © 2007, Google Corporation"});
 			}
@@ -8671,8 +9575,8 @@ W.OptionsPage=function(id,attrs){
 				if(!cat_list){continue;}
 				for(var j=0;j<cat_list.length;j++){
 					var desc_i=cat_list[j];
-					desc_i.is_first=(j==0);
-					if(j==0){
+					desc_i.is_first=(j===0);
+					if(j===0){
 						desc_i.category=UI._(scat_i);
 						desc_i.category_icon=obj.category_icons[i];
 					}
@@ -8714,10 +9618,10 @@ UI.RegisterUtilType("preferences",function(){return UI.NewTab({
 		for(var i=0;i<UI.g_all_document_windows.length;i++){
 			var item_i=UI.g_all_document_windows[i];
 			var name=(item_i.area_name||"doc_default");
-			if(name.length<4||name.substr(0,4)!='doc_'){
+			if(name.length<4||name.substr(0,4)!=='doc_'){
 				continue;
 			}
-			if(item_i.document_type=="text"&&item_i.main_widget&&item_i.main_widget.file_name=="*res/misc/example.cpp"){
+			if(item_i.document_type==="text"&&item_i.main_widget&&item_i.main_widget.file_name==="*res/misc/example.cpp"){
 				tab_frontmost=item_i;
 			}
 			item_i.__global_tab_id=i;
@@ -8727,7 +9631,7 @@ UI.RegisterUtilType("preferences",function(){return UI.NewTab({
 		var body=W.OptionsPage('body',{
 			'anchor':'parent','anchor_align':'fill','anchor_valign':'fill',
 			'owner':obj_real,
-			'activated':this==UI.top.app.document_area.active_tab,
+			'activated':this===UI.top.app.document_area.active_tab,
 			'x':0,'y':0});
 		this.util_widget=body;
 		//if(had_body&&!tab_frontmost){
@@ -8762,7 +9666,7 @@ UI.NewOptionsTab=function(){
 //multi-file editing
 UI.g_editor_from_file={};
 UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
-	if(fn&&fn.substr(0,1)!='*'){
+	if(fn&&fn.substr(0,1)!=='*'){
 		fn=IO.NormalizeFileName(fn);
 	}
 	///////////////////////////
@@ -8777,7 +9681,7 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 				}
 			}
 		}
-	}else if(is_preview==-1){
+	}else if(is_preview===-1){
 		//find mode
 		var arr_ori=UI.g_editor_from_file[fn];
 		if(arr_ori){
@@ -8790,19 +9694,19 @@ UI.OpenCodeEditorDocument=function(fn,is_preview,language_id_override){
 			}
 		}
 		is_preview=0;
-	}else if(is_preview==-2){
+	}else if(is_preview===-2){
 		//forced new document mode
 		is_preview=0;
 	}
 	var loaded_metadata=(fn&&UI.m_ui_metadata[fn]||{})
 	var style=UI.default_styles.code_editor.editor_style;
-	if(style.__proto__!=W.CodeEditor_prototype){
+	if(style.__proto__!==W.CodeEditor_prototype){
 		style.__proto__=W.CodeEditor_prototype;
 	}
 	var s_ext=UI.GetFileNameExtension(fn)
 	//need an initialization-time wrap width
 	var language_id=(language_id_override||loaded_metadata.m_language_id||Language.GetNameByExt(s_ext))
-	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH=="web")?768:1024)):0);
+	var wrap_width=(loaded_metadata.m_enable_wrapping?(loaded_metadata.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH==="web")?768:1024)):0);
 	if(is_preview){
 		wrap_width=1024;
 	}
@@ -8859,13 +9763,13 @@ UI.AddProjectDir=function(spath){
 	}
 	var spath=IO.NormalizeFileName(spath)
 	for(var i=0;i<projects.length;i++){
-		if(projects[i]==spath){
+		if(projects[i]===spath){
 			return;
 		}
 	}
 	projects.push(spath);
 	UI.g_is_dir_a_project[spath]="permanent";
-	UI.g_transient_projects=UI.g_transient_projects.filter(function(a){return a!=spath;})
+	UI.g_transient_projects=UI.g_transient_projects.filter(function(a){return a!==spath;})
 	if(UI.m_current_file_list){
 		var obj=UI.m_current_file_list.m_owner;
 		if(obj){
@@ -8894,7 +9798,7 @@ UI.RemoveProjectDir=function(spath){
 		projects=[];
 	}
 	var spath=IO.NormalizeFileName(spath)
-	UI.m_ui_metadata["<projects>"]=projects.filter(function(a){return a!=spath;})
+	UI.m_ui_metadata["<projects>"]=projects.filter(function(a){return a!==spath;})
 	UI.g_is_dir_a_project[spath]="transient";
 	UI.g_transient_projects.push(spath)
 	if(UI.m_current_file_list){
@@ -8951,7 +9855,7 @@ UI.RegisterSpecialFile("project_list",{
 		for(var i=0;i<files.length;i++){
 			var fn=files[i];
 			if(!fn){continue;}
-			if(fn[0]=='*'){
+			if(fn[0]==='*'){
 				n_stars++;
 				if(n_stars>1){break;}
 				continue;
