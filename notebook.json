@@ -131,40 +131,12 @@ v2
    "m_button_name": "â€¢ Search result"
   }
  ],
- "m_last_focus_cell_id": 2
+ "m_last_focus_cell_id": 0
 }
 =====í¯¿í¿¿=====
 # TODO LIST
 GPD:
-	(test) give qpad its own fork of ui.js and widgets.js
-		or just W.Edit_prototype
-	in-qpad sticky keys
-		m_in_sticky_key rendering
-		implement using message translation:
-			don't modify keymod / keysym directly - a set-key function
-		virtual Fn that turns wsad / ... into cursor
-			F4 for now
-			movement modes
-				char/line
-					not that important
-				home/end/page
-				ctrl+lr / alt+ud
-					shift
-				ctrl+home/end / alt+pgup/pgdn
-				find
-			selection modes
-				move
-				sel
-				line edit
-			stay-in-mode edits
-				copy / cut / paste
-				fold / unfold
-			bookmarks
-		could work for terminal mode
 	implement the sticky key help
-\Uxxxxxxxx
-Win + Space problem: couldn't detect the Win release
-history forward / back vs remote file
 SSH server move up / move down: don't close the menu
 more hints for replace UI - put the buttons next to the top-right bar?
 hidden notebook hotkey

@@ -66,7 +66,7 @@ var ProcessIncludePaths=function(paths){
 	var ret=[]
 	for(var i=0;i<paths.length;i++){
 		var path_i=IO.ProcessUnixFileName(paths[i]);
-		var paths_i=path_i.split(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?";":":");
+		var paths_i=path_i.split(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"?";":":");
 		for(var j=0;j<paths_i.length;j++){
 			if(IO.DirExists(paths_i[j])){
 				ret.push(paths_i[j].replace(g_regexp_backslash,"/"))
@@ -76,7 +76,7 @@ var ProcessIncludePaths=function(paths){
 	return ret
 }
 
-var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?[
+var standard_c_include_paths=ProcessIncludePaths(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"?[
 	"%INCLUDE%",
 	"%VS140COMNTOOLS%../../VC/include",
 	"%VS130COMNTOOLS%../../VC/include",
@@ -163,7 +163,7 @@ Language.Register({
 			'type':['void','char','short','int','long','iptr','uptr','auto','byte','ushort','uint','ulong','i8','i16','i32','i64','u8','u16','u32','u64','f32','f64','float','double','string','Object','Interface','typename','typeof'],
 		},0)
 	},
-	include_paths:ProcessIncludePaths(['c:/tp/pure/units',UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?'%JC_PATH%/units':'${JC_PATH}/units'])
+	include_paths:ProcessIncludePaths(['c:/tp/pure/units',UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"?'%JC_PATH%/units':'${JC_PATH}/units'])
 });
 
 Language.Register({
@@ -501,7 +501,7 @@ Language.Register({
 		kwset.DefineWordColor("color_type")
 		return (function(lang){
 			lang.SetExclusive([bid_comment,bid_cdata,bid_header,bid_string,bid_content,bid_string2]);
-			if(lang.isInside(bid_content)||lang.m_inside_mask==0){
+			if(lang.isInside(bid_content)||lang.m_inside_mask===0){
 				lang.Enable(bid_comment)
 				lang.Enable(bid_cdata)
 				lang.Enable(bid_header)
@@ -672,7 +672,7 @@ var f_tex_like=function(lang){
 	var bid_comment=lang.ColoredDelimiter("key","%","\n","color_comment");
 	var bid_math=lang.ColoredDelimiter("key","$","$","color_string");
 	var bid_bracket=lang.DefineDelimiter("nested",['\\begin','{'],['}','\\end']);
-	//assert(bid_math==2)
+	//assert(bid_math===2)
 	lang.DefineToken('\\{')
 	lang.DefineToken("\\}")
 	lang.DefineToken("\\\\")
@@ -1035,18 +1035,18 @@ UI.RegisterHelpHook(function(items,ssearch){
 	var lang=(fn&&UI.ED_GetFileLanguage(fn));
 	if(!lang){return;}
 	var sext=UI.GetFileNameExtension(fn).toLowerCase();
-	if(lang.name=="C/C++/C#"){
-		if(sext=='m'||sext=='mm'){
+	if(lang.name==="C/C++/C#"){
+		if(sext==='m'||sext==='mm'){
 			SearchEngineHook(items,ssearch,'プ',UI._("“@1” for Apple developers"),"https://developer.apple.com/search/?q=文");
 		}
-		if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+		if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 			SearchEngineHook(items,ssearch,'プ',UI._("“@1” on MSDN"),"https://social.msdn.microsoft.com/Search/en-US?query=文&pgArea=header&emptyWatermark=true&ac=4");
 		}
 	}
-	if(lang.name=="Java"){
+	if(lang.name==="Java"){
 		SearchEngineHook(items,ssearch,'プ',UI._("Android class “@1”"),"http://developer.android.com/reference/classes.html#q=文");
 	}
-	if(lang.name=="Javascript"){
+	if(lang.name==="Javascript"){
 		if(g_node_modules[ssearch.toLowerCase()]){
 			SearchEngineHook(items,ssearch.toLowerCase(),'プ',UI._('Node.js package “@1”'),"https://nodejs.org/api/文.html");
 		}else{
@@ -1075,7 +1075,7 @@ UI.RegisterHelpHook(function(items,ssearch){
 /////////////////////////////////////////////
 //interpreters / notebook cell generators
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
 	this.AddEventHandler('global_menu',function(){
 		var desc=this.plugin_language_desc;
 		//if(!desc.m_buildenv_by_name){return 1;}
@@ -1092,9 +1092,9 @@ UI.RegisterEditorPlugin(function(){
 		var spath_repo=IO.NormalizeFileName(UI.GetNotebookProject(this.m_file_name));
 		//console.log(UI.GetNotebookProject(this.m_file_name),spath_repo);
 		var fn_to_build=IO.NormalizeFileName(this.m_file_name);
-		if(fn_to_build.length>spath_repo.length&&fn_to_build.substr(0,spath_repo.length)==spath_repo){
+		if(fn_to_build.length>spath_repo.length&&fn_to_build.substr(0,spath_repo.length)===spath_repo){
 			fn_to_build=fn_to_build.substr(spath_repo.length);
-			if(fn_to_build[0]=='/'||fn_to_build[0]=='\\'){
+			if(fn_to_build[0]==='/'||fn_to_build[0]==='\\'){
 				fn_to_build=fn_to_build.substr(1);
 			}
 		}
@@ -1105,15 +1105,15 @@ UI.RegisterEditorPlugin(function(){
 			if(obj_buildenv){
 				if(obj_buildenv.CreateInterpreterCall){
 					var args=obj_buildenv.CreateInterpreterCall(fn_to_build,this);
-					if(typeof(args)=='string'){
+					if(typeof(args)==='string'){
 						//qpad js
 						s_script='eval(IO.ReadAll('+fn_to_build,'));';
 					}else{
 						s_script=IO.ShellCmd(args);
-						//if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
-						//	s_script='if "%1"=="run" goto run\nstart /WAIT %0 run\ngoto end\n:run\n'+s_script+'\npause\nexit\n:end\n';
+						//if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
+						//	s_script='if "%1"==="run" goto run\nstart /WAIT %0 run\ngoto end\n:run\n'+s_script+'\npause\nexit\n:end\n';
 						//}
-						if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+						if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 							s_script="rem [new window]\n"+s_script+"\npause";
 						}else{
 							s_script="# [new window]\n"+s_script+'\nread -n1 -r -p '+JSON.stringify(UI._("Press any key to continue..."))+' unused_key';
@@ -1131,14 +1131,14 @@ UI.RegisterEditorPlugin(function(){
 			if(is_project){
 				s_name_in_script='the project'
 				var s_button;
-				if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+				if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 					s_button="rem [button: "+"Run project"+"]\n";
 				}else{
 					s_button="# [button: "+"Run project"+"]\n";
 				}
 				s_script=s_button+s_script;
 			}
-			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 				s_mark="@echo off\nrem build script for "+s_name_in_script+"\nchcp 65001 > NUL\n";
 				s_language="Windows BAT";
 			}else{
@@ -1153,7 +1153,7 @@ UI.RegisterEditorPlugin(function(){
 				var doc_in=cell_i.m_text_in;
 				var size=doc_in.ed.GetTextSize();
 				//console.log(size,Duktape.__byte_length(s_mark_search));
-				if(size==Duktape.__byte_length(s_mark_search)){
+				if(size===Duktape.__byte_length(s_mark_search)){
 					doc_in.HookedEdit([0,size,s_mark+s_script]);
 					doc_in.m_cell_id=cell_i.m_cell_id;
 					doc_in.CallOnChange();
@@ -1161,7 +1161,7 @@ UI.RegisterEditorPlugin(function(){
 				UI.RefreshAllTabs()
 			}
 		}; 
-		if(desc.name!='Markdown'){
+		if(desc.name!=='Markdown'){
 			menu_run.AddNormalItem({text:"Create file cell",key:"CTRL+F7",enable_hotkey:1,action:fgencell.bind(this,0)})
 			menu_run.AddNormalItem({text:"Create project cell",key:"F7",enable_hotkey:1,action:fgencell.bind(this,1)})
 			menu_run.AddSeparator()
@@ -1174,7 +1174,7 @@ UI.RegisterEditorPlugin(function(){
 			if(is_project){
 				s_name_in_script='the project'
 			}
-			if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 				s_mark="@echo off\nrem build script for "+s_name_in_script+"\nchcp 65001 > NUL\n";
 				s_language="Windows BAT";
 			}else{
@@ -1190,7 +1190,7 @@ UI.RegisterEditorPlugin(function(){
 				//var cell_i=obj_notebook.m_cells[result_cell.cell_id];
 				//var doc_in=cell_i.m_text_in;
 				//UI.SetFocus(doc_in)
-				if(obj_notebook.RunCell(result_cell.cell_id)=="focus"){
+				if(obj_notebook.RunCell(result_cell.cell_id)==="focus"){
 					//if we got a cancel notification...
 					bk_active_tab=undefined;
 				}
@@ -1206,7 +1206,7 @@ UI.RegisterEditorPlugin(function(){
 					obj_notebook.RunCell(result_cell.cell_id)
 				}
 			}
-			if(bk_active_tab!=undefined){
+			if(bk_active_tab!==undefined){
 				UI.top.app.document_area.BringUpTab(bk_active_tab.__global_tab_id)
 				UI.SetFocus(this);
 			}
@@ -1220,7 +1220,7 @@ UI.RegisterEditorPlugin(function(){
 					return;
 				}
 				var args=obj_buildenv.CreateInterpreterCall(this.m_file_name)
-				if(typeof(args)=='string'){
+				if(typeof(args)==='string'){
 					//qpad js
 					try{
 						eval(IO.ReadAll(this.m_file_name))
@@ -1238,7 +1238,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 			fruncell(0)
 		}.bind(this);
-		if(desc.name!='Markdown'){
+		if(desc.name!=='Markdown'){
 			menu_run.AddNormalItem({text:"Build / &run file",icon:"放",enable_hotkey:1,key:"CTRL+F5",action:frunfile})
 			/*}*/
 			if(UI.HasFocus(this)&&obj_buildenv){
@@ -1261,7 +1261,7 @@ UI.RegisterEditorPlugin(function(){
 			var file_name=IO.NormalizeFileName(spath_repo+"/notebook.json");
 			var obj_tab_i=UI.BringUpNotebookTab(file_name,"none");
 			if(!obj_tab_i){return;}
-			if(obj_tab_i.document_type=="notebook"){
+			if(obj_tab_i.document_type==="notebook"){
 				if(obj_tab_i.main_widget){
 					var obj_notebook=obj_tab_i.main_widget;
 					if(obj_notebook.m_cells){
@@ -1274,7 +1274,7 @@ UI.RegisterEditorPlugin(function(){
 			/*
 			for(var i=0;i<UI.g_all_document_windows.length;i++){
 				var obj_tab_i=UI.g_all_document_windows[i];
-				if(obj_tab_i.document_type=="notebook"){
+				if(obj_tab_i.document_type==="notebook"){
 					if(obj_tab_i.main_widget){
 						var obj_notebook=obj_tab_i.main_widget;
 						if(obj_notebook.m_cells){
@@ -1294,8 +1294,8 @@ UI.RegisterEditorPlugin(function(){
 				menu_run.AddNormalItem({
 					text:s_name_i,
 					enable_hotkey:0,
-					key:s_name_i==s_name_default?"\u2605":undefined,
-					icon:(obj_buildenv==desc.m_buildenv_by_name[s_name_i])?"对":undefined,
+					key:s_name_i===s_name_default?"\u2605":undefined,
+					icon:(obj_buildenv===desc.m_buildenv_by_name[s_name_i])?"对":undefined,
 					action:function(name,s_lang_name,is_selected,is_default){
 						if(is_selected&&!is_default){
 							if(!UI.m_ui_metadata["<compiler_assoc>"]){
@@ -1306,7 +1306,7 @@ UI.RegisterEditorPlugin(function(){
 						this.m_compiler_name=name;
 						UI.Refresh();
 					}.bind(this,s_name_i,desc.name,
-						obj_buildenv==desc.m_buildenv_by_name[s_name_i],s_name_i==s_name_default)})
+						obj_buildenv===desc.m_buildenv_by_name[s_name_i],s_name_i===s_name_default)})
 			}
 		}
 		menu_run=undefined;
@@ -1332,7 +1332,7 @@ UI.RegisterBuildEnv("TeX/LaTeX",{
 });
 
 //compiled languages are not that important
-if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 	var g_vc_compiler_path=undefined;
 	var DetectVC=function(){
 		if(g_vc_compiler_path){return g_vc_compiler_path;}
@@ -1365,7 +1365,7 @@ UI.RegisterBuildEnv("Jacy",{
 	name:"jc",
 	CreateBuildScript:function(fname,doc){
 		return [
-			UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?'cd /d ':'cd ',UI.GetPathFromFilename(fname),'\n',
+			UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"?'cd /d ':'cd ',UI.GetPathFromFilename(fname),'\n',
 			'jc ',UI.RemovePath(fname),' --run\n',
 		].join("");
 	}
@@ -1381,7 +1381,7 @@ UI.RegisterBuildEnv("Python",{
 UI.RegisterBuildEnv("Javascript",{
 	name:"node.js",
 	CreateInterpreterCall:function(fname,doc){
-		return [UI.Platform.ARCH=="linux32"||UI.Platform.ARCH=="linux64"?"nodejs":"node",fname];
+		return [UI.Platform.ARCH==="linux32"||UI.Platform.ARCH==="linux64"?"nodejs":"node",fname];
 	}
 })
 
@@ -1402,7 +1402,7 @@ UI.RegisterBuildEnv("Windows BAT",{
 UI.RegisterBuildEnv("Unix Shell Script",{
 	name:"exec",
 	CreateInterpreterCall:function(fname,doc){
-		return [UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"?"sh.exe":"/bin/sh",fname];
+		return [UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"?"sh.exe":"/bin/sh",fname];
 	}
 });
 
@@ -1430,14 +1430,14 @@ var GetSpaceIndent=function(){
 };
 
 var DeduceIndent=function(ed,ccnt){
-	return ed.GetUtf8CharNeighborhood(ccnt)[1]==32?GetSpaceIndent():'\t';
+	return ed.GetUtf8CharNeighborhood(ccnt)[1]===32?GetSpaceIndent():'\t';
 };
 
 UI.RegisterEditorPlugin(function(){
 	//bracket-related auto-indent
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('RETURN RETURN2',function(){
-		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
+		if(this.sel0.ccnt!==this.sel1.ccnt){return 1;}
 		var ed=this.ed;
 		var lang=this.plugin_language_desc
 		var ccnt_pos=this.sel1.ccnt
@@ -1451,7 +1451,7 @@ UI.RegisterEditorPlugin(function(){
 		var blevel=this.GetBracketLevel(ccnt_pos)
 		var ccnt_lbra=this.FindBracket(blevel-1,ccnt_pos,-1)
 		var snewline="\n"
-		//if(ed.LineEndingMode=="DOS"){
+		//if(ed.LineEndingMode==="DOS"){
 		//	snewline="\r\n"
 		//}else{
 		//	snewline="\n"
@@ -1480,7 +1480,7 @@ UI.RegisterEditorPlugin(function(){
 			did=1
 		}
 		//this applies in parallel with the dangling bracket rule
-		if(chnext=='}'&&!lang.curly_bracket_is_not_special&&is_bracket_enabled){
+		if(chnext==='}'&&!lang.curly_bracket_is_not_special&&is_bracket_enabled){
 			if(ccnt_lbra>=ccnt_lh){
 				//Case 2: enter inside {}, we need to add an extra blank line for C-like langs
 				//delta doesn't change
@@ -1514,7 +1514,7 @@ UI.RegisterEditorPlugin(function(){
 		if(is_bracket_enabled&&lang.auto_curly_words&&is_lineend){
 			var ch_lineend=String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt_pos)[0])
 			var id_eh
-			if(ch_lineend==')'){
+			if(ch_lineend===')'){
 				var ccnt_eh_bra0=this.FindBracket(blevel-2,ccnt_pos-1,-1)
 				var ccnt_eh=ed.MoveToBoundary(ccnt_eh_bra0,-1,"space")
 				var ccnt_eh0=ed.MoveToBoundary(ccnt_eh,-1,"word_boundary_left")
@@ -1527,12 +1527,12 @@ UI.RegisterEditorPlugin(function(){
 			var nspaces=CountSpacesAfter(ed,ccnt_lh)
 			snewline=snewline+ed.GetText(ccnt_lh,nspaces)
 			var acw=lang.auto_curly_words[id_eh]
-			if((ch_lineend==')'||acw==2&&ch_lineend!=':'&&ch_lineend!=';'&&ch_lineend!=','&&ch_lineend!='\n'&&ch_lineend!='\\'&&ch_lineend)&&acw){
+			if((ch_lineend===')'||acw===2&&ch_lineend!==':'&&ch_lineend!==';'&&ch_lineend!==','&&ch_lineend!=='\n'&&ch_lineend!=='\\'&&ch_lineend)&&acw){
 				//for(), if(), main(), ...
 				//add {} and move cursor in between
 				var delta_ccnt=Duktape.__byte_length(snewline)+2
 				snewline="{"+snewline+DeduceIndent(ed,ccnt_lh)+snewline+"}"
-				if(acw==2){
+				if(acw===2){
 					snewline=snewline+';'
 				}
 				var sel=this.GetSelection()
@@ -1543,7 +1543,7 @@ UI.RegisterEditorPlugin(function(){
 			}else{
 				//test left { and stuff, add ; if found
 				var ccnt_left_bra=this.FindBracket(blevel-1,ccnt_pos,-1)
-				if((ccnt_left_bra<0||ed.GetUtf8CharNeighborhood(ccnt_left_bra)[1]=='{')&&ch_lineend!='{'&&ch_lineend!='}'&&ch_lineend!=':'&&ch_lineend!=';'&&ch_lineend!=','&&ch_lineend!='\n'&&ch_lineend!='\\'&&ch_lineend){
+				if((ccnt_left_bra<0||ed.GetUtf8CharNeighborhood(ccnt_left_bra)[1]==='{')&&ch_lineend!=='{'&&ch_lineend!=='}'&&ch_lineend!==':'&&ch_lineend!==';'&&ch_lineend!==','&&ch_lineend!=='\n'&&ch_lineend!=='\\'&&ch_lineend){
 					var cmt_holder=lang;
 					if(lang.GetCommentStrings){
 						cmt_holder=lang.GetCommentStrings(this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],ccnt_pos,"ill")[0]);
@@ -1551,7 +1551,7 @@ UI.RegisterEditorPlugin(function(){
 					if(cmt_holder.paired_comment){
 						var paired_comment1=cmt_holder.paired_comment[1]
 						if(ccnt_pos>=Duktape.__byte_length(paired_comment1)){
-							if(ed.GetText(ccnt_pos-Duktape.__byte_length(paired_comment1),Duktape.__byte_length(paired_comment1))==paired_comment1){
+							if(ed.GetText(ccnt_pos-Duktape.__byte_length(paired_comment1),Duktape.__byte_length(paired_comment1))===paired_comment1){
 								//don't add ; after /**/
 								return 1
 							}
@@ -1559,11 +1559,11 @@ UI.RegisterEditorPlugin(function(){
 					}
 					var lineno=this.GetLC(ccnt_pos)[0]
 					var ccnt_lh=this.SeekLC(lineno,0)
-					if(ed.MoveToBoundary(ccnt_lh,1,"space")==ccnt_pos){
+					if(ed.MoveToBoundary(ccnt_lh,1,"space")===ccnt_pos){
 						//don't add ; to a blank line
 						return 1;
 					}
-					if(id_eh=="template"||ccnt_pos>=1&&ed.GetUtf8CharNeighborhood(ccnt_pos)[0]=='>'){
+					if(id_eh==="template"||ccnt_pos>=1&&ed.GetUtf8CharNeighborhood(ccnt_pos)[0]==='>'){
 						//don't add ; to a template line
 						return 1;
 					}
@@ -1580,7 +1580,7 @@ UI.RegisterEditorPlugin(function(){
 		return 1
 	})
 	this.AddEventHandler('BACKSPACE',function(){
-		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
+		if(this.sel0.ccnt!==this.sel1.ccnt){return 1;}
 		var ccnt_pos=this.sel1.ccnt;
 		var lineno=this.GetLC(ccnt_pos)[0]
 		var ccnt_lh=this.SeekLC(lineno,0)
@@ -1588,7 +1588,7 @@ UI.RegisterEditorPlugin(function(){
 		var is_markdown=0;
 		if(this.plugin_language_desc&&this.plugin_language_desc.name==='Markdown'){
 			var ch=this.ed.GetUtf8CharNeighborhood(ccnt_after_indent+1)
-			if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]==0x20&&ccnt_pos===this.ed.MoveToBoundary(ccnt_after_indent+1,1,"space")){
+			if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]===0x20&&ccnt_pos===this.ed.MoveToBoundary(ccnt_after_indent+1,1,"space")){
 				//delete the '- '
 				this.HookedEdit([ccnt_after_indent,ccnt_pos-ccnt_after_indent,null])
 				this.CallOnChange()
@@ -1597,12 +1597,12 @@ UI.RegisterEditorPlugin(function(){
 				return 0;
 			}
 		}
-		if(ccnt_pos!=ccnt_after_indent){return 1}
-		if(this.ed.GetUtf8CharNeighborhood(ccnt_pos)[0]!=32){return 1;}//only do this for space indent
+		if(ccnt_pos!==ccnt_after_indent){return 1}
+		if(this.ed.GetUtf8CharNeighborhood(ccnt_pos)[0]!==32){return 1;}//only do this for space indent
 		var ccnt_indent=this.FindOuterIndentation(ccnt_pos);
 		var ccnt_indent_lh=this.ed.MoveToBoundary(ccnt_indent,-1,"space")
 		var n_remaining=ccnt_indent-ccnt_indent_lh;
-		if(!n_remaining||ccnt_lh+n_remaining<this.ed.GetTextSize()&&this.ed.GetText(ccnt_indent_lh,n_remaining)==this.ed.GetText(ccnt_lh,n_remaining)){
+		if(!n_remaining||ccnt_lh+n_remaining<this.ed.GetTextSize()&&this.ed.GetText(ccnt_indent_lh,n_remaining)===this.ed.GetText(ccnt_lh,n_remaining)){
 			if(ccnt_lh+n_remaining<ccnt_pos){
 				//delete to previous indent
 				this.HookedEdit([ccnt_lh+n_remaining,ccnt_pos-(ccnt_lh+n_remaining),null])
@@ -1615,26 +1615,26 @@ UI.RegisterEditorPlugin(function(){
 		return 1;
 	})
 	var f_key_test=function(C){
-		if(this.sel0.ccnt!=this.sel1.ccnt){return 1;}
+		if(this.sel0.ccnt!==this.sel1.ccnt){return 1;}
 		var ccnt_pos=this.sel1.ccnt
 		if(!this.IsLineEndAt(ccnt_pos)){return 1}
 		var ed=this.ed;
 		var lang=this.plugin_language_desc
 		var lineno=this.GetLC(ccnt_pos)[0]
 		var ccnt_lh=this.SeekLC(lineno,0)
-		if(ccnt_pos!=ed.MoveToBoundary(ccnt_lh,1,"space")){return 1}
+		if(ccnt_pos!==ed.MoveToBoundary(ccnt_lh,1,"space")){return 1}
 		if(!this.IsBracketEnabledAt(ccnt_pos)){return 1}
 		var blevel=this.GetBracketLevel(ccnt_pos)
 		var ccnt_lbra=this.FindBracket(blevel-1,ccnt_pos,-1)
 		if(ccnt_lbra<0){return 1;}
 		var C_other=MatchingBracket(C)
-		if(ed.GetUtf8CharNeighborhood(ccnt_lbra)[1]!=C_other.charCodeAt(0)){return 1;}
+		if(ed.GetUtf8CharNeighborhood(ccnt_lbra)[1]!==C_other.charCodeAt(0)){return 1;}
 		//dedent it
 		var ccnt_lh_lbra=this.SeekLC(this.GetLC(ccnt_lbra)[0],0)
 		var nspaces_ours=CountSpacesAfter(ed,ccnt_lh)
 		var nspaces_lbra=CountSpacesAfter(ed,ccnt_lh_lbra)
 		if(nspaces_ours<=nspaces_lbra){return 1}
-		if(ed.GetText(ccnt_lh,nspaces_lbra)!=ed.GetText(ccnt_lh_lbra,nspaces_lbra)){return 1;}
+		if(ed.GetText(ccnt_lh,nspaces_lbra)!==ed.GetText(ccnt_lh_lbra,nspaces_lbra)){return 1;}
 		this.HookedEdit([ccnt_lh+nspaces_lbra,nspaces_ours-nspaces_lbra,null, ccnt_pos,0,C])
 		this.CallOnChange()
 		this.SetCaretTo(ccnt_lh+nspaces_lbra+Duktape.__byte_length(C))
@@ -1649,7 +1649,7 @@ UI.RegisterEditorPlugin(function(){
 
 UI.RegisterEditorPlugin(function(){
 	//bracket-related auto-indent
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	if(!this.plugin_language_desc||this.plugin_language_desc.name!=='Markdown'){return;}
 	this.AddEventHandler('RETURN RETURN2',function(){
 		var ed=this.ed;
@@ -1658,7 +1658,7 @@ UI.RegisterEditorPlugin(function(){
 		var ccnt_lhome=this.SeekLC(this.GetLC(ccnt_ehome)[0],0)
 		var ch=ed.GetUtf8CharNeighborhood(ccnt_ehome+1)
 		// - or * followed by space
-		if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]==0x20&&ccnt_ehome+2<=ccnt){
+		if((ch[0]===0x2d||ch[0]===0x2a)&&ch[1]===0x20&&ccnt_ehome+2<=ccnt){
 			ccnt_ehome+=2;
 			this.OnTextInput({"text":"\n"+this.ed.GetText(ccnt_lhome,ccnt_ehome-ccnt_lhome),"is_paste":1})
 			return 0;
@@ -1670,7 +1670,7 @@ UI.RegisterEditorPlugin(function(){
 }).prototype.desc={category:"Editing",name:"Markdown auto-list",stable_name:"adv_auto_indent"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)&&UI.SDL_HasClipboardText()&&(!this.owner||!this.owner.read_only)){
 			var sel=this.GetSelection();
@@ -1689,16 +1689,16 @@ UI.RegisterEditorPlugin(function(){
 })//.prototype.desc={category:"Editing",name:"Smart paste",stable_name:"smart_paste"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.owner||!this.plugin_language_desc.spell_checker){return;}
+	if(this.plugin_class!=="code_editor"||!this.owner||!this.plugin_language_desc.spell_checker){return;}
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();
 			var menu_edit=UI.BigMenu("&Edit")
 			menu_edit.AddNormalItem({
 					text:"Check &spelling",
-					icon:(this.m_spell_checker&&this.m_spell_checker!="none")?"■":"□",
+					icon:(this.m_spell_checker&&this.m_spell_checker!=="none")?"■":"□",
 					action:function(){
-				this.m_spell_checker=(this.m_spell_checker&&this.m_spell_checker!="none"?"none":this.plugin_language_desc.spell_checker)
+				this.m_spell_checker=(this.m_spell_checker&&this.m_spell_checker!=="none"?"none":this.plugin_language_desc.spell_checker)
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				renderer.ResetSpellChecker(this)
 				UI.Refresh()
@@ -1709,7 +1709,7 @@ UI.RegisterEditorPlugin(function(){
 });//.prototype.desc={category:"Display",name:"Enable spell checks"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();
@@ -1724,7 +1724,7 @@ UI.RegisterEditorPlugin(function(){
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
 				var ed_caret_original=this.GetCaretXY();
 				var scroll_y_original=this.scroll_y;
-				renderer.ResetWrapping(this.m_enable_wrapping?(this.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH=="web")?768:1024)):0,this)
+				renderer.ResetWrapping(this.m_enable_wrapping?(this.m_current_wrap_width||((UI.IS_MOBILE||UI.Platform.ARCH==="web")?768:1024)):0,this)
 				this.caret_is_wrapped=0
 				this.ed.InvalidateStates([0,this.ed.GetTextSize()])
 				var ed_caret_new=this.GetCaretXY();
@@ -1741,7 +1741,7 @@ UI.RegisterEditorPlugin(function(){
 
 //cut line / delete word
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!=="code_editor"){return;}
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)){
 			var sel=this.GetSelection();
@@ -1781,7 +1781,7 @@ UI.RegisterEditorPlugin(function(){
 })//.prototype.desc={category:"Editing",name:"Line / word deletion",stable_name:"line_word_del"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!=="code_editor"){return;}
 	var fcomment=function(){
 		var lang=this.plugin_language_desc
 		var ed=this.ed;
@@ -1792,12 +1792,12 @@ UI.RegisterEditorPlugin(function(){
 		if(lang.GetCommentStrings){
 			cmt_holder=lang.GetCommentStrings(this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],sel[0],"ill")[0]);
 		}
-		if((line0==line1&&sel[0]<sel[1]||!cmt_holder.line_comment)&&cmt_holder.paired_comment){
+		if((line0===line1&&sel[0]<sel[1]||!cmt_holder.line_comment)&&cmt_holder.paired_comment){
 			var s0=cmt_holder.paired_comment[0]
 			var s1=cmt_holder.paired_comment[1]
 			var lg0=Duktape.__byte_length(s0)
 			var lg1=Duktape.__byte_length(s1)
-			if(ed.GetText(sel[0],lg0)==s0&&ed.GetText(sel[1]-lg1,lg1)==s1){
+			if(ed.GetText(sel[0],lg0)===s0&&ed.GetText(sel[1]-lg1,lg1)===s1){
 				this.HookedEdit([sel[0],lg0,undefined,sel[1]-lg1,lg1,undefined])
 				this.CallOnChange()
 				this.SetSelection(sel[0],sel[1]-lg0-lg1)
@@ -1812,7 +1812,7 @@ UI.RegisterEditorPlugin(function(){
 		if(!cmt_holder.line_comment){
 			return 1
 		}
-		if(line0==line1||this.SeekLC(line1,0)<sel[1]){line1++;}
+		if(line0===line1||this.SeekLC(line1,0)<sel[1]){line1++;}
 		var line_ccnts=this.SeekAllLinesBetween(line0,line1+1);
 		var line_ccnts_new=[];
 		var ops=[];
@@ -1823,16 +1823,16 @@ UI.RegisterEditorPlugin(function(){
 		for(var i=0;i<line_ccnts.length-1;i++){
 			var ccnt0=line_ccnts[i];
 			var ccnt_eh=ed.MoveToBoundary(ccnt0,1,"space")
-			if(ed.GetUtf8CharNeighborhood(ccnt0)[0]==10&&ed.GetUtf8CharNeighborhood(ccnt_eh)[1]==10){
+			if(ed.GetUtf8CharNeighborhood(ccnt0)[0]===10&&ed.GetUtf8CharNeighborhood(ccnt_eh)[1]===10){
 				//skip empty lines
 				continue;
 			}
-			if(min_n_spaces==undefined||min_n_spaces>(ccnt_eh-ccnt0)){
+			if(min_n_spaces===undefined||min_n_spaces>(ccnt_eh-ccnt0)){
 				min_n_spaces=ccnt_eh-ccnt0;
 			}
 			ccnt_eh=Math.min(ccnt_eh,ccnt0+min_n_spaces);
 			line_ccnts_new.push(ccnt_eh)
-			if(is_decomment&&ed.GetText(ccnt_eh,lg0)!=s0){
+			if(is_decomment&&ed.GetText(ccnt_eh,lg0)!==s0){
 				is_decomment=0
 			}
 		}
@@ -1872,7 +1872,7 @@ UI.RegisterEditorPlugin(function(){
 	var indentText=function(delta){
 		var ed=this.ed;
 		var sel=this.GetSelection();
-		if(sel[0]==sel[1]){return 1;}
+		if(sel[0]===sel[1]){return 1;}
 		var line0=this.GetLC(sel[0])[0];
 		var line1=this.GetLC(sel[1])[0];
 		if(this.SeekLC(line1,0)<sel[1]){line1++;}
@@ -1886,7 +1886,7 @@ UI.RegisterEditorPlugin(function(){
 			}else{
 				if(ccnt0<ccnt1){
 					var ch=ed.GetUtf8CharNeighborhood(ccnt0)[1];
-					if(ch==32||ch==9){
+					if(ch===32||ch===9){
 						ops.push(ccnt0,1,null)
 					}
 				}
@@ -1928,7 +1928,7 @@ UI.RegisterEditorPlugin(function(){
 
 UI.RegisterEditorPlugin(function(){
 	//alt+pgup/pgdn
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!=="code_editor"){return;}
 	this.m_outer_scope_queue=[]
 	var fouter_scope=function(){
 		var ed=this.ed;
@@ -1952,8 +1952,8 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('ALT+PGUP',fouter_scope)
 	this.AddEventHandler('ALT+PGDN',finner_scope)
 	this.AddEventHandler('selectionChange',function(){
-		if(this.sel0.ccnt==this.m_outer_scope_queue_just_pushed&&
-		this.sel1.ccnt==this.m_outer_scope_queue_just_pushed){
+		if(this.sel0.ccnt===this.m_outer_scope_queue_just_pushed&&
+		this.sel1.ccnt===this.m_outer_scope_queue_just_pushed){
 			return;
 		}
 		this.m_outer_scope_queue=[];
@@ -2009,7 +2009,7 @@ UI.RegisterEditorPlugin(function(){
 
 //control up/down
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class=="widget"){return;}
+	if(this.plugin_class==="widget"){return;}
 	//ctrl+up/down
 	this.AddEventHandler('CTRL+UP',function(){
 		this.scroll_y-=this.GetCharacterHeightAtCaret();
@@ -2050,7 +2050,7 @@ UI.RegisterEditorPlugin(function(){
 
 //bookmarking
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	//the numbered guys
 	for(var i=0;i<10;i++){
 		(function(i){
@@ -2060,7 +2060,7 @@ UI.RegisterEditorPlugin(function(){
 				if(!this.m_bookmarks[i]){
 					this.m_bookmarks[i]=ed.CreateLocator(ccnt,-1)
 				}else{
-					if(this.m_bookmarks[i].ccnt==ccnt){
+					if(this.m_bookmarks[i].ccnt===ccnt){
 						this.m_bookmarks[i].discard();
 						this.m_bookmarks[i]=undefined;
 					}else{
@@ -2095,7 +2095,7 @@ UI.RegisterEditorPlugin(function(){
 				var ed=this.ed;
 				var ccnt=this.sel1.ccnt;
 				var bm0=this.FindNearestBookmark(ccnt,1)
-				if(bm0&&bm0.ccnt==ccnt){
+				if(bm0&&bm0.ccnt===ccnt){
 					this.DeleteBookmark(bm0)
 				}else{
 					this.m_unkeyed_bookmarks.push(ed.CreateLocator(ccnt,-1))
@@ -2111,7 +2111,7 @@ UI.RegisterEditorPlugin(function(){
 			//detect
 			var ccnt0=line_ccnts[0];
 			var ccnt1=line_ccnts[1];
-			if(ccnt1==this.ed.GetTextSize()){
+			if(ccnt1===this.ed.GetTextSize()){
 				ccnt1++;
 			}
 			var did=0;
@@ -2146,16 +2146,16 @@ UI.RegisterEditorPlugin(function(){
 
 //point of interest
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	var fnextbm=function(dir,is_sel){
 		var ccnt=this.sel1.ccnt;
 		var sz=this.ed.GetTextSize()
 		var ccnt_next=undefined;
 		var propose=UI.HackCallback(function(ccnt_cand){
 			if(dir>0){
-				if(ccnt<ccnt_cand&&(ccnt_next>ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
+				if(ccnt<ccnt_cand&&(ccnt_next>ccnt_cand||ccnt_next===undefined)){ccnt_next=ccnt_cand;}
 			}else{
-				if(ccnt>ccnt_cand&&(ccnt_next<ccnt_cand||ccnt_next==undefined)){ccnt_next=ccnt_cand;}
+				if(ccnt>ccnt_cand&&(ccnt_next<ccnt_cand||ccnt_next===undefined)){ccnt_next=ccnt_cand;}
 			}
 		});
 		//bookmark
@@ -2193,7 +2193,7 @@ UI.RegisterEditorPlugin(function(){
 				var m=(l+r)>>1;
 				var ccnt_base_m=this.m_diff_from_save.CurrentToBase(ccnt_starting+dir*m)
 				var ccnt_both_m=this.m_diff_from_save.CurrentToBoth(ccnt_starting+dir*m)
-				if(ccnt_both_m-ccnt_both_starting==dir*m&&ccnt_base_m-ccnt_base_starting==dir*m){
+				if(ccnt_both_m-ccnt_both_starting===dir*m&&ccnt_base_m-ccnt_base_starting===dir*m){
 					l=m+1;
 				}else{
 					r=m-1;
@@ -2201,7 +2201,7 @@ UI.RegisterEditorPlugin(function(){
 			}
 			if(r>0){
 				ccnt_starting+=r*dir;
-				if(ccnt_starting!=0&&ccnt_starting!=sz){
+				if(ccnt_starting!==0&&ccnt_starting!==sz){
 					propose(ccnt_starting);
 				}
 			}
@@ -2219,7 +2219,7 @@ UI.RegisterEditorPlugin(function(){
 		//spell error
 		//there are too many of them, not worth it
 		//actually go there
-		if(ccnt_next==undefined){return 1;}
+		if(ccnt_next===undefined){return 1;}
 		if(is_sel){
 			this.SetSelection(ccnt,ccnt_next)
 		}else{
@@ -2255,20 +2255,20 @@ UI.RegisterEditorPlugin(function(){
 ////////////////////////////////////
 //C-like
 var MatchingBracket=function(c){
-	if(c=='('){return ')';}
-	if(c=='['){return ']';}
-	if(c=='{'){return '}';}
-	if(c=='<'){return '>';}
-	if(c==')'){return '(';}
-	if(c==']'){return '[';}
-	if(c=='}'){return '{';}
-	if(c=='>'){return '<';}
+	if(c==='('){return ')';}
+	if(c==='['){return ']';}
+	if(c==='{'){return '}';}
+	if(c==='<'){return '>';}
+	if(c===')'){return '(';}
+	if(c===']'){return '[';}
+	if(c==='}'){return '{';}
+	if(c==='>'){return '<';}
 	return c
 }
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
-	if(!this.plugin_language_desc||this.plugin_language_desc.name=="Plain text"){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
+	if(!this.plugin_language_desc||this.plugin_language_desc.name==="Plain text"){return;}
 	//bracket auto-matching with bold bracket highlighting
 	this.AddEventHandler('editorCreate',function(){
 		var hl_items=this.CreateTransientHighlight({
@@ -2325,9 +2325,9 @@ UI.RegisterEditorPlugin(function(){
 			return;
 		}
 		var ccnt_new;
-		if(ccnt==this.m_lbracket_p0.ccnt||ccnt==this.m_lbracket_p1.ccnt){
+		if(ccnt===this.m_lbracket_p0.ccnt||ccnt===this.m_lbracket_p1.ccnt){
 			ccnt_new=this.m_rbracket_p0.ccnt;
-		}else if(ccnt==this.m_rbracket_p0.ccnt||ccnt==this.m_rbracket_p1.ccnt){
+		}else if(ccnt===this.m_rbracket_p0.ccnt||ccnt===this.m_rbracket_p1.ccnt){
 			ccnt_new=this.m_lbracket_p1.ccnt;
 		}else{
 			//UI.assert(0,"panic: bracket highlighting enabled but cursor is not at a bracket?")
@@ -2349,7 +2349,7 @@ UI.RegisterEditorPlugin(function(){
 			var doc=this;
 			var ccnt=this.sel1.ccnt
 			var sicon="｛";
-			if(ccnt==this.m_lbracket_p0.ccnt||ccnt==this.m_lbracket_p1.ccnt){
+			if(ccnt===this.m_lbracket_p0.ccnt||ccnt===this.m_lbracket_p1.ccnt){
 				sicon="｝";
 			}
 			menu_search.AddSeparator();
@@ -2388,7 +2388,7 @@ var bracket_context_prototype={
 
 UI.RegisterEditorPlugin(function(){
 	//bracket completion
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.m_bracket_ctx={
 		bac_stack:[],
 		isin:0,
@@ -2422,10 +2422,10 @@ UI.RegisterEditorPlugin(function(){
 			//{ + move away + }
 			//the pair have to be would-be matches: level test, after-ness test
 			var blevel=this.GetBracketLevel(ccnt_pos)
-			if(ccnt_pos>bad_curly_ac_ccnt&&blevel==this.GetBracketLevel(bad_curly_ac_ccnt)-1){
+			if(ccnt_pos>bad_curly_ac_ccnt&&blevel===this.GetBracketLevel(bad_curly_ac_ccnt)-1){
 				//the final left-bra test
 				var ccnt_left_bra=this.FindBracket(blevel-1,ccnt_pos,-1)
-				if(ccnt_left_bra<bad_curly_ac_ccnt&&String.fromCharCode(ed.GetUtf8CharNeighborhood(bad_curly_ac_ccnt)[1])=='}'){
+				if(ccnt_left_bra<bad_curly_ac_ccnt&&String.fromCharCode(ed.GetUtf8CharNeighborhood(bad_curly_ac_ccnt)[1])==='}'){
 					//we should indeed cancel out the previous }
 					//but any auto-completion should continue normally
 					var sel=this.GetSelection()
@@ -2450,7 +2450,7 @@ UI.RegisterEditorPlugin(function(){
 			var ccnt_range0=ctx.current_bracket_ac_ccnt_range[0].ccnt
 			var ccnt_range1=ctx.current_bracket_ac_ccnt_range[1].ccnt
 			if(ccntmin<=ccnt_range0||ccntmax>=ccnt_range1){
-				if(ctx.bac_stack.length==0&&ctx.current_bracket_ac=='}'&&!lang.curly_bracket_is_not_special){
+				if(ctx.bac_stack.length===0&&ctx.current_bracket_ac==='}'&&!lang.curly_bracket_is_not_special){
 					ctx.detecting_bad_curly=1
 					ctx.bad_curly_locator=ctx.current_bracket_ac_ccnt_range[0]
 				}
@@ -2467,8 +2467,8 @@ UI.RegisterEditorPlugin(function(){
 		var sel_new=this.GetSelection()
 		var ccnt0=sel_new[0]
 		var ccnt1=sel_new[1]
-		if(ctx.current_bracket_ac_ccnt_range&&ccnt0==ccnt1&&ccnt1==ctx.current_bracket_ac_ccnt_range[0].ccnt+1){
-			if(ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt){
+		if(ctx.current_bracket_ac_ccnt_range&&ccnt0===ccnt1&&ccnt1===ctx.current_bracket_ac_ccnt_range[0].ccnt+1){
+			if(ccnt1+1===ctx.current_bracket_ac_ccnt_range[1].ccnt){
 				var ccnt_lbra=ccnt1-1
 				this.HookedEdit([ccnt_lbra,2,null])
 				this.CallOnChange()
@@ -2485,12 +2485,12 @@ UI.RegisterEditorPlugin(function(){
 		var sel_new=this.GetSelection()
 		var ccnt0=sel_new[0]
 		var ccnt1=sel_new[1]
-		if(ccnt0==ccnt1&&ctx.current_bracket_ac_ccnt_range&&ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt){
+		if(ccnt0===ccnt1&&ctx.current_bracket_ac_ccnt_range&&ccnt1+1===ctx.current_bracket_ac_ccnt_range[1].ccnt){
 			//pop everything and move past them before entering
 			var lang=this.plugin_language_desc
-			for(;ctx.current_bracket_ac_ccnt_range&&ccnt1+1==ctx.current_bracket_ac_ccnt_range[1].ccnt;){
+			for(;ctx.current_bracket_ac_ccnt_range&&ccnt1+1===ctx.current_bracket_ac_ccnt_range[1].ccnt;){
 				//{} case - don't pop it, also {} vs python
-				if(ctx.current_bracket_ac=='}'&&!lang.curly_bracket_is_not_special){
+				if(ctx.current_bracket_ac==='}'&&!lang.curly_bracket_is_not_special){
 					break;
 				}
 				var ccnt1=ctx.current_bracket_ac_ccnt_range[1].ccnt
@@ -2510,14 +2510,14 @@ UI.RegisterEditorPlugin(function(){
 		var ed=this.ed;
 		var ctx=this.m_bracket_ctx;
 		var sel=this.GetSelection();
-		if(C=="{"||C=="["||C=="("||//normal brackets
+		if(C==="{"||C==="["||C==="("||//normal brackets
 			((//quote-likes
-				C=="'"&&!lang.is_tex_like||
-				C=='$'&&lang.is_tex_like||
-				C=="\""||
-				C=="`"&&lang.has_backquote_string
-			)&&C!=ctx.current_bracket_ac//they don't self-nest
-			&&sel[0]==sel[1])//they are not appropriate when overwriting things
+				C==="'"&&!lang.is_tex_like||
+				C==='$'&&lang.is_tex_like||
+				C==="\""||
+				C==="`"&&lang.has_backquote_string
+			)&&C!==ctx.current_bracket_ac//they don't self-nest
+			&&sel[0]===sel[1])//they are not appropriate when overwriting things
 		){
 			var chbac=MatchingBracket(C)
 			var ccnt_pos=this.sel1.ccnt
@@ -2525,13 +2525,13 @@ UI.RegisterEditorPlugin(function(){
 			var chprev=ch_neibs[0]
 			var chnext=ch_neibs[1]
 			if(chbac){
-				if(this.IsLeftBracket(C.charCodeAt(0))&&chbac!="'"&&chbac!="\""&&chbac!="`"&&chbac!="$"){
+				if(this.IsLeftBracket(C.charCodeAt(0))&&chbac!=="'"&&chbac!=="\""&&chbac!=="`"&&chbac!=="$"){
 					//the syntax has to actually consider it as a bracket, or it has to be a quote-like
 					chbac=0;
 				}else if(!this.IsBracketEnabledAt(ccnt_pos)){
 					//the state has to allow brackets
 					chbac=0
-				}else if(chbac=='}'&&!lang.curly_bracket_is_not_special){
+				}else if(chbac==='}'&&!lang.curly_bracket_is_not_special){
 					//{ before indented line
 					var indent_cur_line=this.GetIndentLevel(ccnt_pos);
 					var lineno=this.GetLC(ccnt_pos)[0]
@@ -2540,12 +2540,12 @@ UI.RegisterEditorPlugin(function(){
 					if(indent_cur_line<indent_next_line){
 						chbac=0;
 					}
-				}else if(C==chbac&&chprev==C.charCodeAt(0)){
+				}else if(C===chbac&&chprev===C.charCodeAt(0)){
 					//typing two quotes in the middle of a string, do not AC
 					chbac=0;
 				}
 			}
-			if(chbac==C){
+			if(chbac===C){
 				//for self-matching things, we need to take space/non-space neighbors as a hint
 				//do not auto-match when the next char is a word-char
 				//also deny ' in tex when the *previous* char is a word-char
@@ -2553,10 +2553,10 @@ UI.RegisterEditorPlugin(function(){
 					chbac=0;
 				}
 			}
-			if(C=='$'&&lang.is_tex_like){
+			if(C==='$'&&lang.is_tex_like){
 				//no $$ if already in LaTeX math
 				var state_id=this.ed.GetStateAt(this.ed.m_handler_registration["colorer"],ccnt_pos,"ill")[0];
-				if(state_id==2){
+				if(state_id===2){
 					chbac=0;
 				}
 			}
@@ -2567,39 +2567,39 @@ UI.RegisterEditorPlugin(function(){
 				if(ctx.bac_stack.length){
 					//only the topmost level should check for the match
 					is_manual_match=0
-				}else if(chbac=='}'&&!lang.indent_as_parenthesis){
+				}else if(chbac==='}'&&!lang.indent_as_parenthesis){
 					is_manual_match=0;
 				}else{
 					var blevel=this.GetBracketLevel(ccnt_pos)
 					var ccnt_rbra=this.FindBracket(blevel-1,ccnt_pos,1)
-					is_manual_match=(ccnt_rbra>=0&&ed.GetUtf8CharNeighborhood(ccnt_rbra)[1]==chbac)
+					is_manual_match=(ccnt_rbra>=0&&ed.GetUtf8CharNeighborhood(ccnt_rbra)[1]===chbac)
 				}
 				//smarter auto (): clearly fcall-ish case
 				var ccnt_next_nonspace=ed.MoveToBoundary(ccnt_pos,1,"space")
 				var chnext_nonspace=String.fromCharCode(ed.GetUtf8CharNeighborhood(ccnt_next_nonspace)[1])
 				var is_fcall_like=0
 				//previous-char whitelist for ([{
-				if('+-*/|&^%<>.?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&chnext_nonspace!=C&&UI.IsWordChar(chprev)&&this.m_user_just_typed_char){
+				if('+-*/|&^%<>.?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&chnext_nonspace!==C&&UI.IsWordChar(chprev)&&this.m_user_just_typed_char){
 					//after-id-and-before-sym-case, and the id is just typed, most likely a func call or sth
 					is_fcall_like=1
 					//avoid ++ --
-					if(chnext_nonspace=='+'||chnext_nonspace=='-'){
-						if(ed.GetUtf8CharNeighborhood(ccnt_next_nonspace+1)[1]==chnext_nonspace){
+					if(chnext_nonspace==='+'||chnext_nonspace==='-'){
+						if(ed.GetUtf8CharNeighborhood(ccnt_next_nonspace+1)[1]===chnext_nonspace){
 							is_fcall_like=0
 						}
 					}
 					//avoid * & in C
-					if(lang.has_pointer_ops&&(chnext_nonspace=='*'||chnext_nonspace=='&')){
+					if(lang.has_pointer_ops&&(chnext_nonspace==='*'||chnext_nonspace==='&')){
 						is_fcall_like=0
 					}
 					//avoid . in BSGP/SPAP
-					if(lang.has_dlist_type&&chnext_nonspace=='.'){
+					if(lang.has_dlist_type&&chnext_nonspace==='.'){
 						is_fcall_like=0
 					}
 				}
 				if((is_lineend||
-				chbac==C&&!UI.IsWordChar(chnext)&&!UI.IsWordChar(chprev))&&'?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&!is_manual_match||
-				ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1==ctx.current_bracket_ac_ccnt_range[1].ccnt||
+				chbac===C&&!UI.IsWordChar(chnext)&&!UI.IsWordChar(chprev))&&'?:,;\r\n)]}'.indexOf(chnext_nonspace)>=0&&!is_manual_match||
+				ctx.current_bracket_ac_ccnt_range&&ccnt_pos+1===ctx.current_bracket_ac_ccnt_range[1].ccnt||
 				is_fcall_like){
 					if(ctx.current_bracket_ac){
 						ctx.bac_stack.push(ctx.current_bracket_ac_ccnt_range)
@@ -2613,15 +2613,15 @@ UI.RegisterEditorPlugin(function(){
 					ccnt_pos=sel[0]
 					if(lang.is_tex_like){
 						//\left completion
-						if(C=="{"){
-							if(ccnt_pos>=1&&ed.GetText(ccnt_pos-1,1)=="\\"){
+						if(C==="{"){
+							if(ccnt_pos>=1&&ed.GetText(ccnt_pos-1,1)==="\\"){
 								str=C+"\\"+chbac;
 							}
-							if(ccnt_pos>=6&&ed.GetText(ccnt_pos-6,6)=="\\left\\"){
+							if(ccnt_pos>=6&&ed.GetText(ccnt_pos-6,6)==="\\left\\"){
 								str=C+"\\right\\"+chbac
 							}
 						}else{
-							if(ccnt_pos>=5&&ed.GetText(ccnt_pos-5,5)=="\\left"){
+							if(ccnt_pos>=5&&ed.GetText(ccnt_pos-5,5)==="\\left"){
 								str=C+"\\right"+chbac
 							}
 						}
@@ -2647,9 +2647,9 @@ UI.RegisterEditorPlugin(function(){
 			}
 			return 1
 		}
-		if(C==ctx.current_bracket_ac){
+		if(C===ctx.current_bracket_ac){
 			var ccnt1=this.sel1.ccnt
-			if(ccnt1+Duktape.__byte_length(C)==ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt==ccnt1){
+			if(ccnt1+Duktape.__byte_length(C)===ctx.current_bracket_ac_ccnt_range[1].ccnt&&this.sel0.ccnt===ccnt1){
 				this.HookedEdit([ccnt1,Duktape.__byte_length(C),C])
 				this.SetCaretTo(ccnt1+Duktape.__byte_length(C))
 				this.UserTypedChar()
@@ -2675,14 +2675,14 @@ UI.RegisterEditorPlugin(function(){
 		var ed_caret=this.GetCaretXY();
 		var ccnt_lend=this.SeekXY(1e17,ed_caret.y);
 		var ccnt_reend=this.GetEnhancedEnd(ccnt_lend)
-		if(ccnt_reend<ccnt_lend&&this.sel1.ccnt!=ccnt_reend){
+		if(ccnt_reend<ccnt_lend&&this.sel1.ccnt!==ccnt_reend){
 			//auto-strip the trailing space
 			ccnt_lend=this.SeekLC(this.GetLC(ccnt_reend)[0],1e17)
-			if(ccnt_lend>ccnt_reend&&this.ed.GetUtf8CharNeighborhood(ccnt_lend)[0]==13){
+			if(ccnt_lend>ccnt_reend&&this.ed.GetUtf8CharNeighborhood(ccnt_lend)[0]===13){
 				ccnt_lend--;
 			}
 			if(ccnt_reend<ccnt_lend){
-				if(this.sel1.ccnt==ccnt_lend&&this.ed.GetUtf8CharNeighborhood(this.ed.MoveToBoundary(this.sel1.ccnt,-1,"space"))[0]==10){
+				if(this.sel1.ccnt===ccnt_lend&&this.ed.GetUtf8CharNeighborhood(this.ed.MoveToBoundary(this.sel1.ccnt,-1,"space"))[0]===10){
 					//all-space line, don't do anything
 					return 0;
 				}
@@ -2695,12 +2695,12 @@ UI.RegisterEditorPlugin(function(){
 		return 1
 	})
 	this.AddEventHandler('DELETE',function(){
-		if(this.sel0.ccnt==this.sel1.ccnt){
+		if(this.sel0.ccnt===this.sel1.ccnt){
 			//auto-delete spaces before enter
 			var ccnt=this.sel1.ccnt
 			var ccnt_original=ccnt;
 			var ccnt_after=this.ed.MoveToBoundary(ccnt,1,"space")
-			if(ccnt<ccnt_after&&this.ed.GetUtf8CharNeighborhood(ccnt_after)[1]==10&&ccnt_after<this.ed.GetTextSize()){
+			if(ccnt<ccnt_after&&this.ed.GetUtf8CharNeighborhood(ccnt_after)[1]===10&&ccnt_after<this.ed.GetTextSize()){
 				this.sel1.ccnt=ccnt_after+1
 				ccnt=ccnt_after+1;
 			}else{
@@ -2709,9 +2709,9 @@ UI.RegisterEditorPlugin(function(){
 			if(ccnt>this.ed.GetTextSize()){return 0;}
 			//auto-delete spaces after enter
 			var ed=this.ed;
-			if(this.plugin_class=="code_editor"&&this.m_is_main_editor){
-				if(ed.GetUtf8CharNeighborhood(ccnt)[0]==10){
-					if(ccnt_original>=this.GetEnhancedHome(ccnt_original)&&ed.GetUtf8CharNeighborhood(ccnt_original)[0]!=10){
+			if(this.plugin_class==="code_editor"&&this.m_is_main_editor){
+				if(ed.GetUtf8CharNeighborhood(ccnt)[0]===10){
+					if(ccnt_original>=this.GetEnhancedHome(ccnt_original)&&ed.GetUtf8CharNeighborhood(ccnt_original)[0]!==10){
 						this.sel1.ccnt=this.ed.MoveToBoundary(ccnt,1,"space")
 					}
 				}
@@ -2723,7 +2723,7 @@ UI.RegisterEditorPlugin(function(){
 
 //hiding
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"){return;}
+	if(this.plugin_class!=="code_editor"){return;}
 	this.AddEventHandler('menu',function(){
 		if(UI.HasFocus(this)&&!this.hyphenator){
 			var sel=this.GetSelection();
@@ -2733,7 +2733,7 @@ UI.RegisterEditorPlugin(function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-				if(sel[0]==sel[1]){
+				if(sel[0]===sel[1]){
 					//bracket: end, ctrl+p
 					//do bracket if possible
 					var ccnt=sel[0]
@@ -2752,7 +2752,7 @@ UI.RegisterEditorPlugin(function(){
 				var ed=this.ed;
 				var sel=this.GetSelection();
 				var renderer=this.ed.GetHandlerByID(this.ed.m_handler_registration["renderer"]);
-				if(sel[0]==sel[1]){
+				if(sel[0]===sel[1]){
 					var ccnt=sel[0]
 					var line=this.GetLC(ccnt)[0]
 					var ccnt_l0=this.SeekLC(line,0)
@@ -2844,7 +2844,7 @@ var ApplyAutoEdit=function(doc,cur_autoedit_ops,line_id){
 }
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	var InvalidateAutoEdit=function(){
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
@@ -2873,7 +2873,7 @@ UI.RegisterEditorPlugin(function(){
 			locs[i]=this.ed.CreateLocator(cclines[i],i&1?1:-1)
 		}
 		//render the stuff - gives some structural understanding
-		if(mode=="explicit"){
+		if(mode==="explicit"){
 			var hlobj=this.ed.CreateHighlight(
 				locs[0],
 				locs[locs.length-1],1)
@@ -2892,27 +2892,27 @@ UI.RegisterEditorPlugin(function(){
 		//still-in-range test
 		if(this.m_autoedit_locators){
 			var locs=this.m_autoedit_locators
-			if(this.m_autoedit_mode=="explicit"&&!renderer.m_tentative_editops){
+			if(this.m_autoedit_mode==="explicit"&&!renderer.m_tentative_editops){
 				//if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[locs.length-1].ccnt)
-				//if(ccnt_lh==locs[0].ccnt){
+				//if(ccnt_lh===locs[0].ccnt){
 				//	return;
 				//}
 				return;
 			}else if(this.m_autoedit_example_line_id>=0){
 				var line_id=this.m_autoedit_example_line_id;
-				//if(ccnt_lh==locs[line_id+0].ccnt)
+				//if(ccnt_lh===locs[line_id+0].ccnt)
 				if(ccnt_lh>=locs[line_id+0].ccnt&&ccnt_lh<locs[line_id+1].ccnt){
 					return;
 				}
 			}else{
 				//if(ccnt_lh>=locs[0].ccnt&&ccnt_lh<locs[1].ccnt)
-				if(ccnt_lh==locs[0].ccnt){
+				if(ccnt_lh===locs[0].ccnt){
 					return;
 				}
 			}
 		}
 		this.m_detect_autoedit_at=ccnt_lh
-		if(this.m_do_not_detect_autoedit_at!=undefined&&this.GetLC(this.sel1.ccnt)[0]!=this.m_do_not_detect_autoedit_at){
+		if(this.m_do_not_detect_autoedit_at!==undefined&&this.GetLC(this.sel1.ccnt)[0]!==this.m_do_not_detect_autoedit_at){
 			this.m_do_not_detect_autoedit_at=undefined
 		}
 		//could allow multi-exampling this
@@ -2921,7 +2921,7 @@ UI.RegisterEditorPlugin(function(){
 	this.AddEventHandler('beforeEdit',function(ops){
 		this.m_autoedit_example_line_id=-1
 		var ctx=this.m_autoedit_context
-		if(!ctx&&this.m_detect_autoedit_at!=undefined&&this.m_detect_autoedit_at>=0&&this.m_detect_autoedit_at<=this.ed.GetTextSize()){
+		if(!ctx&&this.m_detect_autoedit_at!==undefined&&this.m_detect_autoedit_at>=0&&this.m_detect_autoedit_at<=this.ed.GetTextSize()){
 			for(var i=0;i<ops.length;i+=3){
 				var s=ops[i+2];
 				if(s&&s.indexOf('\n')>=0){
@@ -2929,7 +2929,7 @@ UI.RegisterEditorPlugin(function(){
 					return;
 				}
 			}
-			if(this.m_do_not_detect_autoedit_at!=undefined&&this.GetLC(this.m_detect_autoedit_at)[0]==this.m_do_not_detect_autoedit_at){
+			if(this.m_do_not_detect_autoedit_at!==undefined&&this.GetLC(this.m_detect_autoedit_at)[0]===this.m_do_not_detect_autoedit_at){
 				return;
 			}
 			ctx=UI.ED_AutoEdit_Detect(this.ed,this.m_detect_autoedit_at)
@@ -2979,7 +2979,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		var ops=UI.ED_AutoEdit_Evaluate(ctx,locs);
 		//for(var i=0;i<locs.length;i+=2){
-		//	print("============",i/2)
+		//	print("==============",i/2)
 		//	print(ed.GetText(locs[i+0].ccnt,locs[i+1].ccnt-locs[i+0].ccnt))
 		//}
 		//print(ops)
@@ -3109,7 +3109,7 @@ UI.RegisterEditorPlugin(function(){
 		}
 		//this.vsel_display_hl.color=this.bgcolor_selection
 		this.vsel_sel0.ccnt=this.sel1.ccnt
-		if(this.sel0.ccnt!=this.sel1.ccnt){
+		if(this.sel0.ccnt!==this.sel1.ccnt){
 			this.sel0.ccnt=this.sel1.ccnt
 		}
 	}).bind(this)
@@ -3181,7 +3181,7 @@ UI.RegisterEditorPlugin(function(){
 }).prototype.desc={category:"Editing",name:"Automatic edit propagation",stable_name:"auto_edit"};
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('selectionChange',function(){
 		UI.g_cursor_history_test_same_reason=0
 	})
@@ -3193,6 +3193,7 @@ UI.RegisterEditorPlugin(function(){
 	var fnavigate=function(q0,q1){
 		if(!q0.length){return 1;}
 		var navitem=q0.pop()
+		if(navitem.file_name==='*remote'){return 1;}
 		var prev_ccnt0=this.sel0.ccnt
 		var prev_ccnt1=this.sel1.ccnt
 		q1.push({file_name:this.m_file_name,ccnt0:prev_ccnt0,ccnt1:prev_ccnt1,sreason:"navigation"})
@@ -3235,14 +3236,14 @@ UI.RegisterEditorPlugin(function(){
 
 var g_regexp_bash_escaping=new RegExp('[#;&"\'\\\\,`:!*?$(){}\\[\\]<|> \t]','g');
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	if(!UI.TestOption("auto_completion")){return;}
 	//this.AddEventHandler('autoComplete',function(){
 	this.AddEventHandler('explicitAutoComplete',function(){
 		var lang=this.plugin_language_desc
 		if(!lang){return;}
 		//shell script only
-		//||this.plugin_language_desc.parser=="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)
+		//||this.plugin_language_desc.parser==="C"&&!this.IsBracketEnabledAt(this.sel1.ccnt)
 		if(!lang.shell_script_type){return;}
 		var ccnt=this.sel1.ccnt;
 		//followed by non-word
@@ -3266,23 +3267,23 @@ UI.RegisterEditorPlugin(function(){
 		});
 		for(var i=0;i<s.length;i++){
 			var ch=s[i];
-			if(!instr&&(ch==' '||ch=='\t')){
+			if(!instr&&(ch===' '||ch==='\t')){
 				endWord(i);
 				continue;
 			}
 			if(pword<0){
 				pword=i;
 			}
-			if(ch=='\\'&&lang.shell_script_type!="windows"){
+			if(ch==='\\'&&lang.shell_script_type!=="windows"){
 				i++;
 				if(i<s.length){cur_str.push(s[i]);}
 				continue;
 			}
-			if(instr&&ch==instr){
+			if(instr&&ch===instr){
 				instr=undefined;
 				//assert(pword>=0)
 				endWord(i+1);
-			}else if(ch=="'"&&lang.shell_script_type!="windows"||ch=='"'){
+			}else if(ch==="'"&&lang.shell_script_type!=="windows"||ch==='"'){
 				instr=ch;
 				pword=i;
 			}else{
@@ -3312,8 +3313,8 @@ UI.RegisterEditorPlugin(function(){
 			if(s_path_prefix){
 				sname=sname.substr(s_path_prefix.length);
 			}
-			//lang.shell_script_type=="windows"
-			//if(UI.Platform.ARCH=="win32"||UI.Platform.ARCH=="win64"){
+			//lang.shell_script_type==="windows"
+			//if(UI.Platform.ARCH==="win32"||UI.Platform.ARCH==="win64"){
 			//	sname=sname.toLowerCase()
 			//}
 			if(fnext.is_dir){
@@ -3322,7 +3323,7 @@ UI.RegisterEditorPlugin(function(){
 			if(sname.indexOf(' ')>=0||sname.indexOf('\t')>=0){
 				need_quote=1;
 			}
-			if(lang.shell_script_type=="windows"){
+			if(lang.shell_script_type==="windows"){
 				sname=sname.replace(g_regexp_slash,"\\")
 			}
 			cands.push(sname);
@@ -3330,7 +3331,7 @@ UI.RegisterEditorPlugin(function(){
 		if(!cands.length){return;}
 		var ret={cands:cands,s_prefix:s_path};
 		var ccnt0=ccnt_lh+Duktape.__byte_length(s.slice(0,args[args.length-2]));
-		if(need_quote||this.sel1.ccnt-ccnt0!=Duktape.__byte_length(s_path)){
+		if(need_quote||this.sel1.ccnt-ccnt0!==Duktape.__byte_length(s_path)){
 			for(var i=0;i<cands.length;i++){
 				cands[i]='"'+cands[i]+'"';
 			}
@@ -3343,7 +3344,7 @@ UI.RegisterEditorPlugin(function(){
 })//.prototype.name="File name completion";
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('change',function(){
 		if(!this.m_diff_from_save||!this.owner||!(this.owner.h_obj_area>0)){return;}
 		this.m_diff_minimap=UI.ED_CreateDiffTrackerBitmap(this.ed,this.m_diff_from_save,this.owner.h_obj_area*UI.pixels_per_unit);
@@ -3363,7 +3364,7 @@ var fsmart_replace=function(s_regexp,fcallback){
 }
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
 		if(!UI.HasFocus(this)){return;}
 		var menu_convert=UI.BigMenu("Con&vert")
@@ -3421,7 +3422,7 @@ UI.RegisterEditorPlugin(function(){
 							}
 							sret.push("\\u"+ZeroPad(ch.toString(16),4))
 						}else{
-							if(ch==0x5C&&i<n-1&&s0[i+1]=='u'){
+							if(ch===0x5C&&i<n-1&&s0[i+1]==='u'){
 								//enter \u mode
 								ch=parseInt(s0.substr(i+2,4),16)
 								if(ch>=0xd800&&ch<=0xdc00){
@@ -3437,6 +3438,11 @@ UI.RegisterEditorPlugin(function(){
 								}
 								i=i+5
 								continue
+							}else if(ch===0x5C&&i<n-1&&s0[i+1]==='U'){
+								ch=parseInt(s0.substr(i+2,8),16);
+								sret.push(String.fromCharCode(ch))
+								i=i+9;
+								continue;
 							}
 							sret.push(String.fromCharCode(ch))
 						}
@@ -3475,7 +3481,7 @@ var CreateFileTag=function(){
 };
 
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 	this.AddEventHandler('menu',function(){
 		if(!UI.HasFocus(this)){return;}
 		var sel=this.GetSelection();
@@ -3505,7 +3511,7 @@ UI.RegisterEditorPlugin(function(){
 				if(sel[0]<=ccnt_i&&ccnt_i<ccnt_lineend_1st){
 					//it has to be unique
 					var s_key=this.ed.GetText(all_keydecls[i],all_keydecls[i+1]-all_keydecls[i]);
-					if((UI.ED_QueryKeyDeclByNeedle(this,s_key)||[]).length!=2){
+					if((UI.ED_QueryKeyDeclByNeedle(this,s_key)||[]).length!==2){
 						continue;
 					}
 					s_keydecl_tag=s_key;
@@ -3514,7 +3520,7 @@ UI.RegisterEditorPlugin(function(){
 					var ccnt_lend_tag0=this.GetEnhancedEnd(sel[0]);
 					var blevel_tag0=this.GetBracketLevel(this.SeekLC(line0,0));
 					var blevel_lend_tag0=this.GetBracketLevel(ccnt_lend_tag0);
-					if(blevel_lend_tag0==blevel_tag0){
+					if(blevel_lend_tag0===blevel_tag0){
 						//try the next line
 						var ccnt_lnext_tag0=this.GetEnhancedEnd(this.SeekLC(line0+1,0));
 						var blevel_lnext_tag0=this.GetBracketLevel(ccnt_lnext_tag0);
@@ -3526,20 +3532,20 @@ UI.RegisterEditorPlugin(function(){
 					if(blevel_lend_tag0>blevel_tag0){
 						var ccnt_tag1=this.FindOuterBracket(ccnt_lend_tag0,1);
 						ccnt_tag1=this.SeekLC(this.GetLC(ccnt_tag1)[0]+1,0);
-						if(ccnt_tag1==sel[1]){
+						if(ccnt_tag1===sel[1]){
 							is_keydecl_mode=3;
 						}
 					}
 					break;
 				}
 			}
-			if(is_keydecl_mode==1){
+			if(is_keydecl_mode===1){
 				//the range cannot be covered with one func(){}, try to find a second tag for this
 				for(var i=0;i<all_keydecls.length;i+=2){
 					var ccnt_i=all_keydecls[i];
 					if(ccnt_linestart_2nd<=ccnt_i&&ccnt_i<sel[1]){
 						var s_key=this.ed.GetText(all_keydecls[i],all_keydecls[i+1]-all_keydecls[i]);
-						if((UI.ED_QueryKeyDeclByNeedle(this,s_key)||[]).length!=2){
+						if((UI.ED_QueryKeyDeclByNeedle(this,s_key)||[]).length!==2){
 							continue;
 						}
 						s_keydecl_tag1=s_key;
@@ -3582,9 +3588,9 @@ UI.RegisterEditorPlugin(function(){
 					//immediate reparse
 					this.ForceReparse();
 				}
-				if(is_keydecl_mode==1){
+				if(is_keydecl_mode===1){
 					ret={tag0_name:s_keydecl_tag,tag1_name:stag+'_1'};
-				}else if(is_keydecl_mode==3){
+				}else if(is_keydecl_mode===3){
 					ret={tag0_name:s_keydecl_tag,tag1_name:s_keydecl_tag1};
 				}else{
 					ret={tag0_name:stag+'_0',tag1_name:stag+'_1'};
@@ -3602,10 +3608,10 @@ UI.RegisterEditorPlugin(function(){
 
 //markdown
 UI.RegisterEditorPlugin(function(){
-	if(this.plugin_class!="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
+	if(this.plugin_class!=="code_editor"||!this.m_is_main_editor||this.notebook_owner){return;}
 	this.AddEventHandler('global_menu',function(){
 		var desc=this.plugin_language_desc;
-		if(desc.name!='Markdown'){return;}
+		if(desc.name!=='Markdown'){return;}
 		var menu_run=UI.BigMenu("&Run")
 		if(this.m_is_help_page_preview){
 			menu_run.AddNormalItem({text:"View source (&R)...",key:"F5",enable_hotkey:1,action:function(){
@@ -3624,7 +3630,7 @@ UI.RegisterEditorPlugin(function(){
 if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 	require("res/lib/graphview2");
 	UI.RegisterEditorPlugin(function(){
-		if(this.plugin_class!="code_editor"||!this.m_is_main_editor){return;}
+		if(this.plugin_class!=="code_editor"||!this.m_is_main_editor){return;}
 		this.AddEventHandler('render',function(){
 			//this is a rendering hook
 			if(!this.m_graph||!this.owner){return;}
@@ -3654,7 +3660,7 @@ if(UI.ENABLE_EXPERIMENTAL_FEATURES){
 				var cands=[];
 				var BIG_WEIGHT=1048576;
 				for(var i=0;i<ret.objs.length;i++){
-					if(!ret.objs[i].id!='~'){
+					if(!ret.objs[i].id!=='~'){
 						cands.push({name:ret.objs[i].id,weight:BIG_WEIGHT,brief:ret.objs[i].brief});
 					}
 				}
