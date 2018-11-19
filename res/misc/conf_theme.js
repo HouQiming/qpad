@@ -491,7 +491,7 @@ UI.CustomTheme=function(){
 			line_number_bgcolor:L?0xffd0d0d0:0xff333333,
 			line_number_color:L?0xff7f7f7f:0xff6a8264,
 			line_number_color_focus:L?0xff000000:0xff8DAC85,
-			color_cur_line_highlight:L?0xaaffffff:0x55666666,
+			color_cur_line_highlight:GetThemeColor("current_line_highlight",L?0xaaffffff:0x55666666),
 			///////
 			bookmark_font:UI.Font(UI.font_name,12,200),
 			bookmark_color:L?[{x:0,y:0,color:0xffffffff},{x:1,y:1,color:C_sel}]:[{x:0,y:0,color:C_sel},{x:1,y:1,color:0xff3f3f3f}],

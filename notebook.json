@@ -135,6 +135,8 @@ v2
 }
 =====í¯¿í¿¿=====
 # TODO LIST
+switch to the ConPTY API for terminal emulation once available
+ctrl+f without search string: show F2 locations
 GPD:
 	implement the sticky key help
 SSH server move up / move down: don't close the menu

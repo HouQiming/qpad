@@ -58,15 +58,15 @@ var g_regexp_dos2unix=new RegExp("\r\n","g")
 var g_sticky_key_translations={
 	//////////////////
 	//movement
-	[UI.SDLK_w]:'UP',
-	[UI.SDLK_s]:'DOWN',
-	[UI.SDLK_a]:'LEFT',
-	[UI.SDLK_d]:'RIGHT',
+	[UI.SDLK_t]:'UP',
+	[UI.SDLK_g]:'DOWN',
+	[UI.SDLK_f]:'LEFT',
+	[UI.SDLK_h]:'RIGHT',
 	//////
-	[UI.SDLK_t]:'PGUP',
-	[UI.SDLK_g]:'PGDN',
-	[UI.SDLK_f]:'HOME',
-	[UI.SDLK_h]:'END',
+	[UI.SDLK_w]:'PGUP',
+	[UI.SDLK_s]:'PGDN',
+	[UI.SDLK_a]:'HOME',
+	[UI.SDLK_d]:'END',
 	//////
 	[UI.SDLK_i]:'ALT+UP',
 	[UI.SDLK_k]:'ALT+DOWN',
@@ -100,6 +100,8 @@ var g_sticky_key_translations={
 	[UI.SDLK_e]:'ALT+PGDN',
 	[UI.SDLK_o]:'CTRL+HOME',
 	[UI.SDLK_p]:'CTRL+END',
+	[UI.SDLK_r]:'CTRL+P',
+	[UI.SDLK_b]:'F12',
 };
 var SetHotkey=function(event,hotkey_name){
 	var names=hotkey_name.split("+");
@@ -601,7 +603,9 @@ W.Edit_prototype={
 				this.owner.DismissNotification('sticky_key')
 				UI.SDL_StartTextInput();
 			}
-			epilog();
+			this_outer.AutoScroll("show");
+			UI.Refresh();
+			return;
 		}else if(IsHotkey(event,"UP SHIFT+UP")){
 			var ed_caret=this.GetCaretXY();
 			var bk=this.x_updown;

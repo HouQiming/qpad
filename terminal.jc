@@ -4536,6 +4536,7 @@ g_colors=(function() {
 
 	return colors;
 })();
+//Writeln(['0x'+formatNumber(u32(d),{align:32,base:16}) for d in g_colors]);
 
 //g_vcolors=(function() {
 //  auto out=[], colors=g_colors, i=0, color;
