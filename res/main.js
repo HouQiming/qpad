@@ -14,7 +14,7 @@ var MAX_STALE_TIME=3600*24;
 
 UI.g_core_version="3.0.8";
 UI.g_version=UI.g_core_version+" ("+UI.Platform.ARCH+"_"+UI.Platform.BUILD+")";
-UI.g_commit=IO.UIReadAll("res/misc/commit.txt");
+UI.g_commit=IO.UIReadAll("res/misc/commit.txt")||'please run `git log --pretty=format:%%H -n 1 > res/misc/commit.txt` to generate res/misc/commit.txt';
 if(UI.Platform.BUILD=="debug"){
 	UI.g_update_mirrors=["http://192.168.111.51:3000"];
 }else{
